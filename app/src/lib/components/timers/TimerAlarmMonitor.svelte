@@ -7,7 +7,6 @@
      * setTimeout で正確なタイミングにアラームをスケジュールする。
      */
 
-    import { writable } from "svelte/store";
     import { createQuery, useQueryClient } from "@tanstack/svelte-query";
     import { trpc } from "$lib/trpc";
     import {
@@ -95,7 +94,7 @@
     // （トースト消去ではなくタイマーデータに基づく判定）
     $effect(() => {
         const timers =
-            ($timersQuery.data as TimersResult | undefined)?.timers ?? [];
+            (timersQuery.data as TimersResult | undefined)?.timers ?? [];
         const hasCompletedTimer = timers.some((t) => t.expired && !t.running);
         if (hasCompletedTimer) {
             if (originalFaviconImg) {
@@ -113,7 +112,7 @@
     // タイマーがリセットされたらトーストを自動消去
     $effect(() => {
         const timers =
-            ($timersQuery.data as TimersResult | undefined)?.timers ?? [];
+            (timersQuery.data as TimersResult | undefined)?.timers ?? [];
         if (alarms.length === 0) return;
         const filtered = alarms.filter((alarm) => {
             const timer = timers.find((t) => t.id === alarm.timerId);
@@ -135,21 +134,19 @@
     }
 
     // タイマー一覧取得（/timers ページとキャッシュ共有）
-    const timersQuery = createQuery<TimersResult>(
-        writable({
-            queryKey: ["timers"] as const,
-            queryFn: async (): Promise<TimersResult> => {
-                // RTT/2 補正付きオフセット計算
-                const t0 = Date.now();
-                const result = (await trpc.timers.list.query()) as TimersResult;
-                const t1 = Date.now();
-                const serverMs = new Date(result.server_time).getTime();
-                setServerOffset(serverMs - (t0 + t1) / 2);
-                return result;
-            },
-            refetchInterval: 60 * 1000,
-        }),
-    );
+    const timersQuery = createQuery<TimersResult>(() => ({
+        queryKey: ["timers"] as const,
+        queryFn: async (): Promise<TimersResult> => {
+            // RTT/2 補正付きオフセット計算
+            const t0 = Date.now();
+            const result = (await trpc.timers.list.query()) as TimersResult;
+            const t1 = Date.now();
+            const serverMs = new Date(result.server_time).getTime();
+            setServerOffset(serverMs - (t0 + t1) / 2);
+            return result;
+        },
+        refetchInterval: 60 * 1000,
+    }));
 
     /** サーバー時刻補正込みの残りミリ秒を計算する */
     function calcRemainingMs(timer: TimerInfo): number {
@@ -242,11 +239,11 @@
 
         // キャッシュが古すぎる場合はスケジュールしない
         // （refetchOnWindowFocus 完了後に dataUpdatedAt が更新され $effect が再発火する）
-        const dataAge = Date.now() - ($timersQuery.dataUpdatedAt ?? 0);
+        const dataAge = Date.now() - (timersQuery.dataUpdatedAt ?? 0);
         if (dataAge > 5 * 60 * 1000) return;
 
         const timers =
-            ($timersQuery.data as TimersResult | undefined)?.timers ?? [];
+            (timersQuery.data as TimersResult | undefined)?.timers ?? [];
         const runningTimers = timers.filter((t) => t.running);
 
         // running タイマーがなければ alarmedIds をリセット

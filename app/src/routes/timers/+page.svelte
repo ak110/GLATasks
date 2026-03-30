@@ -3,7 +3,6 @@
      * @fileoverview タイマーページ
      */
 
-    import { writable } from "svelte/store";
     import {
         createQuery,
         createMutation,
@@ -48,20 +47,18 @@
     });
 
     // タイマー一覧取得（SSE でリアルタイム同期）
-    const timersQuery = createQuery<TimersResult>(
-        writable({
-            queryKey: ["timers"] as const,
-            queryFn: async (): Promise<TimersResult> => {
-                // RTT/2 補正付きオフセット計算
-                const t0 = Date.now();
-                const result = (await trpc.timers.list.query()) as TimersResult;
-                const t1 = Date.now();
-                const serverMs = new Date(result.server_time).getTime();
-                setServerOffset(serverMs - (t0 + t1) / 2);
-                return result;
-            },
-        }),
-    );
+    const timersQuery = createQuery<TimersResult>(() => ({
+        queryKey: ["timers"] as const,
+        queryFn: async (): Promise<TimersResult> => {
+            // RTT/2 補正付きオフセット計算
+            const t0 = Date.now();
+            const result = (await trpc.timers.list.query()) as TimersResult;
+            const t1 = Date.now();
+            const serverMs = new Date(result.server_time).getTime();
+            setServerOffset(serverMs - (t0 + t1) / 2);
+            return result;
+        },
+    }));
 
     // SSE: サーバーからの通知でクエリを再取得
     onMount(() => {
@@ -80,7 +77,7 @@
     }
 
     // ミューテーション群
-    const createTimerMutation = createMutation({
+    const createTimerMutation = createMutation(() => ({
         mutationFn: (input: {
             name: string;
             mode: TimerMode;
@@ -91,9 +88,9 @@
         }) => trpc.timers.create.mutate(input),
         onSuccess: () =>
             queryClient.invalidateQueries({ queryKey: ["timers"] }),
-    });
+    }));
 
-    const updateTimerMutation = createMutation({
+    const updateTimerMutation = createMutation(() => ({
         mutationFn: (input: {
             timerId: number;
             name?: string;
@@ -105,15 +102,15 @@
         }) => trpc.timers.update.mutate(input),
         onSuccess: () =>
             queryClient.invalidateQueries({ queryKey: ["timers"] }),
-    });
+    }));
 
-    const deleteTimerMutation = createMutation({
+    const deleteTimerMutation = createMutation(() => ({
         mutationFn: (timerId: number) => trpc.timers.delete.mutate({ timerId }),
         onSuccess: () =>
             queryClient.invalidateQueries({ queryKey: ["timers"] }),
-    });
+    }));
 
-    const startTimerMutation = createMutation({
+    const startTimerMutation = createMutation(() => ({
         mutationFn: (input: { timerId: number; tz_offset_minutes?: number }) =>
             trpc.timers.start.mutate(input),
         onSuccess: () => {
@@ -128,29 +125,29 @@
                 Notification.requestPermission();
             }
         },
-    });
+    }));
 
-    const pauseTimerMutation = createMutation({
+    const pauseTimerMutation = createMutation(() => ({
         mutationFn: (timerId: number) => trpc.timers.pause.mutate({ timerId }),
         onSuccess: () =>
             queryClient.invalidateQueries({ queryKey: ["timers"] }),
-    });
+    }));
 
-    const resetTimerMutation = createMutation({
+    const resetTimerMutation = createMutation(() => ({
         mutationFn: (input: { timerId: number; tz_offset_minutes?: number }) =>
             trpc.timers.reset.mutate(input),
         onSuccess: () =>
             queryClient.invalidateQueries({ queryKey: ["timers"] }),
-    });
+    }));
 
-    const adjustTimerMutation = createMutation({
+    const adjustTimerMutation = createMutation(() => ({
         mutationFn: (input: { timerId: number; minutes: number }) =>
             trpc.timers.adjust.mutate(input),
         onSuccess: () =>
             queryClient.invalidateQueries({ queryKey: ["timers"] }),
-    });
+    }));
 
-    const setTimerTimeMutation = createMutation({
+    const setTimerTimeMutation = createMutation(() => ({
         mutationFn: (input: {
             timerId: number;
             seconds: number;
@@ -159,14 +156,14 @@
         }) => trpc.timers.setTime.mutate(input),
         onSuccess: () =>
             queryClient.invalidateQueries({ queryKey: ["timers"] }),
-    });
+    }));
 
-    const reorderTimersMutation = createMutation({
+    const reorderTimersMutation = createMutation(() => ({
         mutationFn: (input: { timerIds: number[] }) =>
             trpc.timers.reorder.mutate(input),
         onSettled: () =>
             queryClient.invalidateQueries({ queryKey: ["timers"] }),
-    });
+    }));
 
     // D&D 状態管理
     let draggedId = $state<number | null>(null);
@@ -220,14 +217,14 @@
                 return { ...old, timers: reordered };
             },
         );
-        $reorderTimersMutation.mutate({ timerIds });
+        reorderTimersMutation.mutate({ timerIds });
     }
 
     // 派生状態
     const timersList = $derived(
-        ($timersQuery.data as TimersResult | undefined)?.timers ?? [],
+        (timersQuery.data as TimersResult | undefined)?.timers ?? [],
     );
-    const isLoading = $derived($timersQuery.isLoading);
+    const isLoading = $derived(timersQuery.isLoading);
 
     // ダイアログ操作
     function openCreateDialog() {
@@ -266,7 +263,7 @@
     }) {
         try {
             if (dialog.mode === "create") {
-                await $createTimerMutation.mutateAsync({
+                await createTimerMutation.mutateAsync({
                     name: data.name,
                     mode: data.mode,
                     base_seconds: data.base_seconds,
@@ -275,7 +272,7 @@
                     adjust_minutes: data.adjust_minutes,
                 });
             } else {
-                await $updateTimerMutation.mutateAsync({
+                await updateTimerMutation.mutateAsync({
                     timerId: dialog.timerId,
                     name: data.name,
                     mode: data.mode,
@@ -294,7 +291,7 @@
     async function handleDelete(timerId: number) {
         if (!globalThis.confirm("このタイマーを削除しますか？")) return;
         try {
-            await $deleteTimerMutation.mutateAsync(timerId);
+            await deleteTimerMutation.mutateAsync(timerId);
         } catch {
             // グローバルエラーハンドラがトースト表示を担当
         }
@@ -329,20 +326,20 @@
                 <TimerCard
                     {timer}
                     onStart={(id) =>
-                        $startTimerMutation.mutate({
+                        startTimerMutation.mutate({
                             timerId: id,
                             tz_offset_minutes: getTzOffset(id),
                         })}
-                    onPause={(id) => $pauseTimerMutation.mutate(id)}
+                    onPause={(id) => pauseTimerMutation.mutate(id)}
                     onReset={(id) =>
-                        $resetTimerMutation.mutate({
+                        resetTimerMutation.mutate({
                             timerId: id,
                             tz_offset_minutes: getTzOffset(id),
                         })}
                     onAdjust={(id, minutes) =>
-                        $adjustTimerMutation.mutate({ timerId: id, minutes })}
+                        adjustTimerMutation.mutate({ timerId: id, minutes })}
                     onSetTime={(id, seconds, targetMinutes, tzOffsetMinutes) =>
-                        $setTimerTimeMutation.mutate({
+                        setTimerTimeMutation.mutate({
                             timerId: id,
                             seconds,
                             target_minutes: targetMinutes,

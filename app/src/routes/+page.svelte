@@ -3,7 +3,6 @@
      * @fileoverview タスクメモ管理メインページ（リスト一覧 + タスク一覧）
      */
 
-    import { writable, derived } from "svelte/store";
     import {
         createQuery,
         createMutation,
@@ -73,55 +72,39 @@
         return () => clearTimeout(timer);
     });
 
-    // rune → Svelte store 同期
-    // @tanstack/svelte-query v5 が Readable<T> のみ対応で rune を直接受け取れないため、
-    // $effect で rune の値を writable store に同期する（Lessons Learned 参照）
-    const showTypeStore = writable<"active" | "archived" | "all">("active");
-    const selectedListIdStore = writable<number | null>(null);
-    const debouncedQueryStore = writable("");
-    $effect(() => showTypeStore.set(showType));
-    $effect(() => selectedListIdStore.set(selectedListId));
-    $effect(() => debouncedQueryStore.set(debouncedQuery));
-
     // リスト一覧取得
-    const listsQuery = createQuery<ListInfo[]>(
-        derived(showTypeStore, ($st) => ({
-            queryKey: ["lists", $st] as const,
-            queryFn: () => trpc.lists.list.query($st) as Promise<ListInfo[]>,
-        })),
-    );
+    const listsQuery = createQuery<ListInfo[]>(() => ({
+        queryKey: ["lists", showType] as const,
+        queryFn: () => trpc.lists.list.query(showType) as Promise<ListInfo[]>,
+    }));
 
     // タスク一覧取得（SSE でリアルタイム同期）
-    const tasksQuery = createQuery<GetTasksResult>(
-        derived([selectedListIdStore, showTypeStore], ([$listId, $st]) => ({
-            queryKey: ["tasks", $listId, $st] as const,
-            queryFn: async (): Promise<GetTasksResult> => {
-                if (!$listId)
-                    return {
-                        status: 200 as const,
-                        data: [] as TaskInfo[],
-                        lastModified: "",
-                    };
-                return trpc.tasks.list.query({
-                    listId: $listId,
-                    showType: $st,
-                }) as Promise<GetTasksResult>;
-            },
-            enabled: $listId !== null,
-        })),
-    );
+    const tasksQuery = createQuery<GetTasksResult>(() => ({
+        queryKey: ["tasks", selectedListId, showType] as const,
+        queryFn: async (): Promise<GetTasksResult> => {
+            if (!selectedListId)
+                return {
+                    status: 200 as const,
+                    data: [] as TaskInfo[],
+                    lastModified: "",
+                };
+            return trpc.tasks.list.query({
+                listId: selectedListId,
+                showType,
+            }) as Promise<GetTasksResult>;
+        },
+        enabled: selectedListId !== null,
+    }));
 
     // 全文検索クエリ
-    const searchResultsQuery = createQuery<SearchTaskResult[]>(
-        derived(debouncedQueryStore, ($q) => ({
-            queryKey: ["search", $q] as const,
-            queryFn: () =>
-                trpc.tasks.search.query({
-                    query: $q,
-                }) as Promise<SearchTaskResult[]>,
-            enabled: $q.length > 0,
-        })),
-    );
+    const searchResultsQuery = createQuery<SearchTaskResult[]>(() => ({
+        queryKey: ["search", debouncedQuery] as const,
+        queryFn: () =>
+            trpc.tasks.search.query({
+                query: debouncedQuery,
+            }) as Promise<SearchTaskResult[]>,
+        enabled: debouncedQuery.length > 0,
+    }));
 
     // SSE: サーバーからの通知でクエリを再取得
     onMount(() => {
@@ -176,16 +159,16 @@
     });
 
     // リスト作成
-    const createListMutation = createMutation({
+    const createListMutation = createMutation(() => ({
         mutationFn: (title: string) => trpc.lists.create.mutate({ title }),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["lists"] });
             addListTitle = "";
         },
-    });
+    }));
 
     // タスク作成
-    const createTaskMutation = createMutation({
+    const createTaskMutation = createMutation(() => ({
         mutationFn: ({ listId, text }: { listId: number; text: string }) =>
             trpc.tasks.create.mutate({ listId, text }),
         onSuccess: (_data, variables) => {
@@ -194,10 +177,10 @@
             });
             addTaskText = "";
         },
-    });
+    }));
 
     // タスク更新
-    const updateTaskMutation = createMutation({
+    const updateTaskMutation = createMutation(() => ({
         mutationFn: (input: {
             listId: number;
             taskId: number;
@@ -210,70 +193,70 @@
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["tasks"] });
         },
-    });
+    }));
 
     // リスト削除
-    const deleteListMutation = createMutation({
+    const deleteListMutation = createMutation(() => ({
         mutationFn: (listId: number) => trpc.lists.delete.mutate({ listId }),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["lists"] });
         },
-    });
+    }));
 
     // リスト名変更
-    const renameListMutation = createMutation({
+    const renameListMutation = createMutation(() => ({
         mutationFn: ({ listId, title }: { listId: number; title: string }) =>
             trpc.lists.rename.mutate({ listId, title }),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["lists"] });
         },
-    });
+    }));
 
     // リストをアーカイブ
-    const archiveListMutation = createMutation({
+    const archiveListMutation = createMutation(() => ({
         mutationFn: (listId: number) => trpc.lists.archive.mutate({ listId }),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["lists"] });
         },
-    });
+    }));
 
     // リストをアーカイブ解除
-    const unarchiveListMutation = createMutation({
+    const unarchiveListMutation = createMutation(() => ({
         mutationFn: (listId: number) => trpc.lists.unarchive.mutate({ listId }),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["lists"] });
         },
-    });
+    }));
 
     // 完了済みタスククリア
-    const clearListMutation = createMutation({
+    const clearListMutation = createMutation(() => ({
         mutationFn: (listId: number) => trpc.lists.clear.mutate({ listId }),
         onSuccess: (_data, listId) => {
             queryClient.invalidateQueries({
                 queryKey: ["tasks", listId],
             });
         },
-    });
+    }));
 
     // タスク並び替え
-    const reorderTasksMutation = createMutation({
+    const reorderTasksMutation = createMutation(() => ({
         mutationFn: (input: { listId: number; taskIds: number[] }) =>
             trpc.tasks.reorder.mutate(input),
         onSettled: () => {
             queryClient.invalidateQueries({ queryKey: ["tasks"] });
         },
-    });
+    }));
 
     // 派生状態
-    const lists = $derived(($listsQuery.data ?? []) as ListInfo[]);
+    const lists = $derived((listsQuery.data ?? []) as ListInfo[]);
     const tasks = $derived.by(() => {
-        const data = $tasksQuery.data as GetTasksResult | undefined;
+        const data = tasksQuery.data as GetTasksResult | undefined;
         return data && "data" in data ? data.data : [];
     });
-    const isLoading = $derived($listsQuery.isLoading || $tasksQuery.isLoading);
+    const isLoading = $derived(listsQuery.isLoading || tasksQuery.isLoading);
     const isSearching = $derived(debouncedQuery.length > 0);
     const searchResults = $derived(
-        ($searchResultsQuery.data ?? []) as SearchTaskResult[],
+        (searchResultsQuery.data ?? []) as SearchTaskResult[],
     );
     // 検索結果をリスト名でグループ化
     const searchResultsByList = $derived.by(() => {
@@ -417,7 +400,7 @@
         const title = addListTitle.trim();
         if (!title) return;
         try {
-            await $createListMutation.mutateAsync(title);
+            await createListMutation.mutateAsync(title);
             const newLists = lists;
             const newList = newLists[newLists.length - 1];
             if (newList) selectList(newList.id);
@@ -431,7 +414,7 @@
         const text = addTaskText.trimEnd();
         if (!text) return;
         try {
-            await $createTaskMutation.mutateAsync({
+            await createTaskMutation.mutateAsync({
                 listId: selectedListId,
                 text,
             });
@@ -446,7 +429,7 @@
             ? { status: "completed" as const }
             : { status: "active" as const, completed: null };
         try {
-            await $updateTaskMutation.mutateAsync({
+            await updateTaskMutation.mutateAsync({
                 listId: selectedListId,
                 taskId,
                 ...taskData,
@@ -486,7 +469,7 @@
                 : {};
 
         try {
-            await $updateTaskMutation.mutateAsync({
+            await updateTaskMutation.mutateAsync({
                 listId,
                 taskId,
                 text: data.text,
@@ -511,7 +494,7 @@
         );
         if (!newTitle || newTitle === currentTitle) return;
         try {
-            await $renameListMutation.mutateAsync({ listId, title: newTitle });
+            await renameListMutation.mutateAsync({ listId, title: newTitle });
         } catch {
             // グローバルエラーハンドラがトースト表示を担当
         }
@@ -521,7 +504,7 @@
         if (!globalThis.confirm("このリストと全てのタスクを削除しますか?"))
             return;
         try {
-            await $deleteListMutation.mutateAsync(listId);
+            await deleteListMutation.mutateAsync(listId);
             if (selectedListId === listId) {
                 const first = lists[0];
                 if (first) selectList(first.id);
@@ -535,7 +518,7 @@
     async function archiveList(listId: number) {
         if (!globalThis.confirm("このリストをアーカイブしますか？")) return;
         try {
-            await $archiveListMutation.mutateAsync(listId);
+            await archiveListMutation.mutateAsync(listId);
             if (selectedListId === listId) {
                 const first = lists[0];
                 if (first) selectList(first.id);
@@ -548,7 +531,7 @@
 
     async function unarchiveList(listId: number) {
         try {
-            await $unarchiveListMutation.mutateAsync(listId);
+            await unarchiveListMutation.mutateAsync(listId);
         } catch {
             // グローバルエラーハンドラがトースト表示を担当
         }
@@ -556,7 +539,7 @@
 
     async function clearList(listId: number) {
         try {
-            await $clearListMutation.mutateAsync(listId);
+            await clearListMutation.mutateAsync(listId);
         } catch {
             // グローバルエラーハンドラがトースト表示を担当
         }
@@ -577,7 +560,7 @@
                 return { ...old, data: reordered };
             },
         );
-        $reorderTasksMutation.mutate({ listId: selectedListId, taskIds });
+        reorderTasksMutation.mutate({ listId: selectedListId, taskIds });
     }
 
     /** サイドバーのリストへのタスクD&D移動（楽観的更新 + 失敗時ロールバック） */
@@ -598,7 +581,7 @@
         );
 
         try {
-            await $updateTaskMutation.mutateAsync({
+            await updateTaskMutation.mutateAsync({
                 listId: selectedListId,
                 taskId,
                 move_to: targetListId,
@@ -709,7 +692,7 @@
                     検索結果: "{debouncedQuery}"
                 </h2>
             </div>
-            {#if $searchResultsQuery.isLoading}
+            {#if searchResultsQuery.isLoading}
                 <p class="p-4 text-gray-400 dark:text-gray-500">検索中...</p>
             {:else if searchResults.length === 0}
                 <p class="p-4 text-gray-400 dark:text-gray-500">
@@ -814,7 +797,7 @@
 
             <TaskList
                 {tasks}
-                isLoading={$tasksQuery.isLoading}
+                isLoading={tasksQuery.isLoading}
                 onToggle={toggleTask}
                 onEdit={openEditDialog}
                 onReorder={handleReorderTasks}

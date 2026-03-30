@@ -39,13 +39,15 @@ describe("playBeep", () => {
     };
     const closeFn = vi.fn().mockResolvedValue(undefined);
 
-    const MockAudioContext = vi.fn().mockImplementation(() => ({
-      currentTime: 0,
-      destination: {},
-      createOscillator: () => mockOsc,
-      createGain: () => mockGain,
-      close: closeFn,
-    }));
+    const MockAudioContext = vi.fn().mockImplementation(function () {
+      return {
+        currentTime: 0,
+        destination: {},
+        createOscillator: () => mockOsc,
+        createGain: () => mockGain,
+        close: closeFn,
+      };
+    });
 
     vi.stubGlobal("AudioContext", MockAudioContext);
 
