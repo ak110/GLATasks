@@ -179,6 +179,7 @@
                 role="button"
                 tabindex="-1"
                 aria-label="ドラッグして並び替え"
+                title="ドラッグして並び替え"
                 ondragstart={(e) => {
                     e.dataTransfer!.effectAllowed = "move";
                     onDragStart(timer.id);

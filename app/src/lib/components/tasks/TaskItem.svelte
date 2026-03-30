@@ -124,19 +124,22 @@
             onclick={() => onEdit(task)}
             class="cursor-pointer rounded p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-600 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-300"
             data-testid="task-edit-btn"
-            aria-label="タスクを編集">✏️</button
+            aria-label="タスクを編集"
+            title="編集">✏️</button
         >
         <button
             onclick={copyTask}
             class="cursor-pointer rounded p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-600 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-300"
             data-testid="task-copy-btn"
-            aria-label="タスクをコピー">📋</button
+            aria-label="タスクをコピー"
+            title="コピー">📋</button
         >
         {#if notesClamped || notesExpanded}
             <button
                 onclick={() => (notesExpanded = !notesExpanded)}
                 class="cursor-pointer rounded p-1 text-xs text-gray-400 hover:bg-gray-100 hover:text-gray-500 dark:text-gray-500 dark:hover:bg-gray-700 dark:hover:text-gray-400"
                 aria-label={notesExpanded ? "notesを折りたたむ" : "notesを展開"}
+                title={notesExpanded ? "折りたたむ" : "展開"}
                 >{notesExpanded ? "▲" : "▼"}</button
             >
         {/if}
@@ -151,6 +154,7 @@
                     role="button"
                     tabindex="-1"
                     aria-label="ドラッグして並び替え"
+                    title="ドラッグして並び替え"
                     ondragstart={(e) => {
                         e.dataTransfer!.effectAllowed = "move";
                         e.dataTransfer!.setData(

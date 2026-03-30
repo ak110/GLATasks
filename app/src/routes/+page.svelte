@@ -759,6 +759,9 @@
                                     aria-label={expandedSearchNotes.has(task.id)
                                         ? "notesを折りたたむ"
                                         : "notesを展開"}
+                                    title={expandedSearchNotes.has(task.id)
+                                        ? "折りたたむ"
+                                        : "展開"}
                                 >
                                     {expandedSearchNotes.has(task.id)
                                         ? "▲"

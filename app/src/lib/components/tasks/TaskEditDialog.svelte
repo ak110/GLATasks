@@ -79,6 +79,7 @@
                     onclick={onClose}
                     class="cursor-pointer rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300"
                     aria-label="閉じる"
+                    title="閉じる"
                 >
                     ✕
                 </button>

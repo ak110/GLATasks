@@ -21,6 +21,7 @@
             onclick={onBack}
             class="cursor-pointer rounded p-1 text-gray-500 hover:bg-gray-200 hover:text-gray-700 sm:hidden dark:text-gray-400 dark:hover:bg-gray-600 dark:hover:text-gray-200"
             aria-label="リスト一覧に戻る"
+            title="戻る"
         >
             <svg
                 class="h-5 w-5"
