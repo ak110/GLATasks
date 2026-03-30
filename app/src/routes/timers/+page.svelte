@@ -264,32 +264,40 @@
         tz_offset_minutes: number | null;
         adjust_minutes: number;
     }) {
-        if (dialog.mode === "create") {
-            await $createTimerMutation.mutateAsync({
-                name: data.name,
-                mode: data.mode,
-                base_seconds: data.base_seconds,
-                target_minutes: data.target_minutes ?? undefined,
-                tz_offset_minutes: data.tz_offset_minutes ?? undefined,
-                adjust_minutes: data.adjust_minutes,
-            });
-        } else {
-            await $updateTimerMutation.mutateAsync({
-                timerId: dialog.timerId,
-                name: data.name,
-                mode: data.mode,
-                base_seconds: data.base_seconds,
-                target_minutes: data.target_minutes ?? undefined,
-                tz_offset_minutes: data.tz_offset_minutes ?? undefined,
-                adjust_minutes: data.adjust_minutes,
-            });
+        try {
+            if (dialog.mode === "create") {
+                await $createTimerMutation.mutateAsync({
+                    name: data.name,
+                    mode: data.mode,
+                    base_seconds: data.base_seconds,
+                    target_minutes: data.target_minutes ?? undefined,
+                    tz_offset_minutes: data.tz_offset_minutes ?? undefined,
+                    adjust_minutes: data.adjust_minutes,
+                });
+            } else {
+                await $updateTimerMutation.mutateAsync({
+                    timerId: dialog.timerId,
+                    name: data.name,
+                    mode: data.mode,
+                    base_seconds: data.base_seconds,
+                    target_minutes: data.target_minutes ?? undefined,
+                    tz_offset_minutes: data.tz_offset_minutes ?? undefined,
+                    adjust_minutes: data.adjust_minutes,
+                });
+            }
+            dialog.open = false;
+        } catch {
+            // グローバルエラーハンドラがトースト表示を担当
         }
-        dialog.open = false;
     }
 
     async function handleDelete(timerId: number) {
         if (!globalThis.confirm("このタイマーを削除しますか？")) return;
-        await $deleteTimerMutation.mutateAsync(timerId);
+        try {
+            await $deleteTimerMutation.mutateAsync(timerId);
+        } catch {
+            // グローバルエラーハンドラがトースト表示を担当
+        }
     }
 </script>
 

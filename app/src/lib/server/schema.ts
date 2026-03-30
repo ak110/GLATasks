@@ -6,7 +6,7 @@ import {
   mysqlTable,
   int,
   varchar,
-  text,
+  mediumtext,
   timestamp,
   tinyint,
 } from "drizzle-orm/mysql-core";
@@ -36,7 +36,7 @@ export const tasks = mysqlTable("task", {
   id: int("id").primaryKey().autoincrement(),
   list_id: int("list_id").notNull(),
   status: varchar("status", { length: 255 }).notNull().default("active"),
-  text: text("text").notNull(),
+  text: mediumtext("text").notNull(),
   sort_order: int("sort_order").notNull().default(0),
   created: timestamp("created").notNull(),
   updated: timestamp("updated").notNull(),

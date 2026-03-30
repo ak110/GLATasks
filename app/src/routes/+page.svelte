@@ -427,17 +427,28 @@
     async function addList() {
         const title = addListTitle.trim();
         if (!title) return;
-        await $createListMutation.mutateAsync(title);
-        const newLists = lists;
-        const newList = newLists[newLists.length - 1];
-        if (newList) selectList(newList.id);
+        try {
+            await $createListMutation.mutateAsync(title);
+            const newLists = lists;
+            const newList = newLists[newLists.length - 1];
+            if (newList) selectList(newList.id);
+        } catch {
+            // グローバルエラーハンドラがトースト表示を担当
+        }
     }
 
     async function addTask() {
         if (!selectedListId) return;
         const text = addTaskText.trimEnd();
         if (!text) return;
-        await $createTaskMutation.mutateAsync({ listId: selectedListId, text });
+        try {
+            await $createTaskMutation.mutateAsync({
+                listId: selectedListId,
+                text,
+            });
+        } catch {
+            // グローバルエラーハンドラがトースト表示を担当
+        }
     }
 
     async function toggleTask(taskId: number, checked: boolean) {
@@ -445,11 +456,15 @@
         const taskData = checked
             ? { status: "completed" as const }
             : { status: "active" as const, completed: null };
-        await $updateTaskMutation.mutateAsync({
-            listId: selectedListId,
-            taskId,
-            ...taskData,
-        });
+        try {
+            await $updateTaskMutation.mutateAsync({
+                listId: selectedListId,
+                taskId,
+                ...taskData,
+            });
+        } catch {
+            // グローバルエラーハンドラがトースト表示を担当
+        }
     }
 
     function openEditDialog(task: TaskInfo) {
@@ -481,18 +496,22 @@
                     : { status: "active" as const, completed: null }
                 : {};
 
-        await $updateTaskMutation.mutateAsync({
-            listId,
-            taskId,
-            text: data.text,
-            move_to: Number(data.moveTo),
-            keep_order: data.keepOrder,
-            ...statusChange,
-        });
-        editDialog.open = false;
+        try {
+            await $updateTaskMutation.mutateAsync({
+                listId,
+                taskId,
+                text: data.text,
+                move_to: Number(data.moveTo),
+                keep_order: data.keepOrder,
+                ...statusChange,
+            });
+            editDialog.open = false;
 
-        if (Number(data.moveTo) !== listId) {
-            queryClient.invalidateQueries({ queryKey: ["lists"] });
+            if (Number(data.moveTo) !== listId) {
+                queryClient.invalidateQueries({ queryKey: ["lists"] });
+            }
+        } catch {
+            // グローバルエラーハンドラがトースト表示を担当
         }
     }
 
@@ -502,36 +521,56 @@
             currentTitle,
         );
         if (!newTitle || newTitle === currentTitle) return;
-        await $renameListMutation.mutateAsync({ listId, title: newTitle });
+        try {
+            await $renameListMutation.mutateAsync({ listId, title: newTitle });
+        } catch {
+            // グローバルエラーハンドラがトースト表示を担当
+        }
     }
 
     async function deleteList(listId: number) {
         if (!globalThis.confirm("このリストと全てのタスクを削除しますか?"))
             return;
-        await $deleteListMutation.mutateAsync(listId);
-        if (selectedListId === listId) {
-            const first = lists[0];
-            if (first) selectList(first.id);
-            else selectedListId = null;
+        try {
+            await $deleteListMutation.mutateAsync(listId);
+            if (selectedListId === listId) {
+                const first = lists[0];
+                if (first) selectList(first.id);
+                else selectedListId = null;
+            }
+        } catch {
+            // グローバルエラーハンドラがトースト表示を担当
         }
     }
 
     async function archiveList(listId: number) {
         if (!globalThis.confirm("このリストをアーカイブしますか？")) return;
-        await $archiveListMutation.mutateAsync(listId);
-        if (selectedListId === listId) {
-            const first = lists[0];
-            if (first) selectList(first.id);
-            else selectedListId = null;
+        try {
+            await $archiveListMutation.mutateAsync(listId);
+            if (selectedListId === listId) {
+                const first = lists[0];
+                if (first) selectList(first.id);
+                else selectedListId = null;
+            }
+        } catch {
+            // グローバルエラーハンドラがトースト表示を担当
         }
     }
 
     async function unarchiveList(listId: number) {
-        await $unarchiveListMutation.mutateAsync(listId);
+        try {
+            await $unarchiveListMutation.mutateAsync(listId);
+        } catch {
+            // グローバルエラーハンドラがトースト表示を担当
+        }
     }
 
     async function clearList(listId: number) {
-        await $clearListMutation.mutateAsync(listId);
+        try {
+            await $clearListMutation.mutateAsync(listId);
+        } catch {
+            // グローバルエラーハンドラがトースト表示を担当
+        }
     }
 
     /** タスクの並び替え（楽観的更新 + API呼出） */

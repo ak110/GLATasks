@@ -15,6 +15,7 @@
     } from "$lib/theme";
     import { connect, disconnect } from "$lib/sse-client";
     import TimerAlarmMonitor from "$lib/components/timers/TimerAlarmMonitor.svelte";
+    import Toast from "$lib/components/ui/Toast.svelte";
     import type { LayoutData } from "./$types";
 
     const { children, data }: { children: Snippet; data: LayoutData } =
@@ -82,6 +83,7 @@
 </script>
 
 <QueryClientProvider client={queryClient}>
+    <Toast />
     {#if data.logged_in}
         <TimerAlarmMonitor />
     {/if}

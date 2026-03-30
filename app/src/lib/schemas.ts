@@ -20,14 +20,14 @@ export const SearchTasksSchema = z.object({
 
 export const CreateTaskSchema = z.object({
   listId: z.number().int().positive(),
-  text: z.string().min(1, "タスク内容は必須です").max(10000),
+  text: z.string().min(1, "タスク内容は必須です").max(100000),
 });
 
 export const UpdateTaskSchema = z
   .object({
     listId: z.number().int().positive(),
     taskId: z.number().int().positive(),
-    text: z.string().max(10000).optional(),
+    text: z.string().max(100000).optional(),
     status: TaskStatusSchema.optional(),
     completed: z.string().datetime().nullable().optional(),
     move_to: z.number().int().positive().optional(),

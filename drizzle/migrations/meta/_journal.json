@@ -43,6 +43,13 @@
       "when": 1774000000000,
       "tag": "0005_add_timer_mode",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1774800000000,
+      "tag": "0006_task_text_mediumtext",
+      "breakpoints": true
     }
   ]
 }
