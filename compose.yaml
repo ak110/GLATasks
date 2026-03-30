@@ -116,7 +116,7 @@ services:
   playwright:
     profiles:
       - development
-    image: mcr.microsoft.com/playwright:v1.50.0-noble
+    image: mcr.microsoft.com/playwright:v1.58.2-noble
     user: ${UID}:${GID}
     environment:
       - HOME=${PWD}/.cache/playwright

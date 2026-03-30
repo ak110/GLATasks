@@ -34,7 +34,7 @@ make test  # OK
 `make help` で一覧を確認できる。よく使うコマンド:
 
 - `make format` — コード編集後に実行。整形 + 自動修正付き lint
-- `make test` — コミット前に実行。format + 型チェック + ユニットテスト + e2e の全検証
+- `make test` — コミット前に実行。format + 型チェック + ユニットテスト + バックアップテスト + e2e の全検証
 - `make deploy` — ビルド → 停止 → 起動
 
 ## Docker 構成
