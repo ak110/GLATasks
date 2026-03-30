@@ -33,6 +33,21 @@
     }: Props = $props();
 
     let copyMessage = $state("");
+    let notesExpanded = $state(false);
+    let notesClamped = $state(false);
+    let notesEl: HTMLParagraphElement | undefined = $state();
+
+    // notesが実際にクランプされているか検知
+    $effect(() => {
+        if (!notesEl) return;
+        const check = () => {
+            notesClamped = notesEl!.scrollHeight > notesEl!.clientHeight;
+        };
+        check();
+        const observer = new ResizeObserver(check);
+        observer.observe(notesEl);
+        return () => observer.disconnect();
+    });
 
     async function copyTask() {
         const full = task.notes ? `${task.title}\n${task.notes}` : task.title;
@@ -88,9 +103,11 @@
         {/if}
         {#if task.notes}
             <p
+                bind:this={notesEl}
                 class="mt-0.5 whitespace-pre-wrap {task.status === 'completed'
                     ? 'text-gray-400 dark:text-gray-500'
                     : 'text-gray-500 dark:text-gray-400'}"
+                class:line-clamp-5={!notesExpanded}
             >
                 <!-- eslint-disable-next-line svelte/no-at-html-tags -- linkify()が自前でHTMLエスケープ済み -->
                 {@html linkify(task.notes)}
@@ -115,6 +132,14 @@
             data-testid="task-copy-btn"
             aria-label="タスクをコピー">📋</button
         >
+        {#if notesClamped || notesExpanded}
+            <button
+                onclick={() => (notesExpanded = !notesExpanded)}
+                class="cursor-pointer rounded p-1 text-xs text-gray-400 hover:bg-gray-100 hover:text-gray-500 dark:text-gray-500 dark:hover:bg-gray-700 dark:hover:text-gray-400"
+                aria-label={notesExpanded ? "notesを折りたたむ" : "notesを展開"}
+                >{notesExpanded ? "▲" : "▼"}</button
+            >
+        {/if}
     </div>
     <!-- ドラッグハンドル + リモート更新マーク -->
     {#if onDragStart || isRemoteUpdated}

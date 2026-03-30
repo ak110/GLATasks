@@ -38,6 +38,7 @@
     let hasHash = $state(false);
     let searchQuery = $state("");
     let debouncedQuery = $state("");
+    let expandedSearchNotes = $state<Set<number>>(new Set());
     const mobileView = $derived(
         hasHash ? ("tasks" as const) : ("lists" as const),
     );
@@ -297,6 +298,34 @@
         }
         return map;
     });
+
+    // 検索結果のnotes折りたたみ
+    let clampedSearchNotes = $state<Set<number>>(new Set());
+
+    function toggleSearchNoteExpand(taskId: number) {
+        const next = new Set(expandedSearchNotes);
+        if (next.has(taskId)) next.delete(taskId);
+        else next.add(taskId);
+        expandedSearchNotes = next;
+    }
+
+    // line-clamp でクランプされているか検知するSvelteアクション
+    function clampDetector(node: HTMLElement, taskId: number) {
+        const check = () => {
+            const isClamped = node.scrollHeight > node.clientHeight;
+            const was = clampedSearchNotes.has(taskId);
+            if (isClamped !== was) {
+                const next = new Set(clampedSearchNotes);
+                if (isClamped) next.add(taskId);
+                else next.delete(taskId);
+                clampedSearchNotes = next;
+            }
+        };
+        check();
+        const observer = new ResizeObserver(check);
+        observer.observe(node);
+        return { destroy: () => observer.disconnect() };
+    }
 
     // URLハッシュからリストIDを解析
     function parseHashListId(): number | null {
@@ -677,30 +706,65 @@
                             <div
                                 class="min-w-0 flex-1 wrap-break-word break-all"
                             >
-                                <button
-                                    class="cursor-pointer text-left leading-tight hover:text-blue-600 dark:text-gray-100 dark:hover:text-blue-400"
-                                    class:line-through={task.status ===
-                                        "completed"}
-                                    class:text-gray-400={task.status ===
-                                        "completed"}
-                                    onclick={() => goToSearchResult(listId)}
-                                >
-                                    <!-- eslint-disable-next-line svelte/no-at-html-tags -- linkify()が自前でHTMLエスケープ済み -->
-                                    {@html linkify(
-                                        task.title ||
-                                            task.notes ||
-                                            "（空のタスク）",
-                                    )}
-                                </button>
-                                {#if task.title && task.notes}
-                                    <p
-                                        class="mt-0.5 whitespace-pre-wrap text-gray-500 dark:text-gray-400"
+                                {#if !task.title && task.notes}
+                                    <!-- タイトルなし: notesを主表示として折りたたみ -->
+                                    <button
+                                        class="cursor-pointer text-left leading-tight hover:text-blue-600 dark:text-gray-100 dark:hover:text-blue-400"
+                                        class:line-through={task.status ===
+                                            "completed"}
+                                        class:text-gray-400={task.status ===
+                                            "completed"}
+                                        class:line-clamp-5={!expandedSearchNotes.has(
+                                            task.id,
+                                        )}
+                                        onclick={() => goToSearchResult(listId)}
+                                        use:clampDetector={task.id}
                                     >
                                         <!-- eslint-disable-next-line svelte/no-at-html-tags -- linkify()が自前でHTMLエスケープ済み -->
                                         {@html linkify(task.notes)}
-                                    </p>
+                                    </button>
+                                {:else}
+                                    <button
+                                        class="cursor-pointer text-left leading-tight hover:text-blue-600 dark:text-gray-100 dark:hover:text-blue-400"
+                                        class:line-through={task.status ===
+                                            "completed"}
+                                        class:text-gray-400={task.status ===
+                                            "completed"}
+                                        onclick={() => goToSearchResult(listId)}
+                                    >
+                                        <!-- eslint-disable-next-line svelte/no-at-html-tags -- linkify()が自前でHTMLエスケープ済み -->
+                                        {@html linkify(
+                                            task.title || "（空のタスク）",
+                                        )}
+                                    </button>
+                                    {#if task.notes}
+                                        <p
+                                            class="mt-0.5 whitespace-pre-wrap text-gray-500 dark:text-gray-400"
+                                            class:line-clamp-5={!expandedSearchNotes.has(
+                                                task.id,
+                                            )}
+                                            use:clampDetector={task.id}
+                                        >
+                                            <!-- eslint-disable-next-line svelte/no-at-html-tags -- linkify()が自前でHTMLエスケープ済み -->
+                                            {@html linkify(task.notes)}
+                                        </p>
+                                    {/if}
                                 {/if}
                             </div>
+                            {#if clampedSearchNotes.has(task.id) || expandedSearchNotes.has(task.id)}
+                                <button
+                                    onclick={() =>
+                                        toggleSearchNoteExpand(task.id)}
+                                    class="shrink-0 cursor-pointer rounded p-1 text-xs text-gray-400 hover:bg-gray-100 hover:text-gray-500 dark:text-gray-500 dark:hover:bg-gray-700 dark:hover:text-gray-400"
+                                    aria-label={expandedSearchNotes.has(task.id)
+                                        ? "notesを折りたたむ"
+                                        : "notesを展開"}
+                                >
+                                    {expandedSearchNotes.has(task.id)
+                                        ? "▲"
+                                        : "▼"}
+                                </button>
+                            {/if}
                         </div>
                     {/each}
                 {/each}
