@@ -8,17 +8,11 @@ paths:
 
 # TypeScriptテストコード記述スタイル
 
-## ユニットテスト (Vitest)
-
-- テストファイルは対象モジュールと同じディレクトリに `*.test.ts` として配置する
+- テストコードは`vitest`で書く
 - `describe` は原則1階層、ネストは2階層まで
 - 類似パターンの網羅には `it.each()` を活用する
 - テストデータ生成ヘルパー (`makeXxx(overrides)`) で本質的でないセットアップを共通化する
 - 時間依存のテストは `vi.useFakeTimers()` で制御し、実時間の `sleep` を避ける
-- モックは外部I/O・ブラウザAPIなど制御不能な依存のみに限定し、実コードを最大限通す
-  - `vi.stubGlobal()`: ブラウザAPI (localStorage, AudioContext 等)
-  - `vi.fn()`: コールバックや依存注入
-  - `vi.spyOn()`: 既存メソッドの呼び出し追跡
 - `afterEach` で `vi.restoreAllMocks()` / `vi.useRealTimers()` を確実に呼ぶ
 
 ## e2eテスト (Playwright)

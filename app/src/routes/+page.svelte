@@ -12,6 +12,7 @@
     import { trpc, tabId } from "$lib/trpc";
     import { subscribe } from "$lib/sse-client";
     import { onMount } from "svelte";
+    import { SvelteSet, SvelteMap } from "svelte/reactivity";
     import type { TaskStatus } from "$lib/schemas";
     import type {
         ListInfo,
@@ -30,7 +31,7 @@
     let selectedListId = $state<number | null>(null);
     let showType = $state<"active" | "archived" | "all">("active");
     // 他端末で更新されたタスクのIDセット（リスト切り替えでクリア）
-    let updatedTaskIds = $state<Set<number>>(new Set());
+    let updatedTaskIds = new SvelteSet<number>();
     let addListTitle = $state("");
     let addTaskText = $state("");
     let openMenuId = $state<number | null>(null);
@@ -38,7 +39,7 @@
     let hasHash = $state(false);
     let searchQuery = $state("");
     let debouncedQuery = $state("");
-    let expandedSearchNotes = $state<Set<number>>(new Set());
+    let expandedSearchNotes = new SvelteSet<number>();
     const mobileView = $derived(
         hasHash ? ("tasks" as const) : ("lists" as const),
     );
@@ -155,20 +156,12 @@
                 ]);
                 const newTasks: TaskInfo[] =
                     newData && "data" in newData ? newData.data : [];
-                const changed = new Set(updatedTaskIds);
-                let hasNew = false;
                 for (const task of newTasks) {
                     const oldKey = oldMap.get(task.id);
                     const newKey = `${task.title}\0${task.notes}\0${task.status}`;
                     if (oldKey === undefined || oldKey !== newKey) {
-                        if (!changed.has(task.id)) {
-                            changed.add(task.id);
-                            hasNew = true;
-                        }
+                        updatedTaskIds.add(task.id);
                     }
-                }
-                if (hasNew) {
-                    updatedTaskIds = changed;
                 }
             });
         });
@@ -284,7 +277,7 @@
     );
     // 検索結果をリスト名でグループ化
     const searchResultsByList = $derived.by(() => {
-        const map = new Map<
+        const map = new SvelteMap<
             number,
             { title: string; tasks: SearchTaskResult[] }
         >();
@@ -300,13 +293,11 @@
     });
 
     // 検索結果のnotes折りたたみ
-    let clampedSearchNotes = $state<Set<number>>(new Set());
+    let clampedSearchNotes = new SvelteSet<number>();
 
     function toggleSearchNoteExpand(taskId: number) {
-        const next = new Set(expandedSearchNotes);
-        if (next.has(taskId)) next.delete(taskId);
-        else next.add(taskId);
-        expandedSearchNotes = next;
+        if (expandedSearchNotes.has(taskId)) expandedSearchNotes.delete(taskId);
+        else expandedSearchNotes.add(taskId);
     }
 
     // line-clamp でクランプされているか検知するSvelteアクション
@@ -315,10 +306,8 @@
             const isClamped = node.scrollHeight > node.clientHeight;
             const was = clampedSearchNotes.has(taskId);
             if (isClamped !== was) {
-                const next = new Set(clampedSearchNotes);
-                if (isClamped) next.add(taskId);
-                else next.delete(taskId);
-                clampedSearchNotes = next;
+                if (isClamped) clampedSearchNotes.add(taskId);
+                else clampedSearchNotes.delete(taskId);
             }
         };
         check();
@@ -408,14 +397,14 @@
     function selectList(listId: number) {
         selectedListId = listId;
         addTaskText = "";
-        updatedTaskIds = new Set();
+        updatedTaskIds.clear();
         // ハッシュ更新 → hashchange イベントで hasHash と localStorage が同期される
         location.hash = "#" + listId;
     }
 
     async function changeShowType(type: "active" | "archived" | "all") {
         showType = type;
-        updatedTaskIds = new Set();
+        updatedTaskIds.clear();
         await queryClient.invalidateQueries({ queryKey: ["lists"] });
         if (!lists.some((l) => l.id === selectedListId)) {
             const first = lists[0];

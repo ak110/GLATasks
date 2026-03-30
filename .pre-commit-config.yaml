@@ -34,9 +34,8 @@ repos:
         args: []
         require_serial: false
         additional_dependencies:
-          - textlint@15.5.1
-          - textlint-rule-preset-ja-technical-writing@12.0.2
-          - textlint-rule-preset-japanese@10.0.4
+          - textlint@latest
+          - textlint-rule-preset-ja-technical-writing@latest
       - id: pnpm-format
         name: pnpm-format
         entry: pnpm run format

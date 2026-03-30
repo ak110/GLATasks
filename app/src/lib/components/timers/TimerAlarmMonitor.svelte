@@ -19,6 +19,7 @@
     import type { TimerInfo, TimersResult } from "$lib/types";
     import { calcTimerRemainingMs } from "$lib/timer-utils";
     import { onMount } from "svelte";
+    import { resolve } from "$app/paths";
 
     type AlarmInfo = {
         timerId: number;
@@ -292,7 +293,10 @@
             <div
                 class="flex items-center gap-2 rounded-lg bg-red-500 text-white shadow-lg"
             >
-                <a href="/timers" class="cursor-pointer px-4 py-3 font-medium">
+                <a
+                    href={resolve("/timers")}
+                    class="cursor-pointer px-4 py-3 font-medium"
+                >
                     {alarm.timerName
                         ? `${alarm.timerName} 完了`
                         : "タイマー完了"}

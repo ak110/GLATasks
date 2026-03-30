@@ -45,7 +45,7 @@
                     required
                     class="w-full rounded border border-gray-200 px-3 py-2 focus:border-blue-500 focus:outline-none"
                 >
-                    {#each data.lists as list}
+                    {#each data.lists as list (list.id)}
                         <option value={list.id}>{list.title}</option>
                     {/each}
                 </select>

@@ -4,6 +4,7 @@
      */
 
     import { getContext } from "svelte";
+    import { resolve } from "$app/paths";
     import type { Theme } from "$lib/theme";
 
     const themeCtx = getContext<{
@@ -41,11 +42,11 @@
 <header
     class="sticky top-0 z-10 flex h-12 items-center gap-1 bg-gray-800 px-2 text-white shadow sm:gap-2 sm:px-4 dark:bg-gray-950"
 >
-    <a href="/" class="font-bold hover:text-gray-300">GLATasks</a>
+    <a href={resolve("/")} class="font-bold hover:text-gray-300">GLATasks</a>
     <span class="hidden text-gray-400 sm:inline">|</span>
     {#if page === "tasks"}
         <a
-            href="/timers"
+            href={resolve("/timers")}
             class="cursor-pointer rounded text-sm text-gray-300 hover:bg-gray-700 hover:text-white"
             >⏱<span class="hidden sm:inline">タイマー</span></a
         >
