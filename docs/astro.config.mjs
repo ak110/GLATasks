@@ -33,7 +33,6 @@ export default defineConfig({
                     items: [
                         { slug: "development/architecture" },
                         { slug: "development/development" },
-                        { slug: "development/coding-style" },
                     ],
                 },
             ],
