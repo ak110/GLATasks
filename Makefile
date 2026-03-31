@@ -109,7 +109,7 @@ update:
 
 format:  # 整形 + 軽量lint（自動修正あり）
 	@# pre-commitはフォーマットによるエラーを考慮して2度まで実行
-	pre-commit run --all-files || pre-commit run --all-files
+	uvx pre-commit run --all-files || uvx pre-commit run --all-files
 
 test:  # format + check + unit test + backup test + e2eテスト
 	$(MAKE) format

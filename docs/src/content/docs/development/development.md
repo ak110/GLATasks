@@ -17,13 +17,19 @@ make test  # OK
 ## 開発環境の構築手順
 
 1. 本リポジトリをcloneする。
-2. [pre-commit](https://pre-commit.com/)フックをインストールする。
+2. [uv](https://docs.astral.sh/uv/) をインストールする。
 
    ```bash
-   pre-commit install
+   curl -LsSf https://astral.sh/uv/install.sh | sh
    ```
 
-3. 起動する。
+3. [pre-commit](https://pre-commit.com/)フックをインストールする。
+
+   ```bash
+   uvx pre-commit install
+   ```
+
+4. 起動する。
 
    ```bash
    make deploy
@@ -102,6 +108,30 @@ nginx 経由の HTTPS（port 38180）でテストするため、開発環境が�
 
 - JSON ボディから受け取る数値は文字列の場合があるため `Number()` で明示変換すること（`"5" !== 5` の型不一致を防ぐ）
 - 日時は全レイヤーで UTC 統一。DB（TIMESTAMP 型）→ サーバー（Date オブジェクト）→ クライアント（ISO8601 文字列）の変換は自動で行われるため、タイムゾーンを意識するコードは不要
+
+## サプライチェーン攻撃対策
+
+npm / PyPI レジストリへの悪意あるパッケージ公開に対する防御として、公開から一定期間経過したパッケージのみインストールを許可する設定を導入している。
+
+### pnpm: minimumReleaseAge
+
+`.npmrc` に `minimumReleaseAge=1440`（1日 = 1440分）を設定。npm レジストリに公開されてから1日未満のバージョンはインストールされない。`pnpm dlx`（pnpx）にも適用される（pnpm 10.18 以降）。
+
+`docs/` は独立した pnpm プロジェクトのため `docs/.npmrc` にも同じ設定を配置している。
+
+緊急でリリース直後のパッケージが必要な場合は `.npmrc` に一時的に追加する:
+
+```ini
+minimumReleaseAgeExclude[]=package-name@1.2.3
+```
+
+### uv: exclude-newer
+
+`uv.toml` に `exclude-newer = "1 day"` を設定。PyPI に公開されてから1日未満のパッケージはインストールされない。`uvx`（`uv tool run`）にも適用される。
+
+### pre-commit のバージョン固定
+
+`.pre-commit-config.yaml` の `additional_dependencies` で指定する npm パッケージ（textlint 等）は pre-commit が直接 npm 経由でインストールするため、pnpm の `minimumReleaseAge` は適用されない。そのため `@latest` ではなくバージョンを固定している。
 
 ## CI/CD
 
