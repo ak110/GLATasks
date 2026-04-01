@@ -115,14 +115,15 @@ npm / PyPI レジストリへの悪意あるパッケージ公開に対する防
 
 ### pnpm: minimumReleaseAge
 
-`.npmrc` に `minimumReleaseAge=1440`（1日 = 1440分）を設定。npm レジストリに公開されてから1日未満のバージョンはインストールされない。`pnpm dlx`（pnpx）にも適用される（pnpm 10.18 以降）。
+`pnpm-workspace.yaml` に `minimumReleaseAge: 1440`（1日 = 1440分）を設定。npm レジストリに公開されてから1日未満のバージョンはインストールされない。`pnpm dlx`（pnpx）にも適用される（pnpm 10.18 以降）。
 
-`docs/` は独立した pnpm プロジェクトのため `docs/.npmrc` にも同じ設定を配置している。
+`docs/` は pnpm workspaces でルートと統合管理しているため、`pnpm-workspace.yaml` の設定が自動的に適用される。
 
-緊急でリリース直後のパッケージが必要な場合は `.npmrc` に一時的に追加する:
+緊急でリリース直後のパッケージが必要な場合は `pnpm-workspace.yaml` に一時的に追加する:
 
-```ini
-minimumReleaseAgeExclude[]=package-name@1.2.3
+```yaml
+minimumReleaseAgeExclude:
+  - package-name@1.2.3
 ```
 
 ### uv: exclude-newer

@@ -32,11 +32,12 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
 
-      - name: Install and build
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build docs
         working-directory: docs
-        run: |
-          pnpm install --frozen-lockfile
-          pnpm build
+        run: pnpm build
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

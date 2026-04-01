@@ -1,7 +1,8 @@
 FROM node:lts AS builder
 RUN corepack enable
 WORKDIR /workspace
-COPY package.json pnpm-lock.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY docs/package.json ./docs/
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
     pnpm config set store-dir /pnpm/store && \
     pnpm install --frozen-lockfile
