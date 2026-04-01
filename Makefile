@@ -105,7 +105,13 @@ node-shell:
 
 update:
 	$(call RUN_NODE, corepack prepare pnpm@latest --activate && corepack use pnpm@latest && pnpm update --latest && pnpm prune && pnpm store prune, --rm)
+	$(MAKE) update-actions
 	$(MAKE) test
+
+# GitHub Actionsのアクションをハッシュピンで最新化（mise未導入時はスキップ）
+update-actions:
+	@command -v mise >/dev/null 2>&1 || { echo "mise未検出、スキップ"; exit 0; }; \
+	GITHUB_TOKEN=$$(gh auth token) mise exec -- pinact run --update --min-age 1
 
 format:  # 整形 + 軽量lint（自動修正あり）
 	@# pre-commitはフォーマットによるエラーを考慮して2度まで実行
@@ -170,4 +176,4 @@ test-e2e:
 			CI=true pnpm install && pnpm run test:e2e\
 		'
 
-.PHONY: help sync backup deploy build start stop restart-app logs ps healthcheck shell node-shell update format test test-unit test-backup test-e2e start-app logs-app migrate db-studio docs
+.PHONY: help sync backup deploy build start stop restart-app logs ps healthcheck shell node-shell update update-actions format test test-unit test-backup test-e2e start-app logs-app migrate db-studio docs
