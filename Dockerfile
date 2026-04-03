@@ -9,7 +9,7 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
 COPY app/ ./app/
 COPY tsconfig.json drizzle.config.ts ./
 COPY drizzle/ ./drizzle/
-RUN pnpm run build && pnpm prune --prod
+RUN pnpm run build && CI=true pnpm prune --prod
 
 FROM node:lts-slim
 ENV NODE_ENV=production TZ=Asia/Tokyo
