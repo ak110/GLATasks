@@ -15,6 +15,7 @@
         onRename: (listId: number, currentTitle: string) => void;
         onArchive: (listId: number) => void;
         onUnarchive: (listId: number) => void;
+        onMerge: (listId: number) => void;
         onDelete: (listId: number) => void;
         onTaskDragOver?: () => void;
         onTaskDrop?: (taskId: number) => void;
@@ -30,6 +31,7 @@
         onRename,
         onArchive,
         onUnarchive,
+        onMerge,
         onDelete,
         onTaskDragOver,
         onTaskDrop,
@@ -111,6 +113,17 @@
                         }}
                     >
                         アーカイブ
+                    </button>
+                {/if}
+                {#if list.status === "active"}
+                    <button
+                        class="block w-full cursor-pointer px-4 py-1.5 text-left hover:bg-gray-100 dark:text-gray-100 dark:hover:bg-gray-700"
+                        onclick={() => {
+                            onMerge(list.id);
+                            onToggleMenu(list.id);
+                        }}
+                    >
+                        他のリストに統合
                     </button>
                 {/if}
                 <hr class="my-1 border-gray-200 dark:border-gray-600" />

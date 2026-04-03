@@ -169,6 +169,13 @@ export const LoginSchema = z.object({
   password: z.string().min(1),
 });
 
+// ── リスト統合スキーマ ──
+
+export const MergeListSchema = z.object({
+  sourceListId: z.number().int().positive(),
+  targetListId: z.number().int().positive(),
+});
+
 // ── 並び替えスキーマ ──
 
 export const ReorderTasksSchema = z.object({
@@ -200,6 +207,7 @@ export type ResetTimerInput = z.infer<typeof ResetTimerSchema>;
 export type TimerStopInput = z.infer<typeof TimerStopSchema>;
 export type SearchTasksInput = z.infer<typeof SearchTasksSchema>;
 export type ReorderTasksInput = z.infer<typeof ReorderTasksSchema>;
+export type MergeListInput = z.infer<typeof MergeListSchema>;
 export type ReorderTimersInput = z.infer<typeof ReorderTimersSchema>;
 export type RegisterUserInput = z.infer<typeof RegisterUserSchema>;
 export type LoginInput = z.infer<typeof LoginSchema>;

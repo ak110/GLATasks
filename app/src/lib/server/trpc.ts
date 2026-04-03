@@ -9,6 +9,7 @@ import {
   CreateTaskSchema,
   CreateTimerSchema,
   GetListTasksSchema,
+  MergeListSchema,
   RegisterUserSchema,
   ShowTypeSchema,
   UpdateListSchema,
@@ -118,6 +119,11 @@ const API_ERRORS: Record<
     message: "対象が見つかりません",
   },
   task_not_found: { code: "NOT_FOUND", message: "タスクが見つかりません" },
+  same_list: { code: "BAD_REQUEST", message: "同じリストは統合できません" },
+  list_not_active: {
+    code: "BAD_REQUEST",
+    message: "アーカイブ済みリストは統合できません",
+  },
   invalid_timer_ids: { code: "BAD_REQUEST", message: "タイマーIDが不正です" },
   timer_is_running: {
     code: "BAD_REQUEST",
@@ -231,6 +237,19 @@ export const appRouter = t.router({
       .input(UpdateListSchema.pick({ listId: true }))
       .mutation(async ({ ctx, input }) => {
         await api.clearList(ctx.userId, input.listId);
+        sendEvent(ctx.userId, "tasks:updated", ctx.tabId);
+        return { success: true };
+      }),
+
+    merge: encryptedProcedure
+      .input(MergeListSchema)
+      .mutation(async ({ ctx, input }) => {
+        await api.mergeLists(
+          ctx.userId,
+          input.sourceListId,
+          input.targetListId,
+        );
+        sendEvent(ctx.userId, "lists:updated", ctx.tabId);
         sendEvent(ctx.userId, "tasks:updated", ctx.tabId);
         return { success: true };
       }),

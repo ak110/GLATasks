@@ -5,6 +5,8 @@
 import bcrypt from "bcryptjs";
 import { and, asc, eq, inArray, like, max, min } from "drizzle-orm";
 
+import { adjustUpdatedTimestamps, mergeByTimestamp } from "./merge-utils";
+
 import type {
   ListInfo,
   TaskInfo,
@@ -286,6 +288,80 @@ export async function archiveList(
     .update(lists)
     .set({ status: "archived" })
     .where(eq(lists.id, listId));
+}
+
+/**
+ * 2つのリストを統合する。
+ *
+ * source の全タスクを target に移動し、source リストを削除する。
+ * 並び順は各リスト内の sort_order を維持しつつ、updated でインターリーブする。
+ * sort_order と updated が矛盾する箇所は線形補間で補正する。
+ */
+export async function mergeLists(
+  userId: number,
+  sourceListId: number,
+  targetListId: number,
+): Promise<void> {
+  if (sourceListId === targetListId) {
+    throw new Error("same_list");
+  }
+  const sourceList = await getOwnedList(sourceListId, userId);
+  const targetList = await getOwnedList(targetListId, userId);
+  if (sourceList.status !== "active" || targetList.status !== "active") {
+    throw new Error("list_not_active");
+  }
+
+  const db = getDb();
+  // 両リストの全タスクを sort_order 昇順で取得
+  const [sourceTasks, targetTasks] = await Promise.all([
+    db
+      .select()
+      .from(tasks)
+      .where(eq(tasks.list_id, sourceListId))
+      .orderBy(asc(tasks.sort_order)),
+    db
+      .select()
+      .from(tasks)
+      .where(eq(tasks.list_id, targetListId))
+      .orderBy(asc(tasks.sort_order)),
+  ]);
+
+  // 各リストの updated を sort_order と整合するよう線形補間で補正
+  const sourceAdjusted = adjustUpdatedTimestamps(sourceTasks);
+  const targetAdjusted = adjustUpdatedTimestamps(targetTasks);
+
+  // マージソートのマージステップで統合（adjusted 降順）
+  const merged = mergeByTimestamp(
+    targetTasks.map((t, i) => ({ task: t, adjusted: targetAdjusted[i] })),
+    sourceTasks.map((t, i) => ({ task: t, adjusted: sourceAdjusted[i] })),
+  );
+
+  // sort_order を 0, 1000, 2000... で再割り当てし、一括更新
+  for (let i = 0; i < merged.length; i++) {
+    const { task, adjusted } = merged[i];
+    const newSortOrder = i * 1000;
+    const isSource = task.list_id === sourceListId;
+    await db
+      .update(tasks)
+      .set({
+        list_id: targetListId,
+        sort_order: newSortOrder,
+        // 補正された updated のみ DB に反映
+        ...(adjusted !== task.updated.getTime() && {
+          updated: new Date(adjusted),
+        }),
+      })
+      .where(eq(tasks.id, task.id));
+    // target のタスクも sort_order が変わる場合がある
+    if (!isSource && newSortOrder !== task.sort_order) {
+      // 上の update で既に更新済み
+    }
+  }
+
+  // source リストを削除
+  await db.delete(lists).where(eq(lists.id, sourceListId));
+  // target の last_updated を更新
+  await touchListUpdated(targetListId);
 }
 
 /** リストを active に戻す。 */

@@ -25,6 +25,7 @@
     import TaskAddForm from "$lib/components/tasks/TaskAddForm.svelte";
     import TaskListHeader from "$lib/components/tasks/TaskListHeader.svelte";
     import TaskEditDialog from "$lib/components/tasks/TaskEditDialog.svelte";
+    import MergeListDialog from "$lib/components/lists/MergeListDialog.svelte";
     import { linkify } from "$lib/linkify";
 
     let selectedListId = $state<number | null>(null);
@@ -52,6 +53,20 @@
         keepOrder: boolean;
         completed: boolean;
     };
+    // リスト統合ダイアログの状態
+    type MergeDialog = {
+        open: boolean;
+        sourceListId: number;
+        sourceTitle: string;
+        taskCount: number;
+    };
+    let mergeDialog = $state<MergeDialog>({
+        open: false,
+        sourceListId: 0,
+        sourceTitle: "",
+        taskCount: 0,
+    });
+
     let editDialog = $state<EditDialog>({
         open: false,
         listId: 0,
@@ -235,6 +250,16 @@
             queryClient.invalidateQueries({
                 queryKey: ["tasks", listId],
             });
+        },
+    }));
+
+    // リスト統合
+    const mergeListMutation = createMutation(() => ({
+        mutationFn: (input: { sourceListId: number; targetListId: number }) =>
+            trpc.lists.merge.mutate(input),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["lists"] });
+            queryClient.invalidateQueries({ queryKey: ["tasks"] });
         },
     }));
 
@@ -537,6 +562,43 @@
         }
     }
 
+    /** 統合ダイアログを開く。タスク数を取得するため現在のクエリキャッシュを参照する。 */
+    async function openMergeDialog(listId: number) {
+        const list = lists.find((l) => l.id === listId);
+        if (!list) return;
+        // タスク数を取得（全タスクを取得してカウント）
+        const tasksResult = (await queryClient.fetchQuery({
+            queryKey: ["tasks", listId, "all"],
+            queryFn: () =>
+                trpc.tasks.list.query({
+                    listId,
+                    showType: "all",
+                }) as Promise<GetTasksResult>,
+        })) as GetTasksResult;
+        const count =
+            tasksResult && "data" in tasksResult ? tasksResult.data.length : 0;
+        mergeDialog = {
+            open: true,
+            sourceListId: listId,
+            sourceTitle: list.title,
+            taskCount: count,
+        };
+    }
+
+    async function submitMerge(targetListId: number) {
+        try {
+            await mergeListMutation.mutateAsync({
+                sourceListId: mergeDialog.sourceListId,
+                targetListId,
+            });
+            mergeDialog.open = false;
+            // 統合先リストを自動選択
+            selectList(targetListId);
+        } catch {
+            // グローバルエラーハンドラがトースト表示を担当
+        }
+    }
+
     async function clearList(listId: number) {
         try {
             await clearListMutation.mutateAsync(listId);
@@ -618,7 +680,8 @@
             tag === "INPUT" ||
             tag === "TEXTAREA" ||
             tag === "SELECT" ||
-            editDialog.open
+            editDialog.open ||
+            mergeDialog.open
         )
             return;
         if (e.key === "n") {
@@ -671,6 +734,7 @@
         onRename={renameList}
         onArchive={archiveList}
         onUnarchive={unarchiveList}
+        onMerge={openMergeDialog}
         onDelete={deleteList}
         onAddList={addList}
         onTaskDragOver={(listId) => (dragOverListId = listId)}
@@ -822,4 +886,16 @@
     completed={editDialog.completed}
     onSubmit={submitTaskEdit}
     onClose={() => (editDialog.open = false)}
+/>
+
+<MergeListDialog
+    open={mergeDialog.open}
+    sourceList={{
+        id: mergeDialog.sourceListId,
+        title: mergeDialog.sourceTitle,
+    }}
+    allLists={lists}
+    taskCount={mergeDialog.taskCount}
+    onSubmit={submitMerge}
+    onClose={() => (mergeDialog.open = false)}
 />

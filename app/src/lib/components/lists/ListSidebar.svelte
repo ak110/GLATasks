@@ -19,6 +19,7 @@
         onRename: (listId: number, currentTitle: string) => void;
         onArchive: (listId: number) => void;
         onUnarchive: (listId: number) => void;
+        onMerge: (listId: number) => void;
         onDelete: (listId: number) => void;
         onAddList: (title: string) => void;
         onTaskDragOver?: (listId: number) => void;
@@ -38,6 +39,7 @@
         onRename,
         onArchive,
         onUnarchive,
+        onMerge,
         onDelete,
         onAddList,
         onTaskDragOver,
@@ -71,6 +73,7 @@
                 {onRename}
                 {onArchive}
                 {onUnarchive}
+                {onMerge}
                 {onDelete}
                 onTaskDragOver={() => onTaskDragOver?.(list.id)}
                 onTaskDrop={(taskId) => onTaskDrop?.(taskId, list.id)}
