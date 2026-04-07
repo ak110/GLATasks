@@ -43,6 +43,16 @@ make test  # OK
 - `make test` — コミット前に実行。format + 型チェック + ユニットテスト + バックアップテスト + e2e の全検証
 - `make deploy` — ビルド → 停止 → 起動
 
+## ツールチェイン
+
+- Prettier, prettier-plugin-svelte, prettier-plugin-tailwindcss: コード整形
+- ESLint: typescript-eslint, eslint-plugin-svelte
+
+Biome移行の主要ブロッカー
+
+1. Svelte マークアップ非対応 — Biome は .svelte の マークアップ部分のフォーマットができない。現在は prettier-plugin-svelte が全体を統一的に処理している
+2. Tailwind CSSクラスソート非対応 — prettier-plugin-tailwindcss の代替がBiomeにない。プロジェクト全体で使われている
+
 ## Docker 構成
 
 サービス構成・環境変数は `compose.yaml` / `.env` を参照。
