@@ -24,6 +24,7 @@ function makeTimer(overrides: Partial<TimerInfo> = {}): TimerInfo {
     adjust_minutes: 5,
     running: false,
     expired: false,
+    ephemeral: false,
     remaining_seconds: 300,
     started_at: null,
     sort_order: 0,

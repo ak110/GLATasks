@@ -15,6 +15,7 @@
     type Props = {
         open: boolean;
         mode: "create" | "edit";
+        ephemeral: boolean;
         name: string;
         timerMode: TimerMode;
         baseSeconds: number;
@@ -34,6 +35,7 @@
     let {
         open,
         mode,
+        ephemeral,
         name: initialName,
         timerMode: initialTimerMode,
         baseSeconds: initialBaseSeconds,
@@ -42,6 +44,15 @@
         onSubmit,
         onClose,
     }: Props = $props();
+
+    // ダイアログタイトル: 一時タイマー作成時のみ専用文言に差し替える
+    const dialogTitle = $derived(
+        mode === "edit"
+            ? "タイマー編集"
+            : ephemeral
+              ? "一時タイマー追加"
+              : "タイマー追加",
+    );
 
     let localName = $state("");
     let localTimerMode = $state<TimerMode>("countdown");
@@ -114,8 +125,9 @@
             <div class="flex items-center justify-between px-6 py-4">
                 <h2
                     class="text-lg font-semibold text-gray-800 dark:text-gray-100"
+                    data-testid="timer-dialog-title"
                 >
-                    {mode === "create" ? "タイマー追加" : "タイマー編集"}
+                    {dialogTitle}
                 </h2>
                 <button
                     onclick={onClose}

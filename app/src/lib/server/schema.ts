@@ -56,6 +56,7 @@ export const timers = mysqlTable("timer", {
     .default(TIMER_DEFAULT_ADJUST_MINUTES),
   running: tinyint("running").notNull().default(0),
   expired: tinyint("expired").notNull().default(0),
+  ephemeral: tinyint("ephemeral").notNull().default(0),
   remaining_seconds: int("remaining_seconds").notNull(),
   started_at: timestamp("started_at"),
   sort_order: int("sort_order").notNull().default(0),

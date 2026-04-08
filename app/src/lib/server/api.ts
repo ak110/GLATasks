@@ -645,6 +645,7 @@ function toTimerInfo(row: typeof timers.$inferSelect): TimerInfo {
     adjust_minutes: row.adjust_minutes,
     running: row.running === 1,
     expired: row.expired === 1,
+    ephemeral: row.ephemeral === 1,
     remaining_seconds: row.remaining_seconds,
     started_at: row.started_at ? toUtcIso(row.started_at) : null,
     sort_order: row.sort_order,
@@ -695,6 +696,7 @@ export async function createTimer(
   mode: string = "countdown",
   targetMinutes: number | null = null,
   tzOffsetMinutes: number | null = null,
+  ephemeral: boolean = false,
 ): Promise<void> {
   if (mode === "alarm") {
     if (targetMinutes === null || tzOffsetMinutes === null)
@@ -721,6 +723,7 @@ export async function createTimer(
     remaining_seconds: remainingSeconds,
     target_minutes: targetMinutes,
     running: isAlarm ? 1 : 0,
+    ephemeral: ephemeral ? 1 : 0,
     started_at: isAlarm ? now : null,
     sort_order: sortOrder,
     created: now,

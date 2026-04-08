@@ -27,7 +27,7 @@
             tzOffsetMinutes?: number,
         ) => void;
         onEdit: (timer: TimerInfo) => void;
-        onDelete: (timerId: number) => void;
+        onDelete: (timer: TimerInfo, skipConfirm: boolean) => void;
         isDragging?: boolean;
         dropIndicator?: "before" | "after" | null;
         onDragStart?: (timerId: number) => void;
@@ -101,6 +101,15 @@
     });
 
     const isExpired = $derived(timer.expired && !timer.running);
+
+    // 満了到達判定 (ephemeral タイマーの削除強調・確認省略に使用)。
+    // displaySeconds <= 0 は countdown 到達直後の即時発火用、
+    // expired && !running は alarm 停止後に displaySeconds が翌日分へ
+    // wrap しても判定を継続させるためのフォールバック。
+    const isTimeUp = $derived(
+        displaySeconds <= 0 || (timer.expired && !timer.running),
+    );
+    const showEphemeralDeleteEmphasis = $derived(timer.ephemeral && isTimeUp);
 
     /** 時刻表示クリック → 編集モードに切り替え */
     function startEditing() {
@@ -203,9 +212,19 @@
                 data-testid="timer-edit-btn">✏️</button
             >
             <button
-                onclick={() => onDelete(timer.id)}
-                class="cursor-pointer rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-red-500 dark:hover:bg-gray-700"
-                title="削除"
+                onclick={() => onDelete(timer, showEphemeralDeleteEmphasis)}
+                class="cursor-pointer rounded p-1 hover:bg-gray-100 dark:hover:bg-gray-700"
+                class:text-gray-400={!showEphemeralDeleteEmphasis}
+                class:hover:text-red-500={!showEphemeralDeleteEmphasis}
+                class:bg-red-100={showEphemeralDeleteEmphasis}
+                class:text-red-600={showEphemeralDeleteEmphasis}
+                class:ring-2={showEphemeralDeleteEmphasis}
+                class:ring-red-400={showEphemeralDeleteEmphasis}
+                class:hover:bg-red-200={showEphemeralDeleteEmphasis}
+                class:dark:bg-red-900={showEphemeralDeleteEmphasis}
+                class:dark:text-red-300={showEphemeralDeleteEmphasis}
+                class:dark:ring-red-500={showEphemeralDeleteEmphasis}
+                title={showEphemeralDeleteEmphasis ? "削除 (確認なし)" : "削除"}
                 aria-label="タイマーを削除"
                 data-testid="timer-delete-btn">🗑</button
             >

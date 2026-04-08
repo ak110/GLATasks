@@ -28,6 +28,7 @@
     type DialogState = {
         open: boolean;
         mode: "create" | "edit";
+        ephemeral: boolean;
         timerId: number;
         name: string;
         timerMode: TimerMode;
@@ -38,6 +39,7 @@
     let dialog = $state<DialogState>({
         open: false,
         mode: "create",
+        ephemeral: false,
         timerId: 0,
         name: "",
         timerMode: "countdown",
@@ -85,6 +87,7 @@
             target_minutes?: number;
             tz_offset_minutes?: number;
             adjust_minutes: number;
+            ephemeral: boolean;
         }) => trpc.timers.create.mutate(input),
         onSuccess: () =>
             queryClient.invalidateQueries({ queryKey: ["timers"] }),
@@ -227,10 +230,11 @@
     const isLoading = $derived(timersQuery.isLoading);
 
     // ダイアログ操作
-    function openCreateDialog() {
+    function openCreateDialog(ephemeral: boolean = false) {
         dialog = {
             open: true,
             mode: "create",
+            ephemeral,
             timerId: 0,
             name: "",
             timerMode: "countdown",
@@ -244,6 +248,7 @@
         dialog = {
             open: true,
             mode: "edit",
+            ephemeral: timer.ephemeral,
             timerId: timer.id,
             name: timer.name,
             timerMode: timer.mode,
@@ -270,6 +275,7 @@
                     target_minutes: data.target_minutes ?? undefined,
                     tz_offset_minutes: data.tz_offset_minutes ?? undefined,
                     adjust_minutes: data.adjust_minutes,
+                    ephemeral: dialog.ephemeral,
                 });
             } else {
                 await updateTimerMutation.mutateAsync({
@@ -288,10 +294,11 @@
         }
     }
 
-    async function handleDelete(timerId: number) {
-        if (!globalThis.confirm("このタイマーを削除しますか？")) return;
+    async function handleDelete(timer: TimerInfo, skipConfirm: boolean) {
+        if (!skipConfirm && !globalThis.confirm("このタイマーを削除しますか？"))
+            return;
         try {
-            await deleteTimerMutation.mutateAsync(timerId);
+            await deleteTimerMutation.mutateAsync(timer.id);
         } catch {
             // グローバルエラーハンドラがトースト表示を担当
         }
@@ -305,13 +312,23 @@
         <h1 class="text-xl font-bold text-gray-800 dark:text-gray-100">
             タイマー
         </h1>
-        <button
-            onclick={openCreateDialog}
-            class="cursor-pointer rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700"
-            data-testid="timer-add-btn"
-        >
-            + 追加
-        </button>
+        <div class="flex gap-2">
+            <button
+                onclick={() => openCreateDialog(false)}
+                class="cursor-pointer rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700"
+                data-testid="timer-add-btn"
+            >
+                + 追加
+            </button>
+            <button
+                onclick={() => openCreateDialog(true)}
+                class="cursor-pointer rounded border border-blue-600 bg-white px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 dark:border-blue-400 dark:bg-gray-800 dark:text-blue-400 dark:hover:bg-blue-900/30"
+                title="満了後に確認なしで削除できる使い切りタイマー"
+                data-testid="timer-add-ephemeral-btn"
+            >
+                + 一時追加
+            </button>
+        </div>
     </div>
 
     {#if timersList.length === 0 && !isLoading}
@@ -364,6 +381,7 @@
 <TimerCreateDialog
     open={dialog.open}
     mode={dialog.mode}
+    ephemeral={dialog.ephemeral}
     name={dialog.name}
     timerMode={dialog.timerMode}
     baseSeconds={dialog.baseSeconds}

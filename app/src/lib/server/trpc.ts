@@ -325,6 +325,7 @@ export const appRouter = t.router({
           input.mode,
           input.target_minutes ?? null,
           input.tz_offset_minutes ?? null,
+          input.ephemeral,
         );
         sendEvent(ctx.userId, "timers:updated", ctx.tabId);
         return { success: true };

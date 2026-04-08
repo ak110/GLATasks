@@ -389,4 +389,68 @@ test.describe("timers", () => {
     await newCard.locator('[data-testid="timer-delete-btn"]').click();
     await expect(newCard).not.toBeVisible({ timeout: 10000 });
   });
+
+  test("一時タイマーを追加し満了時に確認なしで削除できる", async ({ page }) => {
+    const timerName = `一時_${Date.now()}`;
+
+    // 一時追加ボタンをクリック → 専用タイトルのダイアログが開く
+    await page.click('[data-testid="timer-add-ephemeral-btn"]');
+    await page.locator('[data-testid="timer-name-input"]').waitFor();
+    await expect(page.locator('[data-testid="timer-dialog-title"]')).toHaveText(
+      "一時タイマー追加",
+    );
+
+    // 2 秒タイマーとして送信
+    await page.fill('[data-testid="timer-name-input"]', timerName);
+    await page.fill('[data-testid="timer-base-time-input"]', "00:00:02");
+    await page.click('[data-testid="timer-submit-btn"]');
+    await page.waitForResponse((res) => res.url().includes("/api/trpc"));
+
+    const card = page
+      .locator('[data-testid="timer-card"]')
+      .filter({ hasText: timerName });
+    await expect(card).toBeVisible({ timeout: 10000 });
+
+    // タイマー開始 → 残り 0 秒到達を待つ
+    await card.locator('[data-testid="timer-start-btn"]').click();
+    await expect(card.locator('[data-testid="timer-display"]')).toHaveText(
+      "00:00:00",
+      { timeout: 10000 },
+    );
+
+    // confirm を受け入れるリスナーは敢えて設定しない。
+    // 一時タイマーの満了状態では confirm が発火しないため、
+    // リスナー無しでも削除が成立することを確認する。
+    await card.locator('[data-testid="timer-delete-btn"]').click();
+    await expect(card).not.toBeVisible({ timeout: 10000 });
+  });
+
+  test("一時タイマーは未満了だと通常どおり確認ダイアログが出る", async ({
+    page,
+  }) => {
+    const timerName = `一時未満了_${Date.now()}`;
+
+    // 一時タイマーを長めの時間で作成
+    await page.click('[data-testid="timer-add-ephemeral-btn"]');
+    await page.locator('[data-testid="timer-name-input"]').waitFor();
+    await page.fill('[data-testid="timer-name-input"]', timerName);
+    await page.fill('[data-testid="timer-base-time-input"]', "01:00:00");
+    await page.click('[data-testid="timer-submit-btn"]');
+    await page.waitForResponse((res) => res.url().includes("/api/trpc"));
+
+    const card = page
+      .locator('[data-testid="timer-card"]')
+      .filter({ hasText: timerName });
+    await expect(card).toBeVisible({ timeout: 10000 });
+
+    // 開始せずに削除 → confirm が発火することを検証
+    let confirmFired = false;
+    page.once("dialog", (dialog) => {
+      confirmFired = true;
+      dialog.accept();
+    });
+    await card.locator('[data-testid="timer-delete-btn"]').click();
+    await expect(card).not.toBeVisible({ timeout: 10000 });
+    expect(confirmFired).toBe(true);
+  });
 });

@@ -42,6 +42,7 @@ export type TimerInfo = {
   adjust_minutes: number;
   running: boolean;
   expired: boolean;
+  ephemeral: boolean;
   remaining_seconds: number;
   started_at: string | null;
   sort_order: number;
