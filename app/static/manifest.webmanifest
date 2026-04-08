@@ -3,23 +3,23 @@
     "short_name": "GLATasks",
     "icons": [
         {
-            "src": "img/favicon-256.png",
+            "src": "/img/favicon-256.png",
             "sizes": "256x256",
             "type": "image/png"
         },
         {
-            "src": "img/favicon-192.png",
+            "src": "/img/favicon-192.png",
             "sizes": "192x192",
             "type": "image/png"
         },
         {
-            "src": "img/favicon-32.png",
+            "src": "/img/favicon-32.png",
             "sizes": "32x32",
             "type": "image/png"
         }
     ],
-    "start_url": "../",
-    "scope": "../",
+    "start_url": "/",
+    "scope": "/",
     "display": "standalone",
     "background_color": "#f8f9fa",
     "orientation": "portrait",

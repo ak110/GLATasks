@@ -40,7 +40,7 @@
     let originalFaviconImg: HTMLImageElement | null = null;
     // favicon バッジ付き Data URL のキャッシュ
     let badgeFaviconUrl: string | null = null;
-    const FAVICON_PATH = "/static/img/favicon-32.png";
+    const FAVICON_PATH = "/img/favicon-32.png";
 
     onMount(() => {
         const img = new Image();

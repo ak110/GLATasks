@@ -16,12 +16,24 @@
     import { connect, disconnect } from "$lib/sse-client";
     import TimerAlarmMonitor from "$lib/components/timers/TimerAlarmMonitor.svelte";
     import Toast from "$lib/components/ui/Toast.svelte";
+    import UpdateBanner from "$lib/components/ui/UpdateBanner.svelte";
+    import { beforeNavigate } from "$app/navigation";
+    import { updated } from "$app/state";
     import type { LayoutData } from "./$types";
 
     const { children, data }: { children: Snippet; data: LayoutData } =
         $props();
 
     let theme = $state<Theme>("system");
+
+    // 新バージョンを検知している状態で navigation が起きた場合、
+    // バナーを見逃したユーザーにも確実に新版 JS を読み込ませるため hard reload に切り替える。
+    beforeNavigate((nav) => {
+        if (updated.current && nav.to?.url && !nav.willUnload) {
+            nav.cancel();
+            location.href = nav.to.url.href;
+        }
+    });
 
     // 暗号化鍵が提供されている場合は設定
     $effect(() => {
@@ -83,6 +95,7 @@
 </script>
 
 <QueryClientProvider client={queryClient}>
+    <UpdateBanner />
     <Toast />
     {#if data.logged_in}
         <TimerAlarmMonitor />

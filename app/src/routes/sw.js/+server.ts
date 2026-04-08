@@ -6,9 +6,9 @@
  */
 
 const SW_SCRIPT = `\
-const OFFLINE_VERSION = 1;
-const CACHE_NAME = "offline";
-const OFFLINE_URL = "static/html/offline.html";
+const OFFLINE_VERSION = 2;
+const CACHE_NAME = "offline-v" + OFFLINE_VERSION;
+const OFFLINE_URL = "/offline.html";
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -26,6 +26,11 @@ self.addEventListener("activate", (event) => {
       if ("navigationPreload" in globalThis.registration) {
         await globalThis.registration.navigationPreload.enable();
       }
+      // 旧バージョンの offline キャッシュを削除する
+      const keys = await caches.keys();
+      await Promise.all(
+        keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)),
+      );
     })(),
   );
   globalThis.clients.claim();

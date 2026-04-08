@@ -6,7 +6,6 @@ services:
     volumes:
       - ./web/nginx.conf:/etc/nginx/conf.d/default.conf:ro
       - ./web/ssl:/etc/nginx/ssl:ro
-      - ./web/static:/var/www/static:ro
     environment:
       - TZ=Asia/Tokyo
     networks:
