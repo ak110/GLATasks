@@ -33,7 +33,7 @@
     onMount(() => {
         // SSE 接続（ログイン済みの場合のみ）
         if (data.logged_in) {
-            connect();
+            connect(queryClient);
         }
 
         // テーマ初期化

@@ -7,6 +7,8 @@
 - `make update`: 依存更新 + 全テスト実行
   - `make update-actions`: GitHub Actionsのハッシュピン更新のみ（mise経由でpinact実行）
 - Markdownファイルのformat/lintの実行方法: `uvx pre-commit run --files <file>`
+- vitest の environment は `node`（`vitest.config.ts` @ repo root）。DOM API（`EventSource`, `localStorage` 等）を使うコードをテストするときは `globalThis` のプロパティにモック実装を代入する
+- 現在の `COMPOSE_PROFILE` を確認したいときは `make -n deploy` のドライラン出力で判別できる（`.env` を直接読めないことがある）
 
 ## 外部ライブラリ仕様の確認
 

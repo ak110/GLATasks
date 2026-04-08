@@ -282,6 +282,78 @@ test.describe("timers", () => {
     await expect(card).not.toBeVisible({ timeout: 10000 });
   });
 
+  test("SSE 取りこぼし状態のブラウザでも、既に他端末で削除済みのタイマーを削除しようとしてエラーにならない", async ({
+    browser,
+  }) => {
+    // ブラウザ A でタイマーを削除したあと、SSE イベントを受け取れていない
+    // 別ブラウザ B が同じタイマーを削除しようとするケース。
+    // 冪等な削除 API なので、B 側もエラートーストが出ず正常完了するはず。
+    const timerName = `冪等削除_${Date.now()}`;
+
+    const ctxA = await browser.newContext({
+      storageState: "app/tests/.auth/user.json",
+      ignoreHTTPSErrors: true,
+      baseURL: process.env.BASE_URL ?? "https://localhost:38180",
+    });
+    // ブラウザ B は SSE エンドポイントへの接続を遮断する (= 切断中の状態を模擬)
+    const ctxB = await browser.newContext({
+      storageState: "app/tests/.auth/user.json",
+      ignoreHTTPSErrors: true,
+      baseURL: process.env.BASE_URL ?? "https://localhost:38180",
+    });
+    await ctxB.route("**/api/events", (route) => route.abort());
+
+    try {
+      const pageA = await ctxA.newPage();
+      const pageB = await ctxB.newPage();
+
+      await Promise.all([
+        pageA.goto("/timers"),
+        pageA.waitForResponse((res) => res.url().includes("/api/trpc")),
+      ]);
+
+      // A でタイマー作成
+      await pageA.click('[data-testid="timer-add-btn"]');
+      await pageA.locator('[data-testid="timer-name-input"]').waitFor();
+      await pageA.fill('[data-testid="timer-name-input"]', timerName);
+      await pageA.fill('[data-testid="timer-base-time-input"]', "00:01:00");
+      await pageA.click('[data-testid="timer-submit-btn"]');
+
+      const cardA = pageA
+        .locator('[data-testid="timer-card"]')
+        .filter({ hasText: timerName });
+      await expect(cardA).toBeVisible({ timeout: 10000 });
+
+      // B でタイマー一覧を初期ロード (この時点ではタイマーが見える)
+      await Promise.all([
+        pageB.goto("/timers"),
+        pageB.waitForResponse((res) => res.url().includes("/api/trpc")),
+      ]);
+      const cardB = pageB
+        .locator('[data-testid="timer-card"]')
+        .filter({ hasText: timerName });
+      await expect(cardB).toBeVisible({ timeout: 10000 });
+
+      // A で削除 (B は SSE を遮断しているので通知されない)
+      pageA.once("dialog", (dialog) => dialog.accept());
+      await cardA.locator('[data-testid="timer-delete-btn"]').click();
+      await expect(cardA).not.toBeVisible({ timeout: 10000 });
+
+      // B 側ではタイマーがまだ表示されている (取りこぼしを模擬)
+      await expect(cardB).toBeVisible();
+
+      // B で削除を試みる → 冪等なのでエラートーストが出ず、カードが消える
+      pageB.once("dialog", (dialog) => dialog.accept());
+      await cardB.locator('[data-testid="timer-delete-btn"]').click();
+      await expect(cardB).not.toBeVisible({ timeout: 10000 });
+      // エラートーストが出ていないこと
+      await expect(pageB.locator('[data-testid="toast-error"]')).toHaveCount(0);
+    } finally {
+      await ctxA.close();
+      await ctxB.close();
+    }
+  });
+
   test("タイマーを編集できる", async ({ page }) => {
     const timerName = `編集前_${Date.now()}`;
     const newName = `編集後_${Date.now()}`;

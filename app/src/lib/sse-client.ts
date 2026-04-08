@@ -4,7 +4,12 @@
  * 各ページが個別に EventSource を作成していた仕組みを統合し、
  * +layout.svelte で1つの接続を管理する。
  * サーバー時刻オフセットもここで一元管理する。
+ *
+ * 接続成立 (初回および EventSource の自動再接続) のたびに TanStack Query の
+ * 全クエリを invalidate し、切断中に取りこぼしたかもしれない更新を取り直す。
  */
+
+import type { QueryClient } from "@tanstack/svelte-query";
 
 // サーバー時刻オフセット（ms）: サーバー時刻 = Date.now() + offset
 let serverOffset = 0;
@@ -36,19 +41,22 @@ type EventCallback = (event: MessageEvent) => void;
 const subscribers = new Map<string, Set<EventCallback>>();
 
 /** SSE 接続を開始する */
-export function connect(): void {
+export function connect(queryClient: QueryClient): void {
   if (eventSource) return;
 
   const es = new EventSource("/api/events");
   eventSource = es;
 
-  // 接続確立時にサーバー時刻から暫定オフセットを設定
-  // （tRPC レスポンスの RTT/2 補正値で上書きされるまでの初期値）
+  // 接続確立時の処理:
+  // 1. サーバー時刻から暫定オフセットを設定 (tRPC レスポンスの RTT/2 補正値で上書きされる)
+  // 2. 全クエリを invalidate して、切断中に取りこぼしたイベントぶんを取り直す
+  //    (EventSource は自動再接続するため、再接続時もこのハンドラが再発火する)
   es.addEventListener("connected", (e: MessageEvent) => {
     const serverMs = Number(e.data);
     if (serverMs) {
       setServerOffset(serverMs - Date.now());
     }
+    void queryClient.invalidateQueries();
   });
 
   // 登録済みイベントのリスナーを設定

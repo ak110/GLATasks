@@ -102,9 +102,11 @@ nginx 経由の HTTPS（port 38180）でテストするため、開発環境が�
 
 ### Playwright テスト実装の注意点
 
-- **SvelteKit の hydration 完了を待つ**: `waitForSelector` はSSRで描画されるため即返るが、`onMount` の API 呼び出しはまだ完了していない。SSE 接続が常時開いているため `waitUntil: "networkidle"` は使えない。`Promise.all([page.goto(url), page.waitForResponse(res => res.url().includes("/api/trpc"))])` パターンを使うこと。
-- **`browser.newContext()` を使う場合は `baseURL` を明示する**: `page.goto("/")` が動くよう `baseURL` を指定すること。
-- **セレクタの曖昧さに注意**: `button:has-text("追加")` はサイドバーのリスト追加ボタンにも一致する。`main button:has-text("追加")` のようにスコープを限定すること。
+- SvelteKit の hydration 完了を待つ: `waitForSelector` はSSRで描画されるため即返るが、`onMount` の API 呼び出しはまだ完了していない。SSE 接続が常時開いているため `waitUntil: "networkidle"` は使えない。`Promise.all([page.goto(url), page.waitForResponse(res => res.url().includes("/api/trpc"))])` パターンを使うこと。
+- `browser.newContext()` を使う場合は `baseURL` を明示する: `page.goto("/")` が動くよう `baseURL` を指定すること。
+- セレクタの曖昧さに注意: `button:has-text("追加")` はサイドバーのリスト追加ボタンにも一致する。`main button:has-text("追加")` のようにスコープを限定すること。
+- 複数ブラウザ（多端末同期）のテスト: `browser.newContext({ storageState: "app/tests/.auth/user.json", ignoreHTTPSErrors: true, baseURL: process.env.BASE_URL ?? "https://localhost:38180" })` を 2 つ作り、終了時に `finally` で `ctx.close()` する。
+- SSE イベントを受信しない状態を再現する: `await ctx.route("**/api/events", route => route.abort())` で SSE エンドポイントへの接続だけを遮断できる。`/api/trpc` は通るので削除等の通常操作は引き続き実行できる。
 
 ### テスト設計の思想
 

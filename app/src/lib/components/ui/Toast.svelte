@@ -17,6 +17,7 @@
             <div
                 class="flex items-center gap-2 rounded-lg bg-red-100 text-red-800 shadow-lg dark:bg-red-900/40 dark:text-red-400"
                 role="alert"
+                data-testid="toast-error"
             >
                 <span class="px-4 py-3 text-sm">{toast.message}</span>
                 <button

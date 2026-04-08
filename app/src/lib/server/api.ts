@@ -271,8 +271,18 @@ export async function deleteList(
   userId: number,
   listId: number,
 ): Promise<void> {
-  await getOwnedList(listId, userId);
+  // 冪等な削除: 対象が無い・他ユーザーのものは no-op (NOT_FOUND を返さない)。
+  // 別端末で先に削除されていた場合のレース時に、こちらの削除がエラーにならず
+  // クライアントの状態を確実に整合させるため。
+  // schema.ts に ON DELETE CASCADE が無いため、子テーブル (tasks) を明示削除する
+  // 既存の 2 段構成は維持する。
   const db = getDb();
+  const owned = await db
+    .select({ id: lists.id })
+    .from(lists)
+    .where(and(eq(lists.id, listId), eq(lists.user_id, userId)))
+    .limit(1);
+  if (owned.length === 0) return;
   await db.delete(tasks).where(eq(tasks.list_id, listId));
   await db.delete(lists).where(eq(lists.id, listId));
 }
@@ -790,9 +800,13 @@ export async function deleteTimer(
   userId: number,
   timerId: number,
 ): Promise<void> {
-  await getOwnedTimer(timerId, userId);
+  // 冪等な削除: 対象が無い・他ユーザーのものは no-op (NOT_FOUND を返さない)。
+  // 別端末で先に削除されていた場合のレース時に、こちらの削除がエラーにならず
+  // クライアントの状態を確実に整合させるため。
   const db = getDb();
-  await db.delete(timers).where(eq(timers.id, timerId));
+  await db
+    .delete(timers)
+    .where(and(eq(timers.id, timerId), eq(timers.user_id, userId)));
 }
 
 /** タイマーを開始する */
