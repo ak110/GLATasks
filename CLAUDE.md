@@ -8,6 +8,11 @@
   - `make update-actions`: GitHub Actionsのハッシュピン更新のみ（mise経由でpinact実行）
 - Markdownファイルのformat/lintの実行方法: `uvx pre-commit run --files <file>`
 
+## 外部ライブラリ仕様の確認
+
+- SvelteKit / Svelte 5 (runes) / Tailwind CSS v4 / tRPC v11 / Drizzle ORM / TanStack Query / Vitest 4 / Vite 8 / TypeScript 6 など、本リポジトリで使用するライブラリの API・設定・移行手順を参照する場合は `context7` MCP (`mcp__plugin_context7_context7__resolve-library-id` → `mcp__plugin_context7_context7__query-docs`) を優先する
+- 本リポジトリは Claude の学習データより新しいメジャーバージョン (Svelte 5、Tailwind v4、tRPC v11、Vite 8 など) に追従するため、知識のスナップショットではなく最新ドキュメントを確認する
+
 ## 関連ドキュメント
 
 - @README.md

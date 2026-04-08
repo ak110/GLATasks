@@ -1,0 +1,46 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "rm -f \"$CLAUDE_PROJECT_DIR/.claude/.format-dirty\"; exit 0"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r '.tool_input.command // empty' | tr '\\n' ';' | sed 's/\\\\;/ /g' | grep -qE '(^|[;&|(]|&&)[[:space:]]*(cd|pushd)[[:space:]]+\\.?/?app(/[^[:space:];&|)]*)?[[:space:]]*(&&|;)[[:space:]]*make([[:space:]]|$)' && { echo 'app/ に cd してから make を実行することは禁止です。make 内部のパス解決が壊れます (docs/.../development.md 参照)。すべての make コマンドはプロジェクトルート (glatasks/) から実行してください。' >&2; exit 2; } || exit 0"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=$(jq -r '.tool_input.file_path // empty'); case \"$f\" in *.svelte|*.ts|*.tsx|*.js|*.jsx|*.mjs|*.cjs) mkdir -p \"$CLAUDE_PROJECT_DIR/.claude\" && printf '%s\\n' \"$f\" >> \"$CLAUDE_PROJECT_DIR/.claude/.format-dirty\" ;; esac; exit 0"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "M=\"$CLAUDE_PROJECT_DIR/.claude/.format-dirty\"; [ -s \"$M\" ] || { rm -f \"$M\"; exit 0; }; cd \"$CLAUDE_PROJECT_DIR\" || exit 0; sort -u \"$M\" -o \"$M\"; awk 'NF' \"$M\" | while IFS= read -r f; do [ -e \"$f\" ] && printf '%s\\n' \"$f\"; done > \"$M.tmp\" && mv \"$M.tmp\" \"$M\"; [ -s \"$M\" ] || { rm -f \"$M\"; exit 0; }; (xargs -a \"$M\" -d '\\n' uvx pre-commit run --files || xargs -a \"$M\" -d '\\n' uvx pre-commit run --files) >&2; rm -f \"$M\"; exit 0"
+          }
+        ]
+      }
+    ]
+  }
+}
