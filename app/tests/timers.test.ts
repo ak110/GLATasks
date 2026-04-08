@@ -78,7 +78,7 @@ test.describe("timers", () => {
       timeout: 5000,
     });
 
-    // 時間が減っている（1分 = 00:01:00 から少し減ったはず）
+    // 時間が減少していることを確認する（1 分 = 00:01:00 からの経過分）
     const display = await card
       .locator('[data-testid="timer-display"]')
       .textContent();
@@ -287,7 +287,7 @@ test.describe("timers", () => {
   }) => {
     // ブラウザ A でタイマーを削除したあと、SSE イベントを受け取れていない
     // 別ブラウザ B が同じタイマーを削除しようとするケース。
-    // 冪等な削除 API なので、B 側もエラートーストが出ず正常完了するはず。
+    // 冪等な削除 API のため、B 側もエラートーストが出ず正常完了する。
     const timerName = `冪等削除_${Date.now()}`;
 
     const ctxA = await browser.newContext({
@@ -342,7 +342,7 @@ test.describe("timers", () => {
       // B 側ではタイマーがまだ表示されている (取りこぼしを模擬)
       await expect(cardB).toBeVisible();
 
-      // B で削除を試みる → 冪等なのでエラートーストが出ず、カードが消える
+      // B で削除を試みる → 冪等なためエラートーストが出ず、カードが消える
       pageB.once("dialog", (dialog) => dialog.accept());
       await cardB.locator('[data-testid="timer-delete-btn"]').click();
       await expect(cardB).not.toBeVisible({ timeout: 10000 });

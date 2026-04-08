@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "jq -r '.tool_input.command // empty' | tr '\\n' ';' | sed 's/\\\\;/ /g' | grep -qE '(^|[;&|(]|&&)[[:space:]]*(cd|pushd)[[:space:]]+\\.?/?app(/[^[:space:];&|)]*)?[[:space:]]*(&&|;)[[:space:]]*make([[:space:]]|$)' && { echo 'app/ に cd してから make を実行することは禁止です。make 内部のパス解決が壊れます (docs/.../development.md 参照)。すべての make コマンドはプロジェクトルート (glatasks/) から実行してください。' >&2; exit 2; } || exit 0"
+            "command": "jq -r '.tool_input.command // empty' | tr '\\n' ';' | sed 's/\\\\;/ /g' | grep -qE '(^|[;&|(]|&&)[[:space:]]*(cd|pushd)[[:space:]]+\\.?/?app(/[^[:space:];&|)]*)?[[:space:]]*(&&|;)[[:space:]]*make([[:space:]]|$)' && { echo 'app/ に cd してから make を実行することは禁止されています。make 内部のパス解決が誤動作します (docs/.../development.md 参照)。すべての make コマンドはプロジェクトルート (glatasks/) から実行してください。' >&2; exit 2; } || exit 0"
           }
         ]
       }

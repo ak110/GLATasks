@@ -75,7 +75,7 @@ describe("theme", () => {
 
     test("system テーマで prefers-color-scheme に従う", () => {
       applyTheme("system");
-      // matchMedia モックが matches: false なのでライトモード
+      // matchMedia モックが matches: false のためライトモード
       expect(classList.has("dark")).toBe(false);
     });
   });

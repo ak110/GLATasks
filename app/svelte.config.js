@@ -6,8 +6,8 @@ const config = {
   preprocess: vitePreprocess(),
   kit: {
     adapter: adapter({ out: "build" }),
-    // CSRF対策はhooks.server.tsのSec-Fetch-Siteチェックで行うため、
-    // SvelteKit組み込みのOriginチェックは無効化（リバプロ経由で誤検知するため）
+    // CSRF 対策は hooks.server.ts の Sec-Fetch-Site チェックで行うため、
+    // SvelteKit 組み込みの Origin チェックは無効化する（リバースプロキシ経由で誤検知するため）
     csrf: { trustedOrigins: ["*"] },
   },
 };

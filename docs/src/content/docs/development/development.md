@@ -5,14 +5,14 @@ description: 開発環境の構築、テスト、CI/CD、リリース手順
 
 ## 作業ディレクトリ
 
-**すべての `make` コマンドはプロジェクトルートから実行すること。**
+すべての `make` コマンドはプロジェクトルートから実行する。
 
 ```bash
 cd /path/to/glatasks
 make test  # OK
 ```
 
-`app/` に移動して実行すると `${PWD}` がずれて Makefile 内のパス解決が狂うため、必ずルートから実行する。
+`app/` に移動して実行すると `${PWD}` がずれて Makefile 内のパス解決が誤動作するため、必ずルートから実行する。
 
 ## 開発環境の構築手順
 
@@ -48,10 +48,10 @@ make test  # OK
 - Prettier, prettier-plugin-svelte, prettier-plugin-tailwindcss: コード整形
 - ESLint: typescript-eslint, eslint-plugin-svelte
 
-Biome移行の主要ブロッカー
+Biome 移行における主要な阻害要因は以下のとおり。
 
-1. Svelte マークアップ非対応 — Biome は .svelte の マークアップ部分のフォーマットができない。現在は prettier-plugin-svelte が全体を統一的に処理している
-2. Tailwind CSSクラスソート非対応 — prettier-plugin-tailwindcss の代替がBiomeにない。プロジェクト全体で使われている
+1. Svelte マークアップ非対応 — Biome は `.svelte` のマークアップ部分のフォーマットに対応していない。現在は prettier-plugin-svelte が全体を統一的に処理している
+2. Tailwind CSS クラスソート非対応 — prettier-plugin-tailwindcss に相当する機能が Biome に存在しない。当該機能はプロジェクト全体で使用している
 
 ## Docker 構成
 
@@ -112,7 +112,7 @@ nginx 経由の HTTPS（port 38180）でテストするため、開発環境が�
 
 `make format` と `make test` の2パターンを基本とする。
 
-- `make format`: 軽量な整形+lint。コード編集後に気軽に実行する用途。pre-commit hooks（prettier, eslint --fix, markdownlint, textlint）を実行
+- `make format`: 軽量な整形 + lint。コード編集後に日常的に実行する用途。pre-commit hooks（prettier, eslint --fix, markdownlint, textlint）を実行
 - `make test`: 全テスト。コミット前に実行する用途。format → 型チェック → ユニットテスト → バックアップテスト → e2eテスト。format で eslint --fix 済みのため lint チェックは省略
 - CI（`pnpm run test`）: lint + 型チェック + ユニットテスト。CI では format が先行しないため lint を含む
 
@@ -120,11 +120,11 @@ nginx 経由の HTTPS（port 38180）でテストするため、開発環境が�
 
 - JSON ボディから受け取る数値は文字列の場合があるため `Number()` で明示変換すること（`"5" !== 5` の型不一致を防ぐ）
 - 日時は全レイヤーで UTC 統一。DB（TIMESTAMP 型）→ サーバー（Date オブジェクト）→ クライアント（ISO8601 文字列）の変換は自動で行われるため、タイムゾーンを意識するコードは不要
-- pnpm ワークスペース内で同一パッケージの異なるメジャーバージョンが混在すると、依存解決の競合でビルドが壊れる場合がある（例: zod v3/v4 混在による Astro ビルド失敗）。ワークスペース内の全パッケージで共通依存のメジャーバージョンを揃えることを基本方針とする
+- pnpm ワークスペース内で同一パッケージの異なるメジャーバージョンが混在すると、依存解決の競合でビルドが失敗する場合がある（例: zod v3/v4 混在による Astro ビルド失敗）。ワークスペース内の全パッケージで共通依存のメジャーバージョンを揃えることを基本方針とする
 
 ## サプライチェーン攻撃対策
 
-npm / PyPI レジストリへの悪意あるパッケージ公開に対する防御として、公開から一定期間経過したパッケージのみインストールを許可する設定を導入している。
+npm / PyPI レジストリへの悪意あるパッケージ公開に対する防御として、公開から一定期間が経過したパッケージのみインストールを許可する設定を導入している。
 
 ### pnpm: minimumReleaseAge
 

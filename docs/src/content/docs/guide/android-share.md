@@ -3,7 +3,7 @@ title: Android 共有
 description: Android の共有メニューから GLATasks にタスクを追加する方法
 ---
 
-PWA としてホーム画面に追加すると、Android の共有メニューから直接タスクを追加できる（Web Share Target API を使用）。
+PWA としてホーム画面に追加すると、Android の共有メニューから直接タスクを追加できる（Web Share Target API を使用する）。
 
 ## セットアップ
 

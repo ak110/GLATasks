@@ -66,7 +66,7 @@ describe("adjustUpdatedTimestamps", () => {
 
   it("ユーザーの例: sort_orderと矛盾するupdatedが補正される", () => {
     // [0] Sep / [1] Oct(矛盾!) / [2] Aug
-    // 矛盾区間は [0]~[1]（[2] の Aug は [0] の Sep 以下なので区間外）
+    // 矛盾区間は [0]~[1]（[2] の Aug は [0] の Sep 以下のため区間外）
     // 区間 [Sep, Oct] を降順ソート → [Oct, Sep]
     const result = adjustUpdatedTimestamps([
       { updated: new Date("2026-09-01") },

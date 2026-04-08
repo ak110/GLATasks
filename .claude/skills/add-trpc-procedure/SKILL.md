@@ -1,11 +1,11 @@
 ---
 name: add-trpc-procedure
-description: GLATasks に新しい tRPC procedure を追加するときの定型チェックリスト。Zod スキーマ → ルーター登録 → 難読化ミドルウェア → SSE 通知 → クライアント側 invalidate → テストの漏れを防ぐ。ユーザーが "tRPC procedure 追加" や "/add-trpc-procedure" を叩いたとき、もしくは新しい router エントリを書く前に呼び出す。
+description: GLATasks に新しい tRPC procedure を追加するときの定型チェックリスト。Zod スキーマ → ルーター登録 → 難読化ミドルウェア → SSE 通知 → クライアント側 invalidate → テストの漏れを防ぐ。ユーザーが "tRPC procedure 追加" や "/add-trpc-procedure" を実行したとき、もしくは新しい router エントリを書く前に呼び出す。
 ---
 
 # tRPC Procedure 追加手順 (GLATasks)
 
-新しい tRPC procedure を追加するときは以下のチェックリストを TaskCreate に展開してから着手すること。抜けると難読化漏れ、SSE 通知漏れ、クライアント側の再取得漏れ、型不一致などの致命バグを生みやすい。
+新しい tRPC procedure を追加するときは、以下のチェックリストを TaskCreate に展開してから着手する。項目に漏れがあると、難読化漏れ、SSE 通知漏れ、クライアント側の再取得漏れ、型不一致などの致命的なバグを招きやすい。
 
 ## チェックリスト
 
@@ -50,7 +50,7 @@ description: GLATasks に新しい tRPC procedure を追加するときの定型
 
 ### 6. 検証
 
-- `make format` → `make test` をルートから実行 (`app/` に cd しない。Makefile のパス解決が壊れる)
+- `make format` → `make test` をルートから実行 (`app/` に cd しない。Makefile のパス解決が整合しなくなる)
 - 開発環境で `make healthcheck` が通ることを確認
 - `trpc-zod-contract-reviewer` エージェントに差分レビューを依頼する (`.claude/agents/trpc-zod-contract-reviewer.md`)
 

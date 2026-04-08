@@ -1,6 +1,6 @@
 include .env
 ifndef COMPOSE_PROFILE
-$(error COMPOSE_PROFILEが定義されていません)
+$(error COMPOSE_PROFILE が定義されていません)
 endif
 
 RUN_ARGS += --user=$(shell id --user):$(shell id --group) --ulimit="core=0"
@@ -26,7 +26,7 @@ RUN_NODE = docker run $(2) \
 help:
 	@cat Makefile
 
-sync:  # 最新化＆諸々更新
+sync:  # 最新化と各種更新
 	docker pull node:lts
 	git fetch --prune
 	git rebase
@@ -37,26 +37,26 @@ BACKUP_KEEP ?= 5
 
 backup:  # デプロイ前バックアップ（DB + キーファイル）
 	$(eval BACKUP_DIR := $(DATA_DIR)/backups/$(shell date +%Y%m%d_%H%M%S))
-	@echo "📦 バックアップ開始: $(BACKUP_DIR)"
+	@echo "バックアップを開始します: $(BACKUP_DIR)"
 	mkdir -p $(BACKUP_DIR)
 	@# DBダンプ実行（停止中はエラー。SKIP_DB_DUMP=1 でスキップ可）
 	@if [ "$(SKIP_DB_DUMP)" = "1" ]; then \
-		echo "⚠️ SKIP_DB_DUMP=1: DBダンプをスキップ"; \
+		echo "SKIP_DB_DUMP=1: DBダンプをスキップします"; \
 	elif docker compose --profile $(COMPOSE_PROFILE) ps db --format '{{.State}}' 2>/dev/null | grep -q running; then \
 		docker compose --profile $(COMPOSE_PROFILE) exec -T db \
 			mariadb-dump -uglatasks -pglatasks --single-transaction --routines --triggers glatasks \
 			> $(BACKUP_DIR)/glatasks.sql \
-		&& echo "✅ DBダンプ完了" \
-		|| (echo "❌ DBダンプ失敗" && \rm -f $(BACKUP_DIR)/glatasks.sql && exit 1); \
+		&& echo "DBダンプが完了しました" \
+		|| (echo "DBダンプに失敗しました" && \rm -f $(BACKUP_DIR)/glatasks.sql && exit 1); \
 	else \
-		echo "❌ DBコンテナが起動していません" && exit 1; \
+		echo "DBコンテナが起動していません" && exit 1; \
 	fi
 	cp -p $(DATA_DIR)/.encrypt_key $(BACKUP_DIR)/ 2>/dev/null || true
 	cp -p $(DATA_DIR)/.secret_key $(BACKUP_DIR)/ 2>/dev/null || true
-	@echo "✅ バックアップ完了: $(BACKUP_DIR)"
+	@echo "バックアップが完了しました: $(BACKUP_DIR)"
 	@# 古いバックアップを削除（直近 BACKUP_KEEP 世代を保持）
 	@ls -dt $(DATA_DIR)/backups/*/ 2>/dev/null | tail -n +$$(($(BACKUP_KEEP) + 1)) | xargs \rm -rf 2>/dev/null || true
-	@echo "🧹 古いバックアップ削除完了（保持: $(BACKUP_KEEP) 世代）"
+	@echo "古いバックアップを削除しました（保持: $(BACKUP_KEEP) 世代）"
 
 deploy:
 	$(MAKE) build
@@ -108,9 +108,9 @@ update:
 	$(MAKE) update-actions
 	$(MAKE) test
 
-# GitHub Actionsのアクションをハッシュピンで最新化（mise未導入時はスキップ）
+# GitHub Actions のアクションをハッシュピンで最新化する（mise 未導入時はスキップする）
 update-actions:
-	@command -v mise >/dev/null 2>&1 || { echo "mise未検出、スキップ"; exit 0; }; \
+	@command -v mise >/dev/null 2>&1 || { echo "mise が未検出のためスキップします"; exit 0; }; \
 	GITHUB_TOKEN=$$(gh auth token) mise exec -- pinact run --update --min-age 1
 
 format:  # 整形 + 軽量lint（自動修正あり）
@@ -130,10 +130,10 @@ migrate:  # DBマイグレーション実行
 		import mysql from 'mysql2/promise';\
 		const conn = await mysql.createConnection(process.env.DATABASE_URL);\
 		const db = drizzle(conn);\
-		console.log('🔄 Running migrations...');\
+		console.log('Running migrations...');\
 		await migrate(db, { migrationsFolder: './drizzle/migrations' });\
 		await conn.end();\
-		console.log('✅ Done!');\
+		console.log('Done.');\
 	"
 
 db-studio:  # Drizzle Studio起動
@@ -144,24 +144,24 @@ PLAYWRIGHT_IMAGE = mcr.microsoft.com/playwright:v1.58.2-noble
 PNPM_VERSION = $(shell node -e "const p=require('./package.json'); console.log((p.packageManager||'').split('@')[1]?.split('+')[0]||'latest')" 2>/dev/null || echo latest)
 
 test-backup:  # バックアップ機能のテスト（Docker環境が起動していること）
-	@echo "🧪 バックアップテスト開始"
+	@echo "バックアップテストを開始します"
 	@TEST_BACKUP_DIR=$$(mktemp -d) && \
 	trap '\rm -rf "$$TEST_BACKUP_DIR"' EXIT && \
 	\
 	echo "--- テスト1: バックアップ作成 ---" && \
 	$(MAKE) backup DATA_DIR=$$TEST_BACKUP_DIR && \
 	BACKUP=$$(ls -d $$TEST_BACKUP_DIR/backups/*/ | head -1) && \
-	test -f "$$BACKUP/glatasks.sql" && echo "✅ DBダンプが存在する" && \
-	grep -q "CREATE TABLE" "$$BACKUP/glatasks.sql" && echo "✅ DBダンプにテーブル定義が含まれる" && \
+	test -f "$$BACKUP/glatasks.sql" && echo "DBダンプが存在します" && \
+	grep -q "CREATE TABLE" "$$BACKUP/glatasks.sql" && echo "DBダンプにテーブル定義が含まれます" && \
 	\
 	echo "--- テスト2: 世代管理 ---" && \
 	for i in 1 2 3; do \
 		sleep 1 && $(MAKE) backup DATA_DIR=$$TEST_BACKUP_DIR BACKUP_KEEP=2; \
 	done && \
 	BACKUP_COUNT=$$(ls -d $$TEST_BACKUP_DIR/backups/*/ | wc -l) && \
-	test "$$BACKUP_COUNT" -eq 2 && echo "✅ 世代管理: $$BACKUP_COUNT 世代のみ保持されている" && \
+	test "$$BACKUP_COUNT" -eq 2 && echo "世代管理: $$BACKUP_COUNT 世代のみ保持されています" && \
 	\
-	echo "🎉 全テスト成功"
+	echo "全テストが成功しました"
 
 docs:  # ドキュメントサイトをローカルで起動
 	$(call RUN_NODE, cd docs && pnpm dev --host, --rm --interactive --tty -p 4321:4321)

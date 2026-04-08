@@ -158,6 +158,6 @@ vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
 
-# Claude Code (個人設定とランタイム生成ファイル)
+# Claude Code (個人設定およびランタイム生成ファイル)
 .claude/settings.local.json
 .claude/.format-dirty

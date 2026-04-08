@@ -8,7 +8,7 @@ export default defineConfig({
     integrations: [
         starlight({
             title: "GLATasks",
-            description: "タスクメモ管理＆カウントダウンタイマーアプリ",
+            description: "タスクメモ管理とカウントダウンタイマーを統合した Web アプリ",
             social: [
                 {
                     icon: "github",
