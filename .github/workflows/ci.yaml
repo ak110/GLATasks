@@ -30,11 +30,21 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5.0.0
 
+      - name: Install uv
+        uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57 # v8.0.0
+        with:
+          enable-cache: true
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Build
         run: pnpm run build
 
-      - name: Lint and type check
-        run: pnpm run test
+      - name: Lint with pyfltr
+        env:
+          UV_EXCLUDE_NEWER: 0s
+        run: uvx pyfltr --exit-zero-even-if-formatted
+
+      - name: Type check and unit tests
+        run: pnpm run check && pnpm run test:unit

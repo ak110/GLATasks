@@ -113,12 +113,19 @@ update-actions:
 	@command -v mise >/dev/null 2>&1 || { echo "mise が未検出のためスキップします"; exit 0; }; \
 	GITHUB_TOKEN=$$(gh auth token) mise exec -- pinact run --update --min-age 1
 
+# pyfltr 実行コマンド (eslint / prettier / markdownlint / textlint を駆動する)
+# UV_EXCLUDE_NEWER=0s は pyfltr 1.18.0 リリース直後の exclude-newer 制約回避用
+# (24 時間経過後に削除してよい)
+PYFLTR = UV_EXCLUDE_NEWER=0s uvx pyfltr
+
 format:  # 整形 + 軽量lint（自動修正あり）
-	@# pre-commitはフォーマットによるエラーを考慮して2度まで実行
-	uvx pre-commit run --all-files || uvx pre-commit run --all-files
+	@# pre-commit はフォーマットによるエラーを考慮して2度まで実行
+	UV_EXCLUDE_NEWER=0s uvx pre-commit run --all-files || UV_EXCLUDE_NEWER=0s uvx pre-commit run --all-files
+	-$(PYFLTR) --fix --exit-zero-even-if-formatted
 
 test:  # format + check + unit test + backup test + e2eテスト
 	$(MAKE) format
+	$(PYFLTR) --exit-zero-even-if-formatted
 	$(call RUN_NODE, pnpm run check && pnpm run test:unit, --rm)
 	$(MAKE) test-backup
 	$(MAKE) test-e2e

@@ -19,29 +19,15 @@ repos:
       - id: trailing-whitespace
         exclude: ^dist/.*$
 
-  - repo: https://github.com/DavidAnson/markdownlint-cli2
-    rev: v0.21.0
-    hooks:
-      - id: markdownlint-cli2
-
   - repo: local
     hooks:
-      - id: textlint
-        name: textlint
-        entry: textlint
-        language: node
-        files: \.(md|mdown|markdown)$
-        args: []
-        require_serial: false
-        additional_dependencies:
-          - textlint@15.5.4
-          - textlint-rule-preset-ja-technical-writing@12.0.2
-          - textlint-rule-preset-jtf-style@3.0.3
-          - textlint-rule-ja-no-abusage@3.0.0
-      - id: pnpm-format
-        name: pnpm-format
-        entry: pnpm run format
-        types_or: [javascript, json, ts, svelte, css, yaml]
+      - id: pyfltr
+        name: pyfltr
+        # eslint / prettier / markdownlint / textlint を pyfltr 経由でまとめて実行する。
+        # UV_EXCLUDE_NEWER=0s は pyfltr 1.18.0 リリース直後の exclude-newer 制約回避用
+        # (24 時間経過後に削除してよい)。
+        entry: env UV_EXCLUDE_NEWER=0s uvx pyfltr --exit-zero-even-if-formatted --commands=fast
+        types_or: [javascript, jsx, ts, tsx, svelte, json, css, yaml, markdown]
         pass_filenames: false
         require_serial: true
         language: system

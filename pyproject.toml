@@ -1,0 +1,55 @@
+# pyfltr 専用の設定ファイル。
+# glatasks 自体は TypeScript プロジェクトだが、pyfltr が
+# [tool.pyfltr] セクションを読むために本ファイルを置いている。
+
+[tool.pyfltr]
+# JS 系ツールは package.json で管理するため pnpm runner を使う。
+# node_modules/.bin の実行ファイルを pnpm exec 経由で呼び出す。
+js-runner = "pnpm"
+
+# 有効化するツール
+eslint = true
+prettier = true
+markdownlint = true
+textlint = true
+
+# Python ツールは glatasks では使わないため無効化する。
+pyupgrade = false
+autoflake = false
+isort = false
+black = false
+pflake8 = false
+mypy = false
+pylint = false
+ruff-format = false
+ruff-check = false
+pyright = false
+ty = false
+pytest = false
+
+# textlint のプリセット。js-runner=pnpm では package.json 経由で
+# インストールされる前提のため、この列は参照されないが、
+# 将来 pnpx に切り替えた場合のために明示しておく。
+textlint-packages = [
+    "textlint-rule-preset-ja-technical-writing",
+    "textlint-rule-preset-jtf-style",
+    "textlint-rule-ja-no-abusage",
+]
+
+# pyfltr の除外パターン。eslint / prettier は独自の ignore 設定
+# (eslint.config.js の ignores / .prettierignore) を持つが、
+# pyfltr 側でもファイル列挙時点で除外することで高速化する。
+extend-exclude = [
+    "app/.svelte-kit",
+    "app/build",
+    "app/tests",
+    # app/package.json はルート package.json へのシンボリックリンク。
+    # prettier は明示的に指定されたシンボリックリンクを拒否するため、
+    # pyfltr 側のファイル列挙時点で除外する。
+    "app/package.json",
+    ".cache",
+    "docs",
+    "drizzle/migrations",
+    "test-results",
+    "chrome_extension/dist",
+]
