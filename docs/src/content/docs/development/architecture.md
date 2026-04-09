@@ -34,7 +34,7 @@ flowchart TB
 
 ## 外部リバースプロキシ設定
 
-Docker Compose の前段に Let's Encrypt 証明書で HTTPS 終端する外部 nginx を配置する場合の設定。
+Docker Composeの前段にLet's Encrypt証明書でHTTPS終端する外部nginxを配置する場合の設定。
 
 ```mermaid
 flowchart LR
@@ -50,9 +50,9 @@ flowchart LR
 
 設定上の制約:
 
-- `/api/events` と `/` の両方に `proxy_ssl_certificate` / `proxy_ssl_certificate_key` が必要（内部 nginx が自己署名 HTTPS のため）
-- SSE 用の `/api/events` には `proxy_buffering off` + `proxy_read_timeout 86400` + `proxy_http_version 1.1` + `Connection ''` が必須
-- `X-Accel-Buffering: no` ヘッダーで nginx のレスポンスバッファも無効化する
+- `/api/events` と `/` の両方に `proxy_ssl_certificate` / `proxy_ssl_certificate_key` が必要（内部nginxが自己署名HTTPSのため）
+- SSE用の `/api/events` には `proxy_buffering off` + `proxy_read_timeout 86400` + `proxy_http_version 1.1` + `Connection ''` が必須
+- `X-Accel-Buffering: no` ヘッダーでnginxのレスポンスバッファも無効化する
 
 設定例:
 
@@ -102,7 +102,7 @@ server {
 
 ## リアルタイム同期（SSE）
 
-mutation 完了時に SSE (Server-Sent Events) で他タブ・他端末へ即座に通知する。
+mutation完了時にSSE (Server-Sent Events) で他タブ・他端末へ即座に通知する。
 
 ```mermaid
 sequenceDiagram
@@ -118,11 +118,11 @@ sequenceDiagram
     B->>S: invalidateQueries → 再取得
 ```
 
-- エンドポイント: `GET /api/events`（Cookie 認証）
+- エンドポイント: `GET /api/events`（Cookie認証）
 - データは含めずイベント種別のみ送信（`lists:updated` / `tasks:updated` / `timers:updated`）
-- クライアントはイベント受信時に TanStack Query の `invalidateQueries` で該当データを再取得
+- クライアントはイベント受信時にTanStack Queryの `invalidateQueries` で該当データを再取得
 - 再接続はブラウザの `EventSource` 自動再接続に委ねる
-- nginx: `/api/events` に `proxy_buffering off` を設定（SSE がバッファされると配信遅延が発生するため）
+- nginx: `/api/events` に `proxy_buffering off` を設定（SSEがバッファされると配信遅延が発生するため）
 
 ## タイマー時刻同期
 
@@ -130,7 +130,7 @@ sequenceDiagram
 
 ### オフセット計算
 
-tRPC レスポンスで RTT/2 補正付きの精密なオフセットを計算する:
+tRPCレスポンスでRTT/2補正付きの精密なオフセットを計算する:
 
 ```text
 offset = serverTime - (requestStart + requestEnd) / 2
@@ -145,29 +145,29 @@ tRPC response (SSEイベント後) → setServerOffset(RTT/2補正値)
 SSE heartbeat (30秒ごと)  ──→ 接続維持のみ（オフセット更新なし）
 ```
 
-SSE は片道通信のため RTT を測定できない。heartbeat のサーバー時刻でオフセットを上書きすると、tRPC の RTT/2 補正で得た精密値が片道遅延分だけズレた値に劣化するため、heartbeat は接続維持のみに使用する。
+SSEは片道通信のためRTTを測定できない。heartbeatのサーバー時刻でオフセットを上書きすると、tRPCのRTT/2補正で得た精密値が片道遅延分だけズレた値に劣化するため、heartbeatは接続維持のみに使用する。
 
 ## 認証設計
 
-Cookie ベースの JWT/HS256 セッション。実装詳細は `hooks.server.ts` / `session.ts` を参照。
+CookieベースのJWT/HS256セッション。実装詳細は `hooks.server.ts` / `session.ts` を参照。
 
 ### CSRF 対策
 
 多層防御を採用:
 
-- SvelteKit 組み込みの `checkOrigin` で form action を保護
-- `hooks.server.ts` で `Sec-Fetch-Site: cross-site` のミューテーションを `/api/*` でブロック（tRPC エンドポイントの保護）
-- ログアウトを POST に限定（GET での CSRF を防止）
+- SvelteKit組み込みの `checkOrigin` でform actionを保護
+- `hooks.server.ts` で `Sec-Fetch-Site: cross-site` のミューテーションを `/api/*` でブロック（tRPCエンドポイントの保護）
+- ログアウトをPOSTに限定（GETでのCSRFを防止）
 
 ### Chrome 拡張対応
 
-Chrome 拡張のポップアップ内 iframe からのアクセスを許可する必要があるため、Cookie に `sameSite: "none"` + `secure: true` を設定。この設定は CSRF 対策を弱めるため、上記の `Sec-Fetch-Site` チェックで補完している。
+Chrome拡張のポップアップ内iframeからのアクセスを許可する必要があるため、Cookieに `sameSite: "none"` + `secure: true` を設定。この設定はCSRF対策を弱めるため、上記の `Sec-Fetch-Site` チェックで補完している。
 
 ## DB 設計方針
 
 テーブル定義は `app/src/lib/server/schema.ts` を参照。以下はコードから読み取りにくい設計判断:
 
-- 日時カラムはすべて TIMESTAMP 型で UTC 保存。タイムゾーン変換はクライアント側で行い、サーバー・DB 層ではタイムゾーンを意識しない設計
-- 並び順は `sort_order` INT カラム（昇順、1000 刻み）。刻み幅を大きくすることで、挿入時に周囲のレコードを更新せずに済む
+- 日時カラムはすべてTIMESTAMP型でUTC保存。タイムゾーン変換はクライアント側で行い、サーバー・DB層ではタイムゾーンを意識しない設計
+- 並び順は `sort_order` INTカラム（昇順、1000刻み）。刻み幅を大きくすることで、挿入時に周囲のレコードを更新せずに済む
 - タイマーの残り時間はサーバー側で計算せず、`remaining_seconds` と `started_at` をクライアントに渡してブラウザ側で計算する。これにより秒単位のリアルタイム表示をポーリングなしで実現する
-- タイマーの `ephemeral` カラムは 1 回限りの使い切りタイマーを識別するフラグ。作成時のみ設定でき、`adjust` / `reset` / `setTime` などの操作で変更されない。クライアント側では満了到達時に削除ボタンを強調し、確認ダイアログを省略して削除できる体験に用いる
+- タイマーの `ephemeral` カラムは1回限りの使い切りタイマーを識別するフラグ。作成時のみ設定でき、`adjust` / `reset` / `setTime` などの操作で変更されない。クライアント側では満了到達時に削除ボタンを強調し、確認ダイアログを省略して削除できる体験に用いる

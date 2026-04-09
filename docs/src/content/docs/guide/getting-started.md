@@ -3,7 +3,7 @@ title: はじめに
 description: GLATasks の概要と機能紹介
 ---
 
-GLATasks は、タスクメモ管理とカウントダウンタイマーを統合した Web アプリ。自前のサーバーにデプロイして利用する。
+GLATasksは、タスクメモ管理とカウントダウンタイマーを統合したWebアプリ。自前のサーバーにデプロイして利用する。
 
 ## 主な機能
 
@@ -24,7 +24,7 @@ GLATasks は、タスクメモ管理とカウントダウンタイマーを統�
 
 ### リアルタイム同期
 
-- 複数の端末・タブ間で変更が即座に反映（SSE による同期）
+- 複数の端末・タブ間で変更が即座に反映（SSEによる同期）
 - 他端末で更新されたタスクには青丸マークで通知
 
 ### テーマ
@@ -33,16 +33,16 @@ GLATasks は、タスクメモ管理とカウントダウンタイマーを統�
 
 ### マルチプラットフォーム
 
-- PWA としてホーム画面に追加可能
-- [Chrome 拡張機能](/GLATasks/guide/chrome-extension/)で Web ページをワンクリック保存
+- PWAとしてホーム画面に追加可能
+- [Chrome 拡張機能](/GLATasks/guide/chrome-extension/)でWebページをワンクリック保存
 - [Android 共有メニュー](/GLATasks/guide/android-share/)から直接タスク追加
 
 ## デプロイ
 
 ### 前提条件
 
-- Docker / Docker Compose がインストールされたサーバー
-- HTTPS 環境（リバースプロキシ等）
+- Docker / Docker Composeがインストールされたサーバー
+- HTTPS環境（リバースプロキシ等）
 
 ### 手順
 
@@ -59,7 +59,7 @@ GLATasks は、タスクメモ管理とカウントダウンタイマーを統�
    cp .env-example .env
    ```
 
-   `DATA_DIR` にデータ保存先ディレクトリのパスを設定する。`COMPOSE_PROFILE` は `production` を推奨。
+   `DATA_DIR` にデータ保存先ディレクトリのパスを設定する（`COMPOSE_PROFILE` は `production` を推奨）
 
 3. 起動
 
@@ -67,9 +67,9 @@ GLATasks は、タスクメモ管理とカウントダウンタイマーを統�
    make deploy
    ```
 
-4. HTTPS でアクセスできるようリバースプロキシを設定する。設定例は[アーキテクチャの外部リバースプロキシ設定](/GLATasks/development/architecture/#外部リバースプロキシ設定)を参照。
+4. HTTPSでアクセスできるようリバースプロキシを設定する（設定例は[アーキテクチャの外部リバースプロキシ設定](/GLATasks/development/architecture/#外部リバースプロキシ設定)を参照）
 
-5. ブラウザでアクセスし、ユーザー登録してログインする。
+5. ブラウザでアクセスし、ユーザー登録してログインする
 
 ### 停止
 

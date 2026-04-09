@@ -1,13 +1,13 @@
 # Save To GLATasks Chrome拡張機能
 
-現在のページのタイトルと URL を GLATasks に保存するための Chrome 拡張機能。
+現在のページのタイトルとURLをGLATasksに保存するためのChrome拡張機能。
 
 ## 機能
 
 - 右クリックメニュー: ページ上で右クリックして「GLATasksに保存する」を選択
 - 拡張機能アイコン: ツールバーの拡張機能アイコンをクリック
 
-いずれの方法でも、現在のページのタイトルと URL を用いて以下の URL を新しいタブで開く。
+いずれの方法でも、現在のページのタイトルとURLを用いて以下のURLを新しいタブで開く。
 
 ```text
 https://glatasks.tqzh.tk/share/ingest?title={title}&url={url}
@@ -17,7 +17,7 @@ https://glatasks.tqzh.tk/share/ingest?title={title}&url={url}
 
 1. Chrome拡張機能の管理ページを開く:
    - Chromeのアドレスバーに `chrome://extensions/` と入力
-   - または Chrome メニュー > その他のツール > 拡張機能
+   - またはChromeメニューから「その他のツール」「拡張機能」の順に選択
 
 2. 「デベロッパーモード」を有効にする（右上のトグルスイッチ）
 
@@ -52,7 +52,7 @@ https://glatasks.tqzh.tk/share/ingest?title={title}&url={url}
 
 ## 動作環境
 
-- Chrome Manifest V3 対応
+- Chrome Manifest V3対応
 - 必要な権限:
   - `activeTab`: 現在のタブの情報を取得
   - `contextMenus`: 右クリックメニューの追加
