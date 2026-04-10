@@ -2,7 +2,6 @@
 
 [tool.uv]
 exclude-newer = "1 day"
-exclude-newer-package = { pyfltr = false }
 
 [tool.pyfltr]
 # JS/TS 専用プロジェクトのため Python 系ツールを一括無効化する。

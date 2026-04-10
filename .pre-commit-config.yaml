@@ -24,9 +24,7 @@ repos:
       - id: pyfltr
         name: pyfltr
         # eslint / prettier / markdownlint / textlint を pyfltr 経由でまとめて実行する。
-        # UV_EXCLUDE_NEWER=0s は pyfltr 1.18.0 リリース直後の exclude-newer 制約回避用
-        # (24 時間経過後に削除してよい)。
-        entry: env UV_EXCLUDE_NEWER=0s uvx pyfltr --exit-zero-even-if-formatted --commands=fast
+        entry: uvx pyfltr --exit-zero-even-if-formatted --commands=fast
         types_or: [javascript, jsx, ts, tsx, svelte, json, css, yaml, markdown]
         pass_filenames: false
         require_serial: true
