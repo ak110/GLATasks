@@ -115,14 +115,14 @@ update-actions:
 	@command -v mise >/dev/null 2>&1 || { echo "mise が未検出のためスキップします"; exit 0; }; \
 	GITHUB_TOKEN=$$(gh auth token) mise exec -- pinact run --update --min-age 1
 
-format:  # 整形 + 軽量lint（自動修正あり）
+format:  # 整形 + 軽量lint
 	@# pre-commit はフォーマットによるエラーを考慮して2度まで実行
 	uvx pre-commit run --all-files || uvx pre-commit run --all-files
-	-uvx pyfltr --fix --exit-zero-even-if-formatted
+	-uvx pyfltr fast
 
 test:  # format + check + unit test + backup test + e2eテスト
 	$(MAKE) format
-	uvx pyfltr --exit-zero-even-if-formatted
+	uvx pyfltr run
 	$(call RUN_NODE, pnpm run check && pnpm run test:unit, --rm)
 	$(MAKE) test-backup
 	$(MAKE) test-e2e

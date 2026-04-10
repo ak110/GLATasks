@@ -44,7 +44,7 @@ jobs:
       - name: Lint with pyfltr
         env:
           UV_EXCLUDE_NEWER: 0s
-        run: uvx pyfltr --exit-zero-even-if-formatted
+        run: uvx pyfltr ci
 
       - name: Type check and unit tests
         run: pnpm run check && pnpm run test:unit

@@ -1,46 +1,13 @@
 {
-  "hooks": {
-    "SessionStart": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "uvx pyfltr dirty init; exit 0"
-          }
-        ]
+  "extraKnownMarketplaces": {
+    "ak110-dotfiles": {
+      "source": {
+        "source": "github",
+        "repo": "ak110/dotfiles"
       }
-    ],
-    "PreToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "jq -r '.tool_input.command // empty' | tr '\\n' ';' | sed 's/\\\\;/ /g' | grep -qE '(^|[;&|(]|&&)[[:space:]]*(cd|pushd)[[:space:]]+\\.?/?app(/[^[:space:];&|)]*)?[[:space:]]*(&&|;)[[:space:]]*make([[:space:]]|$)' && { echo 'app/ に cd してから make を実行することは禁止されています。make 内部のパス解決が誤動作します (docs/.../development.md 参照)。すべての make コマンドはプロジェクトルート (glatasks/) から実行してください。' >&2; exit 2; } || exit 0"
-          }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": "Edit|Write|MultiEdit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "uvx pyfltr dirty add; exit 0"
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "uvx pyfltr dirty run >&2; exit 0"
-          }
-        ]
-      }
-    ]
+    }
+  },
+  "enabledPlugins": {
+    "agent-toolkit@ak110-dotfiles": true
   }
 }

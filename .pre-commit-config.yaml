@@ -24,7 +24,7 @@ repos:
       - id: pyfltr
         name: pyfltr
         # eslint / prettier / markdownlint / textlint を pyfltr 経由でまとめて実行する。
-        entry: uvx pyfltr --exit-zero-even-if-formatted --commands=fast
+        entry: uvx pyfltr fast
         types_or: [javascript, jsx, ts, tsx, svelte, json, css, yaml, markdown]
         pass_filenames: false
         require_serial: true
