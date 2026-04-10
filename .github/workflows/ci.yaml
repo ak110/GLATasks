@@ -36,6 +36,9 @@ jobs:
         with:
           enable-cache: true
 
+      - name: Setup mise
+        uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151 # v4.0.1
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
