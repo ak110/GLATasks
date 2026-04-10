@@ -10,18 +10,19 @@ const BASE_URL = process.env.BASE_URL ?? "https://localhost:38180";
 const TEST_USER = "e2etest";
 const TEST_PASSWORD = "e2etestpass123";
 
-/** /auth/ 以外のページに遷移したか判定する */
+/** /auth/ 以外のページに遷移するまで待機する */
 async function waitForNonAuthUrl(
   page: import("@playwright/test").Page,
   timeoutMs = 8000,
 ): Promise<boolean> {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    await page.waitForLoadState("load", { timeout: timeoutMs });
-    if (!page.url().includes("/auth/")) return true;
-    await page.waitForTimeout(200);
+  try {
+    await page.waitForURL((url) => !url.toString().includes("/auth/"), {
+      timeout: timeoutMs,
+    });
+    return true;
+  } catch {
+    return false;
   }
-  return false;
 }
 
 async function globalSetup(_config: FullConfig) {
