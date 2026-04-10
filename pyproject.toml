@@ -17,7 +17,7 @@ markdownlint = true
 textlint = true
 vitest = true
 oxlint = true
-tsc = true
+tsc = false
 
 # pyfltr の除外パターン。eslint / prettier は独自の ignore 設定
 # (eslint.config.js の ignores / .prettierignore) を持つが、

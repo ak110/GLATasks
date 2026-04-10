@@ -116,14 +116,14 @@ update-actions:
 	GITHUB_TOKEN=$$(gh auth token) mise exec -- pinact run --update --min-age 1
 
 format:  # 整形 + 軽量lint
-	@# pre-commit はフォーマットによるエラーを考慮して2度まで実行
-	uvx pre-commit run --all-files || uvx pre-commit run --all-files
+	@# pre-commitはフォーマットによるエラーを考慮して2度まで実行する
+	SKIP=pyfltr uvx pre-commit run --all-files || SKIP=pyfltr uvx pre-commit run --all-files
 	-uvx pyfltr fast
 
-test:  # format + check + unit test + backup test + e2eテスト
-	$(MAKE) format
+test:  # 全チェック実行（pyfltr + svelte-check + backup + e2e）
+	SKIP=pyfltr uvx pre-commit run --all-files || SKIP=pyfltr uvx pre-commit run --all-files
 	uvx pyfltr run
-	$(call RUN_NODE, pnpm run check && pnpm run test:unit, --rm)
+	$(call RUN_NODE, pnpm run check, --rm)
 	$(MAKE) test-backup
 	$(MAKE) test-e2e
 

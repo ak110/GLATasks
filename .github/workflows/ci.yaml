@@ -47,5 +47,5 @@ jobs:
           UV_EXCLUDE_NEWER: 0s
         run: uvx pyfltr ci
 
-      - name: Type check and unit tests
-        run: pnpm run check && pnpm run test:unit
+      - name: Type check (svelte-check)
+        run: pnpm run check
