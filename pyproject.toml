@@ -1,6 +1,7 @@
-# pyfltr 専用の設定ファイル。
-# glatasks 自体は TypeScript プロジェクトだが、pyfltr が
-# [tool.pyfltr] セクションを読むために本ファイルを置いている。
+# uv/pyfltr 専用の設定ファイル
+
+[tool.uv]
+exclude-newer = "1 day"
 
 [tool.pyfltr]
 # JS 系ツールは package.json で管理するため pnpm runner を使う。
