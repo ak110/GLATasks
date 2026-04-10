@@ -8,6 +8,8 @@ RUN_ARGS += --user=$(shell id --user):$(shell id --group) --ulimit="core=0"
 export DOCKER_BUILDKIT=1
 
 # pnpm実行用の共通コマンド（プロジェクトルートで実行）
+# サプライチェーン攻撃対策として `pnpm install --frozen-lockfile` で
+# 再resolveを禁止し、`pnpm-lock.yaml` をそのまま使う。
 RUN_NODE = docker run $(2) \
     --env=HOME=${PWD}/.cache \
 	--env=COREPACK_ENABLE_DOWNLOAD_PROMPT=0 \
@@ -19,7 +21,7 @@ RUN_NODE = docker run $(2) \
 	    mkdir -p ${PWD}/.cache/bin &&\
         corepack enable --install-directory ${PWD}/.cache/bin &&\
         export PATH=${PWD}/.cache/bin:${PWD}/node_modules/.bin:$$PATH &&\
-		CI=true pnpm install &&\
+		pnpm install --frozen-lockfile &&\
 		$(1)\
 	'
 
@@ -180,7 +182,7 @@ test-e2e:
 		bash -xc '\
 			npm install -g pnpm@$(PNPM_VERSION) --prefix ${PWD}/.cache/playwright --force &&\
 			export PATH=${PWD}/.cache/playwright/bin:${PWD}/node_modules/.bin:$$PATH &&\
-			CI=true pnpm install && pnpm run test:e2e\
+			pnpm install --frozen-lockfile && pnpm run test:e2e\
 		'
 
 .PHONY: help sync backup deploy build start stop restart-app logs ps healthcheck shell node-shell update update-actions format test test-unit test-backup test-e2e start-app logs-app migrate db-studio docs

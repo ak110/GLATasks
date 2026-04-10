@@ -147,6 +147,17 @@ minimumReleaseAgeExclude:
 
 `.pre-commit-config.yaml` の `additional_dependencies` で指定するnpmパッケージ（textlint等）はpre-commitが直接npm経由でインストールする。そのためpnpmの `minimumReleaseAge` は適用されない。代わりに `@latest` ではなくバージョンを固定している。
 
+### pnpmにおけるlockfile尊重
+
+サプライチェーン攻撃対策の二重防御として、CI・Docker・`make`から呼ばれる`pnpm install`はすべて`--frozen-lockfile`を明示している。これにより`pnpm-lock.yaml`が`package.json`と乖離している場合に再resolveを許さずインストールを失敗させ、ロックファイルが意図せず書き換わるリスクを抑えている。
+
+- `Dockerfile`のビルドステージ
+- `compose.yaml` / `compose.development.yaml`のアプリ起動コマンド
+- `Makefile`の`RUN_NODE`関数および`test-e2e`ターゲット
+- `.github/workflows/ci.yaml` / `.github/workflows/docs.yaml`のCIステップ
+
+依存を更新するときは`make update`から呼ばれる`pnpm update --latest`を使う。`pnpm update`は`--frozen-lockfile`の影響を受けないため、開発フローを阻害しない。
+
 ## CI/CD
 
 ### CI（ci.yaml）
