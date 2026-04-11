@@ -120,10 +120,9 @@ format:  # 整形 + 軽量lint
 	SKIP=pyfltr uvx pre-commit run --all-files || SKIP=pyfltr uvx pre-commit run --all-files
 	-uvx pyfltr fast
 
-test:  # 全チェック実行（pyfltr + svelte-check + backup + e2e）
+test:  # 全チェック実行（pyfltr + backup + e2e）
 	SKIP=pyfltr uvx pre-commit run --all-files || SKIP=pyfltr uvx pre-commit run --all-files
 	uvx pyfltr run
-	$(call RUN_NODE, pnpm run check, --rm)
 	$(MAKE) test-backup
 	$(MAKE) test-e2e
 

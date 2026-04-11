@@ -37,8 +37,10 @@ make test  # OK
 `make help` で一覧を確認できる。よく使うコマンド:
 
 - `make format` — コード編集後に実行。整形 + 自動修正付きlint
-- `make test` — コミット前に実行。format + 型チェック + ユニットテスト + バックアップテスト + e2eの全検証
+- `make test` — コミット前に実行。pre-commit + pyfltr（lint・型チェック・ユニットテスト・svelte-checkを一括実行）+ バックアップテスト + e2eの全検証
 - `make deploy` — ビルド → 停止 → 起動
+
+svelte-checkはpyfltrの`custom-commands`機能で統合されているため、`uvx pyfltr run`から自動実行される。`pyproject.toml`の`[tool.pyfltr.custom-commands.svelte-check]`で設定している。
 
 ## ツールチェイン
 
@@ -116,10 +118,11 @@ nginx経由のHTTPS（port 38180）でテストするため、開発環境が起
 `make format` と `make test` の2パターンを基本とする。
 
 - `make format`: 軽量な整形 + lint。コード編集後に日常的に実行する用途。
-  pre-commit hooks（prettier, eslint --fix, markdownlint, textlint）を実行
+  pre-commit hooks（prettier, eslint --fix, markdownlint, textlint）+ `pyfltr fast`を実行
 - `make test`: 全テスト。コミット前に実行する用途。
-  format → 型チェック → ユニットテスト → バックアップテスト → e2eテスト。formatでeslint --fix済みのためlintチェックは省略
-- CI（`pnpm run test`）: lint + 型チェック + ユニットテスト。CIではformatが先行しないためlintを含む
+  pre-commit → `pyfltr run`（lint・型チェック・ユニットテスト・svelte-check）→ バックアップテスト → e2eテスト
+- CI（ci.yaml）: `test` jobで`pyfltr ci`を実行する。
+  `integration` jobでDocker Composeを起動してバックアップテストとe2eテストを実行する
 
 ## 開発時の注意点
 
@@ -171,9 +174,21 @@ pre-commitが直接npm経由でインストールする。そのためpnpmの `m
 
 ### CI（ci.yaml）
 
-masterへのpush・PR時に自動実行。lint + 型チェック + ユニットテスト（`pnpm run test`）を実行する。
-CIでは `make format` が先行しないため、`pnpm run test` にlintを含めている。
-e2eテストはCIでは実行しない（Docker Compose環境が必要なため）。
+masterへのpush・PR時に自動実行する。以下の2つのjobを並列に走らせる。
+
+- `test` job: `pnpm install` → `pnpm run build` → `uvx pyfltr ci`。
+  lint・型チェック・ユニットテスト・svelte-checkをpyfltr経由で一括実行する
+- `integration` job: 以下の流れでDocker Composeを起動してバックアップテストとe2eテストを実行する
+  1. ランナー上に`.env`を生成する
+  1. `docker build`でproductionイメージをローカルビルドする
+  1. `docker compose --profile production up -d --wait`でスタックを起動する
+  1. `make test-backup`でバックアップテストを実行する
+  1. `docker compose --profile production --profile ci run playwright ...`でe2eテストを実行する
+  1. 失敗時は`test-results` / `playwright-report`を`actions/upload-artifact`で保存する
+
+`integration` jobはDocker Compose環境が必要なため`test` jobと分離している。
+同一ワークフロー内で実行することでmaster push / PRの両方で回帰検出ができる。
+`compose.yaml`の`playwright`サービスには`ci`プロファイルを追加しており、production相当のスタックにplaywrightサービスだけ追加で起動する構成にしている。
 
 ### リリース→デプロイの流れ
 

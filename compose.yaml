@@ -115,6 +115,7 @@ services:
   playwright:
     profiles:
       - development
+      - ci
     image: mcr.microsoft.com/playwright:v1.59.1-noble
     user: ${UID}:${GID}
     environment:

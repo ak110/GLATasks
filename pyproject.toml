@@ -35,3 +35,17 @@ extend-exclude = [
     "test-results",
     "chrome_extension/dist",
 ]
+
+# svelte-check を pyfltr の custom-commands として統合する。
+# `pnpm run check` は `svelte-kit sync && svelte-check` の複合スクリプトで、
+# プロジェクト全体を一括検査する (ファイル単位実行は未対応)。このため
+# pass-filenames = false とし、対象ファイルは実行可否判定のみに使う。
+# fast = false でコミット前の `pyfltr fast` からは除外し、`pyfltr run` /
+# `pyfltr ci` のみで実行する。
+[tool.pyfltr.custom-commands.svelte-check]
+type = "linter"
+path = "pnpm"
+args = ["run", "check"]
+targets = ["*.svelte", "*.ts", "*.tsx", "*.js", "*.mjs", "*.cjs"]
+pass-filenames = false
+fast = false
