@@ -280,9 +280,13 @@ gh workflow run release.yaml --field="bump=メジャーバージョンアップ"
 
 本プロジェクトはWebアプリのため、インストール手順はREADMEには置かず`docs/guide/getting-started.md`に集約している。
 
-README.mdとdocs側で概要・特徴が部分的に重複する場合がある。README.mdはGitHubトップとして、docs側は公開ドキュメントサイトの入口としてそれぞれ自己完結する必要があるため、この重複は許容する。
+README.mdとdocs側で概要・特徴が部分的に重複する場合があるが、README.mdはGitHubトップとして、docs側は公開ドキュメントの入口としてそれぞれ自己完結する必要があるため、この重複は許容する。
 
 変更頻度が低いため二重管理のコストより一貫性・可読性のメリットが上回ると判断した。変更時は、docs側で同じ情報を再掲している箇所があれば同じコミット内で合わせて更新する。
+
+## コミットメッセージ (Conventional Commits)
+
+Conventional Commits形式に従う。ただし記述の方向性があまり変わらないような軽微な修正は`chore`などにしてよい。
 
 ## ドキュメントサイト
 

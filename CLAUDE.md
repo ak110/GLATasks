@@ -11,9 +11,11 @@
   テストするときは `globalThis` のプロパティにモック実装を代入する
 - 現在の `COMPOSE_PROFILE` を確認したいときは `make -n deploy` のドライラン出力で判別できる（`.env` を直接読めないことがある）
 - 本リポジトリはSvelte 5、Tailwind v4、tRPC v11、Vite 8など比較的新しいメジャーバージョンを使用している
+- ドキュメントのみの変更（`*.md`や`docs/**`の更新）をコミットする場合、事前の手動`make test`は省略してよい。`git commit`時点で`pre-commit`の`pyfltr fast`フックが`markdownlint-fast`と`textlint-fast`を自動実行するため、Markdownの検証はそこで担保される
+- コードやテストに手を入れた変更では従来どおり`make test`を通してからコミットする
 
 ## 関連ドキュメント
 
 - @README.md
-- @docs/src/content/docs/development/architecture.md
-- @docs/src/content/docs/development/development.md
+- @docs/development/architecture.md
+- @docs/development/development.md
