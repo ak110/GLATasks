@@ -1,0 +1,18 @@
+$schema: https://raw.githubusercontent.com/DavidAnson/markdownlint-cli2/v0.20.0/schema/markdownlint-cli2-config-schema.json
+config:
+  line-length: false
+  no-inline-html:
+    allowed_elements:
+      - a
+      - br
+      - details
+      - summary
+  link-fragments: false
+  table-column-style: false
+  table-pipe-style: false
+  table-column-count: false
+ignores:
+  - "**/node_modules/**"
+  - "**/.cache/**"
+  - "**/.venv/**"
+  - "*___*/**"

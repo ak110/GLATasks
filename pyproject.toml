@@ -31,7 +31,6 @@ extend-exclude = [
     # pyfltr 側のファイル列挙時点で除外する。
     "app/package.json",
     ".cache",
-    "docs",
     "drizzle/migrations",
     "test-results",
     "chrome_extension/dist",

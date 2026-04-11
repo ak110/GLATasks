@@ -46,8 +46,6 @@ jobs:
         run: pnpm run build
 
       - name: Lint with pyfltr
-        env:
-          UV_EXCLUDE_NEWER: 0s
         run: uvx pyfltr ci
 
       - name: Type check (svelte-check)

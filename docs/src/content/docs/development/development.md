@@ -102,25 +102,36 @@ nginx経由のHTTPS（port 38180）でテストするため、開発環境が起
 
 ### Playwright テスト実装の注意点
 
-- SvelteKitのhydration完了を待つ: `waitForSelector` はSSRで描画されるため即返るが、`onMount` のAPI呼び出しはまだ完了していない。SSE接続が常時開いているため `waitUntil: "networkidle"` は使えない。`Promise.all([page.goto(url), page.waitForResponse(res => res.url().includes("/api/trpc"))])` パターンを使うこと。
+- SvelteKitのhydration完了を待つ: `waitForSelector` はSSRで描画されるため即返るが、
+  `onMount` のAPI呼び出しはまだ完了していない。SSE接続が常時開いているため `waitUntil: "networkidle"` は使えない。
+  `Promise.all([page.goto(url), page.waitForResponse(res => res.url().includes("/api/trpc"))])` パターンを使うこと。
 - `browser.newContext()` を使う場合は `baseURL` を明示する: `page.goto("/")` が動くよう `baseURL` を指定すること。
-- セレクタの曖昧さに注意: `button:has-text("追加")` はサイドバーのリスト追加ボタンにも一致する。`main button:has-text("追加")` のようにスコープを限定すること。
-- 複数ブラウザ（多端末同期）のテスト: `browser.newContext(...)` を2つ作り、終了時に `finally` で `ctx.close()` する。引数には `storageState` / `ignoreHTTPSErrors` / `baseURL` を指定する。値は `app/tests/.auth/user.json` / `true` / `process.env.BASE_URL ?? "https://localhost:38180"` とする。
-- SSEイベントを受信しない状態を再現する: `await ctx.route("**/api/events", route => route.abort())` でSSEエンドポイントへの接続だけを遮断できる。`/api/trpc` は通るので削除等の通常操作は引き続き実行できる。
+- セレクタの曖昧さに注意: `button:has-text("追加")` はサイドバーのリスト追加ボタンにも一致する。
+  `main button:has-text("追加")` のようにスコープを限定すること。
+- 複数ブラウザ（多端末同期）のテスト: `browser.newContext(...)` を2つ作り、終了時に `finally` で `ctx.close()` する。
+  引数には `storageState` / `ignoreHTTPSErrors` / `baseURL` を指定する。
+  値は `app/tests/.auth/user.json` / `true` / `process.env.BASE_URL ?? "https://localhost:38180"` とする。
+- SSEイベントを受信しない状態を再現する: `await ctx.route("**/api/events", route => route.abort())`
+  でSSEエンドポイントへの接続だけを遮断できる。`/api/trpc` は通るので削除等の通常操作は引き続き実行できる。
 
 ### テスト設計の思想
 
 `make format` と `make test` の2パターンを基本とする。
 
-- `make format`: 軽量な整形 + lint。コード編集後に日常的に実行する用途。pre-commit hooks（prettier, eslint --fix, markdownlint, textlint）を実行
-- `make test`: 全テスト。コミット前に実行する用途。format → 型チェック → ユニットテスト → バックアップテスト → e2eテスト。formatでeslint --fix済みのためlintチェックは省略
+- `make format`: 軽量な整形 + lint。コード編集後に日常的に実行する用途。
+  pre-commit hooks（prettier, eslint --fix, markdownlint, textlint）を実行
+- `make test`: 全テスト。コミット前に実行する用途。
+  format → 型チェック → ユニットテスト → バックアップテスト → e2eテスト。formatでeslint --fix済みのためlintチェックは省略
 - CI（`pnpm run test`）: lint + 型チェック + ユニットテスト。CIではformatが先行しないためlintを含む
 
 ## 開発時の注意点
 
 - JSONボディから受け取る数値は文字列の場合があるため `Number()` で明示変換すること（`"5" !== 5` の型不一致を防ぐ）
-- 日時は全レイヤーでUTC統一。DB（TIMESTAMP型）→ サーバー（Dateオブジェクト）→ クライアント（ISO8601文字列）の変換は自動で行われるため、タイムゾーンを意識するコードは不要
-- pnpmワークスペース内で同一パッケージの異なるメジャーバージョンが混在すると、依存解決の競合でビルドが失敗する場合がある（例: zod v3/v4混在によるAstroビルド失敗）。ワークスペース内の全パッケージで共通依存のメジャーバージョンを揃えることを基本方針とする
+- 日時は全レイヤーでUTC統一。DB（TIMESTAMP型）→ サーバー（Dateオブジェクト）→ クライアント（ISO8601文字列）の変換は自動で行われるため、
+  タイムゾーンを意識するコードは不要
+- pnpmワークスペース内で同一パッケージの異なるメジャーバージョンが混在すると、
+  依存解決の競合でビルドが失敗する場合がある（例: zod v3/v4混在によるAstroビルド失敗）。
+  ワークスペース内の全パッケージで共通依存のメジャーバージョンを揃えることを基本方針とする
 
 ## サプライチェーン攻撃対策
 
@@ -128,7 +139,8 @@ npm / PyPIレジストリへの悪意あるパッケージ公開に対する防�
 
 ### pnpm: minimumReleaseAge
 
-`pnpm-workspace.yaml` に `minimumReleaseAge: 1440`（1日 = 1440分）を設定。npmレジストリに公開されてから1日未満のバージョンはインストールされない。`pnpm dlx`（pnpx）にも適用される（pnpm 10.18以降）。
+`pnpm-workspace.yaml` に `minimumReleaseAge: 1440`（1日 = 1440分）を設定。
+npmレジストリに公開されてから1日未満のバージョンはインストールされない。`pnpm dlx`（pnpx）にも適用される（pnpm 10.18以降）。
 
 `docs/` はpnpm workspacesでルートと統合管理しているため、`pnpm-workspace.yaml` の設定が自動的に適用される。
 
@@ -145,11 +157,14 @@ minimumReleaseAgeExclude:
 
 ### pre-commit のバージョン固定
 
-`.pre-commit-config.yaml` の `additional_dependencies` で指定するnpmパッケージ（textlint等）はpre-commitが直接npm経由でインストールする。そのためpnpmの `minimumReleaseAge` は適用されない。代わりに `@latest` ではなくバージョンを固定している。
+`.pre-commit-config.yaml` の `additional_dependencies` で指定するnpmパッケージ（textlint等）は
+pre-commitが直接npm経由でインストールする。そのためpnpmの `minimumReleaseAge` は適用されない。代わりに `@latest` ではなくバージョンを固定している。
 
 ### pnpmにおけるlockfile尊重
 
-サプライチェーン攻撃対策の二重防御として、CI・Docker・`make`から呼ばれる`pnpm install`はすべて`--frozen-lockfile`を明示している。これにより`pnpm-lock.yaml`が`package.json`と乖離している場合に再resolveを許さずインストールを失敗させ、ロックファイルが意図せず書き換わるリスクを抑えている。
+サプライチェーン攻撃対策の二重防御として、CI・Docker・`make`から呼ばれる`pnpm install`はすべて`--frozen-lockfile`を明示している。
+これにより`pnpm-lock.yaml`が`package.json`と乖離している場合に再resolveを許さずインストールを失敗させ、
+ロックファイルが意図せず書き換わるリスクを抑えている。
 
 - `Dockerfile`のビルドステージ
 - `compose.yaml` / `compose.development.yaml`のアプリ起動コマンド
@@ -162,7 +177,9 @@ minimumReleaseAgeExclude:
 
 ### CI（ci.yaml）
 
-masterへのpush・PR時に自動実行。lint + 型チェック + ユニットテスト（`pnpm run test`）を実行する。CIでは `make format` が先行しないため、`pnpm run test` にlintを含めている。e2eテストはCIでは実行しない（Docker Compose環境が必要なため）。
+masterへのpush・PR時に自動実行。lint + 型チェック + ユニットテスト（`pnpm run test`）を実行する。
+CIでは `make format` が先行しないため、`pnpm run test` にlintを含めている。
+e2eテストはCIでは実行しない（Docker Compose環境が必要なため）。
 
 ### リリース→デプロイの流れ
 
@@ -261,7 +278,8 @@ gh workflow run release.yaml --field="bump=メジャーバージョンアップ"
 
 ## ドキュメントサイト
 
-[Starlight (Astro)](https://starlight.astro.build/) を使用。`docs/` ディレクトリがStarlightプロジェクト、`docs/src/content/docs/` にドキュメントのMarkdownファイルを配置。
+[Starlight (Astro)](https://starlight.astro.build/) を使用。
+`docs/` ディレクトリがStarlightプロジェクト、`docs/src/content/docs/` にドキュメントのMarkdownファイルを配置。
 
 ### ローカルプレビュー
 

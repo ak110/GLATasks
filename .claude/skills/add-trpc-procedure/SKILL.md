@@ -35,7 +35,8 @@ description: GLATasks に新しい tRPC procedure を追加するときの定型
 
 ### 4. クライアント側の反映
 
-- 新しいprocedureは `trpc.<domain>.<name>.mutate(...) / .query(...)` として呼び出す。呼び出し箇所は `app/src/routes/**/*.svelte` や `app/src/lib/components/**/*.svelte` に置く
+- 新しいprocedureは `trpc.<domain>.<name>.mutate(...) / .query(...)` として呼び出す。
+  呼び出し箇所は `app/src/routes/**/*.svelte` や `app/src/lib/components/**/*.svelte` に置く
 - `$layout.svelte` / SSEハンドラで当該イベント種別を購読しており、TanStack Queryの `invalidateQueries` が動くかを確認する
 - 新ドメインを増やす場合はSSEイベント一覧とハンドラを更新する
 - 難読化はtRPCクライアントが自動で行うため、呼び出し側の明示的な暗号化処理は不要
