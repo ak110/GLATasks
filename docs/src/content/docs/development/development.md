@@ -278,6 +278,20 @@ gh workflow run release.yaml --field="bump=メジャーバージョンアップ"
 
 リリース作成後、deploy.yamlが自動的にトリガーされ本番デプロイが実行される。詳細は [CI/CD](#cicd) セクションを参照。
 
+## READMEとdocsの役割分担
+
+本プロジェクトのドキュメントは以下の構成で配置している。
+
+- README.md: 概要・特徴・ドキュメントへのリンクを網羅する「玄関」。README.mdだけを読めばプロジェクトの目的と使い始めるための入口が把握できる状態を保つ
+- docs/src/content/docs/guide/: 利用者向けの詳細情報（使い方・導入手順など）
+- docs/src/content/docs/development/: 開発者向けの情報（セットアップ・テスト・CI/CD・リリース手順など）
+
+本プロジェクトはWebアプリのため、インストール手順はREADMEには置かず`docs/src/content/docs/guide/getting-started.md`に集約している。
+
+README.mdとdocs側で概要・特徴が部分的に重複する場合がある。README.mdはGitHubトップとして、docs側は公開ドキュメントサイトの入口としてそれぞれ自己完結する必要があるため、この重複は許容する。
+
+変更頻度が低いため二重管理のコストより一貫性・可読性のメリットが上回ると判断した。変更時は、docs側で同じ情報を再掲している箇所があれば同じコミット内で合わせて更新する。
+
 ## ドキュメントサイト
 
 [Starlight (Astro)](https://starlight.astro.build/) を使用。
