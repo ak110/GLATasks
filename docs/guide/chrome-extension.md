@@ -1,7 +1,4 @@
----
-title: Chrome 拡張機能
-description: Save To GLATasks Chrome 拡張機能のインストールと使い方
----
+# Chrome 拡張機能
 
 現在のページのタイトルとURLを簡単にGLATasksに保存するためのChrome拡張機能。
 

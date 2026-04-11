@@ -1,7 +1,4 @@
----
-title: 開発手順
-description: 開発環境の構築、テスト、CI/CD、リリース手順
----
+# 開発手順
 
 ## 作業ディレクトリ
 
@@ -129,11 +126,6 @@ nginx経由のHTTPS（port 38180）でテストするため、開発環境が起
 - JSONボディから受け取る数値は文字列の場合があるため `Number()` で明示変換すること（`"5" !== 5` の型不一致を防ぐ）
 - 日時は全レイヤーでUTC統一。DB（TIMESTAMP型）→ サーバー（Dateオブジェクト）→ クライアント（ISO8601文字列）の変換は自動で行われるため、
   タイムゾーンを意識するコードは不要
-- pnpmワークスペース内でAstroのビルドパスに乗るサブグラフでは、共通依存のメジャーバージョンがずれないよう注意する。
-  過去にAstro v5時代、astroコア本体がzod v3を固定依存し、`@astrojs/sitemap`がzod v4をpeer解決したため、
-  Starlightビルド中に両者のzodスキーマが混線して失敗した事例がある。Astro v6 / Starlight v0.38では
-  astroコア本体も`@astrojs/sitemap`もzod v4を要求するため、この混線は構造的に解消している。
-  なおtextlintなどAstroのビルドパスから独立したサブグラフに古いzodが残ることは問題にならない
 
 ## サプライチェーン攻撃対策
 
@@ -283,10 +275,10 @@ gh workflow run release.yaml --field="bump=メジャーバージョンアップ"
 本プロジェクトのドキュメントは以下の構成で配置している。
 
 - README.md: 概要・特徴・ドキュメントへのリンクを網羅する「玄関」。README.mdだけを読めばプロジェクトの目的と使い始めるための入口が把握できる状態を保つ
-- docs/src/content/docs/guide/: 利用者向けの詳細情報（使い方・導入手順など）
-- docs/src/content/docs/development/: 開発者向けの情報（セットアップ・テスト・CI/CD・リリース手順など）
+- docs/guide/: 利用者向けの詳細情報（使い方・導入手順など）
+- docs/development/: 開発者向けの情報（セットアップ・テスト・CI/CD・リリース手順など）
 
-本プロジェクトはWebアプリのため、インストール手順はREADMEには置かず`docs/src/content/docs/guide/getting-started.md`に集約している。
+本プロジェクトはWebアプリのため、インストール手順はREADMEには置かず`docs/guide/getting-started.md`に集約している。
 
 README.mdとdocs側で概要・特徴が部分的に重複する場合がある。README.mdはGitHubトップとして、docs側は公開ドキュメントサイトの入口としてそれぞれ自己完結する必要があるため、この重複は許容する。
 
@@ -294,8 +286,8 @@ README.mdとdocs側で概要・特徴が部分的に重複する場合がある�
 
 ## ドキュメントサイト
 
-[Starlight (Astro)](https://starlight.astro.build/) を使用。
-`docs/` ディレクトリがStarlightプロジェクト、`docs/src/content/docs/` にドキュメントのMarkdownファイルを配置。
+[VitePress](https://vitepress.dev/) を使用。
+`docs/` ディレクトリ直下のMarkdownファイルがページ、`docs/.vitepress/config.ts` でサイト設定を管理する。
 
 ### ローカルプレビュー
 
@@ -303,7 +295,7 @@ README.mdとdocs側で概要・特徴が部分的に重複する場合がある�
 make docs
 ```
 
-`http://localhost:4321/GLATasks/` でプレビューできる。
+`http://localhost:5173/GLATasks/` でプレビューできる。
 
 ### デプロイ
 

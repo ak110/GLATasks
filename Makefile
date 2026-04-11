@@ -168,7 +168,7 @@ test-backup:  # バックアップ機能のテスト（Docker環境が起動し�
 	echo "全テストが成功しました"
 
 docs:  # ドキュメントサイトをローカルで起動
-	$(call RUN_NODE, cd docs && pnpm dev --host, --rm --interactive --tty -p 4321:4321)
+	$(call RUN_NODE, cd docs && pnpm dev --host 0.0.0.0 --port 5173, --rm --interactive --tty -p 5173:5173)
 
 test-e2e:
 	docker compose --profile $(COMPOSE_PROFILE) run --rm \

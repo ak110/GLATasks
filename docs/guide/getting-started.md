@@ -1,7 +1,4 @@
----
-title: はじめに
-description: GLATasks の概要と機能紹介
----
+# はじめに
 
 GLATasksは、タスクメモ管理とカウントダウンタイマーを統合したWebアプリ。自前のサーバーにデプロイして利用する。
 
@@ -34,8 +31,8 @@ GLATasksは、タスクメモ管理とカウントダウンタイマーを統合
 ### マルチプラットフォーム
 
 - PWAとしてホーム画面に追加可能
-- [Chrome 拡張機能](/GLATasks/guide/chrome-extension/)でWebページをワンクリック保存
-- [Android 共有メニュー](/GLATasks/guide/android-share/)から直接タスク追加
+- [Chrome 拡張機能](/guide/chrome-extension)でWebページをワンクリック保存
+- [Android 共有メニュー](/guide/android-share)から直接タスク追加
 
 ## デプロイ
 
@@ -67,7 +64,7 @@ GLATasksは、タスクメモ管理とカウントダウンタイマーを統合
    make deploy
    ```
 
-4. HTTPSでアクセスできるようリバースプロキシを設定する（設定例は[アーキテクチャの外部リバースプロキシ設定](/GLATasks/development/architecture/#外部リバースプロキシ設定)を参照）
+4. HTTPSでアクセスできるようリバースプロキシを設定する（設定例は[アーキテクチャの外部リバースプロキシ設定](/development/architecture#外部リバースプロキシ設定)を参照）
 
 5. ブラウザでアクセスし、ユーザー登録してログインする
 
