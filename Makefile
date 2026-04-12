@@ -118,6 +118,7 @@ update-actions:
 format:  # 整形 + 軽量lint
 	@# pre-commitはフォーマットによるエラーを考慮して2度まで実行する
 	SKIP=pyfltr uvx pre-commit run --all-files || SKIP=pyfltr uvx pre-commit run --all-files
+	-uvx pyfltr fix
 	-uvx pyfltr fast
 
 test:  # 全チェック実行（pyfltr + backup + e2e）

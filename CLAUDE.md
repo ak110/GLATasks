@@ -25,6 +25,8 @@ uvx pyfltr run --output-format=jsonl
 バックアップ/E2E系に変更を入れた場合は`make test-backup test-e2e`も実行する。
 人間の開発者は従来通り`make test`を使用する。
 
+注意: 本プロジェクトのDocker Compose環境は開発マシン上で常時稼働している。`make test`（backup/e2eテスト含む）は問題なく実行可能である。上記で`uvx pyfltr run`を使うのはJSON Lines出力で診断結果を効率的に解釈するためであり、環境制約によるものではない。
+
 ## 関連ドキュメント
 
 - @README.md
