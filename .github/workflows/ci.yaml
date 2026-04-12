@@ -60,6 +60,7 @@ jobs:
         run: |
           DATA_DIR="${RUNNER_TEMP}/glatasks-data"
           mkdir -p "${DATA_DIR}"
+          chmod 777 "${DATA_DIR}"
           {
             echo "COMPOSE_PROFILE=production"
             echo "DATA_DIR=${DATA_DIR}"
