@@ -121,7 +121,7 @@ format:  # 整形 + 軽量lint
 	-uvx pyfltr fix
 	-uvx pyfltr fast
 
-test:  # 全チェック実行（pyfltr + backup + e2e）
+test:  # 全チェック実行（これを通過すればコミット可能）
 	SKIP=pyfltr uvx pre-commit run --all-files || SKIP=pyfltr uvx pre-commit run --all-files
 	uvx pyfltr run
 	$(MAKE) test-backup
