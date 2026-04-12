@@ -67,6 +67,11 @@ jobs:
             echo "GID=$(id -g)"
           } > .env
 
+      - name: SSL 自己署名証明書を生成
+        run: |
+          cp web/openssl.cnf-example web/openssl.cnf
+          bash web/keygen.sh
+
       - name: Build production image (ghcr.io/ak110/glatasks:latest)
         uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7.1.0
         with:
