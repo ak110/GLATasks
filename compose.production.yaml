@@ -4,7 +4,14 @@ services:
     image: ghcr.io/ak110/glatasks:latest
     restart: always
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/healthcheck"]
+      test:
+        - CMD
+        - node
+        - -e
+        - >-
+          fetch('http://localhost:3000/healthcheck')
+          .then(r => { if (!r.ok) process.exit(1) })
+          .catch(() => process.exit(1))
       start_period: 30s
       start_interval: 1s
     volumes:
