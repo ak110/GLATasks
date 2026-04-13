@@ -4,7 +4,7 @@
 
 - `make format`: 整形 + 軽量lint + 自動修正（開発時の手動実行用）
 - `make test`: 全チェック実行（これを通過すればコミット可能）
-- `make update`: 依存更新 + 全テスト実行
+- `make update`: 依存更新 + pinactアクション更新 + 全テスト実行
   - `make update-actions`: GitHub Actionsのハッシュピン更新のみ（mise経由でpinact実行）
 - Markdownファイルのformat/lintの実行方法: `uvx pre-commit run --files <file>`
 - vitestのenvironmentは `node`（`vitest.config.ts` @ repo root）。DOM API（`EventSource`, `localStorage` 等）を使うコードを
