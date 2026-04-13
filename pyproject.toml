@@ -4,17 +4,16 @@
 exclude-newer = "1 day"
 
 [tool.pyfltr]
+preset = "latest"
 # JS/TS 専用プロジェクトのため Python 系ツールを一括無効化する。
 python = false
 # JS 系ツールは package.json で管理するため pnpm runner を使う。
 # node_modules/.bin の実行ファイルを pnpm exec 経由で呼び出す。
 js-runner = "pnpm"
 
-# 有効化するツール
+# 有効化するツール（preset = "latest"でmarkdownlint/textlint/pre-commit等は有効化済み）
 eslint = true
 prettier = true
-markdownlint = true
-textlint = true
 vitest = true
 oxlint = true
 tsc = false
