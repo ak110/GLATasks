@@ -271,20 +271,6 @@ cp -p ${DATA_DIR}/backups/YYYYMMDD_HHMMSS/.secret_key ${DATA_DIR}/
 make restart-app
 ```
 
-## リリース手順
-
-事前に`gh`コマンドをインストールして`gh auth login`でログインしておき、以下のコマンドのいずれかを実行。
-
-```bash
-gh workflow run release.yaml --field="bump=バグフィックス"
-gh workflow run release.yaml --field="bump=マイナーバージョンアップ"
-gh workflow run release.yaml --field="bump=メジャーバージョンアップ"
-```
-
-<https://github.com/ak110/GLATasks/actions> で状況を確認できる。
-
-リリース作成後、deploy.yamlが自動的にトリガーされ本番デプロイが実行される。詳細は [CI/CD](#cicd) セクションを参照。
-
 ## READMEとdocsの役割分担
 
 本プロジェクトのドキュメントは以下の構成で配置している。
@@ -298,10 +284,6 @@ gh workflow run release.yaml --field="bump=メジャーバージョンアップ"
 README.mdとdocs側で概要・特徴が部分的に重複する場合があるが、README.mdはGitHubトップとして、docs側は公開ドキュメントの入口としてそれぞれ自己完結する必要があるため、この重複は許容する。
 
 変更頻度が低いため二重管理のコストより一貫性・可読性のメリットが上回ると判断した。変更時は、docs側で同じ情報を再掲している箇所があれば同じコミット内で合わせて更新する。
-
-## コミットメッセージ (Conventional Commits)
-
-Conventional Commits形式に従う。ただし記述の方向性があまり変わらないような軽微な修正は`chore`などにしてよい。
 
 ## ドキュメントサイト
 
@@ -327,3 +309,21 @@ GitHub PagesのソースをGitHub Actionsに設定する:
 ```bash
 gh api repos/ak110/GLATasks/pages -X POST -f build_type=workflow
 ```
+
+## コミットメッセージ（Conventional Commits）
+
+Conventional Commits形式に従う。ただし記述の方向性があまり変わらないような軽微な修正は`chore`などにしてよい。
+
+## リリース手順
+
+事前に`gh`コマンドをインストールして`gh auth login`でログインしておき、以下のコマンドのいずれかを実行。
+
+```bash
+gh workflow run release.yaml --field="bump=バグフィックス"
+gh workflow run release.yaml --field="bump=マイナーバージョンアップ"
+gh workflow run release.yaml --field="bump=メジャーバージョンアップ"
+```
+
+<https://github.com/ak110/GLATasks/actions> で状況を確認できる。
+
+リリース作成後、deploy.yamlが自動的にトリガーされ本番デプロイが実行される。詳細は [CI/CD](#cicd) セクションを参照。
