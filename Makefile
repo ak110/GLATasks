@@ -116,8 +116,7 @@ update-actions:
 	GITHUB_TOKEN=$$(gh auth token) mise exec -- pinact run --update --min-age 1
 
 format:  # 整形 + 軽量lint
-	-uvx pyfltr fix
-	uvx pre-commit run --all-files || uvx pre-commit run --all-files
+	uvx pyfltr fast
 
 test:  # 全チェック実行（これを通過すればコミット可能）
 	uvx pyfltr run
