@@ -16,7 +16,7 @@
   },
   "dependencies": {
     "@sveltejs/adapter-node": "^5.5.4",
-    "@sveltejs/kit": "^2.57.0",
+    "@sveltejs/kit": "^2.57.1",
     "@tailwindcss/vite": "^4.2.2",
     "@tanstack/svelte-query": "^6.1.14",
     "@trpc/client": "^11.16.0",
