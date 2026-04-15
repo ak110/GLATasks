@@ -13,12 +13,34 @@ export type ListInfo = {
   status: string;
 };
 
+/** 利用可能な色相キー。色覚特性の差があっても区別しやすい配色。 */
+export const TAG_COLOR_KEYS = [
+  "amber",
+  "sky",
+  "emerald",
+  "yellow",
+  "blue",
+  "red",
+  "pink",
+  "slate",
+] as const;
+
+/** タグの色相キー型 */
+export type TagColorKey = (typeof TAG_COLOR_KEYS)[number];
+
+/** タグ情報（タスクに付与するラベル） */
+export type TagInfo = {
+  name: string;
+  color: TagColorKey;
+};
+
 /** タスク情報 */
 export type TaskInfo = {
   id: number;
   title: string;
   notes: string;
   status: string;
+  tags: TagInfo[];
 };
 
 /** 検索結果タスク情報 */

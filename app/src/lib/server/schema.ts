@@ -37,6 +37,8 @@ export const tasks = mysqlTable("task", {
   list_id: int("list_id").notNull(),
   status: varchar("status", { length: 255 }).notNull().default("active"),
   text: mediumtext("text").notNull(),
+  // タグ配列のJSON文字列（要素は { name, color }）
+  tags: mediumtext("tags").notNull().default("[]"),
   sort_order: int("sort_order").notNull().default(0),
   created: timestamp("created").notNull(),
   updated: timestamp("updated").notNull(),

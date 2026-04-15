@@ -4,11 +4,24 @@
 
 import { z } from "zod";
 
+import { TAG_COLOR_KEYS } from "./types";
+
 // ── 共通スキーマ ──
 
 export const TaskStatusSchema = z.enum(["active", "completed", "archived"]);
 export const ShowTypeSchema = z.enum(["active", "archived", "all"]);
 export const ListStatusSchema = z.enum(["active", "archived"]);
+
+// ── タグスキーマ ──
+
+/** タスクに付与する個別タグ */
+export const TagInfoSchema = z.object({
+  name: z.string().trim().min(1).max(40),
+  color: z.enum(TAG_COLOR_KEYS),
+});
+
+/** タスクに付与するタグ配列（同一タスク内での上限は32個） */
+export const TagsSchema = z.array(TagInfoSchema).max(32);
 
 // ── 検索スキーマ ──
 
@@ -21,6 +34,7 @@ export const SearchTasksSchema = z.object({
 export const CreateTaskSchema = z.object({
   listId: z.number().int().positive(),
   text: z.string().min(1, "タスク内容は必須です").max(100000),
+  tags: TagsSchema.optional(),
 });
 
 export const UpdateTaskSchema = z
@@ -32,12 +46,14 @@ export const UpdateTaskSchema = z
     completed: z.string().datetime().nullable().optional(),
     move_to: z.number().int().positive().optional(),
     keep_order: z.boolean().default(false),
+    tags: TagsSchema.optional(),
   })
   .refine(
     (data) =>
       data.text !== undefined ||
       data.status !== undefined ||
-      data.move_to !== undefined,
+      data.move_to !== undefined ||
+      data.tags !== undefined,
     { message: "更新する項目が指定されていません" },
   );
 
@@ -194,6 +210,7 @@ export const ReorderTimersSchema = z.object({
 export type TaskStatus = z.infer<typeof TaskStatusSchema>;
 export type ShowType = z.infer<typeof ShowTypeSchema>;
 export type ListStatus = z.infer<typeof ListStatusSchema>;
+export type TagInfoInput = z.infer<typeof TagInfoSchema>;
 
 export type CreateTaskInput = z.infer<typeof CreateTaskSchema>;
 export type UpdateTaskInput = z.infer<typeof UpdateTaskSchema>;

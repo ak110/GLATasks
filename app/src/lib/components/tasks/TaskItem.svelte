@@ -5,6 +5,7 @@
 
     import type { TaskInfo } from "$lib/types";
     import { linkify } from "$lib/linkify";
+    import { getTagColorClass } from "$lib/tag-palette";
 
     type Props = {
         task: TaskInfo;
@@ -33,9 +34,11 @@
     }: Props = $props();
 
     let copyMessage = $state("");
+    let copyMenuOpen = $state(false);
     let notesExpanded = $state(false);
     let notesClamped = $state(false);
     let notesEl: HTMLParagraphElement | undefined = $state();
+    let copyMenuEl: HTMLDivElement | undefined = $state();
 
     // notesが実際にクランプされているか検知
     $effect(() => {
@@ -49,11 +52,40 @@
         return () => observer.disconnect();
     });
 
-    async function copyTask() {
-        const full = task.notes ? `${task.title}\n${task.notes}` : task.title;
-        await navigator.clipboard.writeText(full);
+    // コピーメニュー外クリック/Escapeで閉じる
+    $effect(() => {
+        if (!copyMenuOpen) return;
+        const onClick = (e: MouseEvent) => {
+            if (!copyMenuEl?.contains(e.target as Node)) {
+                copyMenuOpen = false;
+            }
+        };
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key === "Escape") copyMenuOpen = false;
+        };
+        document.addEventListener("mousedown", onClick);
+        document.addEventListener("keydown", onKey);
+        return () => {
+            document.removeEventListener("mousedown", onClick);
+            document.removeEventListener("keydown", onKey);
+        };
+    });
+
+    async function copyText(value: string) {
+        await navigator.clipboard.writeText(value);
         copyMessage = "コピーしました";
         setTimeout(() => (copyMessage = ""), 2000);
+        copyMenuOpen = false;
+    }
+
+    function copyAll() {
+        copyText(task.notes ? `${task.title}\n${task.notes}` : task.title);
+    }
+    function copyTitle() {
+        copyText(task.title);
+    }
+    function copyNotes() {
+        copyText(task.notes);
     }
 </script>
 
@@ -118,6 +150,19 @@
                 （空のタスク）
             </p>
         {/if}
+        {#if task.tags.length > 0}
+            <div class="mt-1 flex flex-wrap gap-1" data-testid="task-tags">
+                {#each task.tags as tag (tag.name)}
+                    <span
+                        class="inline-flex items-center rounded px-1.5 py-0.5 text-[11px] leading-tight {getTagColorClass(
+                            tag.color,
+                        )}"
+                    >
+                        {tag.name}
+                    </span>
+                {/each}
+            </div>
+        {/if}
     </div>
     <div class="flex shrink-0 flex-col gap-1">
         <button
@@ -127,13 +172,52 @@
             aria-label="タスクを編集"
             title="編集">✏️</button
         >
-        <button
-            onclick={copyTask}
-            class="cursor-pointer rounded p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-600 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-300"
-            data-testid="task-copy-btn"
-            aria-label="タスクをコピー"
-            title="コピー">📋</button
-        >
+        <div class="relative" bind:this={copyMenuEl}>
+            <button
+                onclick={() => (copyMenuOpen = !copyMenuOpen)}
+                class="cursor-pointer rounded p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-600 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-300"
+                data-testid="task-copy-btn"
+                aria-label="タスクをコピー"
+                aria-haspopup="menu"
+                aria-expanded={copyMenuOpen}
+                title="コピー">📋</button
+            >
+            {#if copyMenuOpen}
+                <div
+                    class="absolute top-full right-0 z-20 min-w-max rounded border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-600 dark:bg-gray-800"
+                    role="menu"
+                    data-testid="task-copy-menu"
+                >
+                    <button
+                        class="block w-full cursor-pointer px-4 py-1.5 text-left hover:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-400 dark:text-gray-100 dark:hover:bg-gray-700 dark:disabled:text-gray-500"
+                        onclick={copyAll}
+                        disabled={!task.title && !task.notes}
+                        data-testid="task-copy-all"
+                        role="menuitem"
+                    >
+                        全体をコピー
+                    </button>
+                    <button
+                        class="block w-full cursor-pointer px-4 py-1.5 text-left hover:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-400 dark:text-gray-100 dark:hover:bg-gray-700 dark:disabled:text-gray-500"
+                        onclick={copyTitle}
+                        disabled={!task.title}
+                        data-testid="task-copy-title"
+                        role="menuitem"
+                    >
+                        タイトルのみ
+                    </button>
+                    <button
+                        class="block w-full cursor-pointer px-4 py-1.5 text-left hover:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-400 dark:text-gray-100 dark:hover:bg-gray-700 dark:disabled:text-gray-500"
+                        onclick={copyNotes}
+                        disabled={!task.notes}
+                        data-testid="task-copy-notes"
+                        role="menuitem"
+                    >
+                        内容のみ
+                    </button>
+                </div>
+            {/if}
+        </div>
         {#if notesClamped || notesExpanded}
             <button
                 onclick={() => (notesExpanded = !notesExpanded)}

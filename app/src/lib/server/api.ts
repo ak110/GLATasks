@@ -9,17 +9,27 @@ import { adjustUpdatedTimestamps, mergeByTimestamp } from "./merge-utils";
 
 import type {
   ListInfo,
+  TagColorKey,
+  TagInfo,
   TaskInfo,
   TimerInfo,
   SearchTaskResult,
   GetTasksResult,
 } from "$lib/types";
+import { TAG_COLOR_KEYS } from "../types";
 import { getDb } from "./db";
 import { lists, tasks, timers, users } from "./schema";
 
 // ── 型定義（SSOT は $lib/types.ts、ここには api.ts 固有の型のみ） ──
 
-export type { ListInfo, TaskInfo, TimerInfo, SearchTaskResult, GetTasksResult };
+export type {
+  ListInfo,
+  TagInfo,
+  TaskInfo,
+  TimerInfo,
+  SearchTaskResult,
+  GetTasksResult,
+};
 
 export type TaskPatchResult = {
   status: string;
@@ -27,6 +37,7 @@ export type TaskPatchResult = {
   list_id: number;
   title: string;
   notes: string;
+  tags: TagInfo[];
 };
 
 export type UserInfo = {
@@ -54,6 +65,43 @@ function toUtcIso(dt: Date): string {
  */
 function fromUtcIso(isoStr: string): Date {
   return new Date(isoStr);
+}
+
+// ── タグのシリアライズ ──
+
+/**
+ * DB の tags カラム（JSON文字列）を TagInfo 配列に復元する。
+ *
+ * 破損データや旧仕様のレコードに備え、パース失敗時は空配列にフォールバックする。
+ */
+function parseTags(raw: string | null | undefined): TagInfo[] {
+  if (!raw) return [];
+  const knownColors = new Set<string>(TAG_COLOR_KEYS);
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    const result: TagInfo[] = [];
+    for (const v of parsed) {
+      if (
+        typeof v === "object" &&
+        v !== null &&
+        typeof (v as { name: unknown }).name === "string" &&
+        typeof (v as { color: unknown }).color === "string" &&
+        knownColors.has((v as { color: string }).color)
+      ) {
+        const item = v as { name: string; color: string };
+        result.push({ name: item.name, color: item.color as TagColorKey });
+      }
+    }
+    return result;
+  } catch {
+    return [];
+  }
+}
+
+/** TagInfo 配列を DB 保存用の JSON 文字列に変換する。 */
+function serializeTags(value: TagInfo[]): string {
+  return JSON.stringify(value);
 }
 
 // ── タスクの title/notes 分割 ──
@@ -217,6 +265,7 @@ export async function getListTasks(
       title: splitTitle(t.text),
       notes: splitNotes(t.text),
       status: t.status,
+      tags: parseTags(t.tags),
     }));
 
   const lastModified = toUtcIso(list.last_updated);
@@ -391,6 +440,7 @@ export async function postTask(
   userId: number,
   listId: number,
   text: string,
+  tagList: TagInfo[] = [],
 ): Promise<void> {
   await getOwnedList(listId, userId);
   const cleanText = text.trimEnd();
@@ -406,6 +456,7 @@ export async function postTask(
     list_id: listId,
     status: "active",
     text: cleanText,
+    tags: serializeTags(tagList),
     sort_order: sortOrder,
     created: now,
     updated: now,
@@ -469,6 +520,10 @@ export async function patchTask(
     updates.completed =
       data.completed === null ? null : fromUtcIso(data.completed as string);
   }
+  if ("tags" in data) {
+    updates.tags = serializeTags(data.tags as TagInfo[]);
+    updates.updated = new Date();
+  }
 
   let targetListId = listId;
   if ("move_to" in data) {
@@ -502,6 +557,7 @@ export async function patchTask(
     list_id: targetListId,
     title: splitTitle(updated.text),
     notes: splitNotes(updated.text),
+    tags: parseTags(updated.tags),
   };
 }
 
@@ -538,6 +594,7 @@ export async function searchTasks(
       title: splitTitle(t.text),
       notes: splitNotes(t.text),
       status: t.status,
+      tags: parseTags(t.tags),
       listId: t.list_id,
       listTitle: listMap.get(t.list_id) ?? "",
     }));

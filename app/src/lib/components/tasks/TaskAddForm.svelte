@@ -1,15 +1,25 @@
 <script lang="ts">
     /**
-     * @fileoverview タスク追加フォーム（テキストエリア + 追加ボタン）
+     * @fileoverview タスク追加フォーム（テキストエリア + タグ設定 + 追加ボタン）
      */
+
+    import type { TagInfo } from "$lib/types";
+    import TagEditor from "./TagEditor.svelte";
 
     type Props = {
         value: string;
-        onSubmit: (text: string) => void;
+        listTagCandidates: TagInfo[];
+        onSubmit: (data: { text: string; tags: TagInfo[] }) => void;
     };
 
-    let { value = $bindable(), onSubmit }: Props = $props();
+    let { value = $bindable(), listTagCandidates, onSubmit }: Props = $props();
     let formFocused = $state(false);
+    let tags = $state<TagInfo[]>([]);
+
+    // タグ削除などでフォーカスを失っても、入力中のテキストやタグがあれば展開を維持する
+    const expanded = $derived(
+        formFocused || value.length > 0 || tags.length > 0,
+    );
 
     /** フォーム内のどこかにフォーカスがあるかを遅延チェック */
     function handleBlur(e: FocusEvent) {
@@ -29,7 +39,9 @@
         e.preventDefault();
         const text = value.trimEnd();
         if (text) {
-            onSubmit(text);
+            onSubmit({ text, tags });
+            // 送信後はタグもリセット
+            tags = [];
         }
     }
 
@@ -45,25 +57,37 @@
     class="border-b border-gray-200 bg-white px-3 py-2 sm:px-4 dark:border-gray-700 dark:bg-gray-800"
     data-testid="task-add-form"
 >
-    <form onsubmit={handleSubmit} class="flex items-start gap-2">
-        <textarea
-            bind:value
-            placeholder="タスクを追加... (Ctrl+Enter で送信)"
-            rows={formFocused || value ? 5 : 1}
-            onfocus={() => (formFocused = true)}
-            onblur={handleBlur}
-            onkeydown={handleKeydown}
-            class="flex-1 resize-none rounded border border-gray-200 px-3 py-1.5 text-sm focus:border-blue-400 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
-        ></textarea>
-        {#if formFocused || value}
-            <button
-                type="submit"
+    <form onsubmit={handleSubmit} class="flex flex-col gap-2">
+        <div class="flex items-start gap-2">
+            <textarea
+                bind:value
+                placeholder="タスクを追加... (Ctrl+Enter で送信)"
+                rows={expanded ? 5 : 1}
                 onfocus={() => (formFocused = true)}
                 onblur={handleBlur}
-                class="cursor-pointer rounded bg-blue-100 px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-200 dark:bg-blue-900/40 dark:text-blue-400 dark:hover:bg-blue-900/60"
+                onkeydown={handleKeydown}
+                class="flex-1 resize-none rounded border border-gray-200 px-3 py-1.5 text-sm focus:border-blue-400 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+            ></textarea>
+            {#if expanded}
+                <button
+                    type="submit"
+                    onfocus={() => (formFocused = true)}
+                    onblur={handleBlur}
+                    class="cursor-pointer rounded bg-blue-100 px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-200 dark:bg-blue-900/40 dark:text-blue-400 dark:hover:bg-blue-900/60"
+                >
+                    追加
+                </button>
+            {/if}
+        </div>
+        {#if expanded}
+            <div
+                onfocusin={() => (formFocused = true)}
+                onfocusout={handleBlur}
+                role="group"
+                aria-label="タグ"
             >
-                追加
-            </button>
+                <TagEditor bind:tags candidates={listTagCandidates} />
+            </div>
         {/if}
     </form>
 </div>

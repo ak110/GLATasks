@@ -271,7 +271,7 @@ export const appRouter = t.router({
     create: encryptedProcedure
       .input(CreateTaskSchema)
       .mutation(async ({ ctx, input }) => {
-        await api.postTask(ctx.userId, input.listId, input.text);
+        await api.postTask(ctx.userId, input.listId, input.text, input.tags);
         sendEvent(ctx.userId, "tasks:updated", ctx.tabId);
         return { success: true };
       }),

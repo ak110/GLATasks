@@ -15,6 +15,7 @@
     import type { TaskStatus } from "$lib/schemas";
     import type {
         ListInfo,
+        TagInfo,
         TaskInfo,
         GetTasksResult,
         SearchTaskResult,
@@ -52,6 +53,7 @@
         moveTo: string;
         keepOrder: boolean;
         completed: boolean;
+        tags: TagInfo[];
     };
     // リスト統合ダイアログの状態
     type MergeDialog = {
@@ -75,6 +77,7 @@
         moveTo: "",
         keepOrder: false,
         completed: false,
+        tags: [],
     });
 
     const queryClient = useQueryClient();
@@ -184,8 +187,15 @@
 
     // タスク作成
     const createTaskMutation = createMutation(() => ({
-        mutationFn: ({ listId, text }: { listId: number; text: string }) =>
-            trpc.tasks.create.mutate({ listId, text }),
+        mutationFn: ({
+            listId,
+            text,
+            tags,
+        }: {
+            listId: number;
+            text: string;
+            tags?: TagInfo[];
+        }) => trpc.tasks.create.mutate({ listId, text, tags }),
         onSuccess: (_data, variables) => {
             queryClient.invalidateQueries({
                 queryKey: ["tasks", variables.listId],
@@ -204,6 +214,7 @@
             completed?: string | null;
             move_to?: number;
             keep_order?: boolean;
+            tags?: TagInfo[];
         }) => trpc.tasks.update.mutate(input),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["tasks"] });
@@ -277,6 +288,16 @@
     const tasks = $derived.by(() => {
         const data = tasksQuery.data as GetTasksResult | undefined;
         return data && "data" in data ? data.data : [];
+    });
+    // 同一リスト内で既に使われているタグ候補（名前ユニーク、同名は最初の色を採用）
+    const listTagCandidates = $derived.by(() => {
+        const seen = new SvelteMap<string, TagInfo>();
+        for (const t of tasks) {
+            for (const tag of t.tags) {
+                if (!seen.has(tag.name)) seen.set(tag.name, tag);
+            }
+        }
+        return [...seen.values()];
     });
     const isLoading = $derived(listsQuery.isLoading || tasksQuery.isLoading);
     const isSearching = $derived(debouncedQuery.length > 0);
@@ -434,14 +455,15 @@
         }
     }
 
-    async function addTask() {
+    async function addTask(data: { text: string; tags: TagInfo[] }) {
         if (!selectedListId) return;
-        const text = addTaskText.trimEnd();
+        const text = data.text.trimEnd();
         if (!text) return;
         try {
             await createTaskMutation.mutateAsync({
                 listId: selectedListId,
                 text,
+                tags: data.tags,
             });
         } catch {
             // グローバルエラーハンドラがトースト表示を担当
@@ -474,6 +496,7 @@
             moveTo: String(selectedListId!),
             keepOrder: false,
             completed: task.status === "completed",
+            tags: task.tags,
         };
     }
 
@@ -482,6 +505,7 @@
         moveTo: string;
         keepOrder: boolean;
         completed: boolean;
+        tags: TagInfo[];
     }) {
         const { listId, taskId, completed: wasCompleted } = editDialog;
 
@@ -500,6 +524,7 @@
                 text: data.text,
                 move_to: Number(data.moveTo),
                 keep_order: data.keepOrder,
+                tags: data.tags,
                 ...statusChange,
             });
             editDialog.open = false;
@@ -857,7 +882,11 @@
                 />
             {/if}
 
-            <TaskAddForm bind:value={addTaskText} onSubmit={addTask} />
+            <TaskAddForm
+                bind:value={addTaskText}
+                {listTagCandidates}
+                onSubmit={addTask}
+            />
 
             <TaskList
                 {tasks}
@@ -884,6 +913,8 @@
     moveTo={editDialog.moveTo}
     keepOrder={editDialog.keepOrder}
     completed={editDialog.completed}
+    tags={editDialog.tags}
+    {listTagCandidates}
     onSubmit={submitTaskEdit}
     onClose={() => (editDialog.open = false)}
 />

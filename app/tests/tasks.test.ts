@@ -138,6 +138,88 @@ test.describe("tasks", () => {
     });
   });
 
+  test("コピーメニューでタイトルのみをコピーできる", async ({ page }) => {
+    const title = `コピーテスト_${Date.now()}`;
+    const notes = "ノート部分";
+    await page.fill(
+      'textarea[placeholder*="タスクを追加"]',
+      `${title}\n${notes}`,
+    );
+    await page.click('[data-testid="task-add-form"] button[type="submit"]');
+
+    const taskRow = page
+      .locator('[data-testid="task-item"]')
+      .filter({ hasText: title });
+    await taskRow.waitFor({ timeout: 15000 });
+
+    await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+
+    await taskRow
+      .locator('[data-testid="task-copy-btn"]')
+      .dispatchEvent("click");
+    await taskRow
+      .locator('[data-testid="task-copy-menu"]')
+      .waitFor({ timeout: 15000 });
+    await taskRow
+      .locator('[data-testid="task-copy-title"]')
+      .dispatchEvent("click");
+
+    const copied = await page.evaluate(() => navigator.clipboard.readText());
+    expect(copied).toBe(title);
+  });
+
+  test("新規タスクにタグを付けると一覧にバッジが表示される", async ({ page }) => {
+    const title = `タグテスト_${Date.now()}`;
+    const tagName = `ラベル_${Date.now()}`;
+
+    await page.fill('textarea[placeholder*="タスクを追加"]', title);
+    // フォーカス後にタグ入力欄を表示させる
+    await page.locator('[data-testid="task-add-form"] textarea').focus();
+    await page
+      .locator('[data-testid="task-add-form"] [data-testid="tag-editor-input"]')
+      .fill(tagName);
+    await page
+      .locator('[data-testid="task-add-form"] [data-testid="tag-editor-add"]')
+      .click();
+    await page.click('[data-testid="task-add-form"] button[type="submit"]');
+
+    const taskRow = page
+      .locator('[data-testid="task-item"]')
+      .filter({ hasText: title });
+    await taskRow.waitFor({ timeout: 15000 });
+    await expect(
+      taskRow.locator('[data-testid="task-tags"]').filter({ hasText: tagName }),
+    ).toBeVisible({ timeout: 15000 });
+  });
+
+  test("編集ダイアログでタグを追加できる", async ({ page }) => {
+    const title = `タグ編集_${Date.now()}`;
+    const tagName = `編集タグ_${Date.now()}`;
+
+    await page.fill('textarea[placeholder*="タスクを追加"]', title);
+    await page.click('[data-testid="task-add-form"] button[type="submit"]');
+
+    const taskRow = page
+      .locator('[data-testid="task-item"]')
+      .filter({ hasText: title });
+    await taskRow.waitFor({ timeout: 15000 });
+    await taskRow
+      .locator('[data-testid="task-edit-btn"]')
+      .dispatchEvent("click");
+
+    await page
+      .locator('[role="dialog"] [data-testid="tag-editor-input"]')
+      .fill(tagName);
+    await page
+      .locator('[role="dialog"] [data-testid="tag-editor-add"]')
+      .click();
+    await page.click('button:has-text("保存")');
+
+    await expect(
+      taskRow.locator('[data-testid="task-tags"]').filter({ hasText: tagName }),
+    ).toBeVisible({ timeout: 15000 });
+  });
+
   test("編集ダイアログでテキストを変更できる", async ({ page }) => {
     const original = `編集前_${Date.now()}`;
     const edited = `編集後_${Date.now()}`;

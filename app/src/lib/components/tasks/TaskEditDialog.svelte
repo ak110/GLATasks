@@ -1,7 +1,10 @@
 <script lang="ts">
     /**
-     * @fileoverview タスク編集ダイアログ（内容編集・リスト移動・完了状態変更）
+     * @fileoverview タスク編集ダイアログ（内容編集・タグ設定・リスト移動・完了状態変更）
      */
+
+    import type { TagInfo } from "$lib/types";
+    import TagEditor from "./TagEditor.svelte";
 
     type Props = {
         open: boolean;
@@ -9,12 +12,15 @@
         moveTo: string;
         keepOrder: boolean;
         completed: boolean;
+        tags: TagInfo[];
+        listTagCandidates: TagInfo[];
         lists: Array<{ id: number; title: string }>;
         onSubmit: (data: {
             text: string;
             moveTo: string;
             keepOrder: boolean;
             completed: boolean;
+            tags: TagInfo[];
         }) => void;
         onClose: () => void;
     };
@@ -25,6 +31,8 @@
         moveTo,
         keepOrder,
         completed,
+        tags,
+        listTagCandidates,
         lists,
         onSubmit,
         onClose,
@@ -34,6 +42,7 @@
     let localMoveTo = $state("");
     let localKeepOrder = $state(false);
     let localCompleted = $state(false);
+    let localTags = $state<TagInfo[]>([]);
     let textareaEl = $state<HTMLTextAreaElement | null>(null);
     let closeButtonEl = $state<HTMLButtonElement | null>(null);
 
@@ -44,6 +53,7 @@
             localMoveTo = moveTo;
             localKeepOrder = keepOrder;
             localCompleted = completed;
+            localTags = [...tags];
             // tick 後にフォーカス
             queueMicrotask(() => textareaEl?.focus());
         }
@@ -55,6 +65,7 @@
             moveTo: localMoveTo,
             keepOrder: localKeepOrder,
             completed: localCompleted,
+            tags: localTags,
         });
     }
 </script>
@@ -116,6 +127,16 @@
                         }}
                         class="w-full rounded border border-gray-200 px-3 py-2 wrap-break-word break-all focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
                     ></textarea>
+                </div>
+                <div class="mb-4">
+                    <span
+                        class="mb-1 block font-medium text-gray-700 dark:text-gray-200"
+                        >タグ</span
+                    >
+                    <TagEditor
+                        bind:tags={localTags}
+                        candidates={listTagCandidates}
+                    />
                 </div>
                 <div class="mb-4">
                     <label
