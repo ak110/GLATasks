@@ -52,7 +52,7 @@ description: GLATasks に新しい tRPC procedure を追加するときの定型
 
 ### 6. 検証
 
-- `make format` → `make test` をルートから実行（`app/` にcdしない。Makefileのパス解決が整合しなくなる）
+- `uvx pyfltr run --output-format=jsonl` をルートから実行
 - 開発環境で `make healthcheck` が通ることを確認
 - `trpc-zod-contract-reviewer` エージェントに差分レビューを依頼する (`.claude/agents/trpc-zod-contract-reviewer.md`)
 
