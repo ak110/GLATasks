@@ -297,7 +297,7 @@
                 if (!seen.has(tag.name)) seen.set(tag.name, tag);
             }
         }
-        return [...seen.values()];
+        return [...seen.values()].sort((a, b) => a.name.localeCompare(b.name));
     });
     const isLoading = $derived(listsQuery.isLoading || tasksQuery.isLoading);
     const isSearching = $derived(debouncedQuery.length > 0);

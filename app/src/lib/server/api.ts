@@ -93,6 +93,7 @@ function parseTags(raw: string | null | undefined): TagInfo[] {
         result.push({ name: item.name, color: item.color as TagColorKey });
       }
     }
+    result.sort((a, b) => a.name.localeCompare(b.name));
     return result;
   } catch {
     return [];
