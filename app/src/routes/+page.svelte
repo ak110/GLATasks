@@ -20,6 +20,7 @@
         GetTasksResult,
         SearchTaskResult,
     } from "$lib/types";
+    import { compareTagName } from "$lib/tag-sort";
     import Header from "$lib/components/layout/Header.svelte";
     import ListSidebar from "$lib/components/lists/ListSidebar.svelte";
     import TaskList from "$lib/components/tasks/TaskList.svelte";
@@ -297,7 +298,7 @@
                 if (!seen.has(tag.name)) seen.set(tag.name, tag);
             }
         }
-        return [...seen.values()].sort((a, b) => a.name.localeCompare(b.name));
+        return [...seen.values()].sort(compareTagName);
     });
     const isLoading = $derived(listsQuery.isLoading || tasksQuery.isLoading);
     const isSearching = $derived(debouncedQuery.length > 0);
@@ -455,18 +456,23 @@
         }
     }
 
-    async function addTask(data: { text: string; tags: TagInfo[] }) {
-        if (!selectedListId) return;
+    async function addTask(data: {
+        text: string;
+        tags: TagInfo[];
+    }): Promise<boolean> {
+        if (!selectedListId) return false;
         const text = data.text.trimEnd();
-        if (!text) return;
+        if (!text) return false;
         try {
             await createTaskMutation.mutateAsync({
                 listId: selectedListId,
                 text,
                 tags: data.tags,
             });
+            return true;
         } catch {
             // グローバルエラーハンドラがトースト表示を担当
+            return false;
         }
     }
 

@@ -9,7 +9,7 @@
     type Props = {
         value: string;
         listTagCandidates: TagInfo[];
-        onSubmit: (data: { text: string; tags: TagInfo[] }) => void;
+        onSubmit: (data: { text: string; tags: TagInfo[] }) => Promise<boolean>;
     };
 
     let { value = $bindable(), listTagCandidates, onSubmit }: Props = $props();
@@ -35,20 +35,23 @@
         formFocused = false;
     }
 
-    function handleSubmit(e: Event) {
+    async function handleSubmit(e: Event) {
         e.preventDefault();
         const text = value.trimEnd();
-        if (text) {
-            onSubmit({ text, tags });
-            // 送信後はタグもリセット
+        if (!text) return;
+        const ok = await onSubmit({ text, tags });
+        // 送信成功時のみタグをリセットしフォームを折りたたむ。失敗時は
+        // テキスト・タグ・フォーカス状態を残し、ユーザーが修正して再送信できるようにする
+        if (ok) {
             tags = [];
+            formFocused = false;
         }
     }
 
     function handleKeydown(e: KeyboardEvent) {
         if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
             e.preventDefault();
-            handleSubmit(e);
+            void handleSubmit(e);
         }
     }
 </script>

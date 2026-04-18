@@ -76,6 +76,20 @@ test.describe("tasks", () => {
     });
   });
 
+  test("タスク追加後は入力欄が折りたたまれる", async ({ page }) => {
+    const taskTitle = `折りたたみ_${Date.now()}`;
+    const form = page.locator('[data-testid="task-add-form"]');
+    const submitBtn = form.locator('button[type="submit"]');
+    await page.fill('textarea[placeholder*="タスクを追加"]', taskTitle);
+    await expect(submitBtn).toBeVisible();
+    await submitBtn.click();
+    await expect(
+      page.locator('[data-testid="task-item"]').filter({ hasText: taskTitle }),
+    ).toBeVisible({ timeout: 15000 });
+    // 送信成功後は追加ボタンが非表示（expanded=false）に戻る
+    await expect(submitBtn).toBeHidden({ timeout: 15000 });
+  });
+
   test("複数行タスクを追加すると title/notes に分割される", async ({
     page,
   }) => {

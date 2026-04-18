@@ -17,6 +17,7 @@ import type {
   GetTasksResult,
 } from "$lib/types";
 import { TAG_COLOR_KEYS } from "../types";
+import { compareTagName } from "../tag-sort";
 import { getDb } from "./db";
 import { lists, tasks, timers, users } from "./schema";
 
@@ -93,7 +94,7 @@ function parseTags(raw: string | null | undefined): TagInfo[] {
         result.push({ name: item.name, color: item.color as TagColorKey });
       }
     }
-    result.sort((a, b) => a.name.localeCompare(b.name));
+    result.sort(compareTagName);
     return result;
   } catch {
     return [];
