@@ -5,17 +5,14 @@ exclude-newer = "1 day"
 
 [tool.pyfltr]
 preset = "latest"
-# JS/TS 専用プロジェクトのため Python 系ツールを一括無効化する。
-python = false
+# JS/TS 系ツール（eslint / prettier / vitest / oxlint / biome）を一括で有効化する。
+javascript = true
 # JS 系ツールは package.json で管理するため pnpm runner を使う。
 # node_modules/.bin の実行ファイルを pnpm exec 経由で呼び出す。
 js-runner = "pnpm"
 
-# 有効化するツール（preset = "latest"でmarkdownlint/textlint/pre-commit等は有効化済み）
-eslint = true
-prettier = true
-vitest = true
-oxlint = true
+# javascript ゲート経由で有効になるが、本プロジェクトでは未採用のため個別に無効化する。
+biome = false
 tsc = false
 
 # pyfltr の除外パターン。eslint / prettier は独自の ignore 設定
