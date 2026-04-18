@@ -16,4 +16,6 @@
 - vitestのenvironmentは `node`（`vitest.config.ts` @ repo root）。DOM API（`EventSource`, `localStorage` 等）を使うコードを
   テストするときは `globalThis` のプロパティにモック実装を代入する
 - 現在の `COMPOSE_PROFILE` を確認したいときは `make -n deploy` のドライラン出力で判別できる（`.env` を直接読めないことがある）
+- 開発環境はdocker composeで動いているため、アクセスしたい場合は以下ようなコマンドを使用する
+  - `docker compose --profile development exec web curl -fLk https://localhost/`
 - 本リポジトリはSvelte 5、Tailwind v4、tRPC v11、Vite 8など比較的新しいメジャーバージョンを使用している
