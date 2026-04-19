@@ -18,4 +18,4 @@
 ## ドキュメント
 
 - <https://ak110.github.io/GLATasks/> — 概要・使い方・セルフホスト手順
-- [docs/src/content/docs/development/development.md](docs/src/content/docs/development/development.md) — 開発者向け情報
+- [docs/development/development.md](docs/development/development.md) — 開発者向け情報
