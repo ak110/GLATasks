@@ -4,6 +4,7 @@
 
 - `make update`: 依存更新 + pinactアクション更新 + 全テスト実行
   - `make update-actions`: GitHub Actionsのハッシュピン更新のみ（mise経由でpinact実行）
+- リリース手順: [docs/development/development.md](docs/development/development.md) 参照
 - コミット前の検証方法: `uvx pyfltr run-for-agent`
   - ドキュメントなどのみの変更の場合は省略可（pre-commitで実行されるため）
   - テストコードの単体実行なども極力 `uv run pyfltr run-for-agent <path>` を使う（pytestを直接呼び出さない）
