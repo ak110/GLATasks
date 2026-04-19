@@ -1,18 +1,23 @@
 ---
 name: add-trpc-procedure
-description: GLATasks に新しい tRPC procedure を追加するときの定型チェックリスト。Zod スキーマ → ルーター登録 → 難読化ミドルウェア → SSE 通知 → クライアント側 invalidate → テストの漏れを防ぐ。ユーザーが "tRPC procedure 追加" や "/add-trpc-procedure" を実行したとき、もしくは新しい router エントリを書く前に呼び出す。
+description: >-
+  GLATasks に新しい tRPC procedure を追加するときの定型チェックリスト。
+  Zod スキーマ → ルーター登録 → 難読化ミドルウェア → SSE 通知 → クライアント側 invalidate → テストの漏れを防ぐ。
+  ユーザーが "tRPC procedure 追加" や "/add-trpc-procedure" を実行したとき、
+  もしくは新しい router エントリを書く前に呼び出す。
 ---
 
 # tRPC Procedure 追加手順 (GLATasks)
 
-新しいtRPC procedureを追加するときは、以下のチェックリストをTaskCreateに展開してから着手する。項目に漏れがあると、難読化漏れ、SSE通知漏れ、クライアント側の再取得漏れ、型不一致などの致命的なバグを招きやすい。
+新しいtRPC procedureを追加するときは、以下のチェックリストをTaskCreateに展開してから着手する。
+項目に漏れがあると、難読化漏れ、SSE通知漏れ、クライアント側の再取得漏れ、型不一致などの致命的なバグを招きやすい。
 
 ## チェックリスト
 
 ### 1. 入出力スキーマの設計
 
 - `app/src/lib/schemas.ts` にZodスキーマを追加する。既存スキーマ (`UpdateListSchema.pick(...)` 等) で再利用できる場合は優先する
-- 数値パラメータは `z.coerce.number()` か、呼び出し側で `Number()` 変換する方針を明示する（JSONボディから文字列が混入するのを防ぐため）
+- 数値パラメータは `z.coerce.number()` か、呼び出し側で `Number()` 変換するかの方針を明示する（文字列混入を防ぐため）
 - 市民時刻を扱う場合は `tz_offset_minutes: z.number()` を必ず含める（既存のタイマー系スキーマを参照）
 - 型推論用の型エクスポート (`export type FooInput = z.infer<typeof FooSchema>`) は必要な場合のみ追加する
 
@@ -30,7 +35,8 @@ description: GLATasks に新しい tRPC procedure を追加するときの定型
 - 原則として `encryptedProcedure` を使用する（認証 + APIエラー変換 + 難読化）
 - `publicProcedure` は `auth.login` / `auth.register` のような未認証前提のものに限る
 - mutation完了後、`sendEvent(ctx.userId, "<domain>:updated", ctx.tabId)` をreturn前に呼ぶ
-- イベント種別は `lists:updated` / `tasks:updated` / `timers:updated` の3種のみ。影響ドメインが複数なら複数送る（`lists.merge` を参照）
+- イベント種別は `lists:updated` / `tasks:updated` / `timers:updated` の3種のみ。
+  影響ドメインが複数なら複数送る（`lists.merge` を参照）
 - 新しい機械可読エラー識別子を導入した場合は `API_ERRORS` にマッピング追加
 
 ### 4. クライアント側の反映

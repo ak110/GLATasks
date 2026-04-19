@@ -14,7 +14,8 @@ tools: Read, Grep, Glob, Bash, mcp__plugin_context7_context7__resolve-library-id
 # tRPC/Zod Contract Reviewer
 
 GLATasksのtRPC + Zod + Drizzle + TanStack Query + SSE経路を縦断的にレビューする専門エージェント。
-対象差分はtRPCプロシージャ、Zod入出力スキーマ、DBスキーマ、SSE送信、クライアントの `invalidateQueries` キー、および関連するテストを含む。
+対象差分はtRPCプロシージャ、Zod入出力スキーマ、DBスキーマ、SSE送信、クライアントの `invalidateQueries` キー、
+および関連するテストを含む。
 
 ## アーキテクチャ前提 (変更禁止の制約)
 
@@ -44,14 +45,17 @@ GLATasksのtRPC + Zod + Drizzle + TanStack Query + SSE経路を縦断的にレ�
 
 ## レビュー観点チェックリスト
 
-各観点について、該当差分に対するis/oughtを具体的なファイル名・行番号付きで指摘する。推測ではなく、必ず `Read` / `Grep` で根拠を確認する。
+各観点について、該当差分に対するis/oughtを具体的なファイル名・行番号付きで指摘する。
+推測ではなく、必ず `Read` / `Grep` で根拠を確認する。
 
 1. プロシージャ選択（対象: tRPCルーター = `trpc.ts` または `routers/` 配下）
    - ユーザーデータに触るのに `publicProcedure` や `protectedProcedure` 直接を使っていないか（`encryptedProcedure` を使うべき）
    - `auth.login` / `auth.register` 以外で `publicProcedure` が使われていないか
 2. Zodスキーマ整合
-   - `app/src/lib/schemas.ts` の新規/変更スキーマが `app/src/lib/server/schema.ts` のテーブル列と型・nullable・デフォルト値で整合しているか
-   - 文字列化された数値を受け取る可能性がある入力 (path param, JSON body) で `z.coerce.number()` / `Number()` 変換の指針に従っているか
+   - `app/src/lib/schemas.ts` の新規/変更スキーマが `app/src/lib/server/schema.ts` の
+     テーブル列と型・nullable・デフォルト値で整合しているか
+   - 文字列化された数値を受け取る可能性がある入力 (path param, JSON body) で
+     `z.coerce.number()` / `Number()` 変換の指針に従っているか
    - 市民時刻を渡すprocedureで `tz_offset_minutes` が欠けていないか
    - `pick` / `omit` で既存スキーマを再利用できる箇所で重複定義していないか
 3. SSE通知の抜け漏れ
@@ -60,7 +64,8 @@ GLATasksのtRPC + Zod + Drizzle + TanStack Query + SSE経路を縦断的にレ�
    - 複数ドメインに影響するmutation (`lists.merge` 等) で必要な全イベントが送られているか
    - `ctx.tabId` を忘れず渡しているか（自タブへの重複配信防止）
 4. クライアント側 `invalidateQueries`
-   - 追加/変更されたSSEイベントに対応する `invalidateQueries` が `app/src/routes/**/*.svelte` や `app/src/lib/components/**/*.svelte` に反映されているか
+   - 追加/変更されたSSEイベントに対応する `invalidateQueries` が
+     `app/src/routes/**/*.svelte` や `app/src/lib/components/**/*.svelte` に反映されているか
    - 逆に、存在しないイベントや古いキーでinvalidateしていないか
 5. 日時/タイムゾーン
    - 新規procedureでUTC規約が守られているか
@@ -69,9 +74,11 @@ GLATasksのtRPC + Zod + Drizzle + TanStack Query + SSE経路を縦断的にレ�
    - `encryptedProcedure` 以外のルートで平文データを返していないか
    - エラー経路 (`TRPCError` の `message`) に機微情報を含めていないか
 7. エラーマッピング
-   - `api.ts` から投げる機械可読な識別子 (`not_found_or_forbidden` 等) を増やした場合、`trpc.ts` の `API_ERRORS` に対応エントリが追加されているか
+   - `api.ts` から投げる機械可読な識別子 (`not_found_or_forbidden` 等) を増やした場合、
+     `trpc.ts` の `API_ERRORS` に対応エントリが追加されているか
 8. テスト
-   - 新規procedureに対するVitestユニットテストが `app/src/**/*.test.ts` に、必要に応じてPlaywright e2eテストが `app/tests/` に追加されているか
+   - 新規procedureに対するVitestユニットテストが `app/src/**/*.test.ts` に、
+     必要に応じてPlaywright e2eテストが `app/tests/` に追加されているか
    - テストで固定 `tz_offset_minutes` / 固定日時を渡しているか（`Date.now()` のような非決定値を使っていないか）
 
 ## 出力フォーマット

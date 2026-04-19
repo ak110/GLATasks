@@ -48,7 +48,8 @@ flowchart LR
 設定上の制約:
 
 - `/api/events` と `/` の両方に `proxy_ssl_certificate` / `proxy_ssl_certificate_key` が必要（内部nginxが自己署名HTTPSのため）
-- SSE用の `/api/events` には `proxy_buffering off` + `proxy_read_timeout 86400` + `proxy_http_version 1.1` + `Connection ''` が必須
+- SSE用の `/api/events` には `proxy_buffering off` + `proxy_read_timeout 86400` +
+  `proxy_http_version 1.1` + `Connection ''` が必須
 - `X-Accel-Buffering: no` ヘッダーでnginxのレスポンスバッファも無効化する
 
 設定例:
@@ -142,7 +143,8 @@ tRPC response (SSEイベント後) → setServerOffset(RTT/2補正値)
 SSE heartbeat (30秒ごと)  ──→ 接続維持のみ（オフセット更新なし）
 ```
 
-SSEは片道通信のためRTTを測定できない。heartbeatのサーバー時刻でオフセットを上書きすると、tRPCのRTT/2補正で得た精密値が片道遅延分だけズレた値に劣化するため、heartbeatは接続維持のみに使用する。
+SSEは片道通信のためRTTを測定できない。heartbeatのサーバー時刻でオフセットを上書きすると、
+tRPCのRTT/2補正で得た精密値が片道遅延分だけズレた値に劣化するため、heartbeatは接続維持のみに使用する。
 
 ## 認証設計
 
@@ -166,9 +168,11 @@ Cookieに `sameSite: "none"` + `secure: true` を設定。
 
 テーブル定義は `app/src/lib/server/schema.ts` を参照。以下はコードから読み取りにくい設計判断:
 
-- 日時カラムはすべてTIMESTAMP型でUTC保存。タイムゾーン変換はクライアント側で行い、サーバー・DB層ではタイムゾーンを意識しない設計
+- 日時カラムはすべてTIMESTAMP型でUTC保存。タイムゾーン変換はクライアント側で行い、
+  サーバー・DB層ではタイムゾーンを意識しない設計
 - 並び順は `sort_order` INTカラム（昇順、1000刻み）。刻み幅を大きくすることで、挿入時に周囲のレコードを更新せずに済む
-- タイマーの残り時間はサーバー側で計算せず、`remaining_seconds` と `started_at` をクライアントに渡してブラウザ側で計算する。これにより秒単位のリアルタイム表示をポーリングなしで実現する
+- タイマーの残り時間はサーバー側で計算せず、`remaining_seconds` と `started_at` をクライアントに渡して
+  ブラウザ側で計算する。これにより秒単位のリアルタイム表示をポーリングなしで実現する
 - タイマーの `ephemeral` カラムは1回限りの使い切りタイマーを識別するフラグ。
   作成時のみ設定でき、`adjust` / `reset` / `setTime` などの操作で変更されない。
   クライアント側では満了到達時に削除ボタンを強調し、確認ダイアログを省略して削除できる体験に用いる

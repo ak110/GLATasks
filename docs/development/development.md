@@ -37,10 +37,12 @@ make test  # OK
 `make help` で一覧を確認できる。よく使うコマンド:
 
 - `make format` — コード編集後に実行。整形 + 自動修正付きlint
-- `make test` — コミット前に実行。pre-commit + pyfltr（lint・型チェック・ユニットテスト・svelte-checkを一括実行）+ バックアップテスト + e2eの全検証
+- `make test` — コミット前に実行。pre-commit + pyfltr（lint・型チェック・ユニットテスト・svelte-check一括実行）+
+  バックアップテスト + e2eの全検証
 - `make deploy` — ビルド → 停止 → 起動
 
-svelte-checkはpyfltrの`custom-commands`機能で統合されているため、`uvx pyfltr run`から自動実行される。`pyproject.toml`の`[tool.pyfltr.custom-commands.svelte-check]`で設定している。
+svelte-checkはpyfltrの`custom-commands`機能で統合されているため、`uvx pyfltr run`から自動実行される。
+`pyproject.toml`の`[tool.pyfltr.custom-commands.svelte-check]`で設定している。
 
 ## ツールチェイン
 
@@ -49,8 +51,10 @@ svelte-checkはpyfltrの`custom-commands`機能で統合されているため、
 
 Biome移行における主要な阻害要因は以下のとおり。
 
-1. Svelteマークアップ非対応 — Biomeは `.svelte` のマークアップ部分のフォーマットに対応していない。現在はprettier-plugin-svelteが全体を統一的に処理している
-2. Tailwind CSSクラスソート非対応 — prettier-plugin-tailwindcssに相当する機能がBiomeに存在しない。当該機能はプロジェクト全体で使用している
+1. Svelteマークアップ非対応 — Biomeは `.svelte` のマークアップ部分のフォーマットに対応していない。
+   現在はprettier-plugin-svelteが全体を統一的に処理している
+2. Tailwind CSSクラスソート非対応 — prettier-plugin-tailwindcssに相当する機能がBiomeに存在しない。
+   当該機能はプロジェクト全体で使用している
 
 ## Docker 構成
 
@@ -127,12 +131,13 @@ nginx経由のHTTPS（port 38180）でテストするため、開発環境が起
 ## 開発時の注意点
 
 - JSONボディから受け取る数値は文字列の場合があるため `Number()` で明示変換すること（`"5" !== 5` の型不一致を防ぐ）
-- 日時は全レイヤーでUTC統一。DB（TIMESTAMP型）→ サーバー（Dateオブジェクト）→ クライアント（ISO8601文字列）の変換は自動で行われるため、
-  タイムゾーンを意識するコードは不要
+- 日時は全レイヤーでUTC統一。DB（TIMESTAMP型）→ サーバー（Dateオブジェクト）→ クライアント（ISO8601文字列）の
+  変換は自動で行われるため、タイムゾーンを意識するコードは不要
 
 ## サプライチェーン攻撃対策
 
-npm / PyPIレジストリへの悪意あるパッケージ公開に対する防御として、公開から一定期間が経過したパッケージのみインストールを許可する設定を導入している。
+npm / PyPIレジストリへの悪意あるパッケージ公開に対する防御として、
+公開から一定期間が経過したパッケージのみインストールを許可する設定を導入している。
 
 ### pnpm: minimumReleaseAge
 
@@ -150,16 +155,19 @@ minimumReleaseAgeExclude:
 
 ### uv: exclude-newer
 
-`uv.toml` に `exclude-newer = "1 day"` を設定。PyPIに公開されてから1日未満のパッケージはインストールされない。`uvx`（`uv tool run`）にも適用される。
+`uv.toml` に `exclude-newer = "1 day"` を設定。PyPIに公開されてから1日未満のパッケージはインストールされない。
+`uvx`（`uv tool run`）にも適用される。
 
 ### pre-commit のバージョン固定
 
 `.pre-commit-config.yaml` の `additional_dependencies` で指定するnpmパッケージ（textlint等）は
-pre-commitが直接npm経由でインストールする。そのためpnpmの `minimumReleaseAge` は適用されない。代わりに `@latest` ではなくバージョンを固定している。
+pre-commitが直接npm経由でインストールする。そのためpnpmの `minimumReleaseAge` は適用されない。
+代わりに `@latest` ではなくバージョンを固定している。
 
 ### pnpmにおけるlockfile尊重
 
-サプライチェーン攻撃対策の二重防御として、CI・Docker・`make`から呼ばれる`pnpm install`はすべて`--frozen-lockfile`を明示している。
+サプライチェーン攻撃対策の二重防御として、CI・Docker・`make`から呼ばれる`pnpm install`は
+すべて`--frozen-lockfile`を明示している。
 これにより`pnpm-lock.yaml`が`package.json`と乖離している場合に再resolveを許さずインストールを失敗させ、
 ロックファイルが意図せず書き換わるリスクを抑えている。
 
@@ -168,7 +176,8 @@ pre-commitが直接npm経由でインストールする。そのためpnpmの `m
 - `Makefile`の`RUN_NODE`関数および`test-e2e`ターゲット
 - `.github/workflows/ci.yaml` / `.github/workflows/docs.yaml`のCIステップ
 
-依存を更新するときは`make update`から呼ばれる`pnpm update --latest`を使う。`pnpm update`は`--frozen-lockfile`の影響を受けないため、開発フローを阻害しない。
+依存を更新するときは`make update`から呼ばれる`pnpm update --latest`を使う。
+`pnpm update`は`--frozen-lockfile`の影響を受けないため、開発フローを阻害しない。
 
 ## CI/CD
 
@@ -188,7 +197,8 @@ masterへのpush・PR時に自動実行する。以下の2つのjobを並列に�
 
 `integration` jobはDocker Compose環境が必要なため`test` jobと分離している。
 同一ワークフロー内で実行することでmaster push / PRの両方で回帰検出ができる。
-`compose.yaml`の`playwright`サービスには`ci`プロファイルを追加しており、production相当のスタックにplaywrightサービスだけ追加で起動する構成にしている。
+`compose.yaml`の`playwright`サービスには`ci`プロファイルを追加しており、
+production相当のスタックにplaywrightサービスだけ追加で起動する構成にしている。
 
 ### リリース→デプロイの流れ
 
@@ -209,8 +219,10 @@ sequenceDiagram
     D->>S: SSH で make sync && make backup && make deploy
 ```
 
-1. `release.yaml`（手動実行）: masterのci.yamlが成功していることを確認 → バージョンタグとリリースを作成 → `gh workflow run deploy.yaml` でデプロイを起動
-2. `deploy.yaml`（release.yamlから起動）: DockerイメージをビルドしてGHCRにプッシュ → SSHでサーバーに接続し `make sync && make backup && make deploy` を実行
+1. `release.yaml`（手動実行）: masterのci.yamlが成功していることを確認 → バージョンタグとリリースを作成 →
+   `gh workflow run deploy.yaml` でデプロイを起動
+2. `deploy.yaml`（release.yamlから起動）: DockerイメージをビルドしてGHCRにプッシュ →
+   SSHでサーバーに接続し `make sync && make backup && make deploy` を実行
 
 ## GitHub Actionsのデプロイ用SSHキー作成手順
 
@@ -275,15 +287,18 @@ make restart-app
 
 本プロジェクトのドキュメントは以下の構成で配置している。
 
-- README.md: 概要・特徴・ドキュメントへのリンクを網羅する「玄関」。README.mdだけを読めばプロジェクトの目的と使い始めるための入口が把握できる状態を保つ
+- README.md: 概要・特徴・ドキュメントへのリンクを網羅する「玄関」。README.mdだけを読めば
+  プロジェクトの目的と使い始めるための入口が把握できる状態を保つ
 - docs/guide/: 利用者向けの詳細情報（使い方・導入手順など）
 - docs/development/: 開発者向けの情報（セットアップ・テスト・CI/CD・リリース手順など）
 
 本プロジェクトはWebアプリのため、インストール手順はREADMEには置かず`docs/guide/getting-started.md`に集約している。
 
-README.mdとdocs側で概要・特徴が部分的に重複する場合があるが、README.mdはGitHubトップとして、docs側は公開ドキュメントの入口としてそれぞれ自己完結する必要があるため、この重複は許容する。
+README.mdとdocs側で概要・特徴が部分的に重複する場合があるが、README.mdはGitHubトップとして、
+docs側は公開ドキュメントの入口としてそれぞれ自己完結する必要があるため、この重複は許容する。
 
-変更頻度が低いため二重管理のコストより一貫性・可読性のメリットが上回ると判断した。変更時は、docs側で同じ情報を再掲している箇所があれば同じコミット内で合わせて更新する。
+変更頻度が低いため二重管理のコストより一貫性・可読性のメリットが上回ると判断した。
+変更時は、docs側で同じ情報を再掲している箇所があれば同じコミット内で合わせて更新する。
 
 ## ドキュメントサイト
 
