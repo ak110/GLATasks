@@ -21,6 +21,7 @@
             keepOrder: boolean;
             completed: boolean;
             tags: TagInfo[];
+            closeAfter: boolean;
         }) => void;
         onClose: () => void;
     };
@@ -46,9 +47,11 @@
     let textareaEl = $state<HTMLTextAreaElement | null>(null);
     let closeButtonEl = $state<HTMLButtonElement | null>(null);
 
-    // ダイアログが開くたびにローカル状態をリセット（同じタスクの再編集にも対応）
+    // open が偽から真へ遷移した瞬間のみローカル状態を初期化する
+    // （open=true のまま親が値を同期してきた場合に編集中の値を巻き戻さないため）
+    let prevOpen = false;
     $effect(() => {
-        if (open) {
+        if (open && !prevOpen) {
             localText = text;
             localMoveTo = moveTo;
             localKeepOrder = keepOrder;
@@ -57,16 +60,25 @@
             // tick 後にフォーカス
             queueMicrotask(() => textareaEl?.focus());
         }
+        prevOpen = open;
     });
 
-    function handleSubmit() {
+    function handleSubmit(closeAfter: boolean) {
         onSubmit({
             text: localText,
             moveTo: localMoveTo,
             keepOrder: localKeepOrder,
             completed: localCompleted,
             tags: localTags,
+            closeAfter,
         });
+    }
+
+    function handleDialogKeydown(e: KeyboardEvent) {
+        if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+            e.preventDefault();
+            handleSubmit(false);
+        }
     }
 </script>
 
@@ -75,6 +87,7 @@
         class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 sm:p-0"
         role="dialog"
         aria-modal="true"
+        onkeydown={handleDialogKeydown}
     >
         <div
             class="w-full max-w-2xl rounded-lg bg-white shadow-xl dark:bg-gray-800"
@@ -166,11 +179,16 @@
                         >並び順を維持する</label
                     >
                 </div>
-                <div class="flex justify-end">
+                <div class="flex justify-end gap-2">
                     <button
-                        onclick={handleSubmit}
+                        onclick={() => handleSubmit(false)}
+                        class="cursor-pointer rounded bg-gray-100 px-6 py-2 text-gray-700 hover:bg-gray-200 focus:outline-none dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+                        title="Ctrl+S">保存</button
+                    >
+                    <button
+                        onclick={() => handleSubmit(true)}
                         class="cursor-pointer rounded bg-blue-600 px-6 py-2 text-white hover:bg-blue-700 focus:outline-none"
-                        >保存</button
+                        >保存して閉じる</button
                     >
                 </div>
             </div>

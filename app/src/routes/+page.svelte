@@ -512,6 +512,7 @@
         keepOrder: boolean;
         completed: boolean;
         tags: TagInfo[];
+        closeAfter: boolean;
     }) {
         const { listId, taskId, completed: wasCompleted } = editDialog;
 
@@ -533,7 +534,19 @@
                 tags: data.tags,
                 ...statusChange,
             });
-            editDialog.open = false;
+
+            if (data.closeAfter) {
+                editDialog.open = false;
+            } else {
+                // 保存後もダイアログを開いたままにする経路では、後続保存時の statusChange 判定や
+                // 対象リスト判定が古い値で行われないよう、保持値を保存後の値へ同期する
+                editDialog.listId = Number(data.moveTo);
+                editDialog.completed = data.completed;
+                editDialog.text = data.text;
+                editDialog.moveTo = data.moveTo;
+                editDialog.keepOrder = data.keepOrder;
+                editDialog.tags = data.tags;
+            }
 
             if (Number(data.moveTo) !== listId) {
                 queryClient.invalidateQueries({ queryKey: ["lists"] });
