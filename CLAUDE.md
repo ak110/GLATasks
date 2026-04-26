@@ -31,14 +31,14 @@
 - リリース手順: [docs/development/development.md](docs/development/development.md) 参照
 - コミット前の検証方法: `uvx pyfltr run-for-agent`
   - ドキュメントなどのみの変更の場合は省略可（pre-commitで実行されるため）
-  - テストコードの単体実行なども極力 `uv run pyfltr run-for-agent <path>` を使う（pytestを直接呼び出さない）
-    - 詳細な情報などが必要な場合に限り `uv run pytest -vv <path>` などを使用
+  - テストコードの単体実行なども極力 `uvx pyfltr run-for-agent <path>` を使う
   - 修正後の再実行時は、対象ファイルや対象ツールを必要に応じて絞って実行する（最終検証はCIに委ねる前提）
-    - 例: `pyfltr run-for-agent --commands=mypy,ruff-check path/to/file`
-  - バックアップ/E2E系に変更を入れた場合は`make test-backup test-e2e`も実行する。
+    - 例: `uvx pyfltr run-for-agent --commands=eslint,prettier path/to/file.ts`
+    - 利用可能なコマンドは`pyproject.toml`の`[tool.pyfltr]`設定とJS/TS連携で有効になるもの（`eslint`・`prettier`・`oxlint`・`vitest`・カスタムコマンドの`svelte-check`など）
+  - バックアップ/E2E系に変更を入れた場合は`make test-backup test-e2e`も実行する
   - 注意: 本プロジェクトのDocker Compose環境は開発マシン上で常時稼働している
     - `make test`（backup/e2eテスト含む）は問題なく実行可能
-    - 上記で`uvx pyfltr run`を使うのはJSON Lines出力で診断結果を効率的に解釈するためであり、環境制約によるものではない
+    - `uvx pyfltr run-for-agent`を使うのはJSON Lines出力で診断結果を効率的に解釈するためであり、環境制約によるものではない
 
 ## 注意点
 
