@@ -16,18 +16,18 @@
   },
   "dependencies": {
     "@sveltejs/adapter-node": "^5.5.4",
-    "@sveltejs/kit": "^2.57.1",
-    "@tailwindcss/vite": "^4.2.2",
-    "@tanstack/svelte-query": "^6.1.17",
+    "@sveltejs/kit": "^2.58.0",
+    "@tailwindcss/vite": "^4.2.4",
+    "@tanstack/svelte-query": "^6.1.20",
     "@trpc/client": "^11.16.0",
     "@trpc/server": "^11.16.0",
     "bcryptjs": "^3.0.3",
     "drizzle-orm": "^0.45.2",
     "jose": "^6.2.2",
-    "mysql2": "^3.22.1",
-    "svelte": "^5.55.4",
-    "tailwindcss": "^4.2.2",
-    "vite": "^8.0.8",
+    "mysql2": "^3.22.2",
+    "svelte": "^5.55.5",
+    "tailwindcss": "^4.2.4",
+    "vite": "^8.0.10",
     "zod": "^4.3.6"
   },
   "devDependencies": {
@@ -36,24 +36,24 @@
     "@sveltejs/vite-plugin-svelte": "^7.0.0",
     "@types/bcryptjs": "^3.0.0",
     "@types/node": "^25.6.0",
-    "@vitest/ui": "^4.1.4",
+    "@vitest/ui": "^4.1.5",
     "drizzle-kit": "^0.31.10",
     "eslint": "^10.2.1",
-    "eslint-plugin-svelte": "^3.17.0",
+    "eslint-plugin-svelte": "^3.17.1",
     "globals": "^17.5.0",
-    "markdownlint-cli2": "^0.22.0",
-    "oxlint": "^1.60.0",
+    "markdownlint-cli2": "^0.22.1",
+    "oxlint": "^1.61.0",
     "prettier": "^3.8.3",
     "prettier-plugin-svelte": "^3.5.1",
-    "prettier-plugin-tailwindcss": "^0.7.2",
+    "prettier-plugin-tailwindcss": "^0.7.3",
     "svelte-check": "^4.4.6",
     "textlint": "^15.5.4",
     "textlint-rule-ja-no-abusage": "^3.0.0",
     "textlint-rule-preset-ja-technical-writing": "^12.0.2",
     "textlint-rule-preset-jtf-style": "^3.0.3",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.58.2",
-    "vitest": "^4.1.4"
+    "typescript-eslint": "^8.59.0",
+    "vitest": "^4.1.5"
   },
   "pnpm": {
     "ignoredBuiltDependencies": [
@@ -67,5 +67,5 @@
       "esbuild@<0.25.0": "^0.25.0"
     }
   },
-  "packageManager": "pnpm@10.33.0+sha512.10568bb4a6afb58c9eb3630da90cc9516417abebd3fabbe6739f0ae795728da1491e9db5a544c76ad8eb7570f5c4bb3d6c637b2cb41bfdcdb47fa823c8649319"
+  "packageManager": "pnpm@10.33.2+sha512.a90faf6feeab71ad6c6e57f94e0fe1a12f5dcc22cd754db40ae9593eb6a3e0b6b12e3540218bb37ae083404b1f2ce6db2a4121e979829b4aff94b99f49da1cf8"
 }
