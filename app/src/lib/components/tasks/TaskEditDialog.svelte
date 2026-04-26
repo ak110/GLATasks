@@ -64,10 +64,13 @@
     });
 
     function handleSubmit(closeAfter: boolean) {
+        // 「保存」ボタン（closeAfter=false）はダイアログを開いたまま編集を続ける用途のため、
+        // 編集中に並び順が動かないよう常に keepOrder=true で送る。
+        // チェックボックスは「保存して閉じる」専用の指定として扱う。
         onSubmit({
             text: localText,
             moveTo: localMoveTo,
-            keepOrder: localKeepOrder,
+            keepOrder: closeAfter ? localKeepOrder : true,
             completed: localCompleted,
             tags: localTags,
             closeAfter,
@@ -98,15 +101,30 @@
                 >
                     タスクの編集
                 </h2>
-                <button
-                    bind:this={closeButtonEl}
-                    onclick={onClose}
-                    class="cursor-pointer rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300"
-                    aria-label="閉じる"
-                    title="閉じる"
-                >
-                    ✕
-                </button>
+                <div class="flex items-center gap-3">
+                    <div class="flex items-center gap-2">
+                        <input
+                            id="edit-keep-order"
+                            type="checkbox"
+                            bind:checked={localKeepOrder}
+                            class="cursor-pointer"
+                        />
+                        <label
+                            for="edit-keep-order"
+                            class="cursor-pointer text-sm text-gray-700 dark:text-gray-200"
+                            >保存時に並び順を維持する</label
+                        >
+                    </div>
+                    <button
+                        bind:this={closeButtonEl}
+                        onclick={onClose}
+                        class="cursor-pointer rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300"
+                        aria-label="閉じる"
+                        title="閉じる"
+                    >
+                        ✕
+                    </button>
+                </div>
             </div>
             <div class="p-6">
                 <div class="mb-4 flex items-center gap-2">
@@ -166,20 +184,7 @@
                         {/each}
                     </select>
                 </div>
-                <div class="mb-6 flex items-center gap-2">
-                    <input
-                        id="edit-keep-order"
-                        type="checkbox"
-                        bind:checked={localKeepOrder}
-                        class="cursor-pointer"
-                    />
-                    <label
-                        for="edit-keep-order"
-                        class="cursor-pointer text-gray-700 dark:text-gray-200"
-                        >並び順を維持する</label
-                    >
-                </div>
-                <div class="flex justify-end gap-2">
+                <div class="mt-6 flex justify-end gap-2">
                     <button
                         onclick={() => handleSubmit(false)}
                         class="cursor-pointer rounded bg-gray-100 px-6 py-2 text-gray-700 hover:bg-gray-200 focus:outline-none dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
