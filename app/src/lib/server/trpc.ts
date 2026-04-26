@@ -25,6 +25,7 @@ import {
   SearchTasksSchema,
   ReorderTasksSchema,
   ReorderTimersSchema,
+  UserPreferencesSchema,
 } from "$lib/schemas";
 import * as api from "./api";
 import { decryptToString, encryptObject } from "./crypto";
@@ -165,6 +166,21 @@ const encryptedProcedure = protectedProcedure.use(withEncryption);
 // ── ルーター定義 ──
 
 export const appRouter = t.router({
+  // ── 利用者設定 ──
+  users: t.router({
+    getPreferences: encryptedProcedure.query(async ({ ctx }) => {
+      return api.getUserPreferences(ctx.userId);
+    }),
+
+    updatePreferences: encryptedProcedure
+      .input(UserPreferencesSchema)
+      .mutation(async ({ ctx, input }) => {
+        await api.updateUserPreferences(ctx.userId, input);
+        sendEvent(ctx.userId, "users:preferences:updated", ctx.tabId);
+        return { success: true };
+      }),
+  }),
+
   // ── 認証 ──
   auth: t.router({
     login: publicProcedure.input(LoginSchema).mutation(async ({ input }) => {
@@ -326,6 +342,7 @@ export const appRouter = t.router({
           input.target_minutes ?? null,
           input.tz_offset_minutes ?? null,
           input.ephemeral,
+          input.keep_ringing,
         );
         sendEvent(ctx.userId, "timers:updated", ctx.tabId);
         return { success: true };

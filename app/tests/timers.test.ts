@@ -425,6 +425,60 @@ test.describe("timers", () => {
     await expect(card).not.toBeVisible({ timeout: 10000 });
   });
 
+  test("鳴り続けオプションと既定値保存が機能する", async ({ page }) => {
+    const timerName = `鳴り続け_${Date.now()}`;
+
+    // 追加ダイアログを開く
+    await page.click('[data-testid="timer-add-btn"]');
+    await page.locator('[data-testid="timer-name-input"]').waitFor();
+
+    // 鳴り続けチェックボックスは初期OFF
+    const checkbox = page.locator('[data-testid="timer-keep-ringing-input"]');
+    await expect(checkbox).not.toBeChecked();
+
+    // 値を変更し、既定として保存
+    await page.fill('[data-testid="timer-adjust-input"]', "7");
+    await checkbox.check();
+    await page.click('[data-testid="timer-save-default-btn"]');
+    await page.waitForResponse((res) => res.url().includes("/api/trpc"));
+
+    // タイマーを作成
+    await page.fill('[data-testid="timer-name-input"]', timerName);
+    await page.fill('[data-testid="timer-base-time-input"]', "00:05:00");
+    await page.click('[data-testid="timer-submit-btn"]');
+    await page.waitForResponse((res) => res.url().includes("/api/trpc"));
+
+    const card = page
+      .locator('[data-testid="timer-card"]')
+      .filter({ hasText: timerName });
+    await expect(card).toBeVisible({ timeout: 10000 });
+
+    // ダイアログを再度開くと、既定値が反映される
+    await page.click('[data-testid="timer-add-btn"]');
+    await page.locator('[data-testid="timer-name-input"]').waitFor();
+    await expect(checkbox).toBeChecked();
+    await expect(
+      page.locator('[data-testid="timer-adjust-input"]'),
+    ).toHaveValue("7");
+
+    // ダイアログを閉じる
+    await page.keyboard.press("Escape");
+
+    // 後片付け
+    page.once("dialog", (dialog) => dialog.accept());
+    await card.locator('[data-testid="timer-delete-btn"]').click();
+    await expect(card).not.toBeVisible({ timeout: 10000 });
+
+    // 既定値をリセットして次のテストへ影響を残さない
+    await page.click('[data-testid="timer-add-btn"]');
+    await page.locator('[data-testid="timer-name-input"]').waitFor();
+    await checkbox.uncheck();
+    await page.fill('[data-testid="timer-adjust-input"]', "10");
+    await page.click('[data-testid="timer-save-default-btn"]');
+    await page.waitForResponse((res) => res.url().includes("/api/trpc"));
+    await page.keyboard.press("Escape");
+  });
+
   test("一時タイマーは未満了だと通常どおり確認ダイアログが出る", async ({
     page,
   }) => {

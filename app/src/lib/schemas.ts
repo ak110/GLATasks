@@ -82,10 +82,27 @@ export const TIMER_DEFAULT_BASE_MINUTES = 30;
 /** 延長/削減のデフォルト分数 */
 export const TIMER_DEFAULT_ADJUST_MINUTES = 10;
 
+/** 鳴り続けオプションのデフォルト（オプトイン）*/
+export const TIMER_DEFAULT_KEEP_RINGING = false;
+
 /** タイマーモード */
 export const TIMER_MODES = ["countdown", "alarm"] as const;
 export const TimerModeSchema = z.enum(TIMER_MODES);
 export type TimerMode = z.infer<typeof TimerModeSchema>;
+
+// ── 利用者デフォルト値スキーマ ──
+
+/**
+ * 新規タイマー作成時の既定値（利用者ごと）。
+ * 各フィールドはオプショナル。欠落時はコード側のフォールバック定数で補う。
+ */
+export const UserPreferencesSchema = z.object({
+  keep_ringing: z.boolean().optional(),
+  base_seconds: z.number().int().min(0).max(359999).optional(),
+  adjust_minutes: z.number().int().min(1).max(999).optional(),
+  mode: TimerModeSchema.optional(),
+});
+export type UserPreferences = z.infer<typeof UserPreferencesSchema>;
 
 // ── タイマー操作スキーマ ──
 
@@ -104,6 +121,8 @@ export const CreateTimerSchema = z
       .default(TIMER_DEFAULT_ADJUST_MINUTES),
     // 使い切り (1 回限り) タイマー。満了時に削除ボタンを強調し、確認ダイアログを省略する
     ephemeral: z.boolean().default(false),
+    // 期限切れ後に利用者が止めるまでビープを鳴らし続けるかどうか
+    keep_ringing: z.boolean().default(TIMER_DEFAULT_KEEP_RINGING),
   })
   .refine(
     (data) =>
@@ -122,6 +141,7 @@ export const UpdateTimerSchema = z
     target_minutes: z.number().int().min(0).max(1439).optional(),
     tz_offset_minutes: z.number().int().min(-720).max(840).optional(),
     adjust_minutes: z.number().int().min(1).max(999).optional(),
+    keep_ringing: z.boolean().optional(),
   })
   .refine(
     (data) =>

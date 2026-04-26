@@ -19,6 +19,10 @@ export const users = mysqlTable("user", {
   pass_hash: varchar("pass_hash", { length: 255 }).notNull(),
   joined: timestamp("joined").notNull(),
   last_login: timestamp("last_login"),
+  // 利用者ごとの設定値を JSON 文字列で集約する。
+  // 将来項目追加時にスキーマ変更を不要にするため単一カラムでまとめ、
+  // 値の構造は zod の UserPreferencesSchema 側で保証する。
+  preferences: mediumtext("preferences").notNull().default("{}"),
 });
 
 /** list テーブル */
@@ -59,6 +63,9 @@ export const timers = mysqlTable("timer", {
   running: tinyint("running").notNull().default(0),
   expired: tinyint("expired").notNull().default(0),
   ephemeral: tinyint("ephemeral").notNull().default(0),
+  // 期限切れ後に利用者が能動的に止めるまでビープを鳴らし続けるか。
+  // 既定値は OFF（オプトイン）。タイマーごとに上書き可能。
+  keep_ringing: tinyint("keep_ringing").notNull().default(0),
   remaining_seconds: int("remaining_seconds").notNull(),
   started_at: timestamp("started_at"),
   sort_order: int("sort_order").notNull().default(0),

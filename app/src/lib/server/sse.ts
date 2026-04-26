@@ -6,7 +6,11 @@
  */
 
 /** SSE イベント種別 */
-export type SSEEventType = "lists:updated" | "tasks:updated" | "timers:updated";
+export type SSEEventType =
+  | "lists:updated"
+  | "tasks:updated"
+  | "timers:updated"
+  | "users:preferences:updated";
 
 /** ユーザーID → 接続中の ReadableStreamController の Set */
 const connections = new Map<number, Set<ReadableStreamDefaultController>>();

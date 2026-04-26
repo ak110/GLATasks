@@ -13,8 +13,9 @@
     import {
         TIMER_DEFAULT_BASE_MINUTES,
         TIMER_DEFAULT_ADJUST_MINUTES,
+        TIMER_DEFAULT_KEEP_RINGING,
     } from "$lib/schemas";
-    import type { TimerMode } from "$lib/schemas";
+    import type { TimerMode, UserPreferences } from "$lib/schemas";
     import { playStartBeep } from "$lib/beep";
     import { subscribe, setServerOffset } from "$lib/sse-client";
     import type { TimerInfo, TimersResult } from "$lib/types";
@@ -35,6 +36,7 @@
         baseSeconds: number;
         targetMinutes: number | null;
         adjustMinutes: number;
+        keepRinging: boolean;
     };
     let dialog = $state<DialogState>({
         open: false,
@@ -46,7 +48,22 @@
         baseSeconds: TIMER_DEFAULT_BASE_MINUTES * 60,
         targetMinutes: null,
         adjustMinutes: TIMER_DEFAULT_ADJUST_MINUTES,
+        keepRinging: TIMER_DEFAULT_KEEP_RINGING,
     });
+
+    // 利用者既定値（新規タイマー作成時の初期値ソース）
+    const preferencesQuery = createQuery<UserPreferences>(() => ({
+        queryKey: ["user-preferences"] as const,
+        queryFn: () =>
+            trpc.users.getPreferences.query() as Promise<UserPreferences>,
+    }));
+
+    const updatePreferencesMutation = createMutation(() => ({
+        mutationFn: (input: UserPreferences) =>
+            trpc.users.updatePreferences.mutate(input),
+        onSuccess: () =>
+            queryClient.invalidateQueries({ queryKey: ["user-preferences"] }),
+    }));
 
     // タイマー一覧取得（SSE でリアルタイム同期）
     const timersQuery = createQuery<TimersResult>(() => ({
@@ -64,10 +81,16 @@
 
     // SSE: サーバーからの通知でクエリを再取得
     onMount(() => {
-        const unsub = subscribe("timers:updated", () => {
+        const unsubTimers = subscribe("timers:updated", () => {
             queryClient.invalidateQueries({ queryKey: ["timers"] });
         });
-        return unsub;
+        const unsubPrefs = subscribe("users:preferences:updated", () => {
+            queryClient.invalidateQueries({ queryKey: ["user-preferences"] });
+        });
+        return () => {
+            unsubTimers();
+            unsubPrefs();
+        };
     });
 
     /** アラームモードのタイマーかどうかで tz_offset_minutes を付加するヘルパー */
@@ -88,6 +111,7 @@
             tz_offset_minutes?: number;
             adjust_minutes: number;
             ephemeral: boolean;
+            keep_ringing: boolean;
         }) => trpc.timers.create.mutate(input),
         onSuccess: () =>
             queryClient.invalidateQueries({ queryKey: ["timers"] }),
@@ -102,6 +126,7 @@
             target_minutes?: number;
             tz_offset_minutes?: number;
             adjust_minutes?: number;
+            keep_ringing?: boolean;
         }) => trpc.timers.update.mutate(input),
         onSuccess: () =>
             queryClient.invalidateQueries({ queryKey: ["timers"] }),
@@ -231,16 +256,18 @@
 
     // ダイアログ操作
     function openCreateDialog(ephemeral: boolean = false) {
+        const prefs = preferencesQuery.data ?? {};
         dialog = {
             open: true,
             mode: "create",
             ephemeral,
             timerId: 0,
             name: "",
-            timerMode: "countdown",
-            baseSeconds: TIMER_DEFAULT_BASE_MINUTES * 60,
+            timerMode: prefs.mode ?? "countdown",
+            baseSeconds: prefs.base_seconds ?? TIMER_DEFAULT_BASE_MINUTES * 60,
             targetMinutes: null,
-            adjustMinutes: TIMER_DEFAULT_ADJUST_MINUTES,
+            adjustMinutes: prefs.adjust_minutes ?? TIMER_DEFAULT_ADJUST_MINUTES,
+            keepRinging: prefs.keep_ringing ?? TIMER_DEFAULT_KEEP_RINGING,
         };
     }
 
@@ -255,7 +282,12 @@
             baseSeconds: timer.base_seconds,
             targetMinutes: timer.target_minutes,
             adjustMinutes: timer.adjust_minutes,
+            keepRinging: timer.keep_ringing,
         };
+    }
+
+    function handleSaveAsDefault(preferences: UserPreferences) {
+        updatePreferencesMutation.mutate(preferences);
     }
 
     async function handleDialogSubmit(data: {
@@ -265,6 +297,7 @@
         target_minutes: number | null;
         tz_offset_minutes: number | null;
         adjust_minutes: number;
+        keep_ringing: boolean;
     }) {
         try {
             if (dialog.mode === "create") {
@@ -276,6 +309,7 @@
                     tz_offset_minutes: data.tz_offset_minutes ?? undefined,
                     adjust_minutes: data.adjust_minutes,
                     ephemeral: dialog.ephemeral,
+                    keep_ringing: data.keep_ringing,
                 });
             } else {
                 await updateTimerMutation.mutateAsync({
@@ -286,6 +320,7 @@
                     target_minutes: data.target_minutes ?? undefined,
                     tz_offset_minutes: data.tz_offset_minutes ?? undefined,
                     adjust_minutes: data.adjust_minutes,
+                    keep_ringing: data.keep_ringing,
                 });
             }
             dialog.open = false;
@@ -387,6 +422,8 @@
     baseSeconds={dialog.baseSeconds}
     targetMinutes={dialog.targetMinutes}
     adjustMinutes={dialog.adjustMinutes}
+    keepRinging={dialog.keepRinging}
     onSubmit={handleDialogSubmit}
     onClose={() => (dialog.open = false)}
+    onSaveAsDefault={dialog.mode === "create" ? handleSaveAsDefault : undefined}
 />

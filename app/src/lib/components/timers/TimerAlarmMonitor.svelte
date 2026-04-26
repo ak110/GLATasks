@@ -23,6 +23,7 @@
     type AlarmInfo = {
         timerId: number;
         timerName: string;
+        keepRinging: boolean;
     };
 
     const queryClient = useQueryClient();
@@ -110,17 +111,23 @@
     });
 
     // タイマーがリセットされたらトーストを自動消去
+    // expired が解除された/タイマーが消滅したものはループビープも止める
     $effect(() => {
         const timers =
             (timersQuery.data as TimersResult | undefined)?.timers ?? [];
         if (alarms.length === 0) return;
         const filtered = alarms.filter((alarm) => {
             const timer = timers.find((t) => t.id === alarm.timerId);
-            if (!timer) return false;
+            if (!timer) {
+                stopLoopBeepFor(alarm.timerId);
+                return false;
+            }
             // まだ running（stop 完了待ち）→ 維持
             // expired（自然期限切れ）→ 維持
             // リセット済み or 手動で0にした（expired=false）→ 除去
-            return timer.running || timer.expired;
+            const keep = timer.running || timer.expired;
+            if (!keep) stopLoopBeepFor(alarm.timerId);
+            return keep;
         });
         // 新しい配列参照を毎回作ると Svelte が変更検知して無限ループするため、変化があるときだけ更新
         if (filtered.length !== alarms.length) {
@@ -128,8 +135,14 @@
         }
     });
 
-    /** トースト通知を閉じる */
+    /** ループビープが回っていれば停止する（動的 import で SSR 安全） */
+    function stopLoopBeepFor(timerId: number) {
+        import("$lib/beep").then((m) => m.stopLoopBeep(timerId));
+    }
+
+    /** トースト通知を閉じる（ループビープも合わせて停止） */
     function dismissAlarm(timerId: number) {
+        stopLoopBeepFor(timerId);
         alarms = alarms.filter((a) => a.timerId !== timerId);
     }
 
@@ -216,10 +229,22 @@
         if (alarmedIds.has(timerId)) return;
         alarmedIds = new Set([...alarmedIds, timerId]);
 
+        // 当該タイマーの keep_ringing を見てループ/単発を切り替える
+        const timers =
+            (timersQuery.data as TimersResult | undefined)?.timers ?? [];
+        const timer = timers.find((t) => t.id === timerId);
+        const keepRinging = timer?.keep_ringing ?? false;
+
         // ビープ音 + ブラウザ通知 + トースト
-        import("$lib/beep").then((m) => m.playBeep());
+        import("$lib/beep").then((m) => {
+            if (keepRinging) {
+                m.startLoopBeep(timerId);
+            } else {
+                m.playBeep();
+            }
+        });
         showNotification(timerName);
-        alarms = [...alarms, { timerId, timerName }];
+        alarms = [...alarms, { timerId, timerName, keepRinging }];
 
         // サーバーに停止報告（started_at でリセット/再開されていないことを確認）
         trpc.timers.stop

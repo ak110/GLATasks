@@ -8,6 +8,7 @@ import {
   CreateTimerSchema,
   TagInfoSchema,
   UpdateTaskSchema,
+  UserPreferencesSchema,
 } from "./schemas";
 
 describe("CreateTimerSchema", () => {
@@ -26,6 +27,23 @@ describe("CreateTimerSchema", () => {
       ephemeral: true,
     });
     expect(parsed.ephemeral).toBe(true);
+  });
+
+  it("keep_ringing は未指定だと false になる", () => {
+    const parsed = CreateTimerSchema.parse({
+      name: "テスト",
+      base_seconds: 300,
+    });
+    expect(parsed.keep_ringing).toBe(false);
+  });
+
+  it("keep_ringing を true にできる", () => {
+    const parsed = CreateTimerSchema.parse({
+      name: "テスト",
+      base_seconds: 300,
+      keep_ringing: true,
+    });
+    expect(parsed.keep_ringing).toBe(true);
   });
 
   it("alarm モードで ephemeral と必須項目を併用できる", () => {
@@ -62,6 +80,37 @@ describe("TagInfoSchema", () => {
 
   it("空文字列の name を拒否する", () => {
     expect(() => TagInfoSchema.parse({ name: "   ", color: "sky" })).toThrow();
+  });
+});
+
+describe("UserPreferencesSchema", () => {
+  it("空オブジェクトを受け入れる（全フィールドオプショナル）", () => {
+    const parsed = UserPreferencesSchema.parse({});
+    expect(parsed).toEqual({});
+  });
+
+  it("全フィールドを保持する", () => {
+    const parsed = UserPreferencesSchema.parse({
+      keep_ringing: true,
+      base_seconds: 600,
+      adjust_minutes: 5,
+      mode: "alarm",
+    });
+    expect(parsed.keep_ringing).toBe(true);
+    expect(parsed.base_seconds).toBe(600);
+    expect(parsed.adjust_minutes).toBe(5);
+    expect(parsed.mode).toBe("alarm");
+  });
+
+  it("不正な mode を拒否する", () => {
+    expect(() => UserPreferencesSchema.parse({ mode: "stopwatch" })).toThrow();
+  });
+
+  it("adjust_minutes の範囲外を拒否する", () => {
+    expect(() => UserPreferencesSchema.parse({ adjust_minutes: 0 })).toThrow();
+    expect(() =>
+      UserPreferencesSchema.parse({ adjust_minutes: 1000 }),
+    ).toThrow();
   });
 });
 

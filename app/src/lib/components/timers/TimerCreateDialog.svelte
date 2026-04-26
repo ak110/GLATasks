@@ -3,8 +3,11 @@
      * @fileoverview タイマー追加/編集ダイアログ
      */
 
-    import { TIMER_DEFAULT_ADJUST_MINUTES } from "$lib/schemas";
-    import type { TimerMode } from "$lib/schemas";
+    import {
+        TIMER_DEFAULT_ADJUST_MINUTES,
+        TIMER_DEFAULT_KEEP_RINGING,
+    } from "$lib/schemas";
+    import type { TimerMode, UserPreferences } from "$lib/schemas";
     import {
         formatTime,
         parseTimeInput,
@@ -21,6 +24,7 @@
         baseSeconds: number;
         targetMinutes: number | null;
         adjustMinutes: number;
+        keepRinging: boolean;
         onSubmit: (data: {
             name: string;
             mode: TimerMode;
@@ -28,8 +32,10 @@
             target_minutes: number | null;
             tz_offset_minutes: number | null;
             adjust_minutes: number;
+            keep_ringing: boolean;
         }) => void;
         onClose: () => void;
+        onSaveAsDefault?: (preferences: UserPreferences) => void;
     };
 
     let {
@@ -41,8 +47,10 @@
         baseSeconds: initialBaseSeconds,
         targetMinutes: initialTargetMinutes,
         adjustMinutes: initialAdjustMinutes,
+        keepRinging: initialKeepRinging,
         onSubmit,
         onClose,
+        onSaveAsDefault,
     }: Props = $props();
 
     // ダイアログタイトル: 一時タイマー作成時のみ専用文言に差し替える
@@ -59,6 +67,7 @@
     let localBaseTime = $state("");
     let localTargetTime = $state("");
     let localAdjustMinutes = $state(TIMER_DEFAULT_ADJUST_MINUTES);
+    let localKeepRinging = $state(TIMER_DEFAULT_KEEP_RINGING);
     let nameInputEl = $state<HTMLInputElement | null>(null);
 
     // ダイアログ開閉時にローカル状態をリセット
@@ -72,6 +81,7 @@
                     ? formatTargetTime(initialTargetMinutes)
                     : "";
             localAdjustMinutes = initialAdjustMinutes;
+            localKeepRinging = initialKeepRinging;
             queueMicrotask(() => nameInputEl?.focus());
         }
     });
@@ -97,6 +107,7 @@
                 target_minutes: target,
                 tz_offset_minutes: -new Date().getTimezoneOffset(),
                 adjust_minutes: localAdjustMinutes,
+                keep_ringing: localKeepRinging,
             });
         } else {
             const baseSeconds = parseTimeInput(localBaseTime);
@@ -108,8 +119,24 @@
                 target_minutes: null,
                 tz_offset_minutes: null,
                 adjust_minutes: localAdjustMinutes,
+                keep_ringing: localKeepRinging,
             });
         }
+    }
+
+    /** 現在のフォーム値を利用者既定値として保存する */
+    function handleSaveAsDefault() {
+        if (!onSaveAsDefault) return;
+        const baseSeconds =
+            localTimerMode === "countdown"
+                ? (parseTimeInput(localBaseTime) ?? undefined)
+                : undefined;
+        onSaveAsDefault({
+            keep_ringing: localKeepRinging,
+            base_seconds: baseSeconds,
+            adjust_minutes: localAdjustMinutes,
+            mode: localTimerMode,
+        });
     }
 </script>
 
@@ -239,7 +266,34 @@
                     />
                 </div>
 
-                <div class="flex justify-end">
+                <div>
+                    <label
+                        class="flex cursor-pointer items-center gap-2 text-sm text-gray-700 dark:text-gray-200"
+                    >
+                        <input
+                            type="checkbox"
+                            bind:checked={localKeepRinging}
+                            class="cursor-pointer"
+                            data-testid="timer-keep-ringing-input"
+                        />
+                        止めるまで鳴り続ける
+                    </label>
+                </div>
+
+                <div class="flex items-center justify-between">
+                    {#if onSaveAsDefault}
+                        <button
+                            type="button"
+                            onclick={handleSaveAsDefault}
+                            class="cursor-pointer rounded bg-gray-100 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                            title="現在のフォーム値を新規作成時の既定値として保存する"
+                            data-testid="timer-save-default-btn"
+                        >
+                            現在の値を既定として保存
+                        </button>
+                    {:else}
+                        <span></span>
+                    {/if}
                     <button
                         type="submit"
                         class="cursor-pointer rounded bg-blue-600 px-6 py-2 text-white hover:bg-blue-700"

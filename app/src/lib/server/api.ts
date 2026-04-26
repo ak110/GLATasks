@@ -16,6 +16,8 @@ import type {
   SearchTaskResult,
   GetTasksResult,
 } from "$lib/types";
+import type { UserPreferences } from "$lib/schemas";
+import { UserPreferencesSchema } from "$lib/schemas";
 import { TAG_COLOR_KEYS } from "../types";
 import { compareTagName } from "../tag-sort";
 import { getDb } from "./db";
@@ -647,6 +649,44 @@ export async function reorderTimers(
   }
 }
 
+// ── 利用者設定 (preferences) ──
+
+/**
+ * 利用者の新規タイマー作成時の既定値を取得する。
+ * 破損データや未保存の利用者には空オブジェクトを返し、欠落フィールドは
+ * 呼び出し側のフォールバック定数で補う。
+ */
+export async function getUserPreferences(
+  userId: number,
+): Promise<UserPreferences> {
+  const db = getDb();
+  const rows = await db
+    .select({ preferences: users.preferences })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  if (rows.length === 0) return {};
+  try {
+    const parsed: unknown = JSON.parse(rows[0].preferences);
+    const result = UserPreferencesSchema.safeParse(parsed);
+    return result.success ? result.data : {};
+  } catch {
+    return {};
+  }
+}
+
+/** 利用者の既定値を保存する（既存値は完全に置き換える） */
+export async function updateUserPreferences(
+  userId: number,
+  preferences: UserPreferences,
+): Promise<void> {
+  const db = getDb();
+  await db
+    .update(users)
+    .set({ preferences: JSON.stringify(preferences) })
+    .where(eq(users.id, userId));
+}
+
 // ── タイマー操作 ──
 
 /** タイマーの所有権チェック */
@@ -705,6 +745,7 @@ function toTimerInfo(row: typeof timers.$inferSelect): TimerInfo {
     running: row.running === 1,
     expired: row.expired === 1,
     ephemeral: row.ephemeral === 1,
+    keep_ringing: row.keep_ringing === 1,
     remaining_seconds: row.remaining_seconds,
     started_at: row.started_at ? toUtcIso(row.started_at) : null,
     sort_order: row.sort_order,
@@ -756,6 +797,7 @@ export async function createTimer(
   targetMinutes: number | null = null,
   tzOffsetMinutes: number | null = null,
   ephemeral: boolean = false,
+  keepRinging: boolean = false,
 ): Promise<void> {
   if (mode === "alarm") {
     if (targetMinutes === null || tzOffsetMinutes === null)
@@ -783,6 +825,7 @@ export async function createTimer(
     target_minutes: targetMinutes,
     running: isAlarm ? 1 : 0,
     ephemeral: ephemeral ? 1 : 0,
+    keep_ringing: keepRinging ? 1 : 0,
     started_at: isAlarm ? now : null,
     sort_order: sortOrder,
     created: now,
@@ -801,6 +844,7 @@ export async function updateTimer(
     target_minutes?: number;
     tz_offset_minutes?: number;
     adjust_minutes?: number;
+    keep_ringing?: boolean;
   },
 ): Promise<void> {
   const timer = await getOwnedTimer(timerId, userId);
@@ -809,6 +853,8 @@ export async function updateTimer(
   if (data.name !== undefined) updates.name = data.name;
   if (data.adjust_minutes !== undefined)
     updates.adjust_minutes = data.adjust_minutes;
+  if (data.keep_ringing !== undefined)
+    updates.keep_ringing = data.keep_ringing ? 1 : 0;
 
   // モード変更処理
   if (data.mode !== undefined && data.mode !== timer.mode) {
