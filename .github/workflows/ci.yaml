@@ -22,6 +22,10 @@ jobs:
     defaults:
       run:
         shell: bash
+    env:
+      # mise・pinact 等が GitHub API を叩く際の rate limit (403) 回避。
+      # container job では明示しないと secrets.GITHUB_TOKEN がコンテナへ渡らない
+      GITHUB_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
