@@ -10,6 +10,7 @@
  */
 
 import type { QueryClient } from "@tanstack/svelte-query";
+import type { SseEventName } from "./sse-events";
 
 // サーバー時刻オフセット（ms）: サーバー時刻 = Date.now() + offset
 let serverOffset = 0;
@@ -85,7 +86,7 @@ export function disconnect(): void {
  * EventSource に一括設定される。
  */
 export function subscribe(
-  eventType: string,
+  eventType: SseEventName,
   callback: EventCallback,
 ): () => void {
   let callbacks = subscribers.get(eventType);
@@ -95,14 +96,22 @@ export function subscribe(
   }
   callbacks.add(callback);
 
-  // 既に接続中なら EventSource にもリスナーを追加
+  // 既に接続中なら EventSource にもリスナーを追加し、解除関数でアンマウント時に削除する
   if (eventSource) {
-    const handler = (e: MessageEvent) => {
+    const wrappedHandler = (e: MessageEvent) => {
       if (callbacks!.has(callback)) {
         callback(e);
       }
     };
-    eventSource.addEventListener(eventType, handler);
+    eventSource.addEventListener(eventType, wrappedHandler);
+
+    return () => {
+      eventSource?.removeEventListener(eventType, wrappedHandler);
+      callbacks!.delete(callback);
+      if (callbacks!.size === 0) {
+        subscribers.delete(eventType);
+      }
+    };
   }
 
   return () => {

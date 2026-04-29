@@ -8,8 +8,8 @@
         createMutation,
         useQueryClient,
     } from "@tanstack/svelte-query";
-    import { onMount } from "svelte";
-    import { trpc } from "$lib/trpc";
+    import { trpc, type RouterOutputs } from "$lib/trpc";
+    import { createDragReorder } from "$lib/dnd-reorder.svelte";
     import {
         TIMER_DEFAULT_BASE_MINUTES,
         TIMER_DEFAULT_ADJUST_MINUTES,
@@ -17,7 +17,9 @@
     } from "$lib/schemas";
     import type { TimerMode, UserPreferences } from "$lib/schemas";
     import { playStartBeep } from "$lib/beep";
-    import { subscribe, setServerOffset } from "$lib/sse-client";
+    import { setServerOffset } from "$lib/sse-client";
+    import { SSE_EVENTS } from "$lib/sse-events";
+    import { subscribeOnMount } from "$lib/sse-subscribe";
     import type { TimerInfo, TimersResult } from "$lib/types";
     import Header from "$lib/components/layout/Header.svelte";
     import TimerCard from "$lib/components/timers/TimerCard.svelte";
@@ -52,10 +54,11 @@
     });
 
     // 利用者既定値（新規タイマー作成時の初期値ソース）
-    const preferencesQuery = createQuery<UserPreferences>(() => ({
+    const preferencesQuery = createQuery<
+        RouterOutputs["users"]["getPreferences"]
+    >(() => ({
         queryKey: ["user-preferences"] as const,
-        queryFn: () =>
-            trpc.users.getPreferences.query() as Promise<UserPreferences>,
+        queryFn: () => trpc.users.getPreferences.query(),
     }));
 
     const updatePreferencesMutation = createMutation(() => ({
@@ -66,12 +69,12 @@
     }));
 
     // タイマー一覧取得（SSE でリアルタイム同期）
-    const timersQuery = createQuery<TimersResult>(() => ({
+    const timersQuery = createQuery<RouterOutputs["timers"]["list"]>(() => ({
         queryKey: ["timers"] as const,
-        queryFn: async (): Promise<TimersResult> => {
+        queryFn: async (): Promise<RouterOutputs["timers"]["list"]> => {
             // RTT/2 補正付きオフセット計算
             const t0 = Date.now();
-            const result = (await trpc.timers.list.query()) as TimersResult;
+            const result = await trpc.timers.list.query();
             const t1 = Date.now();
             const serverMs = new Date(result.server_time).getTime();
             setServerOffset(serverMs - (t0 + t1) / 2);
@@ -80,17 +83,13 @@
     }));
 
     // SSE: サーバーからの通知でクエリを再取得
-    onMount(() => {
-        const unsubTimers = subscribe("timers:updated", () => {
+    subscribeOnMount({
+        [SSE_EVENTS.timersUpdated]: () => {
             queryClient.invalidateQueries({ queryKey: ["timers"] });
-        });
-        const unsubPrefs = subscribe("users:preferences:updated", () => {
+        },
+        [SSE_EVENTS.usersPreferencesUpdated]: () => {
             queryClient.invalidateQueries({ queryKey: ["user-preferences"] });
-        });
-        return () => {
-            unsubTimers();
-            unsubPrefs();
-        };
+        },
     });
 
     /** アラームモードのタイマーかどうかで tz_offset_minutes を付加するヘルパー */
@@ -193,43 +192,8 @@
             queryClient.invalidateQueries({ queryKey: ["timers"] }),
     }));
 
-    // D&D 状態管理
-    let draggedId = $state<number | null>(null);
-    let dropTargetId = $state<number | null>(null);
-    let dropPosition = $state<"before" | "after" | null>(null);
-
-    function handleDragStart(timerId: number) {
-        draggedId = timerId;
-    }
-
-    function handleDragOver(timerId: number, e: DragEvent) {
-        if (draggedId === null || timerId === draggedId) return;
-        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-        const midY = rect.top + rect.height / 2;
-        dropTargetId = timerId;
-        dropPosition = e.clientY < midY ? "before" : "after";
-    }
-
-    function handleDrop() {
-        if (draggedId === null || dropTargetId === null) return;
-        // 新しい順序を構成
-        const ids = timersList
-            .map((t) => t.id)
-            .filter((id) => id !== draggedId);
-        const targetIndex = ids.indexOf(dropTargetId);
-        if (targetIndex === -1) return;
-        const insertIndex =
-            dropPosition === "after" ? targetIndex + 1 : targetIndex;
-        ids.splice(insertIndex, 0, draggedId);
-        handleReorderTimers(ids);
-        resetDragState();
-    }
-
-    function resetDragState() {
-        draggedId = null;
-        dropTargetId = null;
-        dropPosition = null;
-    }
+    // D&D 状態管理（createDragReorder は派生状態 timersList を参照するためゲッター関数で渡す）
+    const dnd = createDragReorder(() => timersList, handleReorderTimers);
 
     /** タイマーの並び替え（楽観的更新 + API呼出） */
     function handleReorderTimers(timerIds: number[]) {
@@ -249,9 +213,7 @@
     }
 
     // 派生状態
-    const timersList = $derived(
-        (timersQuery.data as TimersResult | undefined)?.timers ?? [],
-    );
+    const timersList = $derived(timersQuery.data?.timers ?? []);
     const isLoading = $derived(timersQuery.isLoading);
 
     // ダイアログ操作
@@ -399,14 +361,14 @@
                         })}
                     onEdit={openEditDialog}
                     onDelete={handleDelete}
-                    isDragging={draggedId === timer.id}
-                    dropIndicator={dropTargetId === timer.id
-                        ? dropPosition
+                    isDragging={dnd.draggedId === timer.id}
+                    dropIndicator={dnd.dropTargetId === timer.id
+                        ? dnd.dropPosition
                         : null}
-                    onDragStart={handleDragStart}
-                    onDragOver={handleDragOver}
-                    onDrop={handleDrop}
-                    onDragEnd={resetDragState}
+                    onDragStart={dnd.handleDragStart}
+                    onDragOver={dnd.handleDragOver}
+                    onDrop={dnd.handleDrop}
+                    onDragEnd={dnd.resetDragState}
                 />
             {/each}
         </div>

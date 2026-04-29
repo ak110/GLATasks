@@ -8,14 +8,15 @@
      */
 
     import { createQuery, useQueryClient } from "@tanstack/svelte-query";
-    import { trpc } from "$lib/trpc";
+    import { trpc, type RouterOutputs } from "$lib/trpc";
     import {
         getServerOffset,
         setServerOffset,
         onOffsetChange,
-        subscribe,
     } from "$lib/sse-client";
-    import type { TimerInfo, TimersResult } from "$lib/types";
+    import { SSE_EVENTS } from "$lib/sse-events";
+    import { subscribeOnMount } from "$lib/sse-subscribe";
+    import type { TimerInfo } from "$lib/types";
     import { calcTimerRemainingMs } from "$lib/timer-utils";
     import { onMount } from "svelte";
     import { resolve } from "$app/paths";
@@ -53,15 +54,16 @@
         const unsubOffset = onOffsetChange((v) => {
             localOffset = v;
         });
-        // SSE: タイマー更新通知でデータを再取得
-        // （/timers ページ以外でもトースト消去・favicon 復元が即座に反映されるように）
-        const unsubSSE = subscribe("timers:updated", () => {
-            queryClient.invalidateQueries({ queryKey: ["timers"] });
-        });
         return () => {
             unsubOffset();
-            unsubSSE();
         };
+    });
+    // SSE: タイマー更新通知でデータを再取得
+    // （/timers ページ以外でもトースト消去・favicon 復元が即座に反映されるように）
+    subscribeOnMount({
+        [SSE_EVENTS.timersUpdated]: () => {
+            queryClient.invalidateQueries({ queryKey: ["timers"] });
+        },
     });
 
     /** favicon に赤丸バッジを重ねた Data URL を生成する */
@@ -94,8 +96,7 @@
     // 完了状態のタイマーの有無に応じて favicon バッジを切り替え
     // （トースト消去ではなくタイマーデータに基づく判定）
     $effect(() => {
-        const timers =
-            (timersQuery.data as TimersResult | undefined)?.timers ?? [];
+        const timers = timersQuery.data?.timers ?? [];
         const hasCompletedTimer = timers.some((t) => t.expired && !t.running);
         if (hasCompletedTimer) {
             if (originalFaviconImg) {
@@ -113,8 +114,7 @@
     // タイマーがリセットされたらトーストを自動消去
     // expired が解除された/タイマーが消滅したものはループビープも止める
     $effect(() => {
-        const timers =
-            (timersQuery.data as TimersResult | undefined)?.timers ?? [];
+        const timers = timersQuery.data?.timers ?? [];
         if (alarms.length === 0) return;
         const filtered = alarms.filter((alarm) => {
             const timer = timers.find((t) => t.id === alarm.timerId);
@@ -147,12 +147,12 @@
     }
 
     // タイマー一覧取得（/timers ページとキャッシュ共有）
-    const timersQuery = createQuery<TimersResult>(() => ({
+    const timersQuery = createQuery<RouterOutputs["timers"]["list"]>(() => ({
         queryKey: ["timers"] as const,
-        queryFn: async (): Promise<TimersResult> => {
+        queryFn: async (): Promise<RouterOutputs["timers"]["list"]> => {
             // RTT/2 補正付きオフセット計算
             const t0 = Date.now();
-            const result = (await trpc.timers.list.query()) as TimersResult;
+            const result = await trpc.timers.list.query();
             const t1 = Date.now();
             const serverMs = new Date(result.server_time).getTime();
             setServerOffset(serverMs - (t0 + t1) / 2);
@@ -207,7 +207,9 @@
             // （refetchOnWindowFocus / refetchInterval で最新データ取得後に再スケジュールされる）
             return;
         }
-        const data = queryClient.getQueryData<TimersResult>(["timers"]);
+        const data = queryClient.getQueryData<RouterOutputs["timers"]["list"]>([
+            "timers",
+        ]);
         const timer = data?.timers?.find((t) => t.id === timerId);
         if (!timer) return;
         // autoStopIfExpired で停止済み（expired=true）→ 完了として扱う
@@ -230,8 +232,7 @@
         alarmedIds = new Set([...alarmedIds, timerId]);
 
         // 当該タイマーの keep_ringing を見てループ/単発を切り替える
-        const timers =
-            (timersQuery.data as TimersResult | undefined)?.timers ?? [];
+        const timers = timersQuery.data?.timers ?? [];
         const timer = timers.find((t) => t.id === timerId);
         const keepRinging = timer?.keep_ringing ?? false;
 
@@ -267,8 +268,7 @@
         const dataAge = Date.now() - (timersQuery.dataUpdatedAt ?? 0);
         if (dataAge > 5 * 60 * 1000) return;
 
-        const timers =
-            (timersQuery.data as TimersResult | undefined)?.timers ?? [];
+        const timers = timersQuery.data?.timers ?? [];
         const runningTimers = timers.filter((t) => t.running);
 
         // running タイマーがなければ alarmedIds をリセット

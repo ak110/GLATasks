@@ -1,10 +1,27 @@
 /**
- * @fileoverview Zod バリデーションスキーマ定義
+ * @fileoverview Zod バリデーションスキーマ定義と型エクスポート
+ *
+ * `TagInfo`・`TAG_COLOR_KEYS`・`TagColorKey` はここを正とし、`types.ts` はre-exportのみ行う。
  */
 
 import { z } from "zod";
 
-import { TAG_COLOR_KEYS } from "./types";
+// ── タグ色相定数 ──
+
+/** 利用可能な色相キー。色覚特性の差があっても区別しやすい配色。 */
+export const TAG_COLOR_KEYS = [
+  "amber",
+  "sky",
+  "emerald",
+  "yellow",
+  "blue",
+  "red",
+  "pink",
+  "slate",
+] as const;
+
+/** タグの色相キー型 */
+export type TagColorKey = (typeof TAG_COLOR_KEYS)[number];
 
 // ── 共通スキーマ ──
 
@@ -230,7 +247,8 @@ export const ReorderTimersSchema = z.object({
 export type TaskStatus = z.infer<typeof TaskStatusSchema>;
 export type ShowType = z.infer<typeof ShowTypeSchema>;
 export type ListStatus = z.infer<typeof ListStatusSchema>;
-export type TagInfoInput = z.infer<typeof TagInfoSchema>;
+/** タグ情報型（`TagInfoSchema` からの推論） */
+export type TagInfo = z.infer<typeof TagInfoSchema>;
 
 export type CreateTaskInput = z.infer<typeof CreateTaskSchema>;
 export type UpdateTaskInput = z.infer<typeof UpdateTaskSchema>;

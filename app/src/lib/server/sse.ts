@@ -5,12 +5,12 @@
  * データは含めず、イベント種別のみを送信する（暗号化不要）。
  */
 
-/** SSE イベント種別 */
-export type SSEEventType =
-  | "lists:updated"
-  | "tasks:updated"
-  | "timers:updated"
-  | "users:preferences:updated";
+import type { SseEventName } from "$lib/sse-events";
+
+export type { SseEventName };
+
+/** モジュールスコープで再利用し、呼び出しごとの生成コストを排除する */
+const encoder = new TextEncoder();
 
 /** ユーザーID → 接続中の ReadableStreamController の Set */
 const connections = new Map<number, Set<ReadableStreamDefaultController>>();
@@ -44,14 +44,14 @@ export function removeConnection(
 /** 指定ユーザーの全接続にイベントを送信する */
 export function sendEvent(
   userId: number,
-  eventType: SSEEventType,
+  eventType: SseEventName,
   sourceTabId?: string | null,
 ): void {
   const userConnections = connections.get(userId);
   if (!userConnections) return;
   // data に発信元タブIDを含める（クライアント側で自タブのイベントを識別するため）
   const data = `event: ${eventType}\ndata: ${sourceTabId ?? ""}\n\n`;
-  const encoded = new TextEncoder().encode(data);
+  const encoded = encoder.encode(data);
   for (const controller of userConnections) {
     try {
       controller.enqueue(encoded);

@@ -30,6 +30,8 @@ import {
 import * as api from "./api";
 import { decryptToString, encryptObject } from "./crypto";
 import { sendEvent } from "./sse";
+import { SSE_EVENTS } from "$lib/sse-events";
+import type { SseEventName } from "$lib/sse-events";
 
 // ── Context 型定義 ──
 
@@ -100,9 +102,9 @@ const withEncryption = t.middleware(async ({ getRawInput, next }) => {
 
   // 出力を暗号化して返す（result を直接変更し型推論を保持する）
   if (result.ok) {
-    (result as unknown as Record<string, unknown>).data = {
+    assignEncryptedData(result, {
       encrypted: await encryptObject(result.data),
-    };
+    });
   }
 
   return result;
@@ -157,6 +159,56 @@ const withApiErrors = t.middleware(async ({ next }) => {
   }
 });
 
+// ── ヘルパー関数 ──
+
+/**
+ * `withEncryption` ミドルウェアがハンドラーの平文 `data` フィールドを暗号化済みの値で上書きするためのヘルパー。
+ *
+ * なぜこの上書きが必要か:
+ *   `withEncryption` ミドルウェアは、ハンドラーが返した平文の `data` フィールドを
+ *   暗号化後の値（`{ encrypted: string }` 形式）で置き換えてクライアントへ返す必要がある。
+ *
+ * なぜキャストが必要か:
+ *   tRPC の内部結果型（`TRPCResultMessage` 等）は `unknown` 扱いであり、
+ *   Drizzle/Zod から推論されるハンドラーの戻り値型と直接合わない。
+ *   型推論を壊さずに `data` フィールドだけを差し替えるため、二重キャストでアクセスする。
+ *
+ * 制約:
+ *   呼び出し側（`withEncryption` ミドルウェア）は、`result` が `{ data: <平文の値> }` 形式であることを
+ *   ミドルウェアの位置（`result.ok` チェック後）で保証している。
+ */
+function assignEncryptedData(
+  result: unknown,
+  data: { encrypted: string },
+): void {
+  (result as unknown as Record<string, unknown>).data = data;
+}
+
+/**
+ * SSEイベントを自動送信して `{ success: true }` を返す mutation ハンドラーファクトリー。
+ *
+ * `.mutation(eventMutationHandler(...))` の形で使い、
+ * ハンドラーは副作用のみを担い、SSE通知と戻り値の組み立ては本関数が担う。
+ * これによりSSE通知漏れを構造的に防ぐ。
+ *
+ * @param eventName - 送信するSSEイベント種別
+ * @param handler - 副作用を実行する非同期関数（戻り値は不要）
+ * @returns procedure builder の `.mutation()` に渡すコールバック
+ */
+function eventMutationHandler<
+  TCtx extends { userId: number; tabId: string | null },
+  TInput,
+>(
+  eventName: SseEventName,
+  handler: (params: { ctx: TCtx; input: TInput }) => Promise<void> | void,
+) {
+  return async ({ ctx, input }: { ctx: TCtx; input: TInput }) => {
+    await handler({ ctx, input });
+    sendEvent(ctx.userId, eventName, ctx.tabId);
+    return { success: true as const };
+  };
+}
+
 // ── プロシージャ定義 ──
 
 const publicProcedure = t.procedure;
@@ -172,13 +224,14 @@ export const appRouter = t.router({
       return api.getUserPreferences(ctx.userId);
     }),
 
-    updatePreferences: encryptedProcedure
-      .input(UserPreferencesSchema)
-      .mutation(async ({ ctx, input }) => {
-        await api.updateUserPreferences(ctx.userId, input);
-        sendEvent(ctx.userId, "users:preferences:updated", ctx.tabId);
-        return { success: true };
-      }),
+    updatePreferences: encryptedProcedure.input(UserPreferencesSchema).mutation(
+      eventMutationHandler(
+        SSE_EVENTS.usersPreferencesUpdated,
+        async ({ ctx, input }) => {
+          await api.updateUserPreferences(ctx.userId, input);
+        },
+      ),
+    ),
   }),
 
   // ── 認証 ──
@@ -209,54 +262,64 @@ export const appRouter = t.router({
         return api.getLists(ctx.userId, input);
       }),
 
-    create: encryptedProcedure
-      .input(CreateListSchema)
-      .mutation(async ({ ctx, input }) => {
+    create: encryptedProcedure.input(CreateListSchema).mutation(
+      eventMutationHandler(SSE_EVENTS.listsUpdated, async ({ ctx, input }) => {
         await api.postList(ctx.userId, input.title);
-        sendEvent(ctx.userId, "lists:updated", ctx.tabId);
-        return { success: true };
       }),
+    ),
 
-    rename: encryptedProcedure
-      .input(UpdateListSchema)
-      .mutation(async ({ ctx, input }) => {
+    rename: encryptedProcedure.input(UpdateListSchema).mutation(
+      eventMutationHandler(SSE_EVENTS.listsUpdated, async ({ ctx, input }) => {
         await api.renameList(ctx.userId, input.listId, input.title);
-        sendEvent(ctx.userId, "lists:updated", ctx.tabId);
-        return { success: true };
       }),
+    ),
 
     delete: encryptedProcedure
       .input(UpdateListSchema.pick({ listId: true }))
-      .mutation(async ({ ctx, input }) => {
-        await api.deleteList(ctx.userId, input.listId);
-        sendEvent(ctx.userId, "lists:updated", ctx.tabId);
-        return { success: true };
-      }),
+      .mutation(
+        eventMutationHandler(
+          SSE_EVENTS.listsUpdated,
+          async ({ ctx, input }) => {
+            await api.deleteList(ctx.userId, input.listId);
+          },
+        ),
+      ),
 
     archive: encryptedProcedure
       .input(UpdateListSchema.pick({ listId: true }))
-      .mutation(async ({ ctx, input }) => {
-        await api.archiveList(ctx.userId, input.listId);
-        sendEvent(ctx.userId, "lists:updated", ctx.tabId);
-        return { success: true };
-      }),
+      .mutation(
+        eventMutationHandler(
+          SSE_EVENTS.listsUpdated,
+          async ({ ctx, input }) => {
+            await api.archiveList(ctx.userId, input.listId);
+          },
+        ),
+      ),
 
     unarchive: encryptedProcedure
       .input(UpdateListSchema.pick({ listId: true }))
-      .mutation(async ({ ctx, input }) => {
-        await api.unarchiveList(ctx.userId, input.listId);
-        sendEvent(ctx.userId, "lists:updated", ctx.tabId);
-        return { success: true };
-      }),
+      .mutation(
+        eventMutationHandler(
+          SSE_EVENTS.listsUpdated,
+          async ({ ctx, input }) => {
+            await api.unarchiveList(ctx.userId, input.listId);
+          },
+        ),
+      ),
 
     clear: encryptedProcedure
       .input(UpdateListSchema.pick({ listId: true }))
-      .mutation(async ({ ctx, input }) => {
-        await api.clearList(ctx.userId, input.listId);
-        sendEvent(ctx.userId, "tasks:updated", ctx.tabId);
-        return { success: true };
-      }),
+      .mutation(
+        eventMutationHandler(
+          SSE_EVENTS.tasksUpdated,
+          async ({ ctx, input }) => {
+            await api.clearList(ctx.userId, input.listId);
+          },
+        ),
+      ),
 
+    // 2つのリソース（listsUpdated + tasksUpdated）に影響するため
+    // eventMutationHandler（単一イベントのみ対応）は使わず、sendEvent を直接呼ぶ
     merge: encryptedProcedure
       .input(MergeListSchema)
       .mutation(async ({ ctx, input }) => {
@@ -265,9 +328,9 @@ export const appRouter = t.router({
           input.sourceListId,
           input.targetListId,
         );
-        sendEvent(ctx.userId, "lists:updated", ctx.tabId);
-        sendEvent(ctx.userId, "tasks:updated", ctx.tabId);
-        return { success: true };
+        sendEvent(ctx.userId, SSE_EVENTS.listsUpdated, ctx.tabId);
+        sendEvent(ctx.userId, SSE_EVENTS.tasksUpdated, ctx.tabId);
+        return { success: true as const };
       }),
   }),
 
@@ -284,22 +347,18 @@ export const appRouter = t.router({
         );
       }),
 
-    create: encryptedProcedure
-      .input(CreateTaskSchema)
-      .mutation(async ({ ctx, input }) => {
+    create: encryptedProcedure.input(CreateTaskSchema).mutation(
+      eventMutationHandler(SSE_EVENTS.tasksUpdated, async ({ ctx, input }) => {
         await api.postTask(ctx.userId, input.listId, input.text, input.tags);
-        sendEvent(ctx.userId, "tasks:updated", ctx.tabId);
-        return { success: true };
       }),
+    ),
 
-    update: encryptedProcedure
-      .input(UpdateTaskSchema)
-      .mutation(async ({ ctx, input }) => {
+    update: encryptedProcedure.input(UpdateTaskSchema).mutation(
+      eventMutationHandler(SSE_EVENTS.tasksUpdated, async ({ ctx, input }) => {
         const { listId, taskId, ...data } = input;
-        const result = await api.patchTask(ctx.userId, listId, taskId, data);
-        sendEvent(ctx.userId, "tasks:updated", ctx.tabId);
-        return result;
+        await api.patchTask(ctx.userId, listId, taskId, data);
       }),
+    ),
 
     search: encryptedProcedure
       .input(SearchTasksSchema)
@@ -307,13 +366,11 @@ export const appRouter = t.router({
         return api.searchTasks(ctx.userId, input.query);
       }),
 
-    reorder: encryptedProcedure
-      .input(ReorderTasksSchema)
-      .mutation(async ({ ctx, input }) => {
+    reorder: encryptedProcedure.input(ReorderTasksSchema).mutation(
+      eventMutationHandler(SSE_EVENTS.tasksUpdated, async ({ ctx, input }) => {
         await api.reorderTasks(ctx.userId, input.listId, input.taskIds);
-        sendEvent(ctx.userId, "tasks:updated", ctx.tabId);
-        return { success: true };
       }),
+    ),
   }),
 
   // ── タイマー操作 ──
@@ -322,17 +379,14 @@ export const appRouter = t.router({
       return api.getTimers(ctx.userId);
     }),
 
-    reorder: encryptedProcedure
-      .input(ReorderTimersSchema)
-      .mutation(async ({ ctx, input }) => {
+    reorder: encryptedProcedure.input(ReorderTimersSchema).mutation(
+      eventMutationHandler(SSE_EVENTS.timersUpdated, async ({ ctx, input }) => {
         await api.reorderTimers(ctx.userId, input.timerIds);
-        sendEvent(ctx.userId, "timers:updated", ctx.tabId);
-        return { success: true };
       }),
+    ),
 
-    create: encryptedProcedure
-      .input(CreateTimerSchema)
-      .mutation(async ({ ctx, input }) => {
+    create: encryptedProcedure.input(CreateTimerSchema).mutation(
+      eventMutationHandler(SSE_EVENTS.timersUpdated, async ({ ctx, input }) => {
         await api.createTimer(
           ctx.userId,
           input.name,
@@ -344,70 +398,56 @@ export const appRouter = t.router({
           input.ephemeral,
           input.keep_ringing,
         );
-        sendEvent(ctx.userId, "timers:updated", ctx.tabId);
-        return { success: true };
       }),
+    ),
 
-    update: encryptedProcedure
-      .input(UpdateTimerSchema)
-      .mutation(async ({ ctx, input }) => {
+    update: encryptedProcedure.input(UpdateTimerSchema).mutation(
+      eventMutationHandler(SSE_EVENTS.timersUpdated, async ({ ctx, input }) => {
         const { timerId, ...data } = input;
         await api.updateTimer(ctx.userId, timerId, data);
-        sendEvent(ctx.userId, "timers:updated", ctx.tabId);
-        return { success: true };
       }),
+    ),
 
-    delete: encryptedProcedure
-      .input(TimerIdSchema)
-      .mutation(async ({ ctx, input }) => {
+    delete: encryptedProcedure.input(TimerIdSchema).mutation(
+      eventMutationHandler(SSE_EVENTS.timersUpdated, async ({ ctx, input }) => {
         await api.deleteTimer(ctx.userId, input.timerId);
-        sendEvent(ctx.userId, "timers:updated", ctx.tabId);
-        return { success: true };
       }),
+    ),
 
-    start: encryptedProcedure
-      .input(StartTimerSchema)
-      .mutation(async ({ ctx, input }) => {
+    start: encryptedProcedure.input(StartTimerSchema).mutation(
+      eventMutationHandler(SSE_EVENTS.timersUpdated, async ({ ctx, input }) => {
         await api.startTimer(
           ctx.userId,
           input.timerId,
           input.tz_offset_minutes,
         );
-        sendEvent(ctx.userId, "timers:updated", ctx.tabId);
-        return { success: true };
       }),
+    ),
 
-    pause: encryptedProcedure
-      .input(TimerIdSchema)
-      .mutation(async ({ ctx, input }) => {
+    pause: encryptedProcedure.input(TimerIdSchema).mutation(
+      eventMutationHandler(SSE_EVENTS.timersUpdated, async ({ ctx, input }) => {
         await api.pauseTimer(ctx.userId, input.timerId);
-        sendEvent(ctx.userId, "timers:updated", ctx.tabId);
-        return { success: true };
       }),
+    ),
 
-    reset: encryptedProcedure
-      .input(ResetTimerSchema)
-      .mutation(async ({ ctx, input }) => {
+    reset: encryptedProcedure.input(ResetTimerSchema).mutation(
+      eventMutationHandler(SSE_EVENTS.timersUpdated, async ({ ctx, input }) => {
         await api.resetTimer(
           ctx.userId,
           input.timerId,
           input.tz_offset_minutes,
         );
-        sendEvent(ctx.userId, "timers:updated", ctx.tabId);
-        return { success: true };
       }),
+    ),
 
-    adjust: encryptedProcedure
-      .input(AdjustTimerSchema)
-      .mutation(async ({ ctx, input }) => {
+    adjust: encryptedProcedure.input(AdjustTimerSchema).mutation(
+      eventMutationHandler(SSE_EVENTS.timersUpdated, async ({ ctx, input }) => {
         await api.adjustTimer(ctx.userId, input.timerId, input.minutes);
-        sendEvent(ctx.userId, "timers:updated", ctx.tabId);
-        return { success: true };
       }),
+    ),
 
-    setTime: encryptedProcedure
-      .input(SetTimerTimeSchema)
-      .mutation(async ({ ctx, input }) => {
+    setTime: encryptedProcedure.input(SetTimerTimeSchema).mutation(
+      eventMutationHandler(SSE_EVENTS.timersUpdated, async ({ ctx, input }) => {
         await api.setTimerTime(
           ctx.userId,
           input.timerId,
@@ -415,17 +455,14 @@ export const appRouter = t.router({
           input.target_minutes,
           input.tz_offset_minutes,
         );
-        sendEvent(ctx.userId, "timers:updated", ctx.tabId);
-        return { success: true };
       }),
+    ),
 
-    stop: encryptedProcedure
-      .input(TimerStopSchema)
-      .mutation(async ({ ctx, input }) => {
+    stop: encryptedProcedure.input(TimerStopSchema).mutation(
+      eventMutationHandler(SSE_EVENTS.timersUpdated, async ({ ctx, input }) => {
         await api.stopTimer(ctx.userId, input.timerId, input.started_at);
-        sendEvent(ctx.userId, "timers:updated", ctx.tabId);
-        return { success: true };
       }),
+    ),
   }),
 });
 

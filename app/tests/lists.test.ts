@@ -29,7 +29,7 @@ test.describe("lists", () => {
       .locator('[data-testid="list-item"]')
       .filter({ hasText: listName });
     await listRow.locator('[data-testid="list-menu-btn"]').click();
-    await page.click('button.text-red-600:has-text("削除")');
+    await page.click('[data-testid="list-delete-btn"]');
   });
 
   test("リストを選択するとサイドバーで選択状態になる", async ({ page }) => {
@@ -50,7 +50,7 @@ test.describe("lists", () => {
       .locator('[data-testid="list-item"]')
       .filter({ hasText: listName });
     await listRow.locator('[data-testid="list-menu-btn"]').click();
-    await page.click('button.text-red-600:has-text("削除")');
+    await page.click('[data-testid="list-delete-btn"]');
   });
 
   test("⋮ メニューから名前変更できる", async ({ page }) => {
@@ -101,7 +101,7 @@ test.describe("lists", () => {
     page.once("dialog", async (dialog) => {
       await dialog.accept();
     });
-    await page.click('button.text-red-600:has-text("削除")');
+    await page.click('[data-testid="list-delete-btn"]');
 
     await expect(
       page.locator(`[data-testid="list-select-btn"]:has-text("${listName}")`),

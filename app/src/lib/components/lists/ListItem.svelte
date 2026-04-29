@@ -129,6 +129,7 @@
                 <hr class="my-1 border-gray-200 dark:border-gray-600" />
                 <button
                     class="block w-full cursor-pointer px-4 py-1.5 text-left text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/30"
+                    data-testid="list-delete-btn"
                     onclick={() => {
                         onDelete(list.id);
                         onToggleMenu(list.id);

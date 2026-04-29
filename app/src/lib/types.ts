@@ -2,7 +2,13 @@
  * @fileoverview アプリケーション共通の型定義
  *
  * tRPC レスポンスのクライアント側型を集約する。
+ * `TagInfo`・`TAG_COLOR_KEYS`・`TagColorKey` は `schemas.ts` が正とし、ここではre-exportのみ行う。
  */
+
+export { TAG_COLOR_KEYS } from "./schemas";
+export type { TagColorKey, TagInfo } from "./schemas";
+
+import type { TagInfo } from "./schemas";
 
 /** リスト情報 */
 export type ListInfo = {
@@ -11,27 +17,6 @@ export type ListInfo = {
   sort_order: number;
   last_updated: string;
   status: string;
-};
-
-/** 利用可能な色相キー。色覚特性の差があっても区別しやすい配色。 */
-export const TAG_COLOR_KEYS = [
-  "amber",
-  "sky",
-  "emerald",
-  "yellow",
-  "blue",
-  "red",
-  "pink",
-  "slate",
-] as const;
-
-/** タグの色相キー型 */
-export type TagColorKey = (typeof TAG_COLOR_KEYS)[number];
-
-/** タグ情報（タスクに付与するラベル） */
-export type TagInfo = {
-  name: string;
-  color: TagColorKey;
 };
 
 /** タスク情報 */

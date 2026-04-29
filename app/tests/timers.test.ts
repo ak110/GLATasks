@@ -3,6 +3,7 @@
  */
 
 import { test, expect } from "@playwright/test";
+import { BASE_URL, STORAGE_STATE_PATH } from "./helpers/common";
 
 test.describe("timers", () => {
   test.beforeEach(async ({ page }) => {
@@ -291,15 +292,15 @@ test.describe("timers", () => {
     const timerName = `冪等削除_${Date.now()}`;
 
     const ctxA = await browser.newContext({
-      storageState: "app/tests/.auth/user.json",
+      storageState: STORAGE_STATE_PATH,
       ignoreHTTPSErrors: true,
-      baseURL: process.env.BASE_URL ?? "https://localhost:38180",
+      baseURL: BASE_URL,
     });
     // ブラウザ B は SSE エンドポイントへの接続を遮断する (= 切断中の状態を模擬)
     const ctxB = await browser.newContext({
-      storageState: "app/tests/.auth/user.json",
+      storageState: STORAGE_STATE_PATH,
       ignoreHTTPSErrors: true,
-      baseURL: process.env.BASE_URL ?? "https://localhost:38180",
+      baseURL: BASE_URL,
     });
     await ctxB.route("**/api/events", (route) => route.abort());
 

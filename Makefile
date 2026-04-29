@@ -123,6 +123,9 @@ test:  # 全チェック実行（これを通過すればコミット可能）
 	$(MAKE) test-backup
 	$(MAKE) test-e2e
 
+test-unit:  # vitestによるユニットテスト実行
+	$(call RUN_NODE, pnpm --filter ./app vitest run)
+
 migrate:  # DBマイグレーション実行
 	docker compose exec app node --input-type=module --eval "\
 		import { drizzle } from 'drizzle-orm/mysql2';\
@@ -169,10 +172,13 @@ docs:  # ドキュメントサイトをローカルで起動
 test-e2e:
 	docker compose --profile $(COMPOSE_PROFILE) run --rm \
 		--env=BASE_URL=https://web \
+		--env=COREPACK_ENABLE_DOWNLOAD_PROMPT=0 \
 		playwright \
 		bash -xc '\
-			npm install -g pnpm@$(PNPM_VERSION) --prefix ${PWD}/.cache/playwright --force &&\
+			mkdir -p ${PWD}/.cache/playwright/bin &&\
+			corepack enable --install-directory ${PWD}/.cache/playwright/bin &&\
 			export PATH=${PWD}/.cache/playwright/bin:${PWD}/node_modules/.bin:$$PATH &&\
+			corepack prepare pnpm@$(PNPM_VERSION) --activate &&\
 			pnpm install --frozen-lockfile && pnpm run test:e2e\
 		'
 

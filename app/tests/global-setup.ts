@@ -16,8 +16,7 @@
 import { chromium, type Page, type FullConfig } from "@playwright/test";
 import * as fs from "node:fs";
 import * as path from "node:path";
-
-const BASE_URL = process.env.BASE_URL ?? "https://localhost:38180";
+import { BASE_URL } from "./helpers/common";
 const TEST_USER = "e2etest";
 const TEST_PASSWORD = "e2etestpass123";
 const MAX_ATTEMPTS = 3;

@@ -3,52 +3,18 @@
  */
 
 import { test, expect } from "@playwright/test";
-import * as path from "node:path";
+import { setupTestList, cleanupTestList } from "./helpers/common";
 
-const BASE_URL = process.env.BASE_URL ?? "https://localhost:38180";
 const LIST_NAME = `shareテスト_${Date.now()}`;
 
 test.describe("share/ingest", () => {
   test.beforeAll(async ({ browser }) => {
     // POST テスト用にリストを1つ作成しておく
-    const ctx = await browser.newContext({
-      baseURL: BASE_URL,
-      storageState: path.join(import.meta.dirname, ".auth", "user.json"),
-      ignoreHTTPSErrors: true,
-    });
-    const page = await ctx.newPage();
-    await Promise.all([
-      page.goto("/"),
-      page.waitForResponse((res) => res.url().includes("/api/trpc")),
-    ]);
-    await page.fill('aside input[placeholder="新しいリスト"]', LIST_NAME);
-    await page.click('aside button[type="submit"]');
-    await page
-      .locator(`[data-testid="list-select-btn"]:has-text("${LIST_NAME}")`)
-      .waitFor({ timeout: 15000 });
-    await ctx.close();
+    await setupTestList(browser, LIST_NAME);
   });
 
   test.afterAll(async ({ browser }) => {
-    // テスト用リストを削除
-    const ctx = await browser.newContext({
-      baseURL: BASE_URL,
-      storageState: path.join(import.meta.dirname, ".auth", "user.json"),
-      ignoreHTTPSErrors: true,
-    });
-    const page = await ctx.newPage();
-    await Promise.all([
-      page.goto("/"),
-      page.waitForResponse((res) => res.url().includes("/api/trpc")),
-    ]);
-    page.once("dialog", (dialog) => dialog.accept());
-    const listRow = page
-      .locator('[data-testid="list-item"]')
-      .filter({ hasText: LIST_NAME });
-    await listRow.locator('[data-testid="list-menu-btn"]').click();
-    await page.click('button:has-text("削除")');
-    await page.waitForTimeout(1000);
-    await ctx.close();
+    await cleanupTestList(browser, LIST_NAME);
   });
 
   test("title と url を渡すとフォームに初期値が表示される", async ({

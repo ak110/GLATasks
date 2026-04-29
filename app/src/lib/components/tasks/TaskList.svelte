@@ -4,6 +4,7 @@
      */
 
     import type { TaskInfo } from "$lib/types";
+    import { createDragReorder } from "$lib/dnd-reorder.svelte";
     import TaskItem from "./TaskItem.svelte";
 
     type Props = {
@@ -24,41 +25,11 @@
         updatedTaskIds,
     }: Props = $props();
 
-    // D&D 状態管理
-    let draggedId = $state<number | null>(null);
-    let dropTargetId = $state<number | null>(null);
-    let dropPosition = $state<"before" | "after" | null>(null);
-
-    function handleDragStart(taskId: number) {
-        draggedId = taskId;
-    }
-
-    function handleDragOver(taskId: number, e: DragEvent) {
-        if (draggedId === null || taskId === draggedId) return;
-        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-        const midY = rect.top + rect.height / 2;
-        dropTargetId = taskId;
-        dropPosition = e.clientY < midY ? "before" : "after";
-    }
-
-    function handleDrop() {
-        if (draggedId === null || dropTargetId === null || !onReorder) return;
-        // 新しい順序を構成
-        const ids = tasks.map((t) => t.id).filter((id) => id !== draggedId);
-        const targetIndex = ids.indexOf(dropTargetId);
-        if (targetIndex === -1) return;
-        const insertIndex =
-            dropPosition === "after" ? targetIndex + 1 : targetIndex;
-        ids.splice(insertIndex, 0, draggedId);
-        onReorder(ids);
-        resetDragState();
-    }
-
-    function resetDragState() {
-        draggedId = null;
-        dropTargetId = null;
-        dropPosition = null;
-    }
+    // D&D 状態管理（onReorder が渡された場合のみ有効化）
+    const dnd = createDragReorder(
+        () => tasks,
+        (ids) => onReorder?.(ids),
+    );
 </script>
 
 <div class="flex-1">
@@ -72,13 +43,15 @@
                 {task}
                 {onToggle}
                 {onEdit}
-                isDragging={draggedId === task.id}
+                isDragging={dnd.draggedId === task.id}
                 isRemoteUpdated={updatedTaskIds?.has(task.id) ?? false}
-                dropIndicator={dropTargetId === task.id ? dropPosition : null}
-                onDragStart={onReorder ? handleDragStart : undefined}
-                onDragOver={onReorder ? handleDragOver : undefined}
-                onDrop={onReorder ? handleDrop : undefined}
-                onDragEnd={onReorder ? resetDragState : undefined}
+                dropIndicator={dnd.dropTargetId === task.id
+                    ? dnd.dropPosition
+                    : null}
+                onDragStart={onReorder ? dnd.handleDragStart : undefined}
+                onDragOver={onReorder ? dnd.handleDragOver : undefined}
+                onDrop={onReorder ? dnd.handleDrop : undefined}
+                onDragEnd={onReorder ? dnd.resetDragState : undefined}
             />
         {/each}
     {/if}

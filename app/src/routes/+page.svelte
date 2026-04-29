@@ -8,13 +8,13 @@
         createMutation,
         useQueryClient,
     } from "@tanstack/svelte-query";
-    import { trpc, tabId } from "$lib/trpc";
-    import { subscribe } from "$lib/sse-client";
+    import { trpc, tabId, type RouterOutputs } from "$lib/trpc";
+    import { subscribeOnMount } from "$lib/sse-subscribe";
+    import { SSE_EVENTS } from "$lib/sse-events";
     import { onMount } from "svelte";
     import { SvelteSet, SvelteMap } from "svelte/reactivity";
     import type { TaskStatus } from "$lib/schemas";
     import type {
-        ListInfo,
         TagInfo,
         TaskInfo,
         GetTasksResult,
@@ -28,7 +28,7 @@
     import TaskListHeader from "$lib/components/tasks/TaskListHeader.svelte";
     import TaskEditDialog from "$lib/components/tasks/TaskEditDialog.svelte";
     import MergeListDialog from "$lib/components/lists/MergeListDialog.svelte";
-    import { linkify } from "$lib/linkify";
+    import SearchResults from "$lib/components/search/SearchResults.svelte";
 
     let selectedListId = $state<number | null>(null);
     let showType = $state<"active" | "archived" | "all">("active");
@@ -41,7 +41,6 @@
     let hasHash = $state(false);
     let searchQuery = $state("");
     let debouncedQuery = $state("");
-    let expandedSearchNotes = new SvelteSet<number>();
     const mobileView = $derived(
         hasHash ? ("tasks" as const) : ("lists" as const),
     );
@@ -90,15 +89,15 @@
     });
 
     // リスト一覧取得
-    const listsQuery = createQuery<ListInfo[]>(() => ({
+    const listsQuery = createQuery<RouterOutputs["lists"]["list"]>(() => ({
         queryKey: ["lists", showType] as const,
-        queryFn: () => trpc.lists.list.query(showType) as Promise<ListInfo[]>,
+        queryFn: () => trpc.lists.list.query(showType),
     }));
 
     // タスク一覧取得（SSE でリアルタイム同期）
-    const tasksQuery = createQuery<GetTasksResult>(() => ({
+    const tasksQuery = createQuery<RouterOutputs["tasks"]["list"]>(() => ({
         queryKey: ["tasks", selectedListId, showType] as const,
-        queryFn: async (): Promise<GetTasksResult> => {
+        queryFn: async (): Promise<RouterOutputs["tasks"]["list"]> => {
             if (!selectedListId)
                 return {
                     status: 200 as const,
@@ -108,27 +107,29 @@
             return trpc.tasks.list.query({
                 listId: selectedListId,
                 showType,
-            }) as Promise<GetTasksResult>;
+            });
         },
         enabled: selectedListId !== null,
     }));
 
     // 全文検索クエリ
-    const searchResultsQuery = createQuery<SearchTaskResult[]>(() => ({
-        queryKey: ["search", debouncedQuery] as const,
-        queryFn: () =>
-            trpc.tasks.search.query({
-                query: debouncedQuery,
-            }) as Promise<SearchTaskResult[]>,
-        enabled: debouncedQuery.length > 0,
-    }));
+    const searchResultsQuery = createQuery<RouterOutputs["tasks"]["search"]>(
+        () => ({
+            queryKey: ["search", debouncedQuery] as const,
+            queryFn: () =>
+                trpc.tasks.search.query({
+                    query: debouncedQuery,
+                }),
+            enabled: debouncedQuery.length > 0,
+        }),
+    );
 
     // SSE: サーバーからの通知でクエリを再取得
-    onMount(() => {
-        const unsub1 = subscribe("lists:updated", () => {
+    subscribeOnMount({
+        [SSE_EVENTS.listsUpdated]: () => {
             queryClient.invalidateQueries({ queryKey: ["lists"] });
-        });
-        const unsub2 = subscribe("tasks:updated", (e) => {
+        },
+        [SSE_EVENTS.tasksUpdated]: (e) => {
             // 自分のタブからのイベント → データ再取得のみ
             if (e.data === tabId) {
                 queryClient.invalidateQueries({ queryKey: ["tasks"] });
@@ -164,13 +165,13 @@
                     }
                 }
             });
-        });
-        // ドラッグ終了時にサイドバーのハイライトをリセット
+        },
+    });
+    // ドラッグ終了時にサイドバーのハイライトをリセット
+    onMount(() => {
         const clearDragOver = () => (dragOverListId = null);
         document.addEventListener("dragend", clearDragOver);
         return () => {
-            unsub1();
-            unsub2();
             document.removeEventListener("dragend", clearDragOver);
         };
     });
@@ -215,8 +216,20 @@
             keep_order?: boolean;
             tags?: TagInfo[];
         }) => trpc.tasks.update.mutate(input),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ["tasks"] });
+        onSuccess: (_data, variables) => {
+            // 更新元リストを無効化
+            queryClient.invalidateQueries({
+                queryKey: ["tasks", variables.listId],
+            });
+            // タスクが別リストへ移動された場合は移動先リストも無効化
+            if (
+                variables.move_to !== undefined &&
+                variables.move_to !== variables.listId
+            ) {
+                queryClient.invalidateQueries({
+                    queryKey: ["tasks", variables.move_to],
+                });
+            }
         },
     }));
 
@@ -283,9 +296,9 @@
     }));
 
     // 派生状態
-    const lists = $derived((listsQuery.data ?? []) as ListInfo[]);
+    const lists = $derived(listsQuery.data ?? []);
     const tasks = $derived.by(() => {
-        const data = tasksQuery.data as GetTasksResult | undefined;
+        const data = tasksQuery.data;
         return data && "data" in data ? data.data : [];
     });
     // 同一リスト内で既に使われているタグ候補（名前ユニーク、同名は最初の色を採用）
@@ -300,9 +313,7 @@
     });
     const isLoading = $derived(listsQuery.isLoading || tasksQuery.isLoading);
     const isSearching = $derived(debouncedQuery.length > 0);
-    const searchResults = $derived(
-        (searchResultsQuery.data ?? []) as SearchTaskResult[],
-    );
+    const searchResults = $derived(searchResultsQuery.data ?? []);
     // 検索結果をリスト名でグループ化
     const searchResultsByList = $derived.by(() => {
         const map = new SvelteMap<
@@ -319,30 +330,6 @@
         }
         return map;
     });
-
-    // 検索結果のnotes折りたたみ
-    let clampedSearchNotes = new SvelteSet<number>();
-
-    function toggleSearchNoteExpand(taskId: number) {
-        if (expandedSearchNotes.has(taskId)) expandedSearchNotes.delete(taskId);
-        else expandedSearchNotes.add(taskId);
-    }
-
-    // line-clamp でクランプされているか検知するSvelteアクション
-    function clampDetector(node: HTMLElement, taskId: number) {
-        const check = () => {
-            const isClamped = node.scrollHeight > node.clientHeight;
-            const was = clampedSearchNotes.has(taskId);
-            if (isClamped !== was) {
-                if (isClamped) clampedSearchNotes.add(taskId);
-                else clampedSearchNotes.delete(taskId);
-            }
-        };
-        check();
-        const observer = new ResizeObserver(check);
-        observer.observe(node);
-        return { destroy: () => observer.disconnect() };
-    }
 
     // URLハッシュからリストIDを解析
     function parseHashListId(): number | null {
@@ -610,14 +597,16 @@
         const list = lists.find((l) => l.id === listId);
         if (!list) return;
         // タスク数を取得（全タスクを取得してカウント）
-        const tasksResult = (await queryClient.fetchQuery({
+        const tasksResult = await queryClient.fetchQuery<
+            RouterOutputs["tasks"]["list"]
+        >({
             queryKey: ["tasks", listId, "all"],
             queryFn: () =>
                 trpc.tasks.list.query({
                     listId,
                     showType: "all",
-                }) as Promise<GetTasksResult>,
-        })) as GetTasksResult;
+                }),
+        });
         const count =
             tasksResult && "data" in tasksResult ? tasksResult.data.length : 0;
         mergeDialog = {
@@ -791,105 +780,12 @@
         class:hidden={mobileView !== "tasks"}
     >
         {#if isSearching}
-            <!-- 検索結果表示 -->
-            <div
-                class="border-b border-gray-200 bg-blue-50 px-4 py-3 dark:border-gray-700 dark:bg-blue-900/30"
-            >
-                <h2 class="font-semibold text-gray-800 dark:text-gray-100">
-                    検索結果: "{debouncedQuery}"
-                </h2>
-            </div>
-            {#if searchResultsQuery.isLoading}
-                <p class="p-4 text-gray-400 dark:text-gray-500">検索中...</p>
-            {:else if searchResults.length === 0}
-                <p class="p-4 text-gray-400 dark:text-gray-500">
-                    該当するタスクがありません
-                </p>
-            {:else}
-                {#each [...searchResultsByList] as [listId, group] (listId)}
-                    <div
-                        class="border-b border-gray-200 bg-gray-50 px-4 py-2 dark:border-gray-700 dark:bg-gray-900"
-                    >
-                        <button
-                            class="cursor-pointer text-sm font-medium text-blue-600 hover:underline dark:text-blue-400"
-                            onclick={() => goToSearchResult(listId)}
-                        >
-                            {group.title}
-                        </button>
-                    </div>
-                    {#each group.tasks as task (task.id)}
-                        <div
-                            class="flex items-start gap-3 border-b border-gray-200 px-3 py-3 hover:bg-gray-50 sm:px-5 dark:border-gray-700 dark:hover:bg-gray-700"
-                        >
-                            <div
-                                class="min-w-0 flex-1 wrap-break-word break-all"
-                            >
-                                {#if !task.title && task.notes}
-                                    <!-- タイトルなし: notesを主表示として折りたたみ -->
-                                    <button
-                                        class="cursor-pointer text-left leading-tight hover:text-blue-600 dark:text-gray-100 dark:hover:text-blue-400"
-                                        class:line-through={task.status ===
-                                            "completed"}
-                                        class:text-gray-400={task.status ===
-                                            "completed"}
-                                        class:line-clamp-5={!expandedSearchNotes.has(
-                                            task.id,
-                                        )}
-                                        onclick={() => goToSearchResult(listId)}
-                                        use:clampDetector={task.id}
-                                    >
-                                        <!-- eslint-disable-next-line svelte/no-at-html-tags -- linkify()が自前でHTMLエスケープ済み -->
-                                        {@html linkify(task.notes)}
-                                    </button>
-                                {:else}
-                                    <button
-                                        class="cursor-pointer text-left leading-tight hover:text-blue-600 dark:text-gray-100 dark:hover:text-blue-400"
-                                        class:line-through={task.status ===
-                                            "completed"}
-                                        class:text-gray-400={task.status ===
-                                            "completed"}
-                                        onclick={() => goToSearchResult(listId)}
-                                    >
-                                        <!-- eslint-disable-next-line svelte/no-at-html-tags -- linkify()が自前でHTMLエスケープ済み -->
-                                        {@html linkify(
-                                            task.title || "（空のタスク）",
-                                        )}
-                                    </button>
-                                    {#if task.notes}
-                                        <p
-                                            class="mt-0.5 whitespace-pre-wrap text-gray-500 dark:text-gray-400"
-                                            class:line-clamp-5={!expandedSearchNotes.has(
-                                                task.id,
-                                            )}
-                                            use:clampDetector={task.id}
-                                        >
-                                            <!-- eslint-disable-next-line svelte/no-at-html-tags -- linkify()が自前でHTMLエスケープ済み -->
-                                            {@html linkify(task.notes)}
-                                        </p>
-                                    {/if}
-                                {/if}
-                            </div>
-                            {#if clampedSearchNotes.has(task.id) || expandedSearchNotes.has(task.id)}
-                                <button
-                                    onclick={() =>
-                                        toggleSearchNoteExpand(task.id)}
-                                    class="shrink-0 cursor-pointer rounded p-1 text-xs text-gray-400 hover:bg-gray-100 hover:text-gray-500 dark:text-gray-500 dark:hover:bg-gray-700 dark:hover:text-gray-400"
-                                    aria-label={expandedSearchNotes.has(task.id)
-                                        ? "notesを折りたたむ"
-                                        : "notesを展開"}
-                                    title={expandedSearchNotes.has(task.id)
-                                        ? "折りたたむ"
-                                        : "展開"}
-                                >
-                                    {expandedSearchNotes.has(task.id)
-                                        ? "▲"
-                                        : "▼"}
-                                </button>
-                            {/if}
-                        </div>
-                    {/each}
-                {/each}
-            {/if}
+            <SearchResults
+                query={debouncedQuery}
+                {searchResultsByList}
+                isLoading={searchResultsQuery.isLoading}
+                onGoToResult={goToSearchResult}
+            />
         {:else if selectedListId !== null}
             {@const selectedList = lists.find((l) => l.id === selectedListId)}
             {#if selectedList}
