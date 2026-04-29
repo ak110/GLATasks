@@ -29,6 +29,8 @@
     import TaskEditDialog from "$lib/components/tasks/TaskEditDialog.svelte";
     import MergeListDialog from "$lib/components/lists/MergeListDialog.svelte";
     import SearchResults from "$lib/components/search/SearchResults.svelte";
+    import ConfirmDialog from "$lib/components/dialogs/ConfirmDialog.svelte";
+    import PromptDialog from "$lib/components/dialogs/PromptDialog.svelte";
 
     let selectedListId = $state<number | null>(null);
     let showType = $state<"active" | "archived" | "all">("active");
@@ -45,6 +47,7 @@
         hasHash ? ("tasks" as const) : ("lists" as const),
     );
 
+    // タスク編集ダイアログの状態
     type EditDialog = {
         open: boolean;
         listId: number;
@@ -54,6 +57,16 @@
         completed: boolean;
         tags: TagInfo[];
     };
+    let editDialog = $state<EditDialog>({
+        open: false,
+        listId: 0,
+        taskId: 0,
+        text: "",
+        moveTo: "",
+        completed: false,
+        tags: [],
+    });
+
     // リスト統合ダイアログの状態
     type MergeDialog = {
         open: boolean;
@@ -68,14 +81,36 @@
         taskCount: 0,
     });
 
-    let editDialog = $state<EditDialog>({
+    // リスト削除確認ダイアログの状態
+    type ConfirmDeleteListDialog = {
+        open: boolean;
+        listId: number;
+    };
+    let confirmDeleteListDialog = $state<ConfirmDeleteListDialog>({
         open: false,
         listId: 0,
-        taskId: 0,
-        text: "",
-        moveTo: "",
-        completed: false,
-        tags: [],
+    });
+
+    // リストアーカイブ確認ダイアログの状態
+    type ConfirmArchiveListDialog = {
+        open: boolean;
+        listId: number;
+    };
+    let confirmArchiveListDialog = $state<ConfirmArchiveListDialog>({
+        open: false,
+        listId: 0,
+    });
+
+    // リスト名変更入力ダイアログの状態
+    type RenameListDialog = {
+        open: boolean;
+        listId: number;
+        currentTitle: string;
+    };
+    let renameListDialog = $state<RenameListDialog>({
+        open: false,
+        listId: 0,
+        currentTitle: "",
     });
 
     const queryClient = useQueryClient();
@@ -542,11 +577,13 @@
         }
     }
 
-    async function renameList(listId: number, currentTitle: string) {
-        const newTitle = globalThis.prompt(
-            "新しいリスト名を入力してください",
-            currentTitle,
-        );
+    function renameList(listId: number, currentTitle: string) {
+        renameListDialog = { open: true, listId, currentTitle };
+    }
+
+    async function submitRenameList(newTitle: string) {
+        const { listId, currentTitle } = renameListDialog;
+        renameListDialog.open = false;
         if (!newTitle || newTitle === currentTitle) return;
         try {
             await renameListMutation.mutateAsync({ listId, title: newTitle });
@@ -555,9 +592,13 @@
         }
     }
 
-    async function deleteList(listId: number) {
-        if (!globalThis.confirm("このリストと全てのタスクを削除しますか?"))
-            return;
+    function deleteList(listId: number) {
+        confirmDeleteListDialog = { open: true, listId };
+    }
+
+    async function submitDeleteList() {
+        const { listId } = confirmDeleteListDialog;
+        confirmDeleteListDialog.open = false;
         try {
             await deleteListMutation.mutateAsync(listId);
             if (selectedListId === listId) {
@@ -570,8 +611,13 @@
         }
     }
 
-    async function archiveList(listId: number) {
-        if (!globalThis.confirm("このリストをアーカイブしますか？")) return;
+    function archiveList(listId: number) {
+        confirmArchiveListDialog = { open: true, listId };
+    }
+
+    async function submitArchiveList() {
+        const { listId } = confirmArchiveListDialog;
+        confirmArchiveListDialog.open = false;
         try {
             await archiveListMutation.mutateAsync(listId);
             if (selectedListId === listId) {
@@ -842,4 +888,33 @@
     taskCount={mergeDialog.taskCount}
     onSubmit={submitMerge}
     onClose={() => (mergeDialog.open = false)}
+/>
+
+<ConfirmDialog
+    open={confirmDeleteListDialog.open}
+    title="リストの削除"
+    message="このリストと全てのタスクを削除しますか?"
+    confirmLabel="削除"
+    variant="danger"
+    onConfirm={submitDeleteList}
+    onCancel={() => (confirmDeleteListDialog.open = false)}
+/>
+
+<ConfirmDialog
+    open={confirmArchiveListDialog.open}
+    title="リストのアーカイブ"
+    message="このリストをアーカイブしますか？"
+    confirmLabel="アーカイブ"
+    onConfirm={submitArchiveList}
+    onCancel={() => (confirmArchiveListDialog.open = false)}
+/>
+
+<PromptDialog
+    open={renameListDialog.open}
+    title="リスト名の変更"
+    message="新しいリスト名を入力してください"
+    defaultValue={renameListDialog.currentTitle}
+    submitLabel="変更"
+    onSubmit={submitRenameList}
+    onCancel={() => (renameListDialog.open = false)}
 />

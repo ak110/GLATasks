@@ -10,22 +10,41 @@
 いずれの方法でも、現在のページのタイトルとURLを用いて以下のURLを新しいタブで開く。
 
 ```text
-https://glatasks.tqzh.tk/share/ingest?title={title}&url={url}
+https://<GLATASKS_DOMAIN>/share/ingest?title={title}&url={url}
 ```
+
+`GLATASKS_DOMAIN` はビルド時に指定するドメインに置き換えられる（既定値は `https://glatasks.tqzh.tk`）。
+
+## ビルド手順
+
+`chrome_extension/templates/` 配下のテンプレートから、接続先ドメインを差し込んだ拡張機能ファイルを生成する。
+生成物は `chrome_extension/dist/` に出力される（git管理外）。
+
+```sh
+# デフォルトドメイン（https://glatasks.tqzh.tk）でビルドする
+make build-extension
+
+# 別ドメインを指定してビルドする
+make build-extension GLATASKS_DOMAIN=https://example.com
+```
+
+環境変数 `GLATASKS_DOMAIN` を省略した場合は `https://glatasks.tqzh.tk` が使われる。
 
 ## インストール手順
 
-1. Chrome拡張機能の管理ページを開く:
+1. 上記「ビルド手順」に従い `chrome_extension/dist/` を生成する
+
+2. Chrome拡張機能の管理ページを開く:
    - Chromeのアドレスバーに `chrome://extensions/` と入力
    - またはChromeメニューから「その他のツール」「拡張機能」の順に選択
 
-2. 「デベロッパーモード」を有効にする（右上のトグルスイッチ）
+3. 「デベロッパーモード」を有効にする（右上のトグルスイッチ）
 
-3. 「パッケージ化されていない拡張機能を読み込む」をクリック
+4. 「パッケージ化されていない拡張機能を読み込む」をクリック
 
-4. このディレクトリ（`chrome_extension`）を選択
+5. `chrome_extension/dist/` ディレクトリを選択
 
-5. 拡張機能がインストールされ、ツールバーにアイコンが表示される
+6. 拡張機能がインストールされ、ツールバーにアイコンが表示される
 
 ## 使用方法
 
@@ -45,10 +64,11 @@ https://glatasks.tqzh.tk/share/ingest?title={title}&url={url}
 
 ## ファイル構成
 
-- `manifest.json`: 拡張機能の設定ファイル
-- `background.js`: 右クリックメニューを管理するサービスワーカー
+- `templates/manifest.json`: 拡張機能の設定ファイル（テンプレート）
+- `templates/background.js`: 右クリックメニューを管理するサービスワーカー（テンプレート）
+- `templates/popup.js`: ポップアップの動作を制御するスクリプト（テンプレート）
 - `popup.html`: 拡張機能アイコンクリック時のポップアップUI
-- `popup.js`: ポップアップの動作を制御するスクリプト
+- `dist/`: ビルド生成物（`make build-extension` で出力。git管理外）
 
 ## 動作環境
 

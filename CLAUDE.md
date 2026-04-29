@@ -4,29 +4,30 @@
 
 ### Makefileターゲット一覧
 
-| ターゲット            | 概要                                                         |
-| --------------------- | ------------------------------------------------------------ |
-| `make format`         | コード整形 + 自動修正付きlint（`uvx pyfltr fast`）           |
-| `make test`           | 全チェック実行（pyfltr + バックアップテスト + e2e）          |
-| `make test-backup`    | バックアップ機能のテスト（Docker環境起動が必要）             |
-| `make test-e2e`       | Playwrightによるe2eテスト（Docker環境起動が必要）            |
-| `make deploy`         | ビルド → 停止 → 起動                                         |
-| `make build`          | Dockerイメージのビルド                                       |
-| `make start`          | Docker Composeでサービスを起動                               |
-| `make stop`           | Docker Composeでサービスを停止                               |
-| `make restart-app`    | appコンテナのみ再起動                                        |
-| `make backup`         | DBダンプ + キーファイルのバックアップ                        |
-| `make sync`           | git fetch/rebase + Docker pull                               |
-| `make update`         | 依存更新 + pinactアクション更新 + 全テスト実行               |
-| `make update-actions` | GitHub Actionsのハッシュピン更新（mise経由でpinact実行）     |
-| `make docs`           | VitePressドキュメントサイトのローカルプレビュー（port 5173） |
-| `make migrate`        | DBマイグレーション実行                                       |
-| `make db-studio`      | Drizzle Studio起動                                           |
-| `make logs`           | 全サービスのログをフォロー                                   |
-| `make shell`          | appコンテナのbashシェルに入る                                |
-| `make node-shell`     | Node.jsコンテナのbashシェルに入る                            |
-| `make healthcheck`    | ヘルスチェック確認                                           |
-| `make ps`             | Docker Composeのサービス状態確認                             |
+| ターゲット             | 概要                                                         |
+| ---------------------- | ------------------------------------------------------------ |
+| `make format`          | コード整形 + 自動修正付きlint（`uvx pyfltr fast`）           |
+| `make test`            | 全チェック実行（pyfltr + バックアップテスト + e2e）          |
+| `make test-backup`     | バックアップ機能のテスト（Docker環境起動が必要）             |
+| `make test-e2e`        | Playwrightによるe2eテスト（Docker環境起動が必要）            |
+| `make deploy`          | ビルド → 停止 → 起動                                         |
+| `make build`           | Dockerイメージのビルド                                       |
+| `make start`           | Docker Composeでサービスを起動                               |
+| `make stop`            | Docker Composeでサービスを停止                               |
+| `make restart-app`     | appコンテナのみ再起動                                        |
+| `make backup`          | DBダンプ + キーファイルのバックアップ                        |
+| `make sync`            | git fetch/rebase + Docker pull                               |
+| `make update`          | 依存更新 + pinactアクション更新 + 全テスト実行               |
+| `make update-actions`  | GitHub Actionsのハッシュピン更新（mise経由でpinact実行）     |
+| `make docs`            | VitePressドキュメントサイトのローカルプレビュー（port 5173） |
+| `make migrate`         | DBマイグレーション実行                                       |
+| `make db-studio`       | Drizzle Studio起動                                           |
+| `make logs`            | 全サービスのログをフォロー                                   |
+| `make shell`           | appコンテナのbashシェルに入る                                |
+| `make node-shell`      | Node.jsコンテナのbashシェルに入る                            |
+| `make healthcheck`     | ヘルスチェック確認                                           |
+| `make ps`              | Docker Composeのサービス状態確認                             |
+| `make build-extension` | Chrome拡張機能のビルド（テンプレートからdistを生成）         |
 
 - リリース手順: [docs/development/development.md](docs/development/development.md) 参照
 - コミット前の検証方法: `uvx pyfltr run-for-agent`

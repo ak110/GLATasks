@@ -5,6 +5,7 @@
 
     import type { TagInfo } from "$lib/types";
     import TagEditor from "./TagEditor.svelte";
+    import ConfirmDialog from "$lib/components/dialogs/ConfirmDialog.svelte";
 
     type Props = {
         open: boolean;
@@ -42,6 +43,8 @@
     let localTags = $state<TagInfo[]>([]);
     let textareaEl = $state<HTMLTextAreaElement | null>(null);
     let closeButtonEl = $state<HTMLButtonElement | null>(null);
+    // 未保存変更がある状態で閉じようとしたときの確認ダイアログ
+    let confirmCloseOpen = $state(false);
 
     // 未保存判定の基準値。本文・リスト・完了状態・タグの4項目について、
     // ダイアログ初期化時または直近の保存後に同期された props を記録し、
@@ -100,11 +103,10 @@
     }
 
     function requestClose() {
-        if (
-            isDirty &&
-            !globalThis.confirm("未保存の変更があります。破棄して閉じますか？")
-        )
+        if (isDirty) {
+            confirmCloseOpen = true;
             return;
+        }
         onClose();
     }
 
@@ -115,6 +117,20 @@
         }
     }
 </script>
+
+<!-- {#if open}ブロック外に置くことで、ダイアログが閉じる遷移中もConfirmDialogが有効に表示される -->
+<ConfirmDialog
+    open={confirmCloseOpen}
+    title="変更を破棄"
+    message="未保存の変更があります。破棄して閉じますか？"
+    confirmLabel="破棄して閉じる"
+    variant="danger"
+    onConfirm={() => {
+        confirmCloseOpen = false;
+        onClose();
+    }}
+    onCancel={() => (confirmCloseOpen = false)}
+/>
 
 {#if open}
     <div

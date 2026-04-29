@@ -1,7 +1,7 @@
 /* global chrome */
 
 document.addEventListener("DOMContentLoaded", async function () {
-  const BASE_URL = "https://glatasks.tqzh.tk";
+  const BASE_URL = "__GLATASKS_DOMAIN__";
   const contentFrame = document.querySelector("#contentFrame");
 
   // 現在のタブ情報を取得する

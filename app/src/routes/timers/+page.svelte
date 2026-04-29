@@ -24,6 +24,7 @@
     import Header from "$lib/components/layout/Header.svelte";
     import TimerCard from "$lib/components/timers/TimerCard.svelte";
     import TimerCreateDialog from "$lib/components/timers/TimerCreateDialog.svelte";
+    import ConfirmDialog from "$lib/components/dialogs/ConfirmDialog.svelte";
 
     const queryClient = useQueryClient();
 
@@ -51,6 +52,15 @@
         targetMinutes: null,
         adjustMinutes: TIMER_DEFAULT_ADJUST_MINUTES,
         keepRinging: TIMER_DEFAULT_KEEP_RINGING,
+    });
+
+    // タイマー削除確認ダイアログの状態
+    // open=true の場合のみ timer が有効な値を持つ前提で管理する
+    type ConfirmDeleteTimerDialog =
+        | { open: false; timer?: TimerInfo }
+        | { open: true; timer: TimerInfo };
+    let confirmDeleteTimerDialog = $state<ConfirmDeleteTimerDialog>({
+        open: false,
     });
 
     // 利用者既定値（新規タイマー作成時の初期値ソース）
@@ -291,11 +301,18 @@
         }
     }
 
-    async function handleDelete(timer: TimerInfo, skipConfirm: boolean) {
-        if (!skipConfirm && !globalThis.confirm("このタイマーを削除しますか？"))
+    function handleDelete(timer: TimerInfo, skipConfirm: boolean) {
+        if (skipConfirm) {
+            submitDeleteTimer(timer.id);
             return;
+        }
+        confirmDeleteTimerDialog = { open: true, timer };
+    }
+
+    async function submitDeleteTimer(timerId: number) {
+        confirmDeleteTimerDialog.open = false;
         try {
-            await deleteTimerMutation.mutateAsync(timer.id);
+            await deleteTimerMutation.mutateAsync(timerId);
         } catch {
             // グローバルエラーハンドラがトースト表示を担当
         }
@@ -388,4 +405,18 @@
     onSubmit={handleDialogSubmit}
     onClose={() => (dialog.open = false)}
     onSaveAsDefault={dialog.mode === "create" ? handleSaveAsDefault : undefined}
+/>
+
+<ConfirmDialog
+    open={confirmDeleteTimerDialog.open}
+    title="タイマーの削除"
+    message="このタイマーを削除しますか？"
+    confirmLabel="削除"
+    variant="danger"
+    onConfirm={() => {
+        if (!confirmDeleteTimerDialog.open || !confirmDeleteTimerDialog.timer)
+            return;
+        submitDeleteTimer(confirmDeleteTimerDialog.timer.id);
+    }}
+    onCancel={() => (confirmDeleteTimerDialog.open = false)}
 />
