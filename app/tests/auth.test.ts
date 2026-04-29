@@ -20,8 +20,11 @@ test.describe("未ログイン状態", () => {
     await page.goto("/auth/login");
     await page.fill('[name="user"]', TEST_USER);
     await page.fill('[name="password"]', TEST_PASSWORD);
-    await page.click('button[type="submit"]');
-    await expect(page).not.toHaveURL(/\/auth\//, { timeout: 10000 });
+    // SvelteKit form action による POST → 303 リダイレクト → "/" の遷移を待つ
+    await Promise.all([
+      page.waitForURL("/"),
+      page.click('button[type="submit"]'),
+    ]);
   });
 
   test("誤った資格情報でログインするとエラーメッセージ表示", async ({
