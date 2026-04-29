@@ -52,7 +52,6 @@
         taskId: number;
         text: string;
         moveTo: string;
-        keepOrder: boolean;
         completed: boolean;
         tags: TagInfo[];
     };
@@ -76,7 +75,6 @@
         taskId: 0,
         text: "",
         moveTo: "",
-        keepOrder: false,
         completed: false,
         tags: [],
     });
@@ -500,7 +498,6 @@
             taskId: task.id,
             text,
             moveTo: String(selectedListId!),
-            keepOrder: false,
             completed: task.status === "completed",
             tags: task.tags,
         };
@@ -509,7 +506,6 @@
     async function submitTaskEdit(data: {
         text: string;
         moveTo: string;
-        keepOrder: boolean;
         completed: boolean;
         tags: TagInfo[];
         closeAfter: boolean;
@@ -530,7 +526,11 @@
                 taskId,
                 text: data.text,
                 move_to: Number(data.moveTo),
-                keep_order: data.keepOrder,
+                // 「保存」（closeAfter=false）は編集続行のため並び順を維持し、
+                // 「保存して閉じる」（closeAfter=true）は並び順を更新して閉じる。
+                // 移動先リストが現在のリストと異なる場合は、サーバー側仕様で
+                // keep_order に関わらず移動先リストの先頭へ配置される
+                keep_order: !data.closeAfter,
                 tags: data.tags,
                 ...statusChange,
             });
@@ -544,7 +544,6 @@
                 editDialog.completed = data.completed;
                 editDialog.text = data.text;
                 editDialog.moveTo = data.moveTo;
-                editDialog.keepOrder = data.keepOrder;
                 editDialog.tags = data.tags;
             }
 
@@ -930,7 +929,6 @@
     open={editDialog.open}
     text={editDialog.text}
     moveTo={editDialog.moveTo}
-    keepOrder={editDialog.keepOrder}
     completed={editDialog.completed}
     tags={editDialog.tags}
     {listTagCandidates}

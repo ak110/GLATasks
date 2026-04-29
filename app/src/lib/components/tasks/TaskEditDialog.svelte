@@ -10,7 +10,6 @@
         open: boolean;
         text: string;
         moveTo: string;
-        keepOrder: boolean;
         completed: boolean;
         tags: TagInfo[];
         listTagCandidates: TagInfo[];
@@ -18,7 +17,6 @@
         onSubmit: (data: {
             text: string;
             moveTo: string;
-            keepOrder: boolean;
             completed: boolean;
             tags: TagInfo[];
             closeAfter: boolean;
@@ -30,7 +28,6 @@
         open,
         text,
         moveTo,
-        keepOrder,
         completed,
         tags,
         listTagCandidates,
@@ -41,11 +38,26 @@
 
     let localText = $state("");
     let localMoveTo = $state("");
-    let localKeepOrder = $state(false);
     let localCompleted = $state(false);
     let localTags = $state<TagInfo[]>([]);
     let textareaEl = $state<HTMLTextAreaElement | null>(null);
     let closeButtonEl = $state<HTMLButtonElement | null>(null);
+
+    // 未保存判定の基準値。本文・リスト・完了状態・タグの4項目について、
+    // ダイアログ初期化時または直近の保存後に同期された props を記録し、
+    // 現在の編集中値との差分から未保存フラグを派生させる
+    let baselineText = $state("");
+    let baselineMoveTo = $state("");
+    let baselineCompleted = $state(false);
+    // タグは順序込みで比較したいため JSON 文字列化して扱う
+    let baselineTagsKey = $state("[]");
+
+    const isDirty = $derived(
+        localText !== baselineText ||
+            localMoveTo !== baselineMoveTo ||
+            localCompleted !== baselineCompleted ||
+            JSON.stringify(localTags) !== baselineTagsKey,
+    );
 
     // open が偽から真へ遷移した瞬間のみローカル状態を初期化する
     // （open=true のまま親が値を同期してきた場合に編集中の値を巻き戻さないため）
@@ -54,7 +66,6 @@
         if (open && !prevOpen) {
             localText = text;
             localMoveTo = moveTo;
-            localKeepOrder = keepOrder;
             localCompleted = completed;
             localTags = [...tags];
             // tick 後にフォーカス
@@ -63,18 +74,38 @@
         prevOpen = open;
     });
 
+    // 開いた瞬間と、open のまま親が保存後の値を同期してきたタイミングで baseline を取り直す。
+    // 失敗時は親側で props を更新しないため baseline も更新されず、未保存のまま扱われる
+    $effect(() => {
+        if (!open) return;
+        baselineText = text;
+        baselineMoveTo = moveTo;
+        baselineCompleted = completed;
+        baselineTagsKey = JSON.stringify(tags);
+    });
+
     function handleSubmit(closeAfter: boolean) {
-        // 「保存」ボタン（closeAfter=false）はダイアログを開いたまま編集を続ける用途のため、
-        // 編集中に並び順が動かないよう常に keepOrder=true で送る。
-        // チェックボックスは「保存して閉じる」専用の指定として扱う。
+        // 保存ボタンの役割分担:
+        // - 「保存」（closeAfter=false）: 編集続行用。同一リスト内編集では並び順を維持する
+        // - 「保存して閉じる」（closeAfter=true）: 同一リスト内編集では並び順を更新して閉じる
+        // リスト変更を伴う場合は両ボタンとも移動先リストの先頭へ配置される（サーバー仕様）。
+        // keep_order の値は呼び出し側で closeAfter から決定する
         onSubmit({
             text: localText,
             moveTo: localMoveTo,
-            keepOrder: closeAfter ? localKeepOrder : true,
             completed: localCompleted,
             tags: localTags,
             closeAfter,
         });
+    }
+
+    function requestClose() {
+        if (
+            isDirty &&
+            !globalThis.confirm("未保存の変更があります。破棄して閉じますか？")
+        )
+            return;
+        onClose();
     }
 
     function handleDialogKeydown(e: KeyboardEvent) {
@@ -101,30 +132,15 @@
                 >
                     タスクの編集
                 </h2>
-                <div class="flex items-center gap-3">
-                    <div class="flex items-center gap-2">
-                        <input
-                            id="edit-keep-order"
-                            type="checkbox"
-                            bind:checked={localKeepOrder}
-                            class="cursor-pointer"
-                        />
-                        <label
-                            for="edit-keep-order"
-                            class="cursor-pointer text-sm text-gray-700 dark:text-gray-200"
-                            >保存時に並び順を維持する</label
-                        >
-                    </div>
-                    <button
-                        bind:this={closeButtonEl}
-                        onclick={onClose}
-                        class="cursor-pointer rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300"
-                        aria-label="閉じる"
-                        title="閉じる"
-                    >
-                        ✕
-                    </button>
-                </div>
+                <button
+                    bind:this={closeButtonEl}
+                    onclick={requestClose}
+                    class="cursor-pointer rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300"
+                    aria-label="閉じる"
+                    title="閉じる"
+                >
+                    ✕
+                </button>
             </div>
             <div class="p-6">
                 <div class="mb-4 flex items-center gap-2">
