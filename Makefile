@@ -106,7 +106,7 @@ node-shell:
 	$(call RUN_NODE, bash, --rm --interactive --tty)
 
 update:
-	$(call RUN_NODE, corepack prepare pnpm@latest --activate && corepack use pnpm@latest && pnpm update --latest && pnpm prune && pnpm store prune, --rm)
+	$(call RUN_NODE, corepack prepare pnpm@latest --activate && corepack use pnpm@latest && pnpm update --latest --recursive && pnpm prune && pnpm store prune, --rm)
 	$(MAKE) update-actions
 	$(MAKE) test
 
