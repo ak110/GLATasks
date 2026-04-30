@@ -43,15 +43,12 @@
                 {task}
                 {onToggle}
                 {onEdit}
-                isDragging={dnd.draggedId === task.id}
+                isDragging={dnd.isActive && dnd.draggedId === task.id}
                 isRemoteUpdated={updatedTaskIds?.has(task.id) ?? false}
-                dropIndicator={dnd.dropTargetId === task.id
+                dropIndicator={dnd.isActive && dnd.dropTargetId === task.id
                     ? dnd.dropPosition
                     : null}
                 onDragStart={onReorder ? dnd.handleDragStart : undefined}
-                onDragOver={onReorder ? dnd.handleDragOver : undefined}
-                onDrop={onReorder ? dnd.handleDrop : undefined}
-                onDragEnd={onReorder ? dnd.resetDragState : undefined}
             />
         {/each}
     {/if}

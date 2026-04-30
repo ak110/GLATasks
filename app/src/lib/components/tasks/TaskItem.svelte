@@ -14,10 +14,7 @@
         isDragging?: boolean;
         isRemoteUpdated?: boolean;
         dropIndicator?: "before" | "after" | null;
-        onDragStart?: (taskId: number) => void;
-        onDragOver?: (taskId: number, e: DragEvent) => void;
-        onDrop?: () => void;
-        onDragEnd?: () => void;
+        onDragStart?: (taskId: number, e: PointerEvent) => void;
     };
 
     let {
@@ -28,9 +25,6 @@
         isRemoteUpdated = false,
         dropIndicator = null,
         onDragStart,
-        onDragOver,
-        onDrop,
-        onDragEnd,
     }: Props = $props();
 
     let copyMessage = $state("");
@@ -97,20 +91,8 @@
     class:border-b-2={dropIndicator === "after"}
     class:border-b-blue-500={dropIndicator === "after"}
     data-testid="task-item"
+    data-reorder-id={task.id}
     role="listitem"
-    ondragover={(e) => {
-        if (onDragOver) {
-            e.preventDefault();
-            onDragOver(task.id, e);
-        }
-    }}
-    ondrop={(e) => {
-        if (onDrop) {
-            e.preventDefault();
-            onDrop();
-        }
-    }}
-    ondragend={() => onDragEnd?.()}
 >
     <input
         type="checkbox"
@@ -233,20 +215,14 @@
         <div class="flex flex-col items-center gap-1">
             {#if onDragStart}
                 <span
-                    class="mt-0.5 hidden cursor-grab text-gray-400 select-none sm:inline dark:text-gray-500"
-                    draggable="true"
+                    class="mt-0.5 cursor-grab touch-none text-gray-400 select-none dark:text-gray-500"
+                    class:cursor-grabbing={isDragging}
                     role="button"
                     tabindex="-1"
                     aria-label="ドラッグして並び替え"
+                    data-testid="task-drag-handle"
                     title="ドラッグして並び替え"
-                    ondragstart={(e) => {
-                        e.dataTransfer!.effectAllowed = "move";
-                        e.dataTransfer!.setData(
-                            "application/x-task-id",
-                            String(task.id),
-                        );
-                        onDragStart(task.id);
-                    }}>⠿</span
+                    onpointerdown={(e) => onDragStart(task.id, e)}>⠿</span
                 >
             {/if}
             {#if isRemoteUpdated}

@@ -117,17 +117,32 @@ tRPCの戻り値型は `AppRouter` から推論する。
 並び替え可能なリストには共通D&Dユーティリティ（`$lib/dnd-reorder.svelte.ts`）を利用する。
 D&Dの状態と操作関数を各コンポーネントで再実装しない。
 
-エントリーポイントは `createDragReorder(getItems, onReorder)` で、以下の状態と操作を提供する。
+Pointer Events APIで実装しており、マウス・タッチ・ペンを単一コードパスで扱う。
+
+エントリーポイントは `createDragReorder(getItems, onReorder, options?)` で、以下の状態と操作を提供する。
 
 - 状態:
-  - `draggedId` — 現在ドラッグ中のアイテムID
+  - `draggedId` — 現在ドラッグ中のアイテムID（`pointerdown`時点で確定）
+  - `isActive` — ドラッグ閾値を超えてアクティブな状態か（視覚フィードバック制御に使う）
   - `dropTargetId` — ドロップ先のアイテムID
   - `dropPosition` — ドロップ位置（`"before"` / `"after"`）
 - 操作:
-  - `handleDragStart(id)` — ドラッグ開始時に呼ぶ
-  - `handleDragOver(id, event)` — ドラッグオーバー時に呼ぶ（ドロップ位置を更新）
-  - `handleDrop()` — ドロップ時に呼ぶ（`onReorder` を新しい順序で呼び出す）
+  - `handleDragStart(id, event)` — ハンドルの`pointerdown`で呼ぶ。
+    pointer captureと`pointermove`／`pointerup`／`pointercancel`の登録を内部で行う
   - `resetDragState()` — ドラッグ中断時に状態をリセットする
+
+コンポーネント側の規約は以下の通り。
+
+- 並び替え対象の各行ルート要素には`data-reorder-id={id}`を付与する（hit-testingに使う）
+- ドラッグハンドル要素には`onpointerdown`を設定し、CSSで`touch-action: none`と
+  `user-select: none`を適用する（タッチでのスクロール抑止とテキスト選択抑止のため）
+- 視覚フィードバック（`isDragging`／`dropIndicator`）は`isActive`を加味して反映する
+
+### 採用方針の根拠
+
+Pointer Events APIへ統一した理由は、マウス・タッチ・ペンの全入力をブラウザ標準の単一APIで扱え、
+HTML5 D&Dと並列でTouch Eventsを実装する二重保守を避けられるため。
+外部D&Dライブラリは要件に対して機能過多で、bundle size増と依存追跡コストに見合わない。
 
 ## Vitest テスト環境
 

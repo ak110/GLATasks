@@ -30,10 +30,7 @@
         onDelete: (timer: TimerInfo, skipConfirm: boolean) => void;
         isDragging?: boolean;
         dropIndicator?: "before" | "after" | null;
-        onDragStart?: (timerId: number) => void;
-        onDragOver?: (timerId: number, e: DragEvent) => void;
-        onDrop?: () => void;
-        onDragEnd?: () => void;
+        onDragStart?: (timerId: number, e: PointerEvent) => void;
     };
 
     let {
@@ -48,9 +45,6 @@
         isDragging = false,
         dropIndicator = null,
         onDragStart,
-        onDragOver,
-        onDrop,
-        onDragEnd,
     }: Props = $props();
 
     let displaySeconds = $state(0);
@@ -164,35 +158,21 @@
     class:border-b-2={dropIndicator === "after"}
     class:border-b-blue-500={dropIndicator === "after"}
     data-testid="timer-card"
+    data-reorder-id={timer.id}
     role="listitem"
-    ondragover={(e) => {
-        if (onDragOver) {
-            e.preventDefault();
-            onDragOver(timer.id, e);
-        }
-    }}
-    ondrop={(e) => {
-        if (onDrop) {
-            e.preventDefault();
-            onDrop();
-        }
-    }}
-    ondragend={() => onDragEnd?.()}
 >
     <!-- ヘッダー: ドラッグハンドル + タイマー名 + 操作ボタン -->
     <div class="mb-3 flex items-center justify-between">
         {#if onDragStart}
             <span
-                class="mr-2 hidden cursor-grab text-gray-400 select-none sm:inline dark:text-gray-500"
-                draggable="true"
+                class="mr-2 cursor-grab touch-none text-gray-400 select-none dark:text-gray-500"
+                class:cursor-grabbing={isDragging}
                 role="button"
                 tabindex="-1"
                 aria-label="ドラッグして並び替え"
+                data-testid="timer-drag-handle"
                 title="ドラッグして並び替え"
-                ondragstart={(e) => {
-                    e.dataTransfer!.effectAllowed = "move";
-                    onDragStart(timer.id);
-                }}>⠿</span
+                onpointerdown={(e) => onDragStart(timer.id, e)}>⠿</span
             >
         {/if}
         {#if timer.name}

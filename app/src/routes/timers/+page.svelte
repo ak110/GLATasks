@@ -378,14 +378,11 @@
                         })}
                     onEdit={openEditDialog}
                     onDelete={handleDelete}
-                    isDragging={dnd.draggedId === timer.id}
-                    dropIndicator={dnd.dropTargetId === timer.id
+                    isDragging={dnd.isActive && dnd.draggedId === timer.id}
+                    dropIndicator={dnd.isActive && dnd.dropTargetId === timer.id
                         ? dnd.dropPosition
                         : null}
                     onDragStart={dnd.handleDragStart}
-                    onDragOver={dnd.handleDragOver}
-                    onDrop={dnd.handleDrop}
-                    onDragEnd={dnd.resetDragState}
                 />
             {/each}
         </div>
