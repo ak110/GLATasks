@@ -63,6 +63,7 @@
     <div
         class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4 sm:p-0"
         role="dialog"
+        tabindex="-1"
         aria-modal="true"
         aria-labelledby={title ? titleId : undefined}
         aria-label={title ? undefined : "確認ダイアログ"}

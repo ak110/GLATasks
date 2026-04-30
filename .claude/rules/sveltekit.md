@@ -19,7 +19,8 @@ paths:
   - ナビリンク: `cursor-pointer rounded text-sm text-gray-300 hover:bg-gray-700 hover:text-white`
   - アクティブナビ: `text-sm font-semibold text-gray-200`（リンクなし）
 - コンテンツ領域のアクションボタン: `cursor-pointer rounded bg-gray-100 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-200`
-- ダイアログの共通パターン: ヘッダーにタイトル+✕閉じるボタン、キャンセルボタンは使わない
+- ダイアログの共通パターン: ヘッダーにタイトル+✕閉じるボタン、キャンセルボタンは使わない。
+  確認・入力ダイアログはこのルールの適用除外（後述のダイアログ運用ルール参照）
 - タグバッジの色は`app/src/lib/tag-palette.ts`に集約し、Tailwindクラスを直接ハードコードしない。
   色覚バリアフリー配色（Okabe-Ito系）を淡色化した8色パレットから`getTagColorClass()`経由で取得する
 
@@ -78,3 +79,63 @@ Tailwind CSS v4の `@custom-variant dark` を使用。`<html>` に `.dark` ク�
 | `hover:bg-blue-100` | `dark:hover:bg-blue-900/50` | 青系ボタンのホバー                     |
 | `hover:bg-blue-200` | `dark:hover:bg-blue-900/60` | 強調青系ボタンのホバー（タスク追加等） |
 | `hover:bg-red-50`   | `dark:hover:bg-red-900/30`  | 削除ボタンのホバー                     |
+
+## 確認・入力ダイアログ運用ルール
+
+- `globalThis.confirm` / `globalThis.prompt` / `globalThis.alert` は使用禁止。
+  代わりに共通ダイアログコンポーネント（`ConfirmDialog`、`PromptDialog`）を使う。
+- 確認・入力ダイアログのコールバックpropsは `onCancel` / `onConfirm` / `onSubmit` を使用し、
+  汎用ダイアログの `onClose` / `onSubmit` 命名とは意図的に分離する。
+  キャンセルボタンを持つことは明示的に許容される（汎用ダイアログの「キャンセルボタンは使わない」
+  ルールの適用除外）。
+- ネストするダイアログは外側より高いz-indexを使う。
+  例: 外側が `z-50` なら内側は `z-60`（`z-[60]`）にする。
+- `role="dialog"` を付けた要素には `tabindex="-1"` を併記し、
+  WAI-ARIAのフォーカス受け取り要件に適合させる。
+  タイトルが存在する場合は見出し要素に `id` を振り `aria-labelledby` で参照し、
+  タイトルが無い場合は `aria-label` を併記する。
+
+## tRPC 実装規約
+
+### mutation の共通 builder
+
+mutation完了後にSSEイベントを送信して `{ success: true }` を返すパターンは、
+`eventMutationHandler`（共通builder）に集約する。
+SSEイベント種別はbuilderのオプション引数として渡し、直接 `sendEvent` を呼び出さない。
+
+例外: 複数のSSEイベントを送信する場合、または固有の戻り値を返す必要がある場合は
+builderを使わず手動で記述してよい（`lists.merge` のような複数ドメインをまたぐmutationを参照）。
+
+### tRPC クライアントの戻り値型
+
+tRPCの戻り値型は `AppRouter` から推論する。
+`inferRouterOutputs<AppRouter>` から導出した `RouterOutputs` 型を使い、
+`as Promise<T>` 等のキャストを書いた場合は型不整合の兆候として扱い、根本原因を調査する。
+
+## D&D 並び替えユーティリティ
+
+並び替え可能なリストには共通D&Dユーティリティ（`$lib/dnd-reorder.svelte.ts`）を利用する。
+D&Dの状態と操作関数を各コンポーネントで再実装しない。
+
+エントリーポイントは `createDragReorder(getItems, onReorder)` で、以下の状態と操作を提供する。
+
+- 状態:
+  - `draggedId` — 現在ドラッグ中のアイテムID
+  - `dropTargetId` — ドロップ先のアイテムID
+  - `dropPosition` — ドロップ位置（`"before"` / `"after"`）
+- 操作:
+  - `handleDragStart(id)` — ドラッグ開始時に呼ぶ
+  - `handleDragOver(id, event)` — ドラッグオーバー時に呼ぶ（ドロップ位置を更新）
+  - `handleDrop()` — ドロップ時に呼ぶ（`onReorder` を新しい順序で呼び出す）
+  - `resetDragState()` — ドラッグ中断時に状態をリセットする
+
+## Vitest テスト環境
+
+DOM環境を要するテストは `vitest.config.ts` の `dom` projectに置き、
+Node環境のテストへ影響を与えない構成を維持する。
+
+テストファイルの命名規則:
+
+- Svelteコンポーネントのテスト: `*.svelte.test.ts`
+- その他のDOM環境テスト: `*.dom.test.ts`
+- Node環境テスト: `*.test.ts`

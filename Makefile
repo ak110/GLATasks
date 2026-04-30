@@ -123,8 +123,8 @@ test:  # 全チェック実行（これを通過すればコミット可能）
 	$(MAKE) test-backup
 	$(MAKE) test-e2e
 
-test-unit:  # vitestによるユニットテスト実行
-	$(call RUN_NODE, pnpm --filter ./app vitest run)
+test-unit:  # vitestによるユニットテスト実行（node/domの両projectを実行）
+	$(call RUN_NODE, pnpm run test:unit)
 
 migrate:  # DBマイグレーション実行
 	docker compose exec app node --input-type=module --eval "\

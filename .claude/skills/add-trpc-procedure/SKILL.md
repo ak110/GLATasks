@@ -23,10 +23,11 @@ description: >-
 
 ### 2. DB 層の実装
 
-- `app/src/lib/server/api.ts` 等にDB操作関数を追加する。Drizzle ORMを使用
+- `app/src/lib/server/api/{ドメイン}.ts`（`lists.ts`・`tasks.ts`・`timers.ts`・`users.ts` 等）にDB操作関数を追加する。Drizzle ORMを使用
 - `app/src/lib/server/schema.ts` のテーブル定義と整合すること
 - 日時はUTCで保存、`sort_order` は1000刻み
-- エラーは `api.ts` 内で機械可読な識別子を投げ、`trpc.ts` の `API_ERRORS` 側でUI文言へ変換する
+- エラーは `api/{ドメイン}.ts` 内で機械可読な識別子を投げ、`trpc.ts` の `API_ERRORS` 側でUI文言へ変換する
+- APIハンドラの関数引数は `Record<string, unknown>` を使わず、Zodスキーマから `z.infer` で得た型を引数に取る（Drizzleの型推論が正しく機能する形を維持する）
 
 ### 3. tRPC ルーター登録
 
@@ -34,7 +35,9 @@ description: >-
 
 - 原則として `encryptedProcedure` を使用する（認証 + APIエラー変換 + 難読化）
 - `publicProcedure` は `auth.login` / `auth.register` のような未認証前提のものに限る
-- mutation完了後、`sendEvent(ctx.userId, "<domain>:updated", ctx.tabId)` をreturn前に呼ぶ
+- mutation完了後にSSEイベントを送信して `{ success: true }` を返すパターンは
+  `eventMutationHandler`（共通builder）を使い、SSEイベント種別を引数で渡す。
+  直接 `sendEvent` を呼び出すのは複数イベントや固有の戻り値が必要な場合に限る
 - イベント種別は `lists:updated` / `tasks:updated` / `timers:updated` の3種のみ。
   影響ドメインが複数なら複数送る（`lists.merge` を参照）
 - 新しい機械可読エラー識別子を導入した場合は `API_ERRORS` にマッピング追加
@@ -72,7 +75,7 @@ description: >-
 - `app/src/lib/server/trpc.ts` — ルーター本体・ミドルウェア
 - `app/src/lib/schemas.ts` — Zodスキーマ定義
 - `app/src/lib/server/schema.ts` — Drizzleテーブル定義
-- `app/src/lib/server/api.ts` — DB操作関数
+- `app/src/lib/server/api/{ドメイン}.ts` — DB操作関数（`api.ts` は呼び出し側向けの再エクスポートバレル）
 - `app/src/lib/server/sse.ts` — SSE送信
 - `app/src/lib/trpc.ts` — クライアント側tRPCクライアント
 - `docs/src/content/docs/development/architecture.md` — SSE / 時刻同期 / 難読化設計

@@ -81,8 +81,10 @@ function toTimerInfo(row: typeof timers.$inferSelect): TimerInfo {
   };
 }
 
+// テスト目的でexport。本来はモジュール内部関数。api.ts バレルからのre-exportは行わない。
+
 /** target_minutes と tz_offset から remaining_seconds を計算する（サーバー側 UTC 基準） */
-function calcAlarmRemainingSeconds(
+export function calcAlarmRemainingSeconds(
   targetMinutes: number,
   tzOffsetMinutes: number,
 ): number {
@@ -104,7 +106,7 @@ function calcAlarmRemainingSeconds(
  * target_minutes または tzOffsetMinutes が未指定の場合は alarm_missing_params を throw する。
  * 有効な場合は計算した remaining_seconds を返す。
  */
-function calcAlarmSecondsOrThrow(
+export function calcAlarmSecondsOrThrow(
   targetMinutes: number | null | undefined,
   tzOffsetMinutes: number | null | undefined,
 ): number {

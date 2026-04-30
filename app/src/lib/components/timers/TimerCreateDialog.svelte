@@ -145,6 +145,7 @@
         class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
         role="dialog"
         aria-modal="true"
+        tabindex="-1"
     >
         <div
             class="mx-4 w-full max-w-md rounded-lg bg-white shadow-xl dark:bg-gray-800"

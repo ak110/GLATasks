@@ -8,6 +8,7 @@
 | ---------------------- | ------------------------------------------------------------ |
 | `make format`          | コード整形 + 自動修正付きlint（`uvx pyfltr fast`）           |
 | `make test`            | 全チェック実行（pyfltr + バックアップテスト + e2e）          |
+| `make test-unit`       | Vitestのユニットテストを実行（node・dom両project）           |
 | `make test-backup`     | バックアップ機能のテスト（Docker環境起動が必要）             |
 | `make test-e2e`        | Playwrightによるe2eテスト（Docker環境起動が必要）            |
 | `make deploy`          | ビルド → 停止 → 起動                                         |
@@ -43,9 +44,15 @@
 
 ## 注意点
 
-- vitestのenvironmentは `node`（`vitest.config.ts` @ repo root）。DOM API（`EventSource`, `localStorage` 等）を使うコードを
-  テストするときは `globalThis` のプロパティにモック実装を代入する
+- Vitestはプロジェクト分割構成（`vitest.config.ts` @ repo root）。
+  `node` project（`*.test.ts`）と `dom` project（`*.svelte.test.ts` / `*.dom.test.ts`）を使い分ける。
+  詳細は `.claude/rules/sveltekit.md` の「Vitestテスト環境」節を参照。
 - 現在の `COMPOSE_PROFILE` を確認したいときは `make -n deploy` のドライラン出力で判別できる（`.env` を直接読めないことがある）
 - 開発環境はdocker composeで動いているため、アクセスしたい場合は以下ようなコマンドを使用する
   - `docker compose --profile development exec web curl -fLk https://localhost/`
 - 本リポジトリはSvelte 5、Tailwind v4、tRPC v11、Vite 8など比較的新しいメジャーバージョンを使用している
+
+## API 実装規約
+
+- APIハンドラ（`app/src/lib/server/api/` 配下）の関数引数は `Record<string, unknown>` を使わず、
+  Zodスキーマから `z.infer` で得た型を引数に取る。Drizzleの型推論が正しく機能する形を維持する。
