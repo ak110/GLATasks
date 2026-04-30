@@ -56,3 +56,7 @@
 
 - APIハンドラ（`app/src/lib/server/api/` 配下）の関数引数は `Record<string, unknown>` を使わず、
   Zodスキーマから `z.infer` で得た型を引数に取る。Drizzleの型推論が正しく機能する形を維持する。
+- 並び順（`sort_order`）の付与方針はドメインごとに異なる。新規作成時の挙動を追加・修正する際は
+  既存仕様に合わせる。
+  - タスク（`tasks.create`）: `sort_order = 既存最小値 - 1000` で先頭挿入
+  - タイマー（`timers.create`）: `sort_order = 既存最大値 + 1000` で末尾追加
