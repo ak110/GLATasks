@@ -2,8 +2,23 @@
  * @fileoverview タイマー機能の e2e テスト
  */
 
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page, type Locator } from "@playwright/test";
 import { BASE_URL, STORAGE_STATE_PATH } from "./helpers/common";
+
+/**
+ * タイマーカードを削除する。
+ * 通常削除（ConfirmDialog 表示）と一時タイマー満了時の確認なし削除の双方を扱う。
+ */
+async function deleteTimerCard(page: Page, card: Locator, skipConfirm = false) {
+  await card.locator('[data-testid="timer-delete-btn"]').click();
+  if (!skipConfirm) {
+    await page
+      .locator('[role="dialog"] button:has-text("削除")')
+      .last()
+      .click();
+  }
+  await expect(card).not.toBeVisible({ timeout: 10000 });
+}
 
 test.describe("timers", () => {
   test.beforeEach(async ({ page }) => {
@@ -44,9 +59,7 @@ test.describe("timers", () => {
     );
 
     // 後片付け
-    page.once("dialog", (dialog) => dialog.accept());
-    await card.locator('[data-testid="timer-delete-btn"]').click();
-    await expect(card).not.toBeVisible({ timeout: 10000 });
+    await deleteTimerCard(page, card);
   });
 
   test("タイマーを開始・一時停止できる", async ({ page }) => {
@@ -86,9 +99,7 @@ test.describe("timers", () => {
     expect(display).not.toBe("00:01:00");
 
     // 後片付け
-    page.once("dialog", (dialog) => dialog.accept());
-    await card.locator('[data-testid="timer-delete-btn"]').click();
-    await expect(card).not.toBeVisible({ timeout: 10000 });
+    await deleteTimerCard(page, card);
   });
 
   test("タイマーをリセットできる", async ({ page }) => {
@@ -118,9 +129,7 @@ test.describe("timers", () => {
     );
 
     // 後片付け
-    page.once("dialog", (dialog) => dialog.accept());
-    await card.locator('[data-testid="timer-delete-btn"]').click();
-    await expect(card).not.toBeVisible({ timeout: 10000 });
+    await deleteTimerCard(page, card);
   });
 
   test("タイマーの延長・削減ができる", async ({ page }) => {
@@ -154,9 +163,7 @@ test.describe("timers", () => {
     );
 
     // 後片付け
-    page.once("dialog", (dialog) => dialog.accept());
-    await card.locator('[data-testid="timer-delete-btn"]').click();
-    await expect(card).not.toBeVisible({ timeout: 10000 });
+    await deleteTimerCard(page, card);
   });
 
   test("アラームモードでタイマーを追加できる", async ({ page }) => {
@@ -197,9 +204,7 @@ test.describe("timers", () => {
     expect(display).not.toBe("00:00:00");
 
     // 後片付け
-    page.once("dialog", (dialog) => dialog.accept());
-    await card.locator('[data-testid="timer-delete-btn"]').click();
-    await expect(card).not.toBeVisible({ timeout: 10000 });
+    await deleteTimerCard(page, card);
   });
 
   test("アラームモードの±ボタンで目標時刻がずれる", async ({ page }) => {
@@ -235,9 +240,7 @@ test.describe("timers", () => {
     ).toContainText("12:00", { timeout: 5000 });
 
     // 後片付け
-    page.once("dialog", (dialog) => dialog.accept());
-    await card.locator('[data-testid="timer-delete-btn"]').click();
-    await expect(card).not.toBeVisible({ timeout: 10000 });
+    await deleteTimerCard(page, card);
   });
 
   test("アラームモードのリセットで再計算される", async ({ page }) => {
@@ -278,9 +281,7 @@ test.describe("timers", () => {
     expect(targetText).toContain("23:59");
 
     // 後片付け
-    page.once("dialog", (dialog) => dialog.accept());
-    await card.locator('[data-testid="timer-delete-btn"]').click();
-    await expect(card).not.toBeVisible({ timeout: 10000 });
+    await deleteTimerCard(page, card);
   });
 
   test("SSE 取りこぼし状態のブラウザでも、既に他端末で削除済みのタイマーを削除しようとしてエラーにならない", async ({
@@ -336,17 +337,13 @@ test.describe("timers", () => {
       await expect(cardB).toBeVisible({ timeout: 10000 });
 
       // A で削除 (B は SSE を遮断しているので通知されない)
-      pageA.once("dialog", (dialog) => dialog.accept());
-      await cardA.locator('[data-testid="timer-delete-btn"]').click();
-      await expect(cardA).not.toBeVisible({ timeout: 10000 });
+      await deleteTimerCard(pageA, cardA);
 
       // B 側ではタイマーがまだ表示されている (取りこぼしを模擬)
       await expect(cardB).toBeVisible();
 
       // B で削除を試みる → 冪等なためエラートーストが出ず、カードが消える
-      pageB.once("dialog", (dialog) => dialog.accept());
-      await cardB.locator('[data-testid="timer-delete-btn"]').click();
-      await expect(cardB).not.toBeVisible({ timeout: 10000 });
+      await deleteTimerCard(pageB, cardB);
       // エラートーストが出ていないこと
       await expect(pageB.locator('[data-testid="toast-error"]')).toHaveCount(0);
     } finally {
@@ -386,9 +383,7 @@ test.describe("timers", () => {
     await expect(newCard).toBeVisible({ timeout: 10000 });
 
     // 後片付け
-    page.once("dialog", (dialog) => dialog.accept());
-    await newCard.locator('[data-testid="timer-delete-btn"]').click();
-    await expect(newCard).not.toBeVisible({ timeout: 10000 });
+    await deleteTimerCard(page, newCard);
   });
 
   test("一時タイマーを追加し満了時に確認なしで削除できる", async ({ page }) => {
@@ -429,12 +424,24 @@ test.describe("timers", () => {
   test("鳴り続けオプションと既定値保存が機能する", async ({ page }) => {
     const timerName = `鳴り続け_${Date.now()}`;
 
-    // 追加ダイアログを開く
+    // 既定値テストは前回テスト失敗時の状態が残ると壊れるため、
+    // 冒頭で確実にOFFへリセットしてから本題に入る
+    const checkbox = page.locator('[data-testid="timer-keep-ringing-input"]');
+    await page.click('[data-testid="timer-add-btn"]');
+    await page.locator('[data-testid="timer-name-input"]').waitFor();
+    if (await checkbox.isChecked()) {
+      await checkbox.uncheck();
+      await page.fill('[data-testid="timer-adjust-input"]', "10");
+      await page.click('[data-testid="timer-save-default-btn"]');
+      await page.waitForResponse((res) => res.url().includes("/api/trpc"));
+    }
+    await page.keyboard.press("Escape");
+
+    // リセット後の状態でダイアログを再度開く
     await page.click('[data-testid="timer-add-btn"]');
     await page.locator('[data-testid="timer-name-input"]').waitFor();
 
     // 鳴り続けチェックボックスは初期OFF
-    const checkbox = page.locator('[data-testid="timer-keep-ringing-input"]');
     await expect(checkbox).not.toBeChecked();
 
     // 値を変更し、既定として保存
@@ -466,9 +473,7 @@ test.describe("timers", () => {
     await page.keyboard.press("Escape");
 
     // 後片付け
-    page.once("dialog", (dialog) => dialog.accept());
-    await card.locator('[data-testid="timer-delete-btn"]').click();
-    await expect(card).not.toBeVisible({ timeout: 10000 });
+    await deleteTimerCard(page, card);
 
     // 既定値をリセットして次のテストへ影響を残さない
     await page.click('[data-testid="timer-add-btn"]');
@@ -498,14 +503,13 @@ test.describe("timers", () => {
       .filter({ hasText: timerName });
     await expect(card).toBeVisible({ timeout: 10000 });
 
-    // 開始せずに削除 → confirm が発火することを検証
-    let confirmFired = false;
-    page.once("dialog", (dialog) => {
-      confirmFired = true;
-      dialog.accept();
-    });
+    // 開始せずに削除 → ConfirmDialog が表示されることを検証
     await card.locator('[data-testid="timer-delete-btn"]').click();
+    const confirmDialog = page.locator('[role="dialog"]', {
+      hasText: "削除",
+    });
+    await expect(confirmDialog).toBeVisible({ timeout: 5000 });
+    await confirmDialog.locator('button:has-text("削除")').last().click();
     await expect(card).not.toBeVisible({ timeout: 10000 });
-    expect(confirmFired).toBe(true);
   });
 });

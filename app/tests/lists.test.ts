@@ -14,6 +14,23 @@ test.describe("lists", () => {
     ]);
   });
 
+  /** ⋮ メニューから対象リストを削除する。後片付け用ヘルパー */
+  async function deleteListFromMenu(
+    page: import("@playwright/test").Page,
+    listName: string,
+  ) {
+    const listRow = page
+      .locator('[data-testid="list-item"]')
+      .filter({ hasText: listName });
+    await listRow.locator('[data-testid="list-menu-btn"]').click();
+    await page.click('[data-testid="list-delete-btn"]');
+    // ConfirmDialog の確認ボタン（「削除」テキスト）を押下する
+    await page
+      .locator('[role="dialog"] button:has-text("削除")')
+      .last()
+      .click();
+  }
+
   test("リストを追加するとサイドバーに表示される", async ({ page }) => {
     const listName = `テストリスト_${Date.now()}`;
     await page.fill('aside input[placeholder="新しいリスト"]', listName);
@@ -23,13 +40,7 @@ test.describe("lists", () => {
     ).toBeVisible({
       timeout: 15000,
     });
-    // 後始末: 作成したリストを削除
-    page.once("dialog", (dialog) => dialog.accept());
-    const listRow = page
-      .locator('[data-testid="list-item"]')
-      .filter({ hasText: listName });
-    await listRow.locator('[data-testid="list-menu-btn"]').click();
-    await page.click('[data-testid="list-delete-btn"]');
+    await deleteListFromMenu(page, listName);
   });
 
   test("リストを選択するとサイドバーで選択状態になる", async ({ page }) => {
@@ -44,13 +55,7 @@ test.describe("lists", () => {
     await expect(page.locator('[data-testid="task-add-form"]')).toBeVisible({
       timeout: 15000,
     });
-    // 後始末: 作成したリストを削除
-    page.once("dialog", (dialog) => dialog.accept());
-    const listRow = page
-      .locator('[data-testid="list-item"]')
-      .filter({ hasText: listName });
-    await listRow.locator('[data-testid="list-menu-btn"]').click();
-    await page.click('[data-testid="list-delete-btn"]');
+    await deleteListFromMenu(page, listName);
   });
 
   test("⋮ メニューから名前変更できる", async ({ page }) => {
@@ -66,20 +71,22 @@ test.describe("lists", () => {
       ),
     ).toBeVisible({ timeout: 15000 });
 
-    // ⋮ メニューを開く
+    // ⋮ メニューを開いて名前変更を選ぶ → PromptDialog の入力欄から確定する
     const listRow = page
       .locator('[data-testid="list-item"]')
       .filter({ hasText: originalName });
     await listRow.hover();
     await listRow.locator('[data-testid="list-menu-btn"]').click();
-    page.once("dialog", async (dialog) => {
-      await dialog.accept(newName);
-    });
     await page.click('button:has-text("名前変更")');
+    const dialogInput = page.locator('[role="dialog"] input[type="text"]');
+    await dialogInput.fill(newName);
+    await page.click('[role="dialog"] button:has-text("変更")');
 
     await expect(
       page.locator(`[data-testid="list-select-btn"]:has-text("${newName}")`),
     ).toBeVisible({ timeout: 15000 });
+
+    await deleteListFromMenu(page, newName);
   });
 
   test("⋮ メニューから削除できる", async ({ page }) => {
@@ -92,16 +99,17 @@ test.describe("lists", () => {
       page.locator(`[data-testid="list-select-btn"]:has-text("${listName}")`),
     ).toBeVisible({ timeout: 15000 });
 
-    // ⋮ メニューから削除
+    // ⋮ メニューから削除（ConfirmDialog 経由）
     const listRow = page
       .locator('[data-testid="list-item"]')
       .filter({ hasText: listName });
     await listRow.hover();
     await listRow.locator('[data-testid="list-menu-btn"]').click();
-    page.once("dialog", async (dialog) => {
-      await dialog.accept();
-    });
     await page.click('[data-testid="list-delete-btn"]');
+    await page
+      .locator('[role="dialog"] button:has-text("削除")')
+      .last()
+      .click();
 
     await expect(
       page.locator(`[data-testid="list-select-btn"]:has-text("${listName}")`),
