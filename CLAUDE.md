@@ -1,9 +1,11 @@
 # CLAUDE.md: glatasks
 
+タスク管理・カウントダウンタイマー・アラームを統合したWeb/PWAアプリ。
+SvelteKit + tRPC + Drizzleで構築し、Docker Composeで運用する。
 本ファイルはClaude Code向けにコーディング規約・設計判断・実装上の注意点を集約する。
 人間の開発者向けの情報は[docs/development/development.md](docs/development/development.md)を参照。
 
-## 開発概要
+## 開発手順
 
 よく使う`make`コマンド:
 
@@ -12,7 +14,7 @@
   pre-commit + pyfltr（lint・型チェック・ユニットテスト・svelte-check）+ バックアップテスト + e2e
 - `make deploy` — ビルド → 停止 → 起動
 
-全ターゲットの一覧は[docs/development/development.md](docs/development/development.md)の「makeタスク一覧」を参照。
+全ターゲットの一覧は[docs/development/development.md](docs/development/development.md)の「開発コマンド」を参照。
 
 コミット前の追加検証は`uvx pyfltr run-for-agent`を使う。
 
@@ -28,7 +30,7 @@
   `uvx pyfltr run-for-agent`を使うのはJSON Lines出力で診断結果を効率的に解釈するためであり、
   環境制約によるものではない
 
-## 設計判断
+## 実装上の不変条件・コーディング規約
 
 ### ツールチェイン
 
@@ -83,7 +85,7 @@ npm / PyPIレジストリへの悪意あるパッケージ公開に対する防�
 - タスク（`tasks.create`）: `sort_order = 既存最小値 - 1000` で先頭挿入
 - タイマー（`timers.create`）: `sort_order = 既存最大値 + 1000` で末尾追加
 
-## 実装規約
+### 実装規約
 
 - APIハンドラ（`app/src/lib/server/api/`配下）の関数引数は`Record<string, unknown>`を使わず、
   Zodスキーマから`z.infer`で得た型を引数に取る。Drizzleの型推論が正しく機能する形を維持する
@@ -93,12 +95,11 @@ npm / PyPIレジストリへの悪意あるパッケージ公開に対する防�
   DB（TIMESTAMP型）→ サーバー（Dateオブジェクト）→ クライアント（ISO8601文字列）の変換は自動で行われるため、
   タイムゾーンを意識するコードは不要
 - Vitestはプロジェクト分割構成（`vitest.config.ts` @ repo root）。
-  `node` project（`*.test.ts`）と`dom` project（`*.svelte.test.ts` / `*.dom.test.ts`）を使い分ける。
-  詳細は[.claude/rules/sveltekit.md](.claude/rules/sveltekit.md)の「Vitestテスト環境」節を参照
+  `node` project（`*.test.ts`）と`dom` project（`*.svelte.test.ts` / `*.dom.test.ts`）を使い分ける
 - tRPC実装規約（mutation共通builder・戻り値型・アーキテクチャ前提）は
-  [.claude/rules/sveltekit.md](.claude/rules/sveltekit.md)の「tRPC実装規約」節を参照
+  自動ロード対象のルールとして個別ファイルに集約している
 
-## 開発時のTips
+## 注意点
 
 - 本リポジトリはSvelte 5、Tailwind v4、tRPC v11、Vite 8など比較的新しいメジャーバージョンを使用している。
   ライブラリ仕様を確認する際はcontext7 MCPなどで最新版のドキュメントを参照する
