@@ -65,7 +65,6 @@
 | `make node-shell`      | Node.jsコンテナのbashシェルに入る                            |
 | `make healthcheck`     | ヘルスチェック確認                                           |
 | `make ps`              | Docker Composeのサービス状態確認                             |
-| `make build-extension` | Chrome拡張機能のビルド（テンプレートからdistを生成）         |
 
 ## Docker構成
 

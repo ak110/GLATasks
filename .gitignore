@@ -161,6 +161,3 @@ vite.config.ts.timestamp-*
 # Claude Code (個人設定およびランタイム生成ファイル)
 .claude/settings.local.json
 .claude/.format-dirty
-
-# Chrome拡張機能のビルド生成物
-/chrome_extension/dist/

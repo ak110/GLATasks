@@ -146,8 +146,6 @@ PLAYWRIGHT_IMAGE = mcr.microsoft.com/playwright:v1.59.1-noble
 
 PNPM_VERSION = $(shell node -e "const p=require('./package.json'); console.log((p.packageManager||'').split('@')[1]?.split('+')[0]||'latest')" 2>/dev/null || echo latest)
 
-GLATASKS_DOMAIN ?= https://glatasks.tqzh.tk
-
 test-backup:  # バックアップ機能のテスト（Docker環境が起動していること）
 	@echo "バックアップテストを開始します"
 	@TEST_BACKUP_DIR=$$(mktemp -d) && \
@@ -184,16 +182,4 @@ test-e2e:
 			pnpm install --frozen-lockfile && pnpm run test:e2e\
 		'
 
-build-extension:  # Chrome拡張機能のビルド（テンプレートからdistを生成）
-	@echo "Chrome拡張機能をビルドします (GLATASKS_DOMAIN=$(GLATASKS_DOMAIN))"
-	@mkdir -p chrome_extension/dist
-	@set -e; for f in popup.js background.js manifest.json; do \
-		sed 's|__GLATASKS_DOMAIN__|$(GLATASKS_DOMAIN)|g' \
-			chrome_extension/templates/$$f > chrome_extension/dist/$$f; \
-	done
-	@set -e; for f in popup.html icon-16.png icon-32.png icon-48.png icon-128.png; do \
-		cp chrome_extension/$$f chrome_extension/dist/$$f; \
-	done
-	@echo "ビルドが完了しました: chrome_extension/dist/"
-
-.PHONY: help sync backup deploy build start stop restart-app logs ps healthcheck shell node-shell update update-actions format test test-unit test-backup test-e2e start-app logs-app migrate db-studio docs build-extension
+.PHONY: help sync backup deploy build start stop restart-app logs ps healthcheck shell node-shell update update-actions format test test-unit test-backup test-e2e start-app logs-app migrate db-studio docs

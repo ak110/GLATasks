@@ -6,39 +6,16 @@
 [docs/guide/chrome-extension.md](../docs/guide/chrome-extension.md)を参照。
 本READMEは拡張機能を改修・配布するための開発者向け情報を扱う。
 
-## テンプレート構成
-
-`templates/`配下のテンプレートに接続先ドメインを差し込んで`dist/`へ生成する構成を採用している。
-固定ドメインでビルドすることで、利用環境ごとに別ビルドを配布できるようにしている。
-
-生成物のURLパターン:
-
-```text
-https://<GLATASKS_DOMAIN>/share/ingest?title={title}&url={url}
-```
-
-`GLATASKS_DOMAIN`はビルド時に指定する。既定値は`https://glatasks.tqzh.tk`。
-
-## ビルド手順
-
-`chrome_extension/templates/`配下から拡張機能ファイルを生成する。
-生成物は`chrome_extension/dist/`に出力される（git管理外）。
-
-```sh
-# デフォルトドメインでビルドする
-make build-extension
-
-# 別ドメインを指定してビルドする
-make build-extension GLATASKS_DOMAIN=https://example.com
-```
-
 ## ファイル構成
 
-- `templates/manifest.json` — 拡張機能の設定ファイル（テンプレート）
-- `templates/background.js` — 右クリックメニューを管理するサービスワーカー（テンプレート）
-- `templates/popup.js` — ポップアップの動作を制御するスクリプト（テンプレート）
+- `manifest.json` — 拡張機能の設定ファイル
+- `background.js` — 右クリックメニューを管理するサービスワーカー
+- `popup.js` — ポップアップの動作を制御するスクリプト
 - `popup.html` — 拡張機能アイコンクリック時のポップアップUI
-- `dist/` — ビルド生成物（`make build-extension`で出力。git管理外）
+- `icon-*.png` — 拡張機能アイコン
+
+接続先ドメインは`background.js`・`popup.js`内に`https://glatasks.tqzh.tk`を直接記述している。
+別ドメインへ向ける場合は両ファイルの該当箇所を直接編集する。
 
 ## 動作環境
 

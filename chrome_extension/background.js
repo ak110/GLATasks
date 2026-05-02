@@ -12,7 +12,7 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId === "saveToGLATasks") {
     const title = encodeURIComponent(tab.title || "");
     const url = encodeURIComponent(tab.url || "");
-    const targetUrl = `__GLATASKS_DOMAIN__/share/ingest?title=${title}&url=${url}`;
+    const targetUrl = `https://glatasks.tqzh.tk/share/ingest?title=${title}&url=${url}`;
 
     chrome.tabs.create({
       url: targetUrl,
