@@ -185,7 +185,7 @@ pre-commitが直接npm経由でインストールする。そのためpnpmの `m
 
 masterへのpush・PR時に自動実行する。以下の2つのjobを並列に走らせる。
 
-- `test` job: `pnpm install` → `pnpm run build` → `uvx pyfltr ci`。
+- `test` job: `pnpm install` → `pnpm run build` → `pyfltr ci`。
   lint・型チェック・ユニットテスト・svelte-checkをpyfltr経由で一括実行する
 - `integration` job: 以下の流れでDocker Composeを起動してバックアップテストとe2eテストを実行する
   1. ランナー上に`.env`を生成する
