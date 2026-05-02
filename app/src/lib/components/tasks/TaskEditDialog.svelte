@@ -42,7 +42,6 @@
     let localCompleted = $state(false);
     let localTags = $state<TagInfo[]>([]);
     let textareaEl = $state<HTMLTextAreaElement | null>(null);
-    let closeButtonEl = $state<HTMLButtonElement | null>(null);
     // 未保存変更がある状態で閉じようとしたときの確認ダイアログ
     let confirmCloseOpen = $state(false);
 
@@ -114,6 +113,9 @@
         if ((e.ctrlKey || e.metaKey) && e.key === "s") {
             e.preventDefault();
             handleSubmit(false);
+        } else if (e.key === "Escape") {
+            e.preventDefault();
+            requestClose();
         }
     }
 </script>
@@ -150,7 +152,6 @@
                     タスクの編集
                 </h2>
                 <button
-                    bind:this={closeButtonEl}
                     onclick={requestClose}
                     class="cursor-pointer rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300"
                     aria-label="閉じる"
@@ -183,12 +184,6 @@
                         rows={10}
                         bind:value={localText}
                         bind:this={textareaEl}
-                        onkeydown={(e) => {
-                            if (e.key === "Escape") {
-                                e.preventDefault();
-                                closeButtonEl?.focus();
-                            }
-                        }}
                         class="w-full rounded border border-gray-200 px-3 py-2 wrap-break-word break-all focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
                     ></textarea>
                 </div>
