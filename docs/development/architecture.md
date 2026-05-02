@@ -31,7 +31,7 @@ flowchart TB
 
 ## 外部リバースプロキシ設定
 
-Docker Composeの前段にLet's Encrypt証明書でHTTPS終端する外部nginxを配置する場合の設定。
+Docker Composeの前段にLet's Encrypt証明書でHTTPS終端する外部nginxを配置する場合の設定要点。
 
 ```mermaid
 flowchart LR
@@ -47,56 +47,35 @@ flowchart LR
 
 設定上の制約:
 
-- `/api/events` と `/` の両方に `proxy_ssl_certificate` / `proxy_ssl_certificate_key` が必要（内部nginxが自己署名HTTPSのため）
-- SSE用の `/api/events` には `proxy_buffering off` + `proxy_read_timeout 86400` +
-  `proxy_http_version 1.1` + `Connection ''` が必須
-- `X-Accel-Buffering: no` ヘッダーでnginxのレスポンスバッファも無効化する
+- 内部nginxは自己署名HTTPSのため、`/api/events`と`/`の両方に
+ `proxy_ssl_certificate` / `proxy_ssl_certificate_key`を指定する
+- SSE用の`/api/events`には`proxy_buffering off`に加え`proxy_read_timeout 86400`・
+ `proxy_http_version 1.1`・`Connection ''`を指定する。
+  さらに`X-Accel-Buffering: no`ヘッダーでレスポンスバッファも無効化する
+（SSEがバッファされると配信遅延が発生するため）
 
-設定例:
+最小サンプル（要点のみ）:
 
 ```nginx
-upstream app_backend {
-    server 127.0.0.1:38180;
+location /api/events {
+    proxy_pass https://app_backend;
+    proxy_http_version 1.1;
+    proxy_set_header Connection '';
+    proxy_ssl_certificate     /path/to/glatasks/web/ssl/server.crt;
+    proxy_ssl_certificate_key /path/to/glatasks/web/ssl/server.key;
+    proxy_buffering off;
+    proxy_read_timeout 86400;
+    add_header X-Accel-Buffering no;
 }
 
-server {
-    listen 443 ssl http2;
-    server_name example.com;
-
-    ssl_certificate     /etc/letsencrypt/live/example.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/example.com/privkey.pem;
-
-    # SSE エンドポイント（バッファリング無効化が必要）
-    location /api/events {
-        proxy_pass https://app_backend;
-        proxy_http_version 1.1;
-        proxy_set_header Connection '';
-        proxy_ssl_certificate     /path/to/glatasks/web/ssl/server.crt;
-        proxy_ssl_certificate_key /path/to/glatasks/web/ssl/server.key;
-        proxy_ssl_protocols TLSv1.3;
-        proxy_redirect off;
-        proxy_set_header Host $http_host;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto https;
-        proxy_buffering off;
-        proxy_cache off;
-        proxy_read_timeout 86400;
-        add_header X-Accel-Buffering no;
-    }
-
-    # 通常リクエスト
-    location / {
-        proxy_pass https://app_backend;
-        proxy_ssl_certificate     /path/to/glatasks/web/ssl/server.crt;
-        proxy_ssl_certificate_key /path/to/glatasks/web/ssl/server.key;
-        proxy_ssl_protocols TLSv1.3;
-        proxy_redirect off;
-        proxy_set_header Host $http_host;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto https;
-    }
+location / {
+    proxy_pass https://app_backend;
+    proxy_ssl_certificate     /path/to/glatasks/web/ssl/server.crt;
+    proxy_ssl_certificate_key /path/to/glatasks/web/ssl/server.key;
 }
 ```
+
+`Host` / `X-Forwarded-For` / `X-Forwarded-Proto`等の標準ヘッダーは通常通り設定する。
 
 ## リアルタイム同期（SSE）
 

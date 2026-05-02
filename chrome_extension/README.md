@@ -2,78 +2,48 @@
 
 現在のページのタイトルとURLをGLATasksに保存するためのChrome拡張機能。
 
-## 機能
+エンドユーザー向けのインストール手順・使い方は
+[docs/guide/chrome-extension.md](../docs/guide/chrome-extension.md)を参照。
+本READMEは拡張機能を改修・配布するための開発者向け情報を扱う。
 
-- 右クリックメニュー: ページ上で右クリックして「GLATasksに保存する」を選択
-- 拡張機能アイコン: ツールバーの拡張機能アイコンをクリック
+## テンプレート構成
 
-いずれの方法でも、現在のページのタイトルとURLを用いて以下のURLを新しいタブで開く。
+`templates/`配下のテンプレートに接続先ドメインを差し込んで`dist/`へ生成する構成を採用している。
+固定ドメインでビルドすることで、利用環境ごとに別ビルドを配布できるようにしている。
+
+生成物のURLパターン:
 
 ```text
 https://<GLATASKS_DOMAIN>/share/ingest?title={title}&url={url}
 ```
 
-`GLATASKS_DOMAIN` はビルド時に指定するドメインに置き換えられる（既定値は `https://glatasks.tqzh.tk`）。
+`GLATASKS_DOMAIN`はビルド時に指定する。既定値は`https://glatasks.tqzh.tk`。
 
 ## ビルド手順
 
-`chrome_extension/templates/` 配下のテンプレートから、接続先ドメインを差し込んだ拡張機能ファイルを生成する。
-生成物は `chrome_extension/dist/` に出力される（git管理外）。
+`chrome_extension/templates/`配下から拡張機能ファイルを生成する。
+生成物は`chrome_extension/dist/`に出力される（git管理外）。
 
 ```sh
-# デフォルトドメイン（https://glatasks.tqzh.tk）でビルドする
+# デフォルトドメインでビルドする
 make build-extension
 
 # 別ドメインを指定してビルドする
 make build-extension GLATASKS_DOMAIN=https://example.com
 ```
 
-環境変数 `GLATASKS_DOMAIN` を省略した場合は `https://glatasks.tqzh.tk` が使われる。
-
-## インストール手順
-
-1. 上記「ビルド手順」に従い `chrome_extension/dist/` を生成する
-
-2. Chrome拡張機能の管理ページを開く:
-   - Chromeのアドレスバーに `chrome://extensions/` と入力
-   - またはChromeメニューから「その他のツール」「拡張機能」の順に選択
-
-3. 「デベロッパーモード」を有効にする（右上のトグルスイッチ）
-
-4. 「パッケージ化されていない拡張機能を読み込む」をクリック
-
-5. `chrome_extension/dist/` ディレクトリを選択
-
-6. 拡張機能がインストールされ、ツールバーにアイコンが表示される
-
-## 使用方法
-
-### 方法1: 右クリックメニュー
-
-1. 保存したいページを開く
-2. ページ上で右クリック
-3. 「GLATasksに保存する」を選択
-4. 新しいタブでGLATasksの取り込みページが開く
-
-### 方法2: 拡張機能アイコン
-
-1. 保存したいページを開く
-2. ツールバーの「Save To GLATasks」アイコンをクリック
-3. ポップアップが表示されるので「GLATasksに保存する」ボタンをクリック
-4. 新しいタブでGLATasksの取り込みページが開く
-
 ## ファイル構成
 
-- `templates/manifest.json`: 拡張機能の設定ファイル（テンプレート）
-- `templates/background.js`: 右クリックメニューを管理するサービスワーカー（テンプレート）
-- `templates/popup.js`: ポップアップの動作を制御するスクリプト（テンプレート）
-- `popup.html`: 拡張機能アイコンクリック時のポップアップUI
-- `dist/`: ビルド生成物（`make build-extension` で出力。git管理外）
+- `templates/manifest.json` — 拡張機能の設定ファイル（テンプレート）
+- `templates/background.js` — 右クリックメニューを管理するサービスワーカー（テンプレート）
+- `templates/popup.js` — ポップアップの動作を制御するスクリプト（テンプレート）
+- `popup.html` — 拡張機能アイコンクリック時のポップアップUI
+- `dist/` — ビルド生成物（`make build-extension`で出力。git管理外）
 
 ## 動作環境
 
 - Chrome Manifest V3対応
 - 必要な権限:
-  - `activeTab`: 現在のタブの情報を取得
-  - `contextMenus`: 右クリックメニューの追加
-  - `tabs`: 新しいタブの作成
+  - `activeTab` — 現在のタブの情報を取得
+  - `contextMenus` — 右クリックメニューの追加
+  - `tabs` — 新しいタブの作成

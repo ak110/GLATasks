@@ -97,48 +97,49 @@ Tailwind CSS v4の `@custom-variant dark` を使用。`<html>` に `.dark` ク�
 
 ## tRPC 実装規約
 
+### アーキテクチャ前提（変更禁止の制約）
+
+本節はtRPC v11 + Zod v3経路全体の前提条件のSSOT。
+`add-trpc-procedure`スキル・`trpc-zod-contract-reviewer`エージェントは本節を参照する。
+
+- ルーター本体は現状`app/src/lib/server/trpc.ts`単一だが、
+  将来`app/src/lib/server/routers/**/*.ts`配下に分割される可能性がある。
+  Zodスキーマは`app/src/lib/schemas.ts`、DBスキーマは`app/src/lib/server/schema.ts`。
+  ファイルが見当たらない場合は`Glob` / `Grep`で最新の配置を確認する
+- 認証必須プロシージャは`protectedProcedure`、難読化必須プロシージャは`encryptedProcedure`を使う。
+  `encryptedProcedure`は`protectedProcedure`に`withEncryption`を組み合わせたもの。
+  `publicProcedure`は`auth.login` / `auth.register`以外では使用しない
+- 難読化ミドルウェア`withEncryption`は`getRawInput()`で暗号文を復号し、戻り値を`{ encrypted: ... }`で包む。
+  ミューテーション・クエリを問わず、ユーザーデータに触るプロシージャは必ず`encryptedProcedure`を使用する
+- SSEイベントは`sendEvent(ctx.userId, "<domain>:updated", ctx.tabId)`で送信する。
+  イベント名は`lists:updated` / `tasks:updated` / `timers:updated`の3種のみ。
+  mutation完了後、return前に送信する
+- 日時はUTCに統一する。
+  DB（TIMESTAMP）→ サーバー（Date）→ クライアント（ISO8601文字列）の変換は自動である。
+  タイマー起動時刻のように「市民時刻」を扱う場合は、既存のタイマー系procedureを参考に
+  `tz_offset_minutes`を入力スキーマに含める
+- 数値はJSONボディで文字列として届くことがあるため、Zod側で`z.coerce.number()`もしくは
+  `z.number()` + 上流での`Number()`変換のどちらか一方を明示的に採用する
+
 ### mutation の共通 builder
 
-mutation完了後にSSEイベントを送信して `{ success: true }` を返すパターンは、
+mutation完了後にSSEイベントを送信して`{ success: true }`を返すパターンは、
 `eventMutationHandler`（共通builder）に集約する。
-SSEイベント種別はbuilderのオプション引数として渡し、直接 `sendEvent` を呼び出さない。
+SSEイベント種別はbuilderのオプション引数として渡し、直接`sendEvent`を呼び出さない。
 
 例外: 複数のSSEイベントを送信する場合、または固有の戻り値を返す必要がある場合は
-builderを使わず手動で記述してよい（`lists.merge` のような複数ドメインをまたぐmutationを参照）。
+builderを使わず手動で記述してよい（`lists.merge`のような複数ドメインをまたぐmutationを参照）。
 
 ### tRPC クライアントの戻り値型
 
-tRPCの戻り値型は `AppRouter` から推論する。
-`inferRouterOutputs<AppRouter>` から導出した `RouterOutputs` 型を使い、
-`as Promise<T>` 等のキャストを書いた場合は型不整合の兆候として扱い、根本原因を調査する。
+tRPCの戻り値型は`AppRouter`から推論する。
+`inferRouterOutputs<AppRouter>`から導出した`RouterOutputs`型を使い、
+`as Promise<T>`等のキャストを書いた場合は型不整合の兆候として扱い、根本原因を調査する。
 
 ## D&D 並び替えユーティリティ
 
 並び替え可能なリストには共通D&Dユーティリティ（`$lib/dnd-reorder.svelte.ts`）を利用する。
-D&Dの状態と操作関数を各コンポーネントで再実装しない。
-
-Pointer Events APIで実装しており、マウス・タッチ・ペンを単一コードパスで扱う。
-
-エントリーポイントは `createDragReorder(getItems, onReorder, options?)` で、以下の状態と操作を提供する。
-
-- 状態:
-  - `draggedId` — 現在ドラッグ中のアイテムID（`pointerdown`時点で確定）
-  - `isActive` — ドラッグ閾値を超えてアクティブな状態か（視覚フィードバック制御に使う）
-  - `dropTargetId` — ドロップ先のアイテムID
-  - `dropPosition` — ドロップ位置（`"before"` / `"after"`）
-- 操作:
-  - `handleDragStart(id, event)` — ハンドルの`pointerdown`で呼ぶ。
-    pointer captureと`pointermove`／`pointerup`／`pointercancel`の登録を内部で行う
-  - `resetDragState()` — ドラッグ中断時に状態をリセットする
-
-コンポーネント側の規約は以下の通り。
-
-- 並び替え対象の各行ルート要素には`data-reorder-id={id}`を付与する（hit-testingに使う）
-- ドラッグハンドル要素には`onpointerdown`を設定し、CSSで`touch-action: none`と
-  `user-select: none`を適用する（タッチでのスクロール抑止とテキスト選択抑止のため）
-- 視覚フィードバック（`isDragging`／`dropIndicator`）は`isActive`を加味して反映する
-
-### 採用方針の根拠
+状態・操作関数の仕様は当該ファイルのexportを参照し、各コンポーネントで再実装しない。
 
 Pointer Events APIへ統一した理由は、マウス・タッチ・ペンの全入力をブラウザ標準の単一APIで扱え、
 HTML5 D&Dと並列でTouch Eventsを実装する二重保守を避けられるため。

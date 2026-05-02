@@ -3,7 +3,7 @@ layout: home
 
 hero:
   name: GLATasks
-  tagline: タスクメモ管理とカウントダウンタイマーを統合した Web アプリ
+  tagline: タスク管理とカウントダウンタイマーを統合した Web アプリ
   actions:
     - theme: brand
       text: はじめに

@@ -17,23 +17,12 @@ GLATasksのtRPC + Zod + Drizzle + TanStack Query + SSE経路を縦断的にレ�
 対象差分はtRPCプロシージャ、Zod入出力スキーマ、DBスキーマ、SSE送信、クライアントの `invalidateQueries` キー、
 および関連するテストを含む。
 
-## アーキテクチャ前提 (変更禁止の制約)
+## アーキテクチャ前提
 
-- tRPC v11 + Zod v3。tRPCルーターは現状 `app/src/lib/server/trpc.ts` 単一だが、
-  将来 `app/src/lib/server/routers/**/*.ts` 配下に分割される可能性がある。
-  Zodスキーマは `app/src/lib/schemas.ts`、DBスキーマは `app/src/lib/server/schema.ts`。
-  ファイルが見当たらない場合はまず `Glob` / `Grep` で最新の配置を確認する
-- 認証必須プロシージャは `protectedProcedure`、難読化必須プロシージャは `encryptedProcedure`
-  (= protected + `withEncryption`)。`publicProcedure` は `auth.login` / `auth.register` 以外では使用しない
-- 難読化ミドルウェア `withEncryption` は `getRawInput()` で暗号文を復号し、戻り値を `{ encrypted: ... }` で包む。
-  ミューテーション・クエリを問わず、ユーザーデータに触るプロシージャは必ず `encryptedProcedure` を使用する
-- SSEイベントは `sendEvent(ctx.userId, "<domain>:updated", ctx.tabId)` で送信する。
-  イベント名は `lists:updated` / `tasks:updated` / `timers:updated` の3種のみ。mutation完了後、return前に送信する
-- 日時はUTCに統一する。DB（TIMESTAMP）→ サーバー（Date）→ クライアント（ISO8601文字列）の変換は自動である。
-  タイマー起動時刻のように「市民時刻」を扱う場合は、既存のタイマー系procedureを参考に
-  `tz_offset_minutes` を入力スキーマに含める
-- 数値はJSONボディで文字列として届くことがあるため、Zod側で `z.coerce.number()` もしくは
-  `z.number()` + 上流での `Number()` 変換のどちらか一方を明示的に採用する
+レビューの前提となるアーキテクチャ制約は`.claude/rules/sveltekit.md`の
+「tRPC実装規約 → アーキテクチャ前提（変更禁止の制約）」節を参照する。
+対象はtRPCルーター配置、`encryptedProcedure`の必須範囲、SSEイベント種別、UTC規約、数値変換方針など。
+レビュー対象差分が当該節と乖離していないかを照合する形で進める。
 
 ## ライブラリ仕様の参照
 

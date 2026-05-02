@@ -12,6 +12,11 @@ description: >-
 新しいtRPC procedureを追加するときは、以下のチェックリストをTaskCreateに展開してから着手する。
 項目に漏れがあると、難読化漏れ、SSE通知漏れ、クライアント側の再取得漏れ、型不一致などの致命的なバグを招きやすい。
 
+アーキテクチャ前提は`.claude/rules/sveltekit.md`の
+「tRPC実装規約 → アーキテクチャ前提（変更禁止の制約）」節を参照する。
+対象は`encryptedProcedure`の必須範囲、SSEイベント種別、UTC規約、数値変換方針など。
+本スキルは新規追加時の作業手順に特化する。
+
 ## チェックリスト
 
 ### 1. 入出力スキーマの設計
@@ -23,11 +28,13 @@ description: >-
 
 ### 2. DB 層の実装
 
-- `app/src/lib/server/api/{ドメイン}.ts`（`lists.ts`・`tasks.ts`・`timers.ts`・`users.ts` 等）にDB操作関数を追加する。Drizzle ORMを使用
-- `app/src/lib/server/schema.ts` のテーブル定義と整合すること
-- 日時はUTCで保存、`sort_order` は1000刻み
-- エラーは `api/{ドメイン}.ts` 内で機械可読な識別子を投げ、`trpc.ts` の `API_ERRORS` 側でUI文言へ変換する
-- APIハンドラの関数引数は `Record<string, unknown>` を使わず、Zodスキーマから `z.infer` で得た型を引数に取る（Drizzleの型推論が正しく機能する形を維持する）
+- `app/src/lib/server/api/{ドメイン}.ts`（`lists.ts`・`tasks.ts`・`timers.ts`・`users.ts`等）に
+  DB操作関数を追加する。Drizzle ORMを使用する
+- `app/src/lib/server/schema.ts`のテーブル定義と整合すること
+- 日時はUTCで保存、`sort_order`は1000刻み
+- エラーは`api/{ドメイン}.ts`内で機械可読な識別子を投げ、`trpc.ts`の`API_ERRORS`側でUI文言へ変換する
+- APIハンドラの関数引数は`Record<string, unknown>`を使わず、Zodスキーマから`z.infer`で得た型を引数に取る。
+  Drizzleの型推論が正しく機能する形を維持するため
 
 ### 3. tRPC ルーター登録
 
@@ -78,5 +85,7 @@ description: >-
 - `app/src/lib/server/api/{ドメイン}.ts` — DB操作関数（`api.ts` は呼び出し側向けの再エクスポートバレル）
 - `app/src/lib/server/sse.ts` — SSE送信
 - `app/src/lib/trpc.ts` — クライアント側tRPCクライアント
-- `docs/src/content/docs/development/architecture.md` — SSE / 時刻同期 / 難読化設計
-- `docs/src/content/docs/development/development.md` — テスト・開発環境の注意点
+- `docs/development/architecture.md` — SSE / 時刻同期 / 難読化設計
+- `docs/development/development.md` — テスト・開発環境の注意点
+- `.claude/rules/sveltekit.md` — tRPC実装規約とアーキテクチャ前提
+- `.claude/rules/e2etest.md` — Playwrightテスト実装の注意点

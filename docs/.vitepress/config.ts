@@ -3,7 +3,7 @@ import { defineConfig } from 'vitepress'
 export default defineConfig({
   lang: 'ja',
   title: 'GLATasks',
-  description: 'タスクメモ管理とカウントダウンタイマーを統合した Web アプリ',
+  description: 'タスク管理とカウントダウンタイマーを統合した Web アプリ',
   base: '/GLATasks/',
 
   themeConfig: {
