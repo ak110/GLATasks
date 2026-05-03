@@ -1,10 +1,12 @@
 # GLATasks
 
-[![CI](https://github.com/ak110/GLATasks/actions/workflows/ci.yaml/badge.svg)][ci]
-[![Deploy](https://github.com/ak110/GLATasks/actions/workflows/deploy.yaml/badge.svg)][deploy]
+[![CI][ci-badge]][ci-url]
+[![Deploy][deploy-badge]][deploy-url]
 
-[ci]: https://github.com/ak110/GLATasks/actions/workflows/ci.yaml
-[deploy]: https://github.com/ak110/GLATasks/actions/workflows/deploy.yaml
+[ci-badge]: https://github.com/ak110/GLATasks/actions/workflows/ci.yaml/badge.svg
+[ci-url]: https://github.com/ak110/GLATasks/actions/workflows/ci.yaml
+[deploy-badge]: https://github.com/ak110/GLATasks/actions/workflows/deploy.yaml/badge.svg
+[deploy-url]: https://github.com/ak110/GLATasks/actions/workflows/deploy.yaml
 
 タスク管理・カウントダウンタイマー・アラームを統合したWeb/PWAアプリ。
 
@@ -14,6 +16,11 @@
 - タスクに紐付くカウントダウンタイマー
 - SSEによる複数端末・タブ間のリアルタイム同期
 - PWA対応、Chrome拡張・Android共有からのタスク追加
+
+## 前提条件
+
+本アプリはセルフホスト型であり、Docker Composeが動作する環境が必要となる。
+セットアップ手順やシステム要件の詳細は[ドキュメントサイト](https://ak110.github.io/GLATasks/)を参照。
 
 ## ドキュメント
 
