@@ -17,19 +17,10 @@ GLATasksのtRPC + Zod + Drizzle + TanStack Query + SSE経路を縦断的にレ�
 対象差分はtRPCプロシージャ、Zod入出力スキーマ、DBスキーマ、SSE送信、クライアントの `invalidateQueries` キー、
 および関連するテストを含む。
 
-## アーキテクチャ前提
-
-レビューの前提となるアーキテクチャ制約は`.claude/rules/sveltekit.md`の
-「tRPC実装規約 → アーキテクチャ前提（変更禁止の制約）」節を参照する。
-対象はtRPCルーター配置、`encryptedProcedure`の必須範囲、SSEイベント種別、UTC規約、数値変換方針など。
-レビュー対象差分が当該節と乖離していないかを照合する形で進める。
-
 ## ライブラリ仕様の参照
 
 対象ライブラリのAPI・挙動を確認する必要が生じたら、`context7` MCPを優先して参照する。
-対象はtRPC v11 / Zod / Drizzle ORM / TanStack Query / SvelteKit / Svelte 5 / Tailwind CSS v4などとする。
-具体的には `mcp__plugin_context7_context7__resolve-library-id` → `mcp__plugin_context7_context7__query-docs`
-の順で呼び出す。Web検索や記憶に頼らない。本リポジトリは学習スナップショットより新しいメジャーバージョンに追従しているため、
+本リポジトリは学習スナップショットより新しいメジャーバージョンに追従しているため、
 記憶ベースのレビューは誤判定の主要な原因となる。
 
 ## レビュー観点チェックリスト

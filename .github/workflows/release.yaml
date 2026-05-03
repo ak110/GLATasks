@@ -87,7 +87,7 @@ jobs:
           set -euo pipefail
 
           # 再実行時の冪等性: HEAD を指すリリースタグが既にあれば再利用
-          existing_tag="$(git tag --points-at HEAD | grep -E '^v[0-9]+\.' | head -n1 || true)"
+          existing_tag="$(git tag --points-at=HEAD | grep -E '^v[0-9]+\.' | head -n1 || true)"
           if [ -n "${existing_tag}" ]; then
             echo "Found existing tag ${existing_tag} on HEAD, reusing"
             echo "next=${existing_tag}" >> "$GITHUB_OUTPUT"
@@ -137,7 +137,7 @@ jobs:
             echo "Release ${{ steps.next.outputs.next }} already exists, skipping"
           else
             gh release create "${{ steps.next.outputs.next }}" \
-              --title "${{ steps.next.outputs.next }}" --notes-file CHANGES.md
+              --title="${{ steps.next.outputs.next }}" --notes-file=CHANGES.md
           fi
 
       - name: Run deploy workflow

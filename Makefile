@@ -19,7 +19,7 @@ RUN_NODE = docker run $(2) \
 	node:lts \
 	bash -xc '\
 	    mkdir -p ${PWD}/.cache/bin &&\
-        corepack enable --install-directory ${PWD}/.cache/bin &&\
+        corepack enable --install-directory=${PWD}/.cache/bin &&\
         export PATH=${PWD}/.cache/bin:${PWD}/node_modules/.bin:$$PATH &&\
 		pnpm install --frozen-lockfile &&\
 		$(1)\
@@ -44,8 +44,8 @@ backup:  # デプロイ前バックアップ（DB + キーファイル）
 	@# DBダンプ実行（停止中はエラー。SKIP_DB_DUMP=1 でスキップ可）
 	@if [ "$(SKIP_DB_DUMP)" = "1" ]; then \
 		echo "SKIP_DB_DUMP=1: DBダンプをスキップします"; \
-	elif docker compose --profile $(COMPOSE_PROFILE) ps db --format '{{.State}}' 2>/dev/null | grep -q running; then \
-		docker compose --profile $(COMPOSE_PROFILE) exec -T db \
+	elif docker compose --profile=$(COMPOSE_PROFILE) ps db --format='{{.State}}' 2>/dev/null | grep -q running; then \
+		docker compose --profile=$(COMPOSE_PROFILE) exec -T db \
 			mariadb-dump -uglatasks -pglatasks --single-transaction --routines --triggers glatasks \
 			> $(BACKUP_DIR)/glatasks.sql \
 		&& echo "DBダンプが完了しました" \
@@ -66,41 +66,41 @@ deploy:
 	$(MAKE) start
 
 build:
-	docker compose --profile $(COMPOSE_PROFILE) pull
+	docker compose --profile=$(COMPOSE_PROFILE) pull
 ifeq ($(COMPOSE_PROFILE), development)
-	docker compose --profile $(COMPOSE_PROFILE) --progress=plain build --pull
+	docker compose --profile=$(COMPOSE_PROFILE) --progress=plain build --pull
 endif
 
 start:
-	docker compose --profile $(COMPOSE_PROFILE) up -d
+	docker compose --profile=$(COMPOSE_PROFILE) up -d
 
 stop:
-	docker compose --profile $(COMPOSE_PROFILE) down
+	docker compose --profile=$(COMPOSE_PROFILE) down
 
 restart-app:
-	docker compose --profile $(COMPOSE_PROFILE) restart app
+	docker compose --profile=$(COMPOSE_PROFILE) restart app
 
 logs:
-	docker compose --profile $(COMPOSE_PROFILE) logs -ft
+	docker compose --profile=$(COMPOSE_PROFILE) logs -ft
 
 ps:
-	docker compose --profile $(COMPOSE_PROFILE) ps
+	docker compose --profile=$(COMPOSE_PROFILE) ps
 
 healthcheck:
-	curl --fail http://localhost:3000/healthcheck 2>/dev/null || docker compose --profile $(COMPOSE_PROFILE) exec app curl --fail http://localhost:3000/healthcheck
+	curl --fail http://localhost:3000/healthcheck 2>/dev/null || docker compose --profile=$(COMPOSE_PROFILE) exec app curl --fail http://localhost:3000/healthcheck
 
 start-app:
-	docker compose --profile $(COMPOSE_PROFILE) down app
-	docker compose --profile $(COMPOSE_PROFILE) up -d app
+	docker compose --profile=$(COMPOSE_PROFILE) down app
+	docker compose --profile=$(COMPOSE_PROFILE) up -d app
 
 logs-app:
-	docker compose --profile $(COMPOSE_PROFILE) logs -ft app
+	docker compose --profile=$(COMPOSE_PROFILE) logs -ft app
 
 sql:
-	docker compose --profile $(COMPOSE_PROFILE) exec db mariadb -uglatasks -pglatasks -Dglatasks
+	docker compose --profile=$(COMPOSE_PROFILE) exec db mariadb -uglatasks -pglatasks -Dglatasks
 
 shell:
-	docker compose --profile $(COMPOSE_PROFILE) exec app bash
+	docker compose --profile=$(COMPOSE_PROFILE) exec app bash
 
 node-shell:
 	$(call RUN_NODE, bash, --rm --interactive --tty)
@@ -113,7 +113,7 @@ update:
 # GitHub Actionsのアクションをハッシュピンで最新化（mise未導入時はスキップ）
 update-actions:
 	@command -v mise >/dev/null 2>&1 || { echo "mise未検出、スキップ"; exit 0; }; \
-	GITHUB_TOKEN=$$(gh auth token) mise exec -- pinact run --update --min-age 1
+	GITHUB_TOKEN=$$(gh auth token) mise exec -- pinact run --update --min-age=1
 
 format:  # 整形 + 軽量lint
 	uvx pyfltr fast
@@ -127,7 +127,7 @@ test-unit:  # vitestによるユニットテスト実行（node/domの両project
 	$(call RUN_NODE, pnpm run test:unit)
 
 migrate:  # DBマイグレーション実行
-	docker compose exec app node --input-type=module --eval "\
+	docker compose exec app node --input-type=module --eval="\
 		import { drizzle } from 'drizzle-orm/mysql2';\
 		import { migrate } from 'drizzle-orm/mysql2/migrator';\
 		import mysql from 'mysql2/promise';\
@@ -167,16 +167,16 @@ test-backup:  # バックアップ機能のテスト（Docker環境が起動し�
 	echo "全テストが成功しました"
 
 docs:  # ドキュメントサイトをローカルで起動
-	$(call RUN_NODE, cd docs && pnpm dev --host 0.0.0.0 --port 5173, --rm --interactive --tty -p 5173:5173)
+	$(call RUN_NODE, cd docs && pnpm dev --host=0.0.0.0 --port=5173, --rm --interactive --tty -p 5173:5173)
 
 test-e2e:
-	docker compose --profile $(COMPOSE_PROFILE) run --rm \
+	docker compose --profile=$(COMPOSE_PROFILE) run --rm \
 		--env=BASE_URL=https://web \
 		--env=COREPACK_ENABLE_DOWNLOAD_PROMPT=0 \
 		playwright \
 		bash -xc '\
 			mkdir -p ${PWD}/.cache/playwright/bin &&\
-			corepack enable --install-directory ${PWD}/.cache/playwright/bin &&\
+			corepack enable --install-directory=${PWD}/.cache/playwright/bin &&\
 			export PATH=${PWD}/.cache/playwright/bin:${PWD}/node_modules/.bin:$$PATH &&\
 			corepack prepare pnpm@$(PNPM_VERSION) --activate &&\
 			pnpm install --frozen-lockfile && pnpm run test:e2e\

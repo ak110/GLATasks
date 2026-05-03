@@ -14,11 +14,11 @@ hero:
 
 features:
   - title: タスク管理
-    details: 複数リストでタスクを整理。ドラッグ＆ドロップでリスト間移動も可能。
+    details: 複数リストでのタスク管理とドラッグ&ドロップによるリスト間移動。
   - title: カウントダウンタイマー
-    details: タスクにタイマーを設定して残り時間をリアルタイム表示。
+    details: タスクに紐付くカウントダウンタイマー。
   - title: リアルタイム同期
-    details: SSE による複数端末・タブ間のリアルタイム同期。
+    details: SSEによる複数端末・タブ間のリアルタイム同期。
   - title: マルチプラットフォーム
-    details: PWA 対応。Chrome 拡張機能や Android 共有からタスクを追加。
+    details: PWA対応、Chrome拡張・Android共有からのタスク追加。
 ---

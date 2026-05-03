@@ -7,7 +7,7 @@
     "dev": "cd app && vite dev",
     "build": "cd app && vite build",
     "preview": "cd app && vite preview",
-    "check": "cd app && svelte-kit sync && svelte-check --tsconfig ../tsconfig.json",
+    "check": "cd app && svelte-kit sync && svelte-check --tsconfig=../tsconfig.json",
     "test:unit": "vitest run",
     "test:e2e": "playwright test",
     "db:generate": "drizzle-kit generate",

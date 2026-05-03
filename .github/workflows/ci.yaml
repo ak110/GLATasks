@@ -81,19 +81,19 @@ jobs:
           tags: ghcr.io/ak110/glatasks:latest
 
       - name: Start stack (production profile)
-        run: docker compose --profile production up -d --wait
+        run: docker compose --profile=production up -d --wait
 
       - name: Run backup test
         run: make test-backup
 
       - name: Run e2e test
         run: |
-          docker compose --profile production --profile ci run --rm \
+          docker compose --profile=production --profile=ci run --rm \
             --env=BASE_URL=https://web \
             playwright \
             bash -xc '
               PNPM_VERSION=$(node -e "const p=require(\"./package.json\"); console.log((p.packageManager||\"\").split(\"@\")[1]?.split(\"+\")[0]||\"latest\")") &&
-              npm install -g pnpm@${PNPM_VERSION} --prefix ${PWD}/.cache/playwright --force &&
+              npm install -g pnpm@${PNPM_VERSION} --prefix=${PWD}/.cache/playwright --force &&
               export PATH=${PWD}/.cache/playwright/bin:${PWD}/node_modules/.bin:$PATH &&
               pnpm install --frozen-lockfile &&
               pnpm run test:e2e
@@ -112,8 +112,8 @@ jobs:
 
       - name: Dump container logs on failure
         if: failure()
-        run: docker compose --profile production --profile ci logs --no-color
+        run: docker compose --profile=production --profile=ci logs --no-color
 
       - name: Tear down stack
         if: always()
-        run: docker compose --profile production --profile ci down --volumes --remove-orphans
+        run: docker compose --profile=production --profile=ci down --volumes --remove-orphans

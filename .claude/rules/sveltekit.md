@@ -120,6 +120,8 @@ Tailwind CSS v4の `@custom-variant dark` を使用。`<html>` に `.dark` ク�
   `tz_offset_minutes`を入力スキーマに含める
 - 数値はJSONボディで文字列として届くことがあるため、Zod側で`z.coerce.number()`もしくは
   `z.number()` + 上流での`Number()`変換のどちらか一方を明示的に採用する
+- APIハンドラ（`app/src/lib/server/api/`配下）の関数引数は`Record<string, unknown>`を使わず、
+  Zodスキーマから`z.infer`で得た型を引数に取る。Drizzleの型推論が正しく機能する形を維持する
 
 ### mutation の共通 builder
 
@@ -140,10 +142,7 @@ tRPCの戻り値型は`AppRouter`から推論する。
 
 並び替え可能なリストには共通D&Dユーティリティ（`$lib/dnd-reorder.svelte.ts`）を利用する。
 状態・操作関数の仕様は当該ファイルのexportを参照し、各コンポーネントで再実装しない。
-
-Pointer Events APIへ統一した理由は、マウス・タッチ・ペンの全入力をブラウザ標準の単一APIで扱え、
-HTML5 D&Dと並列でTouch Eventsを実装する二重保守を避けられるため。
-外部D&Dライブラリは要件に対して機能過多で、bundle size増と依存追跡コストに見合わない。
+Pointer Events APIへ統一することで、マウス・タッチ・ペンの全入力をブラウザ標準の単一APIで扱える。
 
 ## Vitest テスト環境
 

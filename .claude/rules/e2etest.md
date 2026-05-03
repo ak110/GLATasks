@@ -1,6 +1,8 @@
 ---
 paths:
   - "app/tests/**/*.ts"
+# このルールはe2eテスト（app/tests/配下）を編集するときに自動ロードされる。
+# SvelteKit特有のhydrationパターン・ダイアログ操作・マルチブラウザ同期テストの注意点を扱う。
 ---
 
 # e2eテスト (Playwright)
@@ -12,34 +14,49 @@ paths:
 - テストデータは`beforeAll` / `afterAll`で作成・削除し、
   テスト名に`Date.now()`を含めて一意にする
 
-## SvelteKitとの統合
+## 基本パターン
 
-- SvelteKitのhydration完了を待つ:
-  `waitForSelector`はSSRで描画されるため即返るが、`onMount`のAPI呼び出しはまだ完了していない。
-  SSE接続が常時開いているため`waitUntil: "networkidle"`は使えない。
-  次のtRPCレスポンス待ちパターンを使う。
+SvelteKitのhydration完了を待つには、次のtRPCレスポンス待ちパターンを使う。
 
-  ```typescript
-  await Promise.all([
-    page.goto("/"),
-    page.waitForResponse((res) => res.url().includes("/api/trpc")),
-  ]);
-  ```
+`waitForSelector`はSSRで描画されるため即返るが、`onMount`のAPI呼び出しはまだ完了していない。
+SSE接続が常時開いているため`waitUntil: "networkidle"`は使えない。
 
-- `browser.newContext()`を使う場合は`baseURL`を明示する（`page.goto("/")`が動くため）
-- セレクタの曖昧さに注意する。
-  `button:has-text("追加")`はサイドバーのリスト追加ボタンにも一致するため、
-  `main button:has-text("追加")`のようにスコープを限定する
-- 複数ブラウザ（多端末同期）のテスト:
-  `browser.newContext(...)`を2つ作り、終了時に`finally`で`ctx.close()`する。
-  引数には`storageState` / `ignoreHTTPSErrors` / `baseURL`を指定する。
-  値は`app/tests/.auth/user.json` / `true` /
-  `process.env.BASE_URL ?? "https://localhost:38180"`
-- SSEイベントを受信しない状態を再現する:
-  `await ctx.route("**/api/events", route => route.abort())`でSSEエンドポイントへの接続だけを遮断する。
-  `/api/trpc`は通るので削除等の通常操作は引き続き実行できる
+```typescript
+await Promise.all([
+  page.goto("/"),
+  page.waitForResponse((res) => res.url().includes("/api/trpc")),
+]);
+```
 
-## ダイアログ操作の規約
+セレクタの曖昧さに注意する。
+`button:has-text("追加")`はサイドバーのリスト追加ボタンにも一致するため、
+`main button:has-text("追加")`のようにスコープを限定する。
+
+## 複数ブラウザ・マルチタブ
+
+`browser.newContext()`を使う場合は`baseURL`を明示する（`page.goto("/")`が動くため）。
+
+複数ブラウザ（多端末同期）のテスト:
+
+```typescript
+const ctx = await browser.newContext({
+  storageState: "app/tests/.auth/user.json",
+  ignoreHTTPSErrors: true,
+  baseURL: process.env.BASE_URL ?? "https://localhost:38180",
+});
+```
+
+2つ作り、終了時は`finally`で`ctx.close()`する。
+
+## SSE・ネットワーク制御
+
+SSEイベントを受信しない状態を再現する場合は、
+`await ctx.route("**/api/events", route => route.abort())`でSSEエンドポイントへの接続だけを遮断する。
+`/api/trpc`は通るので削除等の通常操作は引き続き実行できる。
+
+## UI操作
+
+### ダイアログ操作の規約
 
 確認・入力ダイアログは共通コンポーネント（`ConfirmDialog` / `PromptDialog`）に統一されている。
 ネイティブの`window.confirm` / `window.prompt`は発火しない。
@@ -53,13 +70,10 @@ paths:
 ネスト時に外側ダイアログのボタンを誤選択しないよう、`role="dialog"`スコープでlocatorを構築する。
 複数候補がある場合は`.last()`で最前面のダイアログを取り出す。
 
-## モバイルブレークポイントのテスト
+## モバイルテスト
 
-`playwright.config.ts`の`mobile-chrome`プロジェクトはモバイルブレークポイントの回帰検知用である。
-完全なmobile emulation（`devices["Pixel 5"]`で`hasTouch: true`・`isMobile: true`）下を想定する。
-この設定ではPlaywrightの`page.mouse`経由で`setPointerCapture`を伴うPointer Eventsを
-自動駆動した際にドラッグが安定して成立しない。
-そのため、Desktop Chromeをベースに`viewport`のみPixel 5サイズへoverrideする構成を採用する。
+`playwright.config.ts`の`mobile-chrome`プロジェクトはモバイルブレークポイントの回帰検知用。
+`viewport`のみPixel 5サイズへoverrideする構成を採用している（完全なmobile emulationではない）。
 実タッチ入力でのD&D動作確認はChrome DevToolsのデバイスエミュレーション等で手動検証する。
 
 ## 状態依存テストのリセット

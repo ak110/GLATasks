@@ -66,57 +66,67 @@
 | `make healthcheck`     | ヘルスチェック確認                                           |
 | `make ps`              | Docker Composeのサービス状態確認                             |
 
-## Docker構成
-
-サービス構成・環境変数は`compose.yaml` / `.env`を参照。
-プロファイルは`production`（既定推奨）と`development`を切り替えて使用する。
-
-## ユニット/e2eテスト実行
-
-ユニットテスト（Vitest）はコンテナ内で実行する。
-
-```bash
-make node-shell
-pnpm exec vitest run
-```
-
-テストコードは`app/src/`配下に`*.test.ts`として配置する（例: `app/src/lib/crypto.test.ts`）。
+コミット前のチェックは`make test`で実行する。`make format`は日常的な整形・lint用途に使う。
 
 e2eテスト（Playwright）は`make test-e2e`で実行する。
 `app/tests/`配下のテストをnginx経由のHTTPS（port 38180）で動作させるため、開発環境が起動している必要がある。
 テストユーザーは`app/tests/global-setup.ts`で初回自動作成される。
 
-## CI/CD
+`waitForSelector`はSSRで描画されるため即返るが、`onMount`のAPI呼び出しはまだ完了していない。
+SSE接続が常時開いているため`waitUntil: "networkidle"`は使えない。
+次のtRPCレスポンス待ちパターンで初期ロードを待つ。
 
-masterへのpushおよびPR時に`ci.yaml`が自動実行される。次の2つのjobを並列に実行する。
-
-- `test` job: `pnpm install` → `pnpm run build` → `pyfltr ci`。
-  lint・型チェック・ユニットテスト・svelte-checkをpyfltr経由で一括実行する
-- `integration` job: ランナー上に`.env`を生成し、productionイメージをローカルビルド、
- `docker compose --profile production up -d --wait`でスタックを起動して
- `make test-backup`とPlaywright e2eテストを実行する。
-  失敗時は`test-results` / `playwright-report`を`actions/upload-artifact`で保存する
-
-`integration` jobはDocker Compose環境が必要なため`test` jobと分離している。
-`compose.yaml`の`playwright`サービスには`ci`プロファイルを付与しており、
-production相当のスタックにplaywrightサービスだけ追加で起動する構成にしている。
-
-## リリース手順
-
-事前に`gh`コマンドをインストールして`gh auth login`でログインしておき、次のいずれかを実行する。
-
-```bash
-gh workflow run release.yaml --field="bump=PATCH"
-gh workflow run release.yaml --field="bump=MINOR"
-gh workflow run release.yaml --field="bump=MAJOR"
+```typescript
+await Promise.all([
+  page.goto("/"),
+  page.waitForResponse((res) => res.url().includes("/api/trpc")),
+]);
 ```
 
-`release.yaml`はmasterの`ci.yaml`成功を確認したうえでバージョンタグとリリースを作成し、
-`deploy.yaml`を起動する。
-`deploy.yaml`はDockerイメージをGHCRへプッシュしてから、
-SSHでサーバーに`make sync && make backup && make deploy`を実行する。
+## サプライチェーン攻撃対策
 
-進捗は<https://github.com/ak110/GLATasks/actions>で確認できる。
+npm / PyPIレジストリへの悪意あるパッケージ公開に対する防御として、次の方針を採用する。
+
+- `pnpm-workspace.yaml`の`minimumReleaseAge: 1440`（1日 = 1440分）で
+  公開から1日未満のnpmパッケージのインストールを禁止する。`pnpm dlx`にも適用される（pnpm 10.18以降）
+- `uv.toml`の`exclude-newer = "1 day"`でPyPIに公開されてから1日未満のパッケージのインストールを禁止する。
+  `uvx`（`uv tool run`）にも適用される
+- `.pre-commit-config.yaml`の`additional_dependencies`はpnpmを介さないため、
+  `@latest`を使わずバージョンを固定する
+- CI・Docker・`make`から呼ばれる`pnpm install`は`--frozen-lockfile`を明示する。
+  ロックファイル乖離時の再resolveを禁止して二重防御を構成する
+
+依存更新時は`make update`から呼ばれる`pnpm update --latest`を使う
+（`pnpm update`は`--frozen-lockfile`の影響を受けないため開発フローを阻害しない）。
+緊急で公開直後のパッケージが必要な場合は`pnpm-workspace.yaml`の`minimumReleaseAgeExclude`に追加する。
+
+## Docker構成
+
+サービス構成・環境変数は`compose.yaml` / `.env`を参照。
+プロファイルは`production`（既定推奨）と`development`を切り替えて使用する。
+
+## CI/CD
+
+masterへのpushおよびPR時に`ci.yaml`が自動実行される（`.github/workflows/ci.yaml`参照）。
+
+- `test` job: lint・型チェック・ユニットテスト・svelte-checkをpyfltr経由で一括実行する
+- `integration` job: Docker Composeを起動してバックアップテストとPlaywright e2eテストを実行する
+
+masterへのpushで`docs/`配下に変更があれば`docs.yaml`ワークフローが自動実行され、
+GitHub Pagesへデプロイされる。
+
+## ドキュメントサイト運用
+
+[VitePress](https://vitepress.dev/)を使用する。
+`docs/`ディレクトリ直下のMarkdownファイルがページ、`docs/.vitepress/config.ts`でサイト設定を管理する。
+
+ローカルプレビュー:
+
+```bash
+make docs
+```
+
+`http://localhost:5173/GLATasks/`でプレビューできる。
 
 ## バックアップとリストア
 
@@ -157,17 +167,19 @@ cp -p ${DATA_DIR}/backups/YYYYMMDD_HHMMSS/.secret_key ${DATA_DIR}/
 make restart-app
 ```
 
-## ドキュメントサイト運用
+## リリース手順
 
-[VitePress](https://vitepress.dev/)を使用する。
-`docs/`ディレクトリ直下のMarkdownファイルがページ、`docs/.vitepress/config.ts`でサイト設定を管理する。
-
-ローカルプレビュー:
+事前に`gh`コマンドをインストールして`gh auth login`でログインしておき、次のいずれかを実行する。
 
 ```bash
-make docs
+gh workflow run release.yaml --field="bump=PATCH"
+gh workflow run release.yaml --field="bump=MINOR"
+gh workflow run release.yaml --field="bump=MAJOR"
 ```
 
-`http://localhost:5173/GLATasks/`でプレビューできる。
+`release.yaml`はmasterの`ci.yaml`成功を確認したうえでバージョンタグとリリースを作成し、
+`deploy.yaml`を起動する。
+`deploy.yaml`はDockerイメージをGHCRへプッシュしてから、
+SSHでサーバーに`make sync && make backup && make deploy`を実行する。
 
-masterへのpush時に`docs/`配下の変更があれば`docs.yaml`ワークフローが自動実行され、GitHub Pagesにデプロイされる。
+進捗は<https://github.com/ak110/GLATasks/actions>で確認できる。

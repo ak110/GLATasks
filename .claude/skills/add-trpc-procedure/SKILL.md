@@ -12,11 +12,6 @@ description: >-
 新しいtRPC procedureを追加するときは、以下のチェックリストをTaskCreateに展開してから着手する。
 項目に漏れがあると、難読化漏れ、SSE通知漏れ、クライアント側の再取得漏れ、型不一致などの致命的なバグを招きやすい。
 
-アーキテクチャ前提は`.claude/rules/sveltekit.md`の
-「tRPC実装規約 → アーキテクチャ前提（変更禁止の制約）」節を参照する。
-対象は`encryptedProcedure`の必須範囲、SSEイベント種別、UTC規約、数値変換方針など。
-本スキルは新規追加時の作業手順に特化する。
-
 ## チェックリスト
 
 ### 1. 入出力スキーマの設計
@@ -33,8 +28,6 @@ description: >-
 - `app/src/lib/server/schema.ts`のテーブル定義と整合すること
 - 日時はUTCで保存、`sort_order`は1000刻み
 - エラーは`api/{ドメイン}.ts`内で機械可読な識別子を投げ、`trpc.ts`の`API_ERRORS`側でUI文言へ変換する
-- APIハンドラの関数引数は`Record<string, unknown>`を使わず、Zodスキーマから`z.infer`で得た型を引数に取る。
-  Drizzleの型推論が正しく機能する形を維持するため
 
 ### 3. tRPC ルーター登録
 

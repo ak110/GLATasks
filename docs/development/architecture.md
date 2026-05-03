@@ -131,17 +131,15 @@ CookieベースのJWT/HS256セッション。実装詳細は `hooks.server.ts` /
 
 ### CSRF 対策
 
-多層防御を採用:
+多層防御を採用している。
 
-- SvelteKit組み込みの `checkOrigin` でform actionを保護
-- `hooks.server.ts` で `Sec-Fetch-Site: cross-site` のミューテーションを `/api/*` でブロック（tRPCエンドポイントの保護）
-- ログアウトをPOSTに限定（GETでのCSRFを防止）
-
-### Chrome 拡張対応
+- SvelteKit組み込み機能でform actionを保護
+- カスタムリクエストヘッダーのオリジンチェックでtRPCエンドポイント（`/api/*`）のクロスサイトミューテーションをブロック
+- ログアウトをPOSTに限定（GETリクエストによるCSRFを防止するため）
 
 Chrome拡張のポップアップ内iframeからのアクセスを許可する必要があるため、
-Cookieに `sameSite: "none"` + `secure: true` を設定。
-この設定はCSRF対策を弱めるため、上記の `Sec-Fetch-Site` チェックで補完している。
+Cookieに `sameSite: "none"` + `secure: true` を設定している。
+この設定はCSRF対策を弱めるため、上記のオリジンチェックで補完している。
 
 ## DB 設計方針
 
@@ -149,7 +147,9 @@ Cookieに `sameSite: "none"` + `secure: true` を設定。
 
 - 日時カラムはすべてTIMESTAMP型でUTC保存。タイムゾーン変換はクライアント側で行い、
   サーバー・DB層ではタイムゾーンを意識しない設計
-- 並び順は `sort_order` INTカラム（昇順、1000刻み）。刻み幅を大きくすることで、挿入時に周囲のレコードを更新せずに済む
+- 並び順は `sort_order` INTカラム（昇順、1000刻み）。刻み幅を大きくすることで、挿入時に周囲のレコードを更新せずに済む。
+  ドメインごとの挿入位置: タスク（`tasks.create`）は `sort_order = 既存最小値 - 1000` で先頭挿入、
+  タイマー（`timers.create`）は `sort_order = 既存最大値 + 1000` で末尾追加
 - タイマーの残り時間はサーバー側で計算せず、`remaining_seconds` と `started_at` をクライアントに渡して
   ブラウザ側で計算する。これにより秒単位のリアルタイム表示をポーリングなしで実現する
 - タイマーの `ephemeral` カラムは1回限りの使い切りタイマーを識別するフラグ。

@@ -20,9 +20,9 @@
 ## 前提条件
 
 本アプリはセルフホスト型であり、Docker Composeが動作する環境が必要となる。
-セットアップ手順やシステム要件の詳細は[ドキュメントサイト](https://ak110.github.io/GLATasks/)を参照。
+セットアップ手順やシステム要件の詳細は[はじめに](https://ak110.github.io/GLATasks/guide/getting-started)を参照。
 
 ## ドキュメント
 
-- <https://ak110.github.io/GLATasks/> — 概要・使い方・セルフホスト手順
+- <https://ak110.github.io/GLATasks/guide/getting-started> — はじめに（セルフホスト手順）
 - [docs/development/development.md](docs/development/development.md) — 開発者向け情報
