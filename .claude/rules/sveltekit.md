@@ -135,7 +135,7 @@ builderを使わず手動で記述してよい（`lists.merge`のような複数
 ### tRPC クライアントの戻り値型
 
 tRPCの戻り値型は`AppRouter`から推論する。
-`inferRouterOutputs<AppRouter>`から導出した`RouterOutputs`型を使い、
+`inferRouterOutputs<AppRouter>`から推論される`RouterOutputs`型を使い、
 `as Promise<T>`等のキャストを書いた場合は型不整合の兆候として扱い、根本原因を調査する。
 
 ## D&D 並び替えユーティリティ

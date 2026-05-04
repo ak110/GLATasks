@@ -27,7 +27,7 @@ description: >-
   DB操作関数を追加する。Drizzle ORMを使用する
 - `app/src/lib/server/schema.ts`のテーブル定義と整合すること
 - 日時はUTCで保存、`sort_order`は1000刻み
-- エラーは`api/{ドメイン}.ts`内で機械可読な識別子を投げ、`trpc.ts`の`API_ERRORS`側でUI文言へ変換する
+- エラーは`api/{ドメイン}.ts`内で機械可読な識別子を送出し、`trpc.ts`の`API_ERRORS`側でUI文言へ変換する
 
 ### 3. tRPC ルーター登録
 

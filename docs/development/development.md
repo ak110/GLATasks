@@ -97,7 +97,7 @@ npm / PyPIレジストリへの悪意あるパッケージ公開に対する防�
   ロックファイル乖離時の再resolveを禁止して二重防御を構成する
 
 依存更新時は`make update`から呼ばれる`pnpm update --latest`を使う
-（`pnpm update`は`--frozen-lockfile`の影響を受けないため開発フローを阻害しない）。
+（`pnpm update`は`--frozen-lockfile`の影響対象外のため開発フローを阻害しない）。
 緊急で公開直後のパッケージが必要な場合は`pnpm-workspace.yaml`の`minimumReleaseAgeExclude`に追加する。
 
 ## Docker構成

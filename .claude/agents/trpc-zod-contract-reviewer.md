@@ -40,7 +40,7 @@ GLATasksのtRPC + Zod + Drizzle + TanStack Query + SSE経路を縦断的にレ�
    - `pick` / `omit` で既存スキーマを再利用できる箇所で重複定義していないか
 3. SSE通知の抜け漏れ
    - mutation後に `sendEvent` を呼び忘れていないか
-   - 呼ぶイベント種別が正しいか（`lists.clear` のようにtasksを消す操作は `tasks:updated` を送る、など）
+   - 呼ぶイベント種別が正しいか（`lists.clear` のようにtasksを削除する操作は `tasks:updated` を送る、など）
    - 複数ドメインに影響するmutation (`lists.merge` 等) で必要な全イベントが送られているか
    - `ctx.tabId` を忘れず渡しているか（自タブへの重複配信防止）
 4. クライアント側 `invalidateQueries`
@@ -54,7 +54,7 @@ GLATasksのtRPC + Zod + Drizzle + TanStack Query + SSE経路を縦断的にレ�
    - `encryptedProcedure` 以外のルートで平文データを返していないか
    - エラー経路 (`TRPCError` の `message`) に機微情報を含めていないか
 7. エラーマッピング
-   - `api.ts` から投げる機械可読な識別子 (`not_found_or_forbidden` 等) を増やした場合、
+   - `api.ts` から送出する機械可読な識別子 (`not_found_or_forbidden` 等) を増やした場合、
      `trpc.ts` の `API_ERRORS` に対応エントリが追加されているか
 8. テスト
    - 新規procedureに対するVitestユニットテストが `app/src/**/*.test.ts` に、

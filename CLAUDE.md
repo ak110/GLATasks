@@ -21,7 +21,7 @@ SvelteKit + tRPC + Drizzleで構築し、Docker Composeで運用する。
     - 例: `uvx pyfltr run-for-agent --commands=eslint,prettier path/to/file.ts`
   - 利用可能なコマンドは`pyproject.toml`の`[tool.pyfltr]`設定とJS/TS連携で有効になるもの。
     例: `eslint`・`prettier`・`oxlint`・`vitest`・カスタムコマンドの`svelte-check`
-  - バックアップ/E2E系に変更を入れた場合は`make test-backup test-e2e`も実行する
+  - バックアップ/E2E系に変更を加えた場合は`make test-backup test-e2e`も実行する
   - 注意: 本プロジェクトのDocker Compose環境は開発マシン上で常時稼働している。
     `make test`（backup/e2eテスト含む）は問題なく実行可能。
     `uvx pyfltr run-for-agent`を使うのはJSON Lines出力で診断結果を効率的に解釈するためであり、
