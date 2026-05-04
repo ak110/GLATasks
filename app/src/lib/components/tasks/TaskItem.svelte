@@ -73,7 +73,7 @@
     }
 
     function copyAll() {
-        copyText(task.notes ? `${task.title}\n${task.notes}` : task.title);
+        copyText(task.notes ? `${task.title}\n\n${task.notes}` : task.title);
     }
     function copyTitle() {
         copyText(task.title);

@@ -149,6 +149,40 @@ test.describe("tasks", () => {
     expect(copied).toBe(title);
   });
 
+  test("コピーメニューで全体をコピーするとタイトルとボディが空行で区切られる", async ({
+    page,
+  }) => {
+    const title = `全体コピー_${Date.now()}`;
+    const notes = "ノート部分";
+    await page.fill(
+      'textarea[placeholder*="タスクを追加"]',
+      `${title}\n${notes}`,
+    );
+    await page.click('[data-testid="task-add-form"] button[type="submit"]');
+
+    const taskRow = page
+      .locator('[data-testid="task-item"]')
+      .filter({ hasText: title });
+    await taskRow.waitFor({ timeout: 15000 });
+
+    await page
+      .context()
+      .grantPermissions(["clipboard-read", "clipboard-write"]);
+
+    await taskRow
+      .locator('[data-testid="task-copy-btn"]')
+      .dispatchEvent("click");
+    await taskRow
+      .locator('[data-testid="task-copy-menu"]')
+      .waitFor({ timeout: 15000 });
+    await taskRow
+      .locator('[data-testid="task-copy-all"]')
+      .dispatchEvent("click");
+
+    const copied = await page.evaluate(() => navigator.clipboard.readText());
+    expect(copied).toBe(`${title}\n\n${notes}`);
+  });
+
   test("新規タスクにタグを付けると一覧にバッジが表示される", async ({
     page,
   }) => {
