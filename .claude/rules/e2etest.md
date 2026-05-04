@@ -70,6 +70,21 @@ SSEイベントを受信しない状態を再現する場合は、
 ネスト時に外側ダイアログのボタンを誤選択しないよう、`role="dialog"`スコープでlocatorを構築する。
 複数候補がある場合は`.last()`で最前面のダイアログを取り出す。
 
+### クリップボード操作
+
+クリップボードを使うテストでは、操作前に権限を付与してから`navigator.clipboard.readText()`で検証する。
+
+```typescript
+await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+await taskRow.locator('[data-testid="task-copy-btn"]').dispatchEvent("click");
+await taskRow
+  .locator('[data-testid="task-copy-menu"]')
+  .waitFor({ timeout: 15000 });
+await taskRow.locator('[data-testid="task-copy-all"]').dispatchEvent("click");
+const copied = await page.evaluate(() => navigator.clipboard.readText());
+expect(copied).toBe(`${title}\n\n${notes}`);
+```
+
 ## モバイルテスト
 
 `playwright.config.ts`の`mobile-chrome`プロジェクトはモバイルブレークポイントの回帰検知用。

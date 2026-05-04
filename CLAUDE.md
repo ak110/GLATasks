@@ -56,3 +56,6 @@ Biomeへの移行は次の阻害要因により見送っている。
   - `make healthcheck`はホスト直接 → コンテナ経由の順にフォールバックする
 - 現在の`COMPOSE_PROFILE`を確認したいときは`make -n deploy`のドライラン出力で判別できる。
   `.env`を直接読めないことがあるため
+- 特定のe2eテストだけを実行したい場合、`make test-e2e`はフィルタ引数を受け付けない。
+  `make -n test-e2e`でドライラン展開した`docker compose`コマンドを直接呼び、
+  末尾の`pnpm run test:e2e`を`pnpm exec playwright test -g "パターン"`へ差し替える
