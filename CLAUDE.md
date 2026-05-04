@@ -17,7 +17,7 @@ SvelteKit + tRPC + Drizzleで構築し、Docker Composeで運用する。
 
 - コミット前の検証方法: `uvx pyfltr run-for-agent`
   - ドキュメントなどのみの変更の場合は省略可（pre-commitで実行されるため）
-  - 修正後の再実行時は、対象ファイルや対象ツールを必要に応じて絞って実行する（最終検証はCIに委ねる前提）
+  - 修正後の再実行時は、対象ファイルや対象ツールを必要に応じて限定して実行する（最終検証はCIに委ねる前提）
     - 例: `uvx pyfltr run-for-agent --commands=eslint,prettier path/to/file.ts`
   - 利用可能なコマンドは`pyproject.toml`の`[tool.pyfltr]`設定とJS/TS連携で有効になるもの。
     例: `eslint`・`prettier`・`oxlint`・`vitest`・カスタムコマンドの`svelte-check`
@@ -55,7 +55,7 @@ Biomeへの移行は次の阻害要因により見送っている。
   - `docker compose --profile=development exec web curl -fLk https://localhost/`
   - `make healthcheck`はホスト直接 → コンテナ経由の順にフォールバックする
 - 現在の`COMPOSE_PROFILE`を確認したいときは`make -n deploy`のドライラン出力で判別できる。
-  `.env`を直接読めないことがあるため
+  `.env`を直接読み取れないことがあるため
 - 特定のe2eテストだけを実行したい場合、`make test-e2e`はフィルタ引数を受け付けない。
   `make -n test-e2e`でドライラン展開した`docker compose`コマンドを直接呼び、
   末尾の`pnpm run test:e2e`を`pnpm exec playwright test -g "パターン"`へ差し替える

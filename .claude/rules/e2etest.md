@@ -19,7 +19,7 @@ paths:
 SvelteKitのhydration完了を待つには、次のtRPCレスポンス待ちパターンを使う。
 
 `waitForSelector`はSSRで描画されるため即返るが、`onMount`のAPI呼び出しはまだ完了していない。
-SSE接続が常時開いているため`waitUntil: "networkidle"`は使えない。
+SSE接続が常時開いているため`waitUntil: "networkidle"`は利用できない。
 
 ```typescript
 await Promise.all([

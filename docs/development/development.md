@@ -73,7 +73,7 @@ e2eテスト（Playwright）は`make test-e2e`で実行する。
 テストユーザーは`app/tests/global-setup.ts`で初回自動作成される。
 
 `waitForSelector`はSSRで描画されるため即返るが、`onMount`のAPI呼び出しはまだ完了していない。
-SSE接続が常時開いているため`waitUntil: "networkidle"`は使えない。
+SSE接続が常時開いているため`waitUntil: "networkidle"`は利用できない。
 次のtRPCレスポンス待ちパターンで初期ロードを待つ。
 
 ```typescript
