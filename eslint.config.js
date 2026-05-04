@@ -11,6 +11,18 @@ export default [
     languageOptions: {
       globals: { ...globals.browser, ...globals.node },
     },
+    rules: {
+      // `_` プレフィックス付きの引数・変数・catchハンドラは意図的な未使用としてlint対象外にする
+      // （TypeScript/typescript-eslintコミュニティの一般的慣例）
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+          caughtErrorsIgnorePattern: "^_",
+        },
+      ],
+    },
   },
   {
     files: ["**/*.svelte", "**/*.svelte.ts", "**/*.svelte.js"],
@@ -26,7 +38,6 @@ export default [
     ignores: [
       "app/.svelte-kit/**",
       "app/build/**",
-      "app/tests/**",
       "node_modules/**",
       ".cache/**",
       "docs/**",

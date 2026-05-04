@@ -31,7 +31,7 @@ repos:
         language: system
       - id: vitepress-build
         name: VitePress build
-        entry: bash -c 'cd docs && pnpm build'
+        entry: bash -c 'CI=1 pnpm --dir=docs run build'
         language: system
         pass_filenames: false
         files: ^docs/.*\.(md|ts|json)$|^docs/\.vitepress/

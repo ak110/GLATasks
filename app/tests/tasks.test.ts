@@ -3,7 +3,7 @@
  */
 
 import { test, expect } from "@playwright/test";
-import { BASE_URL, setupTestList, cleanupTestList } from "./helpers/common";
+import { setupTestList, cleanupTestList } from "./helpers/common";
 
 const LIST_NAME = `タスクテスト_${Date.now()}`;
 

@@ -21,7 +21,6 @@ tsc = false
 extend-exclude = [
     "app/.svelte-kit",
     "app/build",
-    "app/tests",
     # app/package.json はルート package.json へのシンボリックリンク。
     # prettier は明示的に指定されたシンボリックリンクを拒否するため、
     # pyfltr 側のファイル列挙時点で除外する。
