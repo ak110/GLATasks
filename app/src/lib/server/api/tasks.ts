@@ -238,7 +238,7 @@ export async function reorderTasks(
   await getOwnedList(listId, userId);
   const db = getDb();
   // taskIds の順に sort_order を 0, 1000, 2000... で再割当
-  // 依存関係のないタスクの更新を並列実行し RTT の線形積み上がりを回避する
+  // 依存関係のないタスクを並列更新し、直列実行による RTT の線形増大を回避する
   await Promise.all(
     taskIds.map((id, i) =>
       db

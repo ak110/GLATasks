@@ -484,7 +484,7 @@ export async function reorderTimers(
     throw new Error("invalid_timer_ids");
   }
   // timerIds の順に sort_order を 0, 1000, 2000... で再割当
-  // 依存関係のないタイマーの更新を並列実行し RTT の線形積み上がりを回避する
+  // 依存関係のないタイマーを並列更新し、直列実行による RTT の線形増大を回避する
   await Promise.all(
     timerIds.map((id, i) =>
       db

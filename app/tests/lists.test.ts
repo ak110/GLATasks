@@ -6,7 +6,7 @@ import { test, expect } from "@playwright/test";
 
 test.describe("lists", () => {
   test.beforeEach(async ({ page }) => {
-    // SSE 接続が常時開いているため networkidle は使えない。
+    // SSE 接続が常時開いているため networkidle は利用できない。
     // goto + 初回 tRPC レスポンス待ちで hydration + データ取得完了を確保する。
     await Promise.all([
       page.goto("/"),

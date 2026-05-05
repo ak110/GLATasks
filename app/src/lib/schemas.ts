@@ -136,7 +136,7 @@ export const CreateTimerSchema = z
       .min(1)
       .max(999)
       .default(TIMER_DEFAULT_ADJUST_MINUTES),
-    // 使い切り (1 回限り) タイマー。満了時に削除ボタンを強調し、確認ダイアログを省略する
+    // 1回限りのタイマー。満了時に削除ボタンを強調し、確認ダイアログを省略する
     ephemeral: z.boolean().default(false),
     // 期限切れ後に利用者が止めるまでビープを鳴らし続けるかどうか
     keep_ringing: z.boolean().default(TIMER_DEFAULT_KEEP_RINGING),

@@ -22,7 +22,7 @@ async function deleteTimerCard(page: Page, card: Locator, skipConfirm = false) {
 
 test.describe("timers", () => {
   test.beforeEach(async ({ page }) => {
-    // SSE 接続が常時開いているため networkidle は使えない
+    // SSE 接続が常時開いているため networkidle は利用できない
     await Promise.all([
       page.goto("/timers"),
       page.waitForResponse((res) => res.url().includes("/api/trpc")),
@@ -326,7 +326,7 @@ test.describe("timers", () => {
         .filter({ hasText: timerName });
       await expect(cardA).toBeVisible({ timeout: 10000 });
 
-      // B でタイマー一覧を初期ロード (この時点ではタイマーが見える)
+      // B でタイマー一覧を初期ロード（この時点でタイマーが表示されている）
       await Promise.all([
         pageB.goto("/timers"),
         pageB.waitForResponse((res) => res.url().includes("/api/trpc")),
@@ -424,7 +424,7 @@ test.describe("timers", () => {
   test("鳴り続けオプションと既定値保存が機能する", async ({ page }) => {
     const timerName = `鳴り続け_${Date.now()}`;
 
-    // 既定値テストは前回テスト失敗時の状態が残ると壊れるため、
+    // 既定値テストは前回テスト失敗時の状態が残ると誤判定するため、
     // 冒頭で確実にOFFへリセットしてから本題に入る
     const checkbox = page.locator('[data-testid="timer-keep-ringing-input"]');
     await page.click('[data-testid="timer-add-btn"]');

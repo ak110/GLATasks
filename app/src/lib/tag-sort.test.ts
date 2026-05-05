@@ -11,7 +11,7 @@ function makeTag(name: string): TagInfo {
 }
 
 describe("compareTagName", () => {
-  it("ASCII大文字は小文字より前に来る（コード順）", () => {
+  it("ASCII大文字は小文字より前に並ぶ（コード順）", () => {
     const sorted = [
       makeTag("banana"),
       makeTag("Apple"),
@@ -43,7 +43,7 @@ describe("compareTagName", () => {
     expect(sorted.map((t) => t.name)).toEqual(["あ", "い", "う"]);
   });
 
-  it("先頭が同じで長さが異なる場合は短い方が前に来る", () => {
+  it("先頭が同じで長さが異なる場合は短い方が前に並ぶ", () => {
     const sorted = [makeTag("abc"), makeTag("ab"), makeTag("abcd")].sort(
       compareTagName,
     );

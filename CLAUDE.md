@@ -2,7 +2,6 @@
 
 タスク管理・カウントダウンタイマー・アラームを統合したWeb/PWAアプリ。
 SvelteKit + tRPC + Drizzleで構築し、Docker Composeで運用する。
-本ファイルはClaude Code向けにコーディング規約・設計判断・実装上の注意点を集約する。
 
 ## 開発手順
 
@@ -47,7 +46,7 @@ Biomeへの移行は次の阻害要因により見送っている。
 
 ## 注意点
 
-- 本リポジトリはSvelte 5、Tailwind v4、tRPC v11、Vite 8など比較的新しいメジャーバージョンを使用している。
+- 本プロジェクトはSvelte 5、Tailwind v4、tRPC v11、Vite 8など比較的新しいメジャーバージョンを使用している。
   ライブラリ仕様を確認する際はcontext7 MCPなどで最新版のドキュメントを参照する
 - 開発環境はDocker Composeで動作する。ホストから`localhost:3000`に直接アクセスできない場合は次のいずれかを使う
   - nginx経由: `curl -k https://localhost:38180/healthcheck`

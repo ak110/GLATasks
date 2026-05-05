@@ -2,7 +2,6 @@
  * @fileoverview D&D による並び替えロジック共通ユーティリティ（Svelte 5 rune ベース）
  *
  * Pointer Events API で実装し、マウス・タッチ・ペンを単一コードパスで扱う。
- * TaskList および TimerCard 一覧で重複していた D&D 状態管理と操作関数をここに集約する。
  *
  * 呼び出し側コンポーネントの規約:
  *
@@ -103,7 +102,7 @@ export function createDragReorder<T extends Orderable>(
 
   /**
    * pointermove ハンドラ。
-   * 閾値超過で isActive を立て、座標から hit-testing で対象アイテムと before/after を判定する。
+   * 閾値超過で isActive を true にし、座標から hit-testing で対象アイテムと before/after を判定する。
    */
   function handlePointerMove(event: PointerEvent) {
     if (draggedId === null) return;

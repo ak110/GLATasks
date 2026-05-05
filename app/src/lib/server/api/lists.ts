@@ -90,8 +90,7 @@ export async function deleteList(
   // 冪等な削除: 対象が無い・他ユーザーのものは no-op (NOT_FOUND を返さない)。
   // 別端末で先に削除されていた場合のレース時に、こちらの削除がエラーにならず
   // クライアントの状態を確実に整合させるため。
-  // schema.ts に ON DELETE CASCADE が無いため、子テーブル (tasks) を明示削除する
-  // 既存の 2 段構成は維持する。
+  // schema.ts に ON DELETE CASCADE が無いため、子テーブル (tasks) を明示削除する。
   const db = getDb();
   const owned = await db
     .select({ id: lists.id })

@@ -38,7 +38,7 @@ function makeRowElement(id: number, rect = { top: 100, height: 100 }) {
   return el;
 }
 
-/** 必要な最小フィールドを持つ PointerEvent 風オブジェクトを作る（DragOver レガシー API 用） */
+/** 必要な最小フィールドを持つ PointerEvent 風オブジェクトを生成する（DragOver レガシー API 用） */
 function makeOverEvent(
   currentTarget: HTMLElement,
   clientY: number,
@@ -49,7 +49,7 @@ function makeOverEvent(
   } as unknown as PointerEvent;
 }
 
-/** ハンドル要素に対する pointerdown を模した PointerEvent 風オブジェクトを作る */
+/** ハンドル要素に対する pointerdown を模した PointerEvent 風オブジェクトを生成する */
 function makeStartEvent(
   handle: Element,
   clientX: number,

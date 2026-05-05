@@ -63,7 +63,7 @@ const loopHandles = new Map<number, LoopHandle>();
 /**
  * 指定タイマーIDに対しビープをループ再生する。
  * 既にループ中の場合は何もしない（多重起動防止）。
- * AudioContext が無い環境では警告を出して終了する。
+ * AudioContext が無い環境では警告を出力して終了する。
  */
 export function startLoopBeep(timerId: number): void {
   if (loopHandles.has(timerId)) return;

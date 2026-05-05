@@ -14,7 +14,6 @@ export type RouterOutputs = inferRouterOutputs<AppRouter>;
 // タブ固有のID（SSEイベントの発信元識別に使用）
 export const tabId = crypto.randomUUID();
 
-// 暗号化鍵を保持するグローバル変数
 let encryptKey: string | null = null;
 
 /**
@@ -25,7 +24,7 @@ export function setEncryptKey(key: string) {
 }
 
 /**
- * 暗号化リンク: リクエストを暗号化し、レスポンスを復号化する
+ * 暗号化リンク: リクエストを暗号化し、レスポンスを復号する
  */
 const encryptionLink: TRPCLink<AppRouter> = () => {
   return ({ next, op }) => {
@@ -89,7 +88,7 @@ const encryptionLink: TRPCLink<AppRouter> = () => {
 };
 
 /**
- * リクエスト暗号化用のfetch wrapper
+ * リクエストを暗号化するfetch wrapper
  */
 async function encryptedFetch(
   url: RequestInfo | URL,
@@ -125,7 +124,6 @@ async function encryptedFetch(
           body: JSON.stringify(encryptedBatch),
         };
       } else if (bodyObj.input !== undefined) {
-        // 単一リクエストの場合
         const encryptedInput = await encrypt(
           JSON.stringify(bodyObj.input),
           encryptKey,

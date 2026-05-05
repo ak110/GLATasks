@@ -1,9 +1,5 @@
 # 開発手順
 
-本リポジトリの開発で必要となるツールチェイン・コマンド・ワークフローを説明する。
-コーディング規約や設計判断はClaude Code向け資料に集約しているため、
-本書からは外部開発者向けの手順情報のみを扱う。
-
 ## 開発環境の構築手順
 
 ### 必要環境
@@ -18,14 +14,14 @@
 すべての`make`コマンドはプロジェクトルートから実行する
 （`app/`へ移動して実行すると`${PWD}`がずれてMakefile内のパス解決が誤動作する）。
 
-1. 本リポジトリをcloneする
-2. uvをインストールする
+1. 本リポジトリをclone
+2. uvをインストール
 
    ```bash
    curl -LsSf https://astral.sh/uv/install.sh | sh
    ```
 
-3. `.env-example`を`.env`にコピーして環境変数を設定する
+3. `.env-example`を`.env`にコピーして環境変数を設定
 
    ```bash
    cp .env-example .env
@@ -33,15 +29,15 @@
 
    `COMPOSE_PROFILE`・`DATA_DIR`・`UID`・`GID`を環境に合わせて編集する
 
-4. 開発環境のセットアップを実行する
+4. 開発環境のセットアップを実行
 
    ```bash
    make setup
    ```
 
-   pre-commitフックをインストールし、`.gitmessage`を`commit.template`へ登録する
+   pre-commitフックをインストールし、`.gitmessage`をコミットテンプレートとして登録する
 
-5. 起動する
+5. 起動
 
    ```bash
    make deploy
@@ -113,7 +109,7 @@ npm / PyPIレジストリへの悪意あるパッケージ公開に対する防�
 ## Docker構成
 
 サービス構成・環境変数は`compose.yaml` / `.env`を参照。
-プロファイルは`production`（既定推奨）と`development`を切り替えて使用する。
+プロファイルは`production`（既定推奨）と`development`の2種類がある。
 
 ## CI/CD
 
@@ -179,7 +175,7 @@ make restart-app
 
 ## リリース手順
 
-事前に`gh`コマンドをインストールして`gh auth login`でログインしておき、次のいずれかを実行する。
+事前に`gh`コマンドをインストールして`gh auth login`でログインしておく。次のいずれかを実行。
 
 ```bash
 gh workflow run release.yaml --field="bump=PATCH"

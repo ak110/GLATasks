@@ -99,8 +99,8 @@ Tailwind CSS v4の `@custom-variant dark` を使用。`<html>` に `.dark` ク�
 
 ### アーキテクチャ前提（変更禁止の制約）
 
-本節はtRPC v11 + Zod v3経路全体の前提条件のSSOT。
-`add-trpc-procedure`スキル・`trpc-zod-contract-reviewer`エージェントは本節を参照する。
+tRPC v11 + Zod v3経路全体の前提条件。
+`add-trpc-procedure`スキルおよび`trpc-zod-contract-reviewer`エージェントはこの制約に従う。
 
 - ルーター本体は現状`app/src/lib/server/trpc.ts`単一だが、
   将来`app/src/lib/server/routers/**/*.ts`配下に分割される可能性がある。

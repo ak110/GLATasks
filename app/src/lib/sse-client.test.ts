@@ -1,7 +1,7 @@
 /**
  * @fileoverview SSE クライアントのユニットテスト
  *
- * EventSource は環境に存在しないためモックを差し込む。
+ * EventSource は環境に存在しないためモックを注入する。
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";

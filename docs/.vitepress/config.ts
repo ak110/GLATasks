@@ -17,8 +17,8 @@ export default defineConfig({
         text: 'ガイド',
         items: [
           { text: 'はじめに', link: '/guide/getting-started' },
-          { text: 'Chrome 拡張機能', link: '/guide/chrome-extension' },
-          { text: 'Android 共有', link: '/guide/android-share' },
+          { text: 'Chrome拡張機能', link: '/guide/chrome-extension' },
+          { text: 'Android共有', link: '/guide/android-share' },
         ],
       },
       {

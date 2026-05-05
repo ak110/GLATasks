@@ -1,10 +1,9 @@
 # Save To GLATasks Chrome拡張機能
 
-現在のページのタイトルとURLをGLATasksに保存するためのChrome拡張機能。
+現在のページのタイトルとURLをGLATasksに保存するChrome拡張機能の開発者向け情報。
 
-エンドユーザー向けのインストール手順・使い方は
+利用者向けのインストール手順・使い方は
 [docs/guide/chrome-extension.md](../docs/guide/chrome-extension.md)を参照。
-本READMEは拡張機能を改修・配布するための開発者向け情報を扱う。
 
 ## 重要な設定
 
