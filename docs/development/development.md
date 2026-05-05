@@ -25,13 +25,23 @@
    curl -LsSf https://astral.sh/uv/install.sh | sh
    ```
 
-3. pre-commitフックをインストールする
+3. `.env-example`を`.env`にコピーして環境変数を設定する
 
    ```bash
-   uvx pre-commit install
+   cp .env-example .env
    ```
 
-4. 起動する
+   `COMPOSE_PROFILE`・`DATA_DIR`・`UID`・`GID`を環境に合わせて編集する
+
+4. 開発環境のセットアップを実行する
+
+   ```bash
+   make setup
+   ```
+
+   pre-commitフックをインストールし、`.gitmessage`を`commit.template`へ登録する
+
+5. 起動する
 
    ```bash
    make deploy

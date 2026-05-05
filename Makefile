@@ -28,6 +28,10 @@ RUN_NODE = docker run $(2) \
 help:
 	@cat Makefile
 
+setup:  # 開発環境のセットアップ
+	uvx pre-commit install
+	git config --local commit.template .gitmessage
+
 sync:  # 最新化と各種更新
 	docker pull node:lts
 	git fetch --prune
@@ -182,4 +186,4 @@ test-e2e:
 			pnpm install --frozen-lockfile && pnpm run test:e2e\
 		'
 
-.PHONY: help sync backup deploy build start stop restart-app logs ps healthcheck shell node-shell update update-actions format test test-unit test-backup test-e2e start-app logs-app migrate db-studio docs
+.PHONY: help setup sync backup deploy build start stop restart-app logs ps healthcheck shell node-shell update update-actions format test test-unit test-backup test-e2e start-app logs-app migrate db-studio docs
