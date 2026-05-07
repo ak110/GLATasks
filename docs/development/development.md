@@ -43,6 +43,43 @@
    make deploy
    ```
 
+## DBマイグレーション運用
+
+### 自動適用
+
+appサービスは`migrate`サービス（開発プロファイルでは`migrate-dev`サービス）に
+`service_completed_successfully`で依存している。
+そのため`make deploy`（`docker compose up`）の起動時にマイグレーションが自動適用され、
+別途`make migrate`を実行しなくても新規migrationが反映される。
+
+`make migrate`は稼働中のappを止めずに即座にマイグレーションを反映したい場合に使う。
+
+### マイグレーションファイルの追加
+
+新規スキーマ変更は必ずdrizzle-kitの`pnpm run db:generate`経由で生成する。
+`drizzle/migrations/meta/_journal.json`に追記される`when`値（UNIXミリ秒）は直前エントリより大きくなければならない。
+drizzle-orm migratorは`__drizzle_migrations`テーブルに記録した最新の`created_at`より
+大きい`when`を持つentryのみ適用するため、過去日時のentryはskipされて反映漏れになる。
+別ブランチで生成したmigrationのmergeで順序が逆転する場合は、新しい側の`when`を再生成し直してからcommitする。
+
+### 履歴整合のリカバリー
+
+DBが手動修正等で半端な状態になり、マイグレーションが失敗または重複適用される場合は、
+`make sql`（dbコンテナのmariadbクライアント）から次の手順で`__drizzle_migrations`テーブルと
+実DB状態を整合させる。
+
+1. 適用済みでない（未適用扱いに戻したい）migrationの記録を削除する
+
+   ```sql
+   DELETE FROM __drizzle_migrations WHERE created_at >= <対象when値>;
+   ```
+
+2. DB側の実スキーマが対象migrationを既に反映している場合は、
+   `ALTER TABLE`等で当該migrationのSQLを巻き戻すか、逆に整合する状態に揃える
+3. 再起動して自動適用に委ねる
+
+整合手順を実行する前に必ず`make backup`を取得する。
+
 ## 開発コマンド
 
 ```bash

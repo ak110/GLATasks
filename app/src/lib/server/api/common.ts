@@ -72,6 +72,8 @@ export function serializeTags(value: TagInfo[]): string {
 
 // ── タスクの title/notes 分割 ──
 
+// SSOTは $lib/text-split.ts。サーバー・クライアント両方から参照されるため
+// このファイルでは re-export のみとし、片側で再実装しない。
 export { splitTitle, splitNotes } from "$lib/text-split";
 
 // ── DB 更新ヘルパー ──

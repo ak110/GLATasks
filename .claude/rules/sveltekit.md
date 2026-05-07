@@ -95,6 +95,25 @@ Tailwind CSS v4の `@custom-variant dark` を使用。`<html>` に `.dark` ク�
   タイトルが存在する場合は見出し要素に `id` を振り `aria-labelledby` で参照し、
   タイトルが無い場合は `aria-label` を併記する。
 
+## TanStack Query 楽観的更新
+
+楽観追加・更新するリストの`{#each}` keyには`id`を直接渡さず、
+仮IDから実IDへ書き換わっても変わらない安定フィールド（`_key`等）を渡す。
+Svelteはkey値の変化でコンポーネントインスタンスを再生成するため、
+`id`を直接keyに渡すと、サーバー応答で実IDに置き換わったタイミングでメニュー開閉等の`$state`が初期化される。
+
+型定義は`app/src/lib/types.ts`の`TaskListItem._key`を参照する。
+リスト側の使用例は`app/src/lib/components/tasks/TaskList.svelte`の`{#each tasks as task (task._key)}`にある。
+
+## サーバー・クライアント共有モジュール
+
+サーバー・クライアント両方から参照する純粋関数は`$lib`直下に置き、
+サーバー固有モジュール（`$lib/server/api/common.ts`等）からはre-exportのみを行う。
+片側に再実装するとロジック乖離の温床になる。
+
+代表例: タスクテキスト分割の`splitTitle` / `splitNotes`は`$lib/text-split.ts`がSSOT。
+`$lib/server/api/common.ts`はre-exportのみ。
+
 ## tRPC 実装規約
 
 ### アーキテクチャ前提（変更禁止の制約）
