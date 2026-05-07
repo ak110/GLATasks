@@ -8,6 +8,7 @@ import {
   CreateListSchema,
   CreateTaskSchema,
   CreateTimerSchema,
+  GetActiveTasksSchema,
   GetListTasksSchema,
   MergeListSchema,
   RegisterUserSchema,
@@ -347,11 +348,26 @@ export const appRouter = t.router({
         );
       }),
 
-    create: encryptedProcedure.input(CreateTaskSchema).mutation(
-      eventMutationHandler(SSE_EVENTS.tasksUpdated, async ({ ctx, input }) => {
-        await api.postTask(ctx.userId, input.listId, input.text, input.tags);
+    listActive: encryptedProcedure
+      .input(GetActiveTasksSchema)
+      .query(async ({ ctx, input }) => {
+        const since = input.since ? new Date(input.since) : undefined;
+        return api.getActiveTasks(ctx.userId, since);
       }),
-    ),
+
+    // 戻り値に taskId を含めるため eventMutationHandler は使わず直接 sendEvent を呼ぶ
+    create: encryptedProcedure
+      .input(CreateTaskSchema)
+      .mutation(async ({ ctx, input }) => {
+        const taskId = await api.postTask(
+          ctx.userId,
+          input.listId,
+          input.text,
+          input.tags,
+        );
+        sendEvent(ctx.userId, SSE_EVENTS.tasksUpdated, ctx.tabId);
+        return { success: true as const, taskId };
+      }),
 
     update: encryptedProcedure.input(UpdateTaskSchema).mutation(
       eventMutationHandler(SSE_EVENTS.tasksUpdated, async ({ ctx, input }) => {

@@ -224,6 +224,13 @@ export const LoginSchema = z.object({
   password: z.string().min(1),
 });
 
+// ── 差分syncスキーマ ──
+
+/** 全アクティブタスク取得（差分 sync 対応）の入力スキーマ */
+export const GetActiveTasksSchema = z.object({
+  since: z.string().datetime().optional(),
+});
+
 // ── リスト統合スキーマ ──
 
 export const MergeListSchema = z.object({
@@ -268,3 +275,4 @@ export type MergeListInput = z.infer<typeof MergeListSchema>;
 export type ReorderTimersInput = z.infer<typeof ReorderTimersSchema>;
 export type RegisterUserInput = z.infer<typeof RegisterUserSchema>;
 export type LoginInput = z.infer<typeof LoginSchema>;
+export type GetActiveTasksInput = z.infer<typeof GetActiveTasksSchema>;

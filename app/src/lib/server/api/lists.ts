@@ -64,7 +64,7 @@ export async function clearList(userId: number, listId: number): Promise<void> {
   const db = getDb();
   await db
     .update(tasks)
-    .set({ status: "archived" })
+    .set({ status: "archived", updated: new Date() })
     .where(and(eq(tasks.list_id, listId), eq(tasks.status, "completed")));
   await touchListUpdated(listId);
 }

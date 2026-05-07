@@ -23,11 +23,14 @@ export {
 export type {
   TagInfo,
   TaskInfo,
+  TaskListItem,
   SearchTaskResult,
   GetTasksResult,
+  GetActiveTasksResult,
 } from "./api/tasks";
 export {
   getListTasks,
+  getActiveTasks,
   postTask,
   patchTask,
   searchTasks,

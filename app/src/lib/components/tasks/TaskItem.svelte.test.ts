@@ -8,16 +8,22 @@
 import { render, screen } from "@testing-library/svelte";
 import { describe, expect, it, vi } from "vitest";
 
+import type { TaskListItem } from "$lib/types";
 import TaskItem from "./TaskItem.svelte";
 
 /** テスト用タスクデータのデフォルト値 */
-function makeTask(overrides?: object) {
+function makeTask(overrides: Partial<TaskListItem> = {}): TaskListItem {
+  const id = overrides.id ?? 1;
   return {
-    id: 1,
+    _key: id,
+    id,
+    listId: 1,
     title: "テストタスク",
     notes: "",
     status: "active",
     tags: [],
+    sort_order: 0,
+    updated: "2024-01-01T00:00:00.000Z",
     ...overrides,
   };
 }

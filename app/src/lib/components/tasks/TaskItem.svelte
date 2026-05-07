@@ -3,14 +3,14 @@
      * @fileoverview タスクアイテム（チェックボックス + テキスト表示 + 編集・コピーボタン）
      */
 
-    import type { TaskInfo } from "$lib/types";
+    import type { TaskListItem } from "$lib/types";
     import { linkify } from "$lib/linkify";
     import { getTagColorClass } from "$lib/tag-palette";
 
     type Props = {
-        task: TaskInfo;
+        task: TaskListItem;
         onToggle: (taskId: number, checked: boolean) => void;
-        onEdit: (task: TaskInfo) => void;
+        onEdit: (task: TaskListItem) => void;
         isDragging?: boolean;
         isRemoteUpdated?: boolean;
         dropIndicator?: "before" | "after" | null;

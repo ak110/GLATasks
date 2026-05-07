@@ -16,10 +16,18 @@
     import type { TaskStatus } from "$lib/schemas";
     import type {
         TagInfo,
-        TaskInfo,
-        GetTasksResult,
         SearchTaskResult,
+        TaskListItem,
+        GetActiveTasksResult,
+        GetTasksResult,
     } from "$lib/types";
+    import {
+        mergeActiveTasks,
+        sortByListAndOrder,
+        filterByList,
+        type ActiveTasksCache,
+    } from "$lib/task-cache";
+    import { splitTitle, splitNotes } from "$lib/text-split";
     import { compareTagName } from "$lib/tag-sort";
     import Header from "$lib/components/layout/Header.svelte";
     import ListSidebar from "$lib/components/lists/ListSidebar.svelte";
@@ -129,22 +137,32 @@
         queryFn: () => trpc.lists.list.query(showType),
     }));
 
-    // タスク一覧取得（SSE でリアルタイム同期）
-    const tasksQuery = createQuery<RouterOutputs["tasks"]["list"]>(() => ({
-        queryKey: ["tasks", selectedListId, showType] as const,
-        queryFn: async (): Promise<RouterOutputs["tasks"]["list"]> => {
-            if (!selectedListId)
-                return {
-                    status: 200 as const,
-                    data: [] as TaskInfo[],
-                    lastModified: "",
-                };
-            return trpc.tasks.list.query({
-                listId: selectedListId,
-                showType,
-            });
+    // 全アクティブタスク一括取得（SSE でリアルタイム差分同期）
+    // selectedListId に依存しないため、ページロード時に即実行する
+    const tasksQuery = createQuery<ActiveTasksCache>(() => ({
+        queryKey: ["activeTasks"] as const,
+        queryFn: async (): Promise<ActiveTasksCache> => {
+            const prev = queryClient.getQueryData<ActiveTasksCache>([
+                "activeTasks",
+            ]);
+            const response: GetActiveTasksResult =
+                await trpc.tasks.listActive.query({
+                    since: prev?.serverTime,
+                });
+            return mergeActiveTasks(prev, response);
         },
-        enabled: selectedListId !== null,
+        staleTime: Infinity,
+    }));
+
+    // アーカイブタスク取得（showType="archived" のときのみ起動）
+    const archivedTasksQuery = createQuery<GetTasksResult>(() => ({
+        queryKey: ["tasks", selectedListId, "archived"] as const,
+        enabled: showType === "archived" && selectedListId !== null,
+        queryFn: () =>
+            trpc.tasks.list.query({
+                listId: selectedListId!,
+                showType: "archived",
+            }),
     }));
 
     // 全文検索クエリ
@@ -162,44 +180,78 @@
     // SSE: サーバーからの通知でクエリを再取得
     subscribeOnMount({
         [SSE_EVENTS.listsUpdated]: () => {
-            queryClient.invalidateQueries({ queryKey: ["lists"] });
+            // リスト集合の id+status に変化があった場合のみアクティブタスクキャッシュをリセットする
+            // rename はリセット不要、archive/unarchive/delete/merge はリセット要
+            void (async () => {
+                const prevLists =
+                    queryClient.getQueryData<RouterOutputs["lists"]["list"]>([
+                        "lists",
+                        showType,
+                    ]) ?? [];
+                const prevKey = JSON.stringify(
+                    prevLists.map((l) => `${l.id}:${l.status}`).sort(),
+                );
+                await queryClient.invalidateQueries({ queryKey: ["lists"] });
+                const newLists =
+                    queryClient.getQueryData<RouterOutputs["lists"]["list"]>([
+                        "lists",
+                        showType,
+                    ]) ?? [];
+                const newKey = JSON.stringify(
+                    newLists.map((l) => `${l.id}:${l.status}`).sort(),
+                );
+                if (prevKey !== newKey) {
+                    // 物理削除追従のためアクティブタスクキャッシュをundefined化し、
+                    // 次のfetchで since 未指定の fullモードリクエストを走らせる。
+                    queryClient.setQueryData<ActiveTasksCache | undefined>(
+                        ["activeTasks"],
+                        () => undefined,
+                    );
+                    await queryClient.invalidateQueries({
+                        queryKey: ["activeTasks"],
+                    });
+                    // 注: 本ハンドラは async で動作するため、tasksUpdated と並走した場合
+                    // updatedTaskIds の差分検知が空キャッシュを参照する可能性がある。
+                    // その場合 updatedTaskIds が一時的に空になるが、後続のSSE/操作で復元されるので許容。
+                }
+            })();
         },
         [SSE_EVENTS.tasksUpdated]: (e) => {
-            // 自分のタブからのイベント → データ再取得のみ
+            // アーカイブモード時は archived 用クエリも無効化する
+            if (showType === "archived") {
+                queryClient.invalidateQueries({
+                    queryKey: ["tasks", selectedListId, "archived"],
+                });
+            }
+            // 自分のタブからのイベント → 差分 sync で取り直すのみ
             if (e.data === tabId) {
-                queryClient.invalidateQueries({ queryKey: ["tasks"] });
+                queryClient.invalidateQueries({ queryKey: ["activeTasks"] });
                 return;
             }
             // 他タブ/他端末からの更新 → スナップショット比較で変更タスクを検出
-            const currentData = queryClient.getQueryData<GetTasksResult>([
-                "tasks",
-                selectedListId,
-                showType,
+            const oldCache = queryClient.getQueryData<ActiveTasksCache>([
+                "activeTasks",
             ]);
-            const oldTasks: TaskInfo[] =
-                currentData && "data" in currentData ? currentData.data : [];
             const oldMap = new Map(
-                oldTasks.map((t) => [
+                (oldCache?.tasks ?? []).map((t) => [
                     t.id,
                     `${t.title}\0${t.notes}\0${t.status}`,
                 ]),
             );
-            queryClient.invalidateQueries({ queryKey: ["tasks"] }).then(() => {
-                const newData = queryClient.getQueryData<GetTasksResult>([
-                    "tasks",
-                    selectedListId,
-                    showType,
-                ]);
-                const newTasks: TaskInfo[] =
-                    newData && "data" in newData ? newData.data : [];
-                for (const task of newTasks) {
-                    const oldKey = oldMap.get(task.id);
-                    const newKey = `${task.title}\0${task.notes}\0${task.status}`;
-                    if (oldKey === undefined || oldKey !== newKey) {
-                        updatedTaskIds.add(task.id);
+            queryClient
+                .invalidateQueries({ queryKey: ["activeTasks"] })
+                .then(() => {
+                    const newCache = queryClient.getQueryData<ActiveTasksCache>(
+                        ["activeTasks"],
+                    );
+                    for (const task of newCache?.tasks ?? []) {
+                        const oldKey = oldMap.get(task.id);
+                        const newKey = `${task.title}\0${task.notes}\0${task.status}`;
+                        if (oldKey === undefined || oldKey !== newKey) {
+                            updatedTaskIds.add(task.id);
+                        }
                     }
-                }
-            });
+                });
         },
     });
     // ドラッグ終了時にサイドバーのハイライトをリセット
@@ -231,10 +283,75 @@
             text: string;
             tags?: TagInfo[];
         }) => trpc.tasks.create.mutate({ listId, text, tags }),
-        onSuccess: (_data, variables) => {
-            queryClient.invalidateQueries({
-                queryKey: ["tasks", variables.listId],
-            });
+        onMutate: async ({
+            listId,
+            text,
+            tags,
+        }: {
+            listId: number;
+            text: string;
+            tags?: TagInfo[];
+        }) => {
+            await queryClient.cancelQueries({ queryKey: ["activeTasks"] });
+            const prev = queryClient.getQueryData<ActiveTasksCache>([
+                "activeTasks",
+            ]);
+            const tempId = -Date.now();
+            queryClient.setQueryData<ActiveTasksCache>(
+                ["activeTasks"],
+                (old) => {
+                    // キャッシュ未初期化の場合は楽観タスクを追加せず、
+                    // サーバー応答後の差分 sync に委ねる
+                    if (!old) return undefined;
+                    const minOrder =
+                        old.tasks.length > 0
+                            ? Math.min(...old.tasks.map((t) => t.sort_order))
+                            : 0;
+                    const optimisticTask: TaskListItem = {
+                        _key: tempId,
+                        id: tempId,
+                        listId,
+                        title: splitTitle(text),
+                        notes: splitNotes(text),
+                        status: "active",
+                        tags: tags ?? [],
+                        sort_order: minOrder - 1000,
+                        updated: new Date().toISOString(),
+                    };
+                    return { ...old, tasks: [...old.tasks, optimisticTask] };
+                },
+            );
+            return { prev, tempId };
+        },
+        onError: (_err, _vars, context) => {
+            if (context?.prev !== undefined) {
+                queryClient.setQueryData(["activeTasks"], context.prev);
+            }
+        },
+        onSuccess: (data, _vars, context) => {
+            // 仮IDタスクを実IDで置き換える。DOMの連続性を保ちつつ正しいIDになる。
+            const tempId = context?.tempId;
+            if (tempId !== undefined) {
+                queryClient.setQueryData<ActiveTasksCache>(
+                    ["activeTasks"],
+                    (old) =>
+                        old
+                            ? {
+                                  ...old,
+                                  tasks: old.tasks.map((t) =>
+                                      t.id === tempId
+                                          ? { ...t, id: data.taskId }
+                                          : t,
+                                  ),
+                              }
+                            : old,
+                );
+                // 編集ダイアログが楽観タスクを参照していた場合、taskIdを実IDに更新する
+                if (editDialog.taskId === tempId) {
+                    editDialog.taskId = data.taskId;
+                }
+            }
+            queryClient.invalidateQueries({ queryKey: ["activeTasks"] });
             addTaskText = "";
         },
     }));
@@ -251,19 +368,98 @@
             keep_order?: boolean;
             tags?: TagInfo[];
         }) => trpc.tasks.update.mutate(input),
+        onMutate: async (variables: {
+            listId: number;
+            taskId: number;
+            text?: string;
+            status?: TaskStatus;
+            completed?: string | null;
+            move_to?: number;
+            keep_order?: boolean;
+            tags?: TagInfo[];
+        }) => {
+            await queryClient.cancelQueries({ queryKey: ["activeTasks"] });
+            const prev = queryClient.getQueryData<ActiveTasksCache>([
+                "activeTasks",
+            ]);
+            // text変更かつkeep_order=falseなら先頭移動（サーバーロジック踏襲）
+            let optimisticSortOrder: number | undefined;
+            if (variables.text !== undefined && variables.keep_order !== true) {
+                const prev2 = queryClient.getQueryData<ActiveTasksCache>([
+                    "activeTasks",
+                ]);
+                const targetListId = variables.move_to ?? variables.listId;
+                const sameListTasks = (prev2?.tasks ?? []).filter(
+                    (t) => t.listId === targetListId,
+                );
+                const minOrder =
+                    sameListTasks.length > 0
+                        ? Math.min(...sameListTasks.map((t) => t.sort_order))
+                        : 1000;
+                optimisticSortOrder = minOrder - 1000;
+            } else if (variables.move_to !== undefined) {
+                // move_to のみの場合も移動先リストの先頭に楽観配置
+                const prev2 = queryClient.getQueryData<ActiveTasksCache>([
+                    "activeTasks",
+                ]);
+                const sameListTasks = (prev2?.tasks ?? []).filter(
+                    (t) => t.listId === variables.move_to,
+                );
+                const minOrder =
+                    sameListTasks.length > 0
+                        ? Math.min(...sameListTasks.map((t) => t.sort_order))
+                        : 1000;
+                optimisticSortOrder = minOrder - 1000;
+            }
+            queryClient.setQueryData<ActiveTasksCache>(
+                ["activeTasks"],
+                (old) => {
+                    if (!old) return old;
+                    return {
+                        ...old,
+                        tasks: old.tasks.map((t) => {
+                            if (t.id !== variables.taskId) return t;
+                            return {
+                                ...t,
+                                ...(variables.text !== undefined
+                                    ? {
+                                          title: splitTitle(variables.text),
+                                          notes: splitNotes(variables.text),
+                                      }
+                                    : {}),
+                                ...(variables.status !== undefined
+                                    ? { status: variables.status }
+                                    : {}),
+                                ...(variables.tags !== undefined
+                                    ? { tags: variables.tags }
+                                    : {}),
+                                ...(variables.move_to !== undefined
+                                    ? { listId: variables.move_to }
+                                    : {}),
+                                ...(optimisticSortOrder !== undefined
+                                    ? { sort_order: optimisticSortOrder }
+                                    : {}),
+                                updated: new Date().toISOString(),
+                            };
+                        }),
+                    };
+                },
+            );
+            return { prev };
+        },
+        onError: (_err, _vars, context) => {
+            if (context?.prev !== undefined) {
+                queryClient.setQueryData(["activeTasks"], context.prev);
+            }
+        },
         onSuccess: (_data, variables) => {
-            // 更新元リストを無効化
-            queryClient.invalidateQueries({
-                queryKey: ["tasks", variables.listId],
-            });
-            // タスクが別リストへ移動された場合は移動先リストも無効化
+            queryClient.invalidateQueries({ queryKey: ["activeTasks"] });
+            // タスクが別リストへ移動された場合はリスト一覧も更新する
             if (
                 variables.move_to !== undefined &&
                 variables.move_to !== variables.listId
             ) {
-                queryClient.invalidateQueries({
-                    queryKey: ["tasks", variables.move_to],
-                });
+                queryClient.invalidateQueries({ queryKey: ["lists"] });
             }
         },
     }));
@@ -304,10 +500,8 @@
     // 完了済みタスククリア
     const clearListMutation = createMutation(() => ({
         mutationFn: (listId: number) => trpc.lists.clear.mutate({ listId }),
-        onSuccess: (_data, listId) => {
-            queryClient.invalidateQueries({
-                queryKey: ["tasks", listId],
-            });
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["activeTasks"] });
         },
     }));
 
@@ -315,9 +509,14 @@
     const mergeListMutation = createMutation(() => ({
         mutationFn: (input: { sourceListId: number; targetListId: number }) =>
             trpc.lists.merge.mutate(input),
-        onSuccess: () => {
+        onSuccess: async () => {
             queryClient.invalidateQueries({ queryKey: ["lists"] });
-            queryClient.invalidateQueries({ queryKey: ["tasks"] });
+            // リスト統合は物理削除を伴うためキャッシュをundefined化してフル再取得する
+            queryClient.setQueryData<ActiveTasksCache | undefined>(
+                ["activeTasks"],
+                () => undefined,
+            );
+            await queryClient.invalidateQueries({ queryKey: ["activeTasks"] });
         },
     }));
 
@@ -326,15 +525,33 @@
         mutationFn: (input: { listId: number; taskIds: number[] }) =>
             trpc.tasks.reorder.mutate(input),
         onSettled: () => {
-            queryClient.invalidateQueries({ queryKey: ["tasks"] });
+            queryClient.invalidateQueries({ queryKey: ["activeTasks"] });
         },
     }));
 
     // 派生状態
     const lists = $derived(listsQuery.data ?? []);
-    const tasks = $derived.by(() => {
-        const data = tasksQuery.data;
-        return data && "data" in data ? data.data : [];
+    const tasks = $derived.by((): TaskListItem[] => {
+        if (showType === "archived") {
+            const data = archivedTasksQuery.data;
+            if (!data || !("data" in data)) return [];
+            return data.data.map((t) => ({
+                _key: t.id,
+                id: t.id,
+                listId: selectedListId!,
+                title: t.title,
+                notes: t.notes,
+                status: t.status,
+                tags: t.tags,
+                sort_order: 0,
+                updated: "",
+            }));
+        }
+        const cache = tasksQuery.data;
+        if (!cache || selectedListId === null) return [];
+        return sortByListAndOrder(
+            filterByList(cache.tasks, selectedListId, showType),
+        );
     });
     // 同一リスト内で既に使われているタグ候補（名前ユニーク、同名は最初の色を採用）
     const listTagCandidates = $derived.by(() => {
@@ -346,7 +563,11 @@
         }
         return [...seen.values()].sort(compareTagName);
     });
-    const isLoading = $derived(listsQuery.isLoading || tasksQuery.isLoading);
+    const isLoading = $derived(
+        listsQuery.isLoading ||
+            tasksQuery.isLoading ||
+            (showType === "archived" && archivedTasksQuery.isLoading),
+    );
     const isSearching = $derived(debouncedQuery.length > 0);
     const searchResults = $derived(searchResultsQuery.data ?? []);
     // 検索結果をリスト名でグループ化
@@ -512,7 +733,7 @@
         }
     }
 
-    function openEditDialog(task: TaskInfo) {
+    function openEditDialog(task: TaskListItem) {
         const text = task.notes ? `${task.title}\n\n${task.notes}` : task.title;
         editDialog = {
             open: true,
@@ -638,23 +859,15 @@
         }
     }
 
-    /** 統合ダイアログを開く。タスク数を取得するため現在のクエリキャッシュを参照する。 */
-    async function openMergeDialog(listId: number) {
+    /** 統合ダイアログを開く。activeTasks キャッシュからタスク数をカウントする。 */
+    function openMergeDialog(listId: number) {
         const list = lists.find((l) => l.id === listId);
         if (!list) return;
-        // タスク数を取得（全タスクを取得してカウント）
-        const tasksResult = await queryClient.fetchQuery<
-            RouterOutputs["tasks"]["list"]
-        >({
-            queryKey: ["tasks", listId, "all"],
-            queryFn: () =>
-                trpc.tasks.list.query({
-                    listId,
-                    showType: "all",
-                }),
-        });
+        const cache = queryClient.getQueryData<ActiveTasksCache>([
+            "activeTasks",
+        ]);
         const count =
-            tasksResult && "data" in tasksResult ? tasksResult.data.length : 0;
+            cache?.tasks.filter((t) => t.listId === listId).length ?? 0;
         mergeDialog = {
             open: true,
             sourceListId: listId,
@@ -688,18 +901,21 @@
     /** タスクの並び替え（楽観的更新 + API呼出） */
     function handleReorderTasks(taskIds: number[]) {
         if (!selectedListId) return;
-        // 楽観的更新: キャッシュ内のタスク配列を即座に並び替え
-        queryClient.setQueryData(
-            ["tasks", selectedListId, showType],
-            (old: GetTasksResult | undefined) => {
-                if (!old || !("data" in old)) return old;
-                const taskMap = new Map(old.data.map((t) => [t.id, t]));
-                const reordered = taskIds
-                    .map((id) => taskMap.get(id))
-                    .filter((t): t is TaskInfo => t !== undefined);
-                return { ...old, data: reordered };
-            },
-        );
+        // 楽観的更新: キャッシュ内の sort_order と updated をリスト内連番で上書きする
+        const now = new Date().toISOString();
+        queryClient.setQueryData<ActiveTasksCache>(["activeTasks"], (old) => {
+            if (!old) return old;
+            const idxMap = new Map(taskIds.map((id, i) => [id, i]));
+            return {
+                ...old,
+                tasks: old.tasks.map((t) => {
+                    const newOrder = idxMap.get(t.id);
+                    return newOrder !== undefined
+                        ? { ...t, sort_order: newOrder, updated: now }
+                        : t;
+                }),
+            };
+        });
         reorderTasksMutation.mutate({ listId: selectedListId, taskIds });
     }
 
@@ -708,19 +924,8 @@
         if (!selectedListId || targetListId === selectedListId) return;
         dragOverListId = null;
 
-        // 楽観的更新: 現在のリストのキャッシュからタスクを除去
-        queryClient.setQueryData(
-            ["tasks", selectedListId, showType],
-            (old: GetTasksResult | undefined) => {
-                if (!old || !("data" in old)) return old;
-                return {
-                    ...old,
-                    data: old.data.filter((t) => t.id !== taskId),
-                };
-            },
-        );
-
         try {
+            // updateTaskMutation の onMutate で楽観的更新を実施する
             await updateTaskMutation.mutateAsync({
                 listId: selectedListId,
                 taskId,
@@ -728,8 +933,7 @@
                 keep_order: false,
             });
         } catch {
-            // 失敗時はキャッシュを再取得してロールバック
-            queryClient.invalidateQueries({ queryKey: ["tasks"] });
+            // onError でロールバック済みのため追加処理不要
         }
     }
 

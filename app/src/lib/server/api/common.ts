@@ -72,22 +72,7 @@ export function serializeTags(value: TagInfo[]): string {
 
 // ── タスクの title/notes 分割 ──
 
-export function splitTitle(text: string): string {
-  return text
-    .split("\n", 1)[0]
-    .replace(/^[\r\n]+/, "")
-    .trimEnd();
-}
-
-export function splitNotes(text: string): string {
-  const idx = text.indexOf("\n");
-  return idx === -1
-    ? ""
-    : text
-        .slice(idx + 1)
-        .replace(/^[\r\n]+/, "")
-        .trimEnd();
-}
+export { splitTitle, splitNotes } from "$lib/text-split";
 
 // ── DB 更新ヘルパー ──
 

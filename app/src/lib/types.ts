@@ -39,6 +39,37 @@ export type GetTasksResult =
   | { status: 304 }
   | { status: 200; data: TaskInfo[]; lastModified: string };
 
+/**
+ * 差分 sync 用タスク項目。
+ * クライアント側のリスト単位フィルタ・並び順表示に必要な全フィールドを含む。
+ */
+export type TaskListItem = {
+  /**
+   * Svelte の `{#each}` keying 用の安定値。楽観追加時は仮IDを保持し、
+   * サーバー応答後にidが実IDへ書き換わっても同じ値を維持してDOM identityを保つ。
+   * サーバー応答経由のタスクでは id と同値を入れる。
+   */
+  _key: number;
+  id: number;
+  listId: number;
+  title: string;
+  notes: string;
+  status: string;
+  tags: TagInfo[];
+  sort_order: number;
+  /** UTC ISO 文字列 */
+  updated: string;
+};
+
+/** 全アクティブタスク取得レスポンス（差分 sync 対応） */
+export type GetActiveTasksResult = {
+  tasks: TaskListItem[];
+  /** 次回リクエストで使う基準時刻（1秒 overlap 済みの UTC ISO 文字列） */
+  serverTime: string;
+  /** full: 全件取得、delta: 差分取得 */
+  mode: "full" | "delta";
+};
+
 /** タイマー情報 */
 export type TimerInfo = {
   id: number;
