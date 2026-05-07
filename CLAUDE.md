@@ -7,19 +7,17 @@ SvelteKit + tRPC + Drizzleで構築し、Docker Composeで運用する。
 
 よく使う`make`コマンド:
 
-- `make format` — コード編集後に実行する。整形 + 自動修正付きlint
-- `make test` — コミット前に実行する。
-  pre-commit + pyfltr（lint・型チェック・ユニットテスト・svelte-check）+ バックアップテスト + e2e
+- `make test-e2e` — E2Eテスト
+- `make test-backup` — バックアップのリストアと検証
 - `make deploy` — ビルド → 停止 → 起動
 
 全ターゲットの一覧は`make help`で確認できる。
 
 - コミット前の検証方法: `uvx pyfltr run-for-agent`
-  - ドキュメントなどのみの変更の場合は省略可（pre-commitで実行されるため）
-  - 修正後の再実行時は、対象ファイルや対象ツールを必要に応じて限定して実行する（最終検証はCIに委ねる前提）
-    - 例: `uvx pyfltr run-for-agent --commands=eslint,prettier path/to/file.ts`
-  - 利用可能なコマンドは`pyproject.toml`の`[tool.pyfltr]`設定とJS/TS連携で有効になるもの。
-    例: `eslint`・`prettier`・`oxlint`・`vitest`・カスタムコマンドの`svelte-check`
+  - テストコードの単体実行なども極力`uvx pyfltr run-for-agent <path>`を使う（直接呼び出さない）
+  - 修正後の再実行時は`--commands=eslint,prettier`等で限定して実行する（最終検証はCIに委ねる前提）
+    - 利用可能なコマンドは`pyproject.toml`の`[tool.pyfltr]`設定とJS/TS連携で有効になるもの。
+      例: `eslint`・`prettier`・`oxlint`・`vitest`・カスタムコマンドの`svelte-check`
   - バックアップ/E2E系に変更を加えた場合は`make test-backup test-e2e`も実行する
   - 注意: 本プロジェクトのDocker Compose環境は開発マシン上で常時稼働している。
     `make test`（backup/e2eテスト含む）は問題なく実行可能。

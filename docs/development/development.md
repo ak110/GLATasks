@@ -45,49 +45,15 @@
 
 ## 開発コマンド
 
-`make help`でも一覧を確認できる。
-
-| ターゲット             | 概要                                                         |
-| ---------------------- | ------------------------------------------------------------ |
-| `make format`          | コード整形 + 自動修正付きlint（`uvx pyfltr fast`）           |
-| `make test`            | 全チェック実行（pyfltr + バックアップテスト + e2e）          |
-| `make test-unit`       | Vitestのユニットテストを実行（node・dom両project）           |
-| `make test-backup`     | バックアップ機能のテスト（Docker環境起動が必要）             |
-| `make test-e2e`        | Playwrightによるe2eテスト（Docker環境起動が必要）            |
-| `make deploy`          | ビルド → 停止 → 起動                                         |
-| `make build`           | Dockerイメージのビルド                                       |
-| `make start`           | Docker Composeでサービスを起動                               |
-| `make stop`            | Docker Composeでサービスを停止                               |
-| `make restart-app`     | appコンテナのみ再起動                                        |
-| `make backup`          | DBダンプ + キーファイルのバックアップ                        |
-| `make sync`            | git fetch/rebase + Docker pull                               |
-| `make update`          | 依存更新 + pinactアクション更新 + 全テスト実行               |
-| `make update-actions`  | GitHub Actionsのハッシュピン更新（mise経由でpinact実行）     |
-| `make docs`            | VitePressドキュメントサイトのローカルプレビュー（port 5173） |
-| `make migrate`         | DBマイグレーション実行                                       |
-| `make db-studio`       | Drizzle Studio起動                                           |
-| `make logs`            | 全サービスのログをフォロー                                   |
-| `make shell`           | appコンテナのbashシェルに入る                                |
-| `make node-shell`      | Node.jsコンテナのbashシェルに入る                            |
-| `make healthcheck`     | ヘルスチェック確認                                           |
-| `make ps`              | Docker Composeのサービス状態確認                             |
-
-コミット前のチェックは`make test`で実行する。`make format`は日常的な整形・lint用途に使う。
+```bash
+make format   # 整形 + 軽量lint + 自動修正（開発時の手動実行用）
+make test     # 全チェック実行（これを通過すればコミット可能）
+make update   # 依存更新
+```
 
 e2eテスト（Playwright）は`make test-e2e`で実行する。
 `app/tests/`配下のテストをnginx経由のHTTPS（port 38180）で動作させるため、開発環境が起動している必要がある。
 テストユーザーは`app/tests/global-setup.ts`で初回自動作成される。
-
-`waitForSelector`はSSRで描画されるため即返るが、`onMount`のAPI呼び出しはまだ完了していない。
-SSE接続が常時開いているため`waitUntil: "networkidle"`は利用できない。
-次のtRPCレスポンス待ちパターンで初期ロードを待つ。
-
-```typescript
-await Promise.all([
-  page.goto("/"),
-  page.waitForResponse((res) => res.url().includes("/api/trpc")),
-]);
-```
 
 ## サプライチェーン攻撃対策
 
