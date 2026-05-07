@@ -75,6 +75,23 @@ describe("mergeActiveTasks", () => {
     });
     expect(result.tasks.map((t) => t.id)).toEqual([1, 2]);
   });
+
+  it("delta モードのupsertでは prev 側の _key を保持する", () => {
+    // 楽観追加直後: id は実ID（onSuccess 反映後）に、_key は仮IDのまま残る状況。
+    const tempKey = -1700000000000;
+    const prev: ActiveTasksCache = {
+      tasks: [makeTask({ id: 10, _key: tempKey, title: "旧" })],
+      serverTime: "2024-01-01T00:00:00.000Z",
+    };
+    const result = mergeActiveTasks(prev, {
+      tasks: [makeTask({ id: 10, _key: 10, title: "新" })],
+      serverTime: "2024-01-02T01:00:00.000Z",
+      mode: "delta",
+    });
+    expect(result.tasks).toHaveLength(1);
+    expect(result.tasks[0]._key).toBe(tempKey);
+    expect(result.tasks[0].title).toBe("新");
+  });
 });
 
 describe("sortByListAndOrder", () => {

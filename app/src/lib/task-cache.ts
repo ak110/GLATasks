@@ -31,8 +31,15 @@ export function mergeActiveTasks(
   const responseMap = new Map(response.tasks.map((t) => [t.id, t]));
   const prevIds = new Set(prev.tasks.map((t) => t.id));
 
-  // 既存タスクは応答にあれば応答値で更新、無ければそのまま維持
-  const merged = prev.tasks.map((t) => responseMap.get(t.id) ?? t);
+  // 既存タスクは応答にあれば応答値で更新、無ければそのまま維持。
+  // _key は prev 側の値を保持する。楽観追加タスクは onSuccess で id だけ実IDに
+  // 差し替え _key は仮IDのまま残るため、ここで応答の _key（実ID）に置き換えると
+  // Svelte の {#each} keying が変化してコンポーネントが再生成され、開いていた
+  // メニュー等の $state が初期化される。
+  const merged = prev.tasks.map((t) => {
+    const updated = responseMap.get(t.id);
+    return updated ? { ...updated, _key: t._key } : t;
+  });
 
   // 応答にしか含まれない新規タスクを末尾に追加
   for (const t of response.tasks) {
