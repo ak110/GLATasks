@@ -2,3 +2,5 @@ packages:
   - docs
 storeDir: .cache/pnpm-store
 minimumReleaseAge: 1440
+allowBuilds:
+  esbuild: true

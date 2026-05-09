@@ -16,46 +16,46 @@
   },
   "dependencies": {
     "@sveltejs/adapter-node": "^5.5.4",
-    "@sveltejs/kit": "^2.58.0",
+    "@sveltejs/kit": "^2.59.1",
     "@tailwindcss/vite": "^4.2.4",
-    "@tanstack/svelte-query": "^6.1.24",
-    "@trpc/client": "^11.16.0",
-    "@trpc/server": "^11.16.0",
+    "@tanstack/svelte-query": "^6.1.28",
+    "@trpc/client": "^11.17.0",
+    "@trpc/server": "^11.17.0",
     "bcryptjs": "^3.0.3",
     "drizzle-orm": "^0.45.2",
     "jose": "^6.2.3",
     "mysql2": "^3.22.3",
     "svelte": "^5.55.5",
     "tailwindcss": "^4.2.4",
-    "vite": "^8.0.10",
-    "zod": "^4.3.6"
+    "vite": "^8.0.11",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@playwright/test": "1.59.1",
-    "@sveltejs/vite-plugin-svelte": "^7.0.0",
+    "@sveltejs/vite-plugin-svelte": "^7.1.2",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/svelte": "^5.3.1",
     "@types/bcryptjs": "^3.0.0",
-    "@types/node": "^25.6.0",
+    "@types/node": "^25.6.2",
     "@vitest/ui": "^4.1.5",
     "drizzle-kit": "^0.31.10",
-    "eslint": "^10.2.1",
+    "eslint": "^10.3.0",
     "eslint-plugin-svelte": "^3.17.1",
-    "globals": "^17.5.0",
+    "globals": "^17.6.0",
     "happy-dom": "^20.9.0",
     "markdownlint-cli2": "^0.22.1",
-    "oxlint": "^1.62.0",
+    "oxlint": "^1.63.0",
     "prettier": "^3.8.3",
     "prettier-plugin-svelte": "^3.5.1",
     "prettier-plugin-tailwindcss": "^0.8.0",
-    "svelte-check": "^4.4.6",
+    "svelte-check": "^4.4.8",
     "textlint": "^15.6.0",
     "textlint-rule-ja-no-abusage": "^3.0.0",
     "textlint-rule-preset-ja-technical-writing": "^12.0.2",
     "textlint-rule-preset-jtf-style": "^3.0.3",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.59.1",
+    "typescript-eslint": "^8.59.2",
     "vitest": "^4.1.5"
   },
   "pnpm": {
@@ -71,5 +71,5 @@
       "postcss@<8.5.10": "^8.5.10"
     }
   },
-  "packageManager": "pnpm@10.33.2+sha512.a90faf6feeab71ad6c6e57f94e0fe1a12f5dcc22cd754db40ae9593eb6a3e0b6b12e3540218bb37ae083404b1f2ce6db2a4121e979829b4aff94b99f49da1cf8"
+  "packageManager": "pnpm@11.0.9+sha512.34ce82e6780233cf9cad8685029a8f81d2e06196c5a9bad98879f7424940c6817c4e4524fb7d38b8553ceed48b9758b8ebaf1abd3600c232c4c8cf7366086f38"
 }
