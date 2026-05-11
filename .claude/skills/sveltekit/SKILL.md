@@ -1,8 +1,9 @@
 ---
-paths:
-  - "**/*.svelte"
-  - "**/*.ts"
-  - "**/*.css"
+name: sveltekit
+description: >-
+  GLATasks の SvelteKit コーディングスタイルと規約リファレンス。
+  Svelte コンポーネント（`.svelte`）・TypeScript（`.ts`）・CSS（`.css`）を編集するとき、
+  またはダークモード対応・ダイアログ操作・tRPC 実装・D&D 並び替え・Vitest 設定を扱うときに呼び出す。
 ---
 
 # SvelteKit コーディングスタイル
@@ -19,10 +20,10 @@ paths:
   - ナビリンク: `cursor-pointer rounded text-sm text-gray-300 hover:bg-gray-700 hover:text-white`
   - アクティブナビ: `text-sm font-semibold text-gray-200`（リンクなし）
 - コンテンツ領域のアクションボタン: `cursor-pointer rounded bg-gray-100 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-200`
-- ダイアログの共通パターン: ヘッダーにタイトル+✕閉じるボタン、キャンセルボタンは使わない。
-  確認・入力ダイアログはこのルールの適用除外（後述のダイアログ運用ルール参照）
-- タグバッジの色は`app/src/lib/tag-palette.ts`に集約し、Tailwindクラスを直接ハードコードしない。
-  色覚バリアフリー配色（Okabe-Ito系）を淡色化した8色パレットから`getTagColorClass()`経由で取得する
+- ダイアログの共通パターン: ヘッダーにタイトル+✕閉じるボタン、キャンセルボタンは使わない
+  - 確認・入力ダイアログはこのルールの適用除外（後述のダイアログ運用ルール参照）
+- タグバッジの色は`app/src/lib/tag-palette.ts`に集約し、Tailwindクラスを直接ハードコードしない
+  - 色覚バリアフリー配色（Okabe-Ito系）を淡色化した8色パレットから`getTagColorClass()`経由で取得する
 
 ## ダークモードの色マッピング
 
@@ -82,18 +83,18 @@ Tailwind CSS v4の `@custom-variant dark` を使用。`<html>` に `.dark` ク�
 
 ## 確認・入力ダイアログ運用ルール
 
-- `globalThis.confirm` / `globalThis.prompt` / `globalThis.alert` は使用禁止。
-  代わりに共通ダイアログコンポーネント（`ConfirmDialog`、`PromptDialog`）を使う。
+- `globalThis.confirm` / `globalThis.prompt` / `globalThis.alert` は使用禁止
+  - 代わりに共通ダイアログコンポーネント（`ConfirmDialog`、`PromptDialog`）を使う
 - 確認・入力ダイアログのコールバックpropsは `onCancel` / `onConfirm` / `onSubmit` を使用し、
-  汎用ダイアログの `onClose` / `onSubmit` 命名とは意図的に分離する。
-  キャンセルボタンを持つことは明示的に許容される（汎用ダイアログの「キャンセルボタンは使わない」
-  ルールの適用除外）。
-- ネストするダイアログは外側より高いz-indexを使う。
-  例: 外側が `z-50` なら内側は `z-60`（`z-[60]`）にする。
+  汎用ダイアログの `onClose` / `onSubmit` 命名とは意図的に分離する
+  - キャンセルボタンを持つことは明示的に許容される（汎用ダイアログの「キャンセルボタンは使わない」
+    ルールの適用除外）
+- ネストするダイアログは外側より高いz-indexを使う
+  - 例: 外側が `z-50` なら内側は `z-60`（`z-[60]`）にする
 - `role="dialog"` を付けた要素には `tabindex="-1"` を併記し、
-  WAI-ARIAのフォーカス受け取り要件に適合させる。
-  タイトルが存在する場合は見出し要素に `id` を振り `aria-labelledby` で参照し、
-  タイトルが無い場合は `aria-label` を併記する。
+  WAI-ARIAのフォーカス受け取り要件に適合させる
+  - タイトルが存在する場合は見出し要素に `id` を振り `aria-labelledby` で参照し、
+    タイトルが無い場合は `aria-label` を併記する
 
 ## TanStack Query 楽観的更新
 

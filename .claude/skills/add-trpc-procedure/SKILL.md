@@ -82,5 +82,5 @@ description: >-
 - `app/src/lib/trpc.ts` — クライアント側tRPCクライアント
 - `docs/development/architecture.md` — SSE / 時刻同期 / 難読化設計
 - `docs/development/development.md` — テスト・開発環境の注意点
-- `.claude/rules/sveltekit.md` — tRPC実装規約とアーキテクチャ前提
-- `.claude/rules/e2etest.md` — Playwrightテスト実装の注意点
+- `.claude/skills/sveltekit/SKILL.md` — tRPC実装規約とアーキテクチャ前提
+- `.claude/skills/e2etest/SKILL.md` — Playwrightテスト実装の注意点

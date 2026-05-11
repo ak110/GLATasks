@@ -1,8 +1,9 @@
 ---
-paths:
-  - "app/tests/**/*.ts"
-# このルールはe2eテスト（app/tests/配下）を編集するときに自動ロードされる。
-# SvelteKit特有のhydrationパターン・ダイアログ操作・マルチブラウザ同期テストの注意点を扱う。
+name: e2etest
+description: >-
+  GLATasks の e2e テスト（Playwright）実装リファレンス。
+  `app/tests/` 配下のテストファイルを編集するとき、または SvelteKit の hydration パターン・
+  ダイアログ操作・マルチブラウザ同期テスト・SSE 制御を扱うときに呼び出す。
 ---
 
 # e2eテスト (Playwright)

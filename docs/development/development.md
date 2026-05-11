@@ -35,84 +35,56 @@
    make setup
    ```
 
-   pre-commitフックをインストールし、`.gitmessage`をコミットテンプレートとして登録する
-
 5. 起動
 
    ```bash
    make deploy
    ```
 
-## DBマイグレーション運用
-
-### 自動適用
-
-appサービスは`migrate`サービス（開発プロファイルでは`migrate-dev`サービス）に
-`service_completed_successfully`で依存している。
-そのため`make deploy`（`docker compose up`）の起動時にマイグレーションが自動適用され、
-別途`make migrate`を実行しなくても新規migrationが反映される。
-
-`make migrate`は稼働中のappを止めずに即座にマイグレーションを反映したい場合に使う。
-
-### マイグレーションファイルの追加
-
-新規スキーマ変更は必ずdrizzle-kitの`pnpm run db:generate`経由で生成する。
-`drizzle/migrations/meta/_journal.json`に追記される`when`値（UNIXミリ秒）は直前エントリより大きくなければならない。
-drizzle-orm migratorは`__drizzle_migrations`テーブルに記録した最新の`created_at`より
-大きい`when`を持つentryのみ適用するため、過去日時のentryはskipされて反映漏れになる。
-別ブランチで生成したmigrationのmergeで順序が逆転する場合は、新しい側の`when`を再生成し直してからcommitする。
-
-### 履歴整合のリカバリー
-
-DBが手動修正等で半端な状態になり、マイグレーションが失敗または重複適用される場合は、
-`make sql`（dbコンテナのmariadbクライアント）から次の手順で`__drizzle_migrations`テーブルと
-実DB状態を整合させる。
-
-1. 適用済みでない（未適用扱いに戻したい）migrationの記録を削除する
-
-   ```sql
-   DELETE FROM __drizzle_migrations WHERE created_at >= <対象when値>;
-   ```
-
-2. DB側の実スキーマが対象migrationを既に反映している場合は、
-   `ALTER TABLE`等で当該migrationのSQLを巻き戻すか、逆に整合する状態に揃える
-3. 再起動して自動適用に委ねる
-
-整合手順を実行する前に必ず`make backup`を取得する。
-
 ## 開発コマンド
 
-```bash
-make format   # 整形 + 軽量lint + 自動修正（開発時の手動実行用）
-make test     # 全チェック実行（これを通過すればコミット可能）
-make update   # 依存更新
-```
+| コマンド | 内容 |
+| --- | --- |
+| `make format` | 整形 + 軽量lint + 自動修正 |
+| `make test` | 全チェック実行（コミット前の必須検証） |
+| `make test-e2e` | e2eテスト（Playwright）単独実行 |
+| `make update` | 依存更新 |
 
-e2eテスト（Playwright）は`make test-e2e`で実行する。
-`app/tests/`配下のテストをnginx経由のHTTPS（port 38180）で動作させるため、開発環境が起動している必要がある。
-テストユーザーは`app/tests/global-setup.ts`で初回自動作成される。
+e2eテスト（`make test-e2e`）は開発環境（`make deploy`）が起動している必要がある。
 
 ## サプライチェーン攻撃対策
 
-npm / PyPIレジストリへの悪意あるパッケージ公開に対する防御として、次の方針を採用する。
+npm / PyPIレジストリへの悪意あるパッケージ公開に対し、次の方針を採用する。
 
-- `pnpm-workspace.yaml`の`minimumReleaseAge: 1440`（1日 = 1440分）で
-  公開から1日未満のnpmパッケージのインストールを禁止する。`pnpm dlx`にも適用される（pnpm 10.18以降）
-- `uv.toml`の`exclude-newer = "1 day"`でPyPIに公開されてから1日未満のパッケージのインストールを禁止する。
-  `uvx`（`uv tool run`）にも適用される
-- `.pre-commit-config.yaml`の`additional_dependencies`はpnpmを介さないため、
-  `@latest`を使わずバージョンを固定する
-- CI・Docker・`make`から呼ばれる`pnpm install`は`--frozen-lockfile`を明示する。
-  ロックファイル乖離時の再resolveを禁止して二重防御を構成する
+- npmパッケージ: `pnpm-workspace.yaml`の`minimumReleaseAge: 1440`で公開から1日未満のインストールを禁止する
+- PyPIパッケージ: `uv.toml`の`exclude-newer = "1 day"`で公開から1日未満のインストールを禁止する
+- `pnpm install`は`--frozen-lockfile`を明示してロックファイル乖離時の再resolveを禁止する
+- `.pre-commit-config.yaml`の`additional_dependencies`はバージョンを固定する（`@latest`は使わない）
 
-依存更新時は`make update`から呼ばれる`pnpm update --latest`を使う
-（`pnpm update`は`--frozen-lockfile`の影響対象外のため開発フローを阻害しない）。
-緊急で公開直後のパッケージが必要な場合は`pnpm-workspace.yaml`の`minimumReleaseAgeExclude`に追加する。
+依存更新は`make update`を使う。
 
 ## Docker構成
 
 サービス構成・環境変数は`compose.yaml` / `.env`を参照。
 プロファイルは`production`（既定推奨）と`development`の2種類がある。
+
+## DBマイグレーション運用
+
+### 自動適用
+
+`make deploy`（`docker compose up`）の起動時にマイグレーションが自動適用される。
+稼働中のappを止めずに即座にマイグレーションを反映したい場合は`make migrate`を実行する。
+
+### マイグレーションファイルの追加
+
+新規スキーマ変更は必ず`pnpm run db:generate`経由で生成する。
+`drizzle/migrations/meta/_journal.json`の`when`値（UNIXミリ秒）は直前エントリより大きくなければならない。
+別ブランチで生成したmigrationのmergeで順序が逆転する場合は、新しい側の`when`を再生成してからcommitする。
+
+### 履歴整合のリカバリー
+
+DBが半端な状態になった場合は`make sql`から`__drizzle_migrations`テーブルと実DB状態を整合させる。
+整合手順を実行する前に必ず`make backup`を取得する。
 
 ## CI/CD
 
@@ -129,8 +101,6 @@ GitHub Pagesへデプロイされる。
 [VitePress](https://vitepress.dev/)を使用する。
 `docs/`ディレクトリ直下のMarkdownファイルがページ、`docs/.vitepress/config.ts`でサイト設定を管理する。
 
-ローカルプレビュー:
-
 ```bash
 make docs
 ```
@@ -141,26 +111,13 @@ make docs
 
 ### バックアップ
 
-デプロイ前にDBダンプとキーファイルのバックアップを取得する。
-CIデプロイ（`deploy.yaml`）では`make deploy`の前に自動実行される。
-
 ```bash
 make backup
 ```
 
 バックアップ先: `${DATA_DIR}/backups/YYYYMMDD_HHMMSS/`（DBダンプ + キーファイル）。
-既定で直近5世代を保持する。`BACKUP_KEEP`環境変数で変更可能。
-
-```bash
-BACKUP_KEEP=10 make backup
-```
-
-DBコンテナが停止中の場合はエラー終了する。
-初回デプロイなどDBがない状態では`SKIP_DB_DUMP=1`でスキップ可能。
-
-```bash
-SKIP_DB_DUMP=1 make backup
-```
+既定で直近5世代を保持する（`BACKUP_KEEP`環境変数で変更可能）。
+DBコンテナが停止中の場合はエラー終了する。初回デプロイなどDBがない状態では`SKIP_DB_DUMP=1`でスキップ可能。
 
 ### リストア
 
@@ -185,10 +142,5 @@ gh workflow run release.yaml --field="bump=PATCH"
 gh workflow run release.yaml --field="bump=MINOR"
 gh workflow run release.yaml --field="bump=MAJOR"
 ```
-
-`release.yaml`はmasterの`ci.yaml`成功を確認したうえでバージョンタグとリリースを作成し、
-`deploy.yaml`を起動する。
-`deploy.yaml`はDockerイメージをGHCRへプッシュしてから、
-SSHでサーバーに`make sync && make backup && make deploy`を実行する。
 
 進捗は<https://github.com/ak110/GLATasks/actions>で確認できる。
