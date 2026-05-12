@@ -1,0 +1,4 @@
+# lycheeリンクチェッカーの設定。
+# SvelteKit規約でroot-relativeリンク（/manifest.webmanifest等）を必須とする
+# app/src/app.htmlはlychee側でbase解決ができないため除外する。
+exclude_path = ["app/src/app.html"]

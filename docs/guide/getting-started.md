@@ -8,8 +8,8 @@
 - タスクに紐付くカウントダウンタイマー（カウントダウン・アラームの2モード）
 - SSEによる複数端末・タブ間のリアルタイム同期
 - PWA対応
-- [Chrome拡張機能](/guide/chrome-extension)でWebページをワンクリック保存
-- [Android共有メニュー](/guide/android-share)から直接タスク追加
+- [Chrome拡張機能](./chrome-extension.md)でWebページをワンクリック保存
+- [Android共有メニュー](./android-share.md)から直接タスク追加
 
 ## デプロイ
 
@@ -42,7 +42,7 @@
    ```
 
 4. HTTPSでアクセスできるようリバースプロキシを設定
-  （設定例は[アーキテクチャの外部リバースプロキシ設定](/development/architecture#外部リバースプロキシ設定)を参照）
+  （設定例は[アーキテクチャの外部リバースプロキシ設定](../development/architecture.md#外部リバースプロキシ設定)を参照）
 
 5. ブラウザでアクセスし、ユーザー登録してログイン
 
