@@ -13,7 +13,7 @@
         cycleTheme,
         type Theme,
     } from "$lib/theme";
-    import { connect, disconnect } from "$lib/sse-client";
+    import { connect, disconnect, checkConnection } from "$lib/sse-client";
     import TimerAlarmMonitor from "$lib/components/timers/TimerAlarmMonitor.svelte";
     import Toast from "$lib/components/ui/Toast.svelte";
     import UpdateBanner from "$lib/components/ui/UpdateBanner.svelte";
@@ -43,9 +43,18 @@
     });
 
     onMount(() => {
-        // SSE 接続（ログイン済みの場合のみ）
+        // SSE 接続と可視復帰トリガ（ログイン済みの場合のみ）
+        // visibilitychange は SSE 接続の健全性を前倒し判定するためのトリガであり、
+        // 未ログイン時は購読対象が存在しないため connect と同じ条件ブロックに統合する
+        let visibilityHandler: (() => void) | null = null;
         if (data.logged_in) {
             connect(queryClient);
+            visibilityHandler = () => {
+                if (document.visibilityState === "visible") {
+                    checkConnection();
+                }
+            };
+            document.addEventListener("visibilitychange", visibilityHandler);
         }
 
         // テーマ初期化
@@ -76,6 +85,12 @@
 
         return () => {
             mq.removeEventListener("change", handler);
+            if (visibilityHandler) {
+                document.removeEventListener(
+                    "visibilitychange",
+                    visibilityHandler,
+                );
+            }
             disconnect();
         };
     });

@@ -25,10 +25,15 @@ export const GET: RequestHandler = async ({ locals }) => {
       controller.enqueue(
         new TextEncoder().encode(`event: connected\ndata: ${Date.now()}\n\n`),
       );
-      // 30秒間隔でハートビート（接続維持のみ、データなし）
+      // 30秒間隔でハートビートイベントを送出する
+      // 設計は docs/development/architecture.md のリアルタイム同期節を参照
       heartbeatInterval = setInterval(() => {
         try {
-          controller.enqueue(new TextEncoder().encode(":\n\n"));
+          controller.enqueue(
+            new TextEncoder().encode(
+              `event: heartbeat\ndata: ${Date.now()}\n\n`,
+            ),
+          );
         } catch {
           /* closed */
         }

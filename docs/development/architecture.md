@@ -98,7 +98,11 @@ sequenceDiagram
 - エンドポイント: `GET /api/events`（Cookie認証）
 - データは含めずイベント種別のみ送信（`lists:updated` / `tasks:updated` / `timers:updated`）
 - クライアントはイベント受信時にTanStack Queryの `invalidateQueries` で該当データを再取得
-- 再接続はブラウザの `EventSource` 自動再接続に委ねる
+- 再接続は`EventSource`の自動再接続に加え、クライアント側で接続の健全性を監視する。
+  受信ウォッチドッグ（30秒周期で判定、最終受信から75秒経過で強制再接続）・
+  `error`イベント発火時の`readyState=CLOSED`即時再接続・
+  `visibilitychange`での可視復帰時の前倒し判定を組み合わせ、
+  ブラウザのネットワークタイマー減速等で接続がゾンビ化した際の差分sync取りこぼしを防ぐ
 - nginx: `/api/events` に `proxy_buffering off` を設定（SSEがバッファされると配信遅延が発生するため）
 
 ## タイマー時刻同期
@@ -124,6 +128,11 @@ SSE heartbeat (30秒ごと)  ──→ 接続維持のみ（オフセット更�
 
 SSEは片道通信のためRTTを測定できない。heartbeatのサーバー時刻でオフセットを上書きすると、
 tRPCのRTT/2補正で得た精密値が片道遅延分だけズレた値に劣化するため、heartbeatは接続維持のみに使用する。
+
+heartbeatの送出形式には名前付きイベント（`event: heartbeat`）を採用する。
+コメント行形式（`:\n\n`）では`EventSource`がイベントとして通知せず、
+クライアント側の受信ウォッチドッグが`addEventListener("heartbeat", ...)`で
+最終受信時刻を更新できない。
 
 ## 認証設計
 
