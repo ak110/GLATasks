@@ -166,11 +166,12 @@ Pointer Events APIへ統一することで、マウス・タッチ・ペンの�
 
 ## Vitest テスト環境
 
-DOM環境を要するテストは `vitest.config.ts` の `dom` projectに置き、
-Node環境のテストへ影響を与えない構成を維持する。
+`vitest.config.ts`はリポジトリルート（`app/`配下ではない）に配置し、
+`test.projects`で`node`と`dom`の2プロジェクトへ分割する。
+DOM環境を要するテストは`dom`プロジェクトに置き、Node環境のテストへ影響を与えない構成を維持する。
 
 テストファイルの命名規則:
 
-- Svelteコンポーネントのテスト: `*.svelte.test.ts`
-- その他のDOM環境テスト: `*.dom.test.ts`
-- Node環境テスト: `*.test.ts`
+- Svelteコンポーネントのテスト: `*.svelte.test.ts`（`dom`プロジェクトで実行）
+- その他のDOM環境テスト: `*.dom.test.ts`（`dom`プロジェクトで実行）
+- Node環境テスト: `*.test.ts`（`node`プロジェクトで実行）
