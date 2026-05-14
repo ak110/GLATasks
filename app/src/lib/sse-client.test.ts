@@ -30,9 +30,9 @@ class MockEventSource {
     arr.push(cb);
   }
 
-  /** テスト用: 指定タイプのイベントを発火する */
-  dispatch(type: string, data: string = ""): void {
-    const event = { data } as MessageEvent;
+  /** テスト用: 指定タイプのイベントを発火する。lastEventIdも与えられる */
+  dispatch(type: string, data: string = "", lastEventId: string = ""): void {
+    const event = { data, lastEventId } as MessageEvent;
     for (const cb of this.listeners.get(type) ?? []) cb(event);
   }
 
@@ -59,7 +59,7 @@ describe("sse-client", () => {
 
   it("connected イベント受信時に queryClient.invalidateQueries を呼ぶ", async () => {
     // 切断中に取りこぼしたかもしれない更新を取り直すため、初回接続および
-    // EventSource の自動再接続のたびに全クエリを invalidate する。
+    // EventSource の自動再接続のたびに全クエリーを invalidate する。
     const { connect, disconnect } = await import("./sse-client");
     const invalidate = vi.fn().mockResolvedValue(undefined);
     const queryClient = {
@@ -175,6 +175,112 @@ describe("sse-client", () => {
 
       const expectedInstances = shouldReconnect ? 2 : 1;
       expect(MockEventSource.instances.length).toBe(expectedInstances);
+
+      disconnect();
+    },
+  );
+
+  it("reset イベント受信時に全クエリーを invalidate する", async () => {
+    // バッファ外れやサーバー再起動時、サーバーが reset を送出する。
+    // クライアントは connected と同等の全クエリーinvalidateで整合性を回復する。
+    const { connect, disconnect } = await import("./sse-client");
+    const invalidate = vi.fn().mockResolvedValue(undefined);
+    const queryClient = {
+      invalidateQueries: invalidate,
+    } as unknown as import("@tanstack/svelte-query").QueryClient;
+
+    connect(queryClient);
+    expect(MockEventSource.instances.length).toBe(1);
+
+    MockEventSource.instances[0].dispatch("reset", "", "");
+    expect(invalidate).toHaveBeenCalledTimes(1);
+
+    disconnect();
+  });
+
+  it("reset イベント受信後の再接続URLには lastEventId パラメータを付けない", async () => {
+    // reset 受信時に保持中の lastEventId をクリアし、次回再接続を connected 経路へ戻す。
+    // これにより、サーバー側バッファ復元不能時に reset が返り続けるループを避ける。
+    const { connect, disconnect } = await import("./sse-client");
+    const queryClient = {
+      invalidateQueries: vi.fn().mockResolvedValue(undefined),
+    } as unknown as import("@tanstack/svelte-query").QueryClient;
+
+    connect(queryClient);
+    const es1 = MockEventSource.instances[0];
+
+    // 先に有効なIDを受信して保持させる
+    es1.dispatch("connected", String(Date.now()), "5");
+    // reset 受信で lastEventId をクリア
+    es1.dispatch("reset", "", "");
+
+    // 強制再接続を発火させる
+    es1.readyState = MockEventSource.CLOSED;
+    es1.dispatch("error");
+
+    expect(MockEventSource.instances.length).toBe(2);
+    expect(MockEventSource.instances[1].url).toBe("/api/events");
+
+    disconnect();
+  });
+
+  it("初回 connect 時のURLには lastEventId クエリーパラメータを付けない", async () => {
+    const { connect, disconnect } = await import("./sse-client");
+    const queryClient = {
+      invalidateQueries: vi.fn().mockResolvedValue(undefined),
+    } as unknown as import("@tanstack/svelte-query").QueryClient;
+
+    connect(queryClient);
+    expect(MockEventSource.instances[0].url).toBe("/api/events");
+    disconnect();
+  });
+
+  // 同値分割: 受信イベントのID保持パターン
+  // - 有効なID付き: 保持してURLに反映
+  // - 空文字ID: 維持（更新しない）
+  // - lastEventId プロパティ自体が欠落: 維持
+  // 再接続時のURLに反映するため、forceReconnect 経由で2つ目のEventSourceのURLを観測する
+  it.each([
+    {
+      label: "有効なID付き",
+      lastEventIds: ["7"],
+      expectedUrl: "/api/events?lastEventId=7",
+    },
+    {
+      label: "空文字ID（更新しない）",
+      lastEventIds: [""],
+      expectedUrl: "/api/events",
+    },
+    {
+      label: "ID付きの後に空文字（後者は無視）",
+      lastEventIds: ["3", ""],
+      expectedUrl: "/api/events?lastEventId=3",
+    },
+    {
+      label: "複数受信時は最新IDを採用",
+      lastEventIds: ["3", "9"],
+      expectedUrl: "/api/events?lastEventId=9",
+    },
+  ])(
+    "lastEventId保持: $label → 再接続URL=$expectedUrl",
+    async ({ lastEventIds, expectedUrl }) => {
+      const { connect, disconnect } = await import("./sse-client");
+      const queryClient = {
+        invalidateQueries: vi.fn().mockResolvedValue(undefined),
+      } as unknown as import("@tanstack/svelte-query").QueryClient;
+
+      connect(queryClient);
+      const es1 = MockEventSource.instances[0];
+      for (const id of lastEventIds) {
+        es1.dispatch("connected", String(Date.now()), id);
+      }
+
+      // forceReconnect を発火するため CLOSED の error を起こす
+      es1.readyState = MockEventSource.CLOSED;
+      es1.dispatch("error");
+
+      expect(MockEventSource.instances.length).toBe(2);
+      expect(MockEventSource.instances[1].url).toBe(expectedUrl);
 
       disconnect();
     },

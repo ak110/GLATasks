@@ -1,20 +1,33 @@
 /**
- * @fileoverview SSE 共有接続管理 + サーバー時刻オフセット管理
+ * @fileoverview SSE 共有接続管理 + サーバー時刻オフセット管理 + 差分catchup連携
  *
  * 各ページが個別に EventSource を作成していた仕組みを統合し、
  * +layout.svelte で1つの接続を管理する。
  * サーバー時刻オフセットもここで一元管理する。
  *
- * 接続成立 (初回および再接続) のたびに TanStack Query の
- * 全クエリを invalidate し、切断中に取りこぼしたかもしれない更新を取り直す。
+ * ## 差分catchup連携
+ *
+ * 受信したイベントの `lastEventId` をモジュールスコープ変数に保持する。
+ * 接続URLには値がある場合に限り `?lastEventId=<id>` を付加し、
+ * 明示再接続（`forceReconnect()`）でも確実にサーバーへ伝達する。
+ * `EventSource` の自動再接続では標準仕様により `Last-Event-ID` ヘッダーも
+ * 送信されるため、サーバー側は両方を受け取る前提とする。
+ *
+ * 永続化は行わない。タブを閉じれば失う前提で、再起動後の初回接続は
+ * サーバー側の `connected` イベントによる全 invalidate に委ねる。
+ *
+ * `reset` イベントを受信した場合は、`connected` 受信時と同じ全 `invalidateQueries()` を行い、
+ * バッファ外れやサーバー再起動による差分取りこぼしから整合性を回復する。
+ *
+ * ## 接続健全性監視
  *
  * ブラウザのネットワークタイマー減速・スリープ・瞬断などで EventSource が
  * OPEN のまま実通信が停止する「ゾンビ化」を検知するため、
- * 受信ウォッチドッグとエラー時即時再接続を組み合わせた接続健全性監視を行う。
+ * 受信ウォッチドッグとエラー時即時再接続を組み合わせる。
  */
 
 import type { QueryClient } from "@tanstack/svelte-query";
-import type { SseEventName } from "./sse-events";
+import { SSE_EVENTS, type SseEventName } from "./sse-events";
 
 // サーバー時刻オフセット（ms）: サーバー時刻 = Date.now() + offset
 let serverOffset = 0;
@@ -50,6 +63,8 @@ let eventSource: EventSource | null = null;
 let queryClientRef: QueryClient | null = null;
 let lastReceivedAt = 0;
 let watchdogTimer: ReturnType<typeof setInterval> | null = null;
+// 受信した最新の Last-Event-ID（数値文字列。未受信時は null）
+let lastEventId: string | null = null;
 type EventCallback = (event: MessageEvent) => void;
 const subscribers = new Map<string, Set<EventCallback>>();
 
@@ -60,19 +75,30 @@ export function connect(queryClient: QueryClient): void {
   queryClientRef = queryClient;
   lastReceivedAt = Date.now();
 
-  const es = new EventSource("/api/events");
+  const es = new EventSource(buildConnectUrl());
   eventSource = es;
 
   // 接続確立時の処理:
   // 1. サーバー時刻から暫定オフセットを設定 (tRPC レスポンスの RTT/2 補正値で上書きされる)
-  // 2. 全クエリを invalidate して、切断中に取りこぼしたイベントぶんを取り直す
+  // 2. 全クエリーを invalidate して、切断中に取りこぼしたイベントぶんを取り直す
   //    (EventSource は自動再接続するため、再接続時もこのハンドラが再発火する)
   es.addEventListener("connected", (e: MessageEvent) => {
     touchReceived();
+    captureEventId(e);
     const serverMs = Number(e.data);
     if (serverMs) {
       setServerOffset(serverMs - Date.now());
     }
+    void queryClient.invalidateQueries();
+  });
+
+  // reset イベント: サーバー側バッファ外れ・再起動などで差分catchupが成立しない場合に送出される。
+  // connected と同等に全クエリーを invalidate して整合性を回復する。
+  // 受信時点で保持中の lastEventId は破棄し、次回再接続を初回接続扱い（connected経路）に戻す。
+  // これにより `reset` ループ（古い lastEventId を送り続けて毎回 reset が返る状態）を避ける。
+  es.addEventListener(SSE_EVENTS.reset, () => {
+    touchReceived();
+    lastEventId = null;
     void queryClient.invalidateQueries();
   });
 
@@ -96,6 +122,7 @@ export function connect(queryClient: QueryClient): void {
   for (const [eventType, callbacks] of subscribers) {
     es.addEventListener(eventType, (e: MessageEvent) => {
       touchReceived();
+      captureEventId(e);
       for (const cb of callbacks) {
         cb(e);
       }
@@ -137,6 +164,7 @@ export function subscribe(
   if (eventSource) {
     const wrappedHandler = (e: MessageEvent) => {
       touchReceived();
+      captureEventId(e);
       if (callbacks!.has(callback)) {
         callback(e);
       }
@@ -172,6 +200,21 @@ export function checkConnection(): void {
   if (elapsed >= RECEIVE_TIMEOUT_MS) {
     forceReconnect();
   }
+}
+
+/** 受信イベントから lastEventId を取り出して保持する（空文字・欠落は無視） */
+function captureEventId(e: MessageEvent): void {
+  // MessageEvent.lastEventId は仕様上 string で、SSEに `id:` が無いと空文字
+  const id = e.lastEventId;
+  if (typeof id === "string" && id !== "") {
+    lastEventId = id;
+  }
+}
+
+/** 接続URLを組み立てる。受信済みIDがあればクエリーパラメータで伝達する */
+function buildConnectUrl(): string {
+  if (lastEventId === null) return "/api/events";
+  return `/api/events?lastEventId=${encodeURIComponent(lastEventId)}`;
 }
 
 /** 最終受信時刻を現在時刻で更新する */

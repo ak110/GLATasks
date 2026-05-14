@@ -43,17 +43,6 @@ async function tickPoll(times = 1): Promise<void> {
   }
 }
 
-/** 連続失敗用の fetch モック設定 + 末尾に成功を1件積む */
-function queueFailuresThenOk(
-  fetchMock: ReturnType<typeof vi.fn>,
-  failCount: number,
-): void {
-  for (let i = 0; i < failCount; i++) {
-    fetchMock.mockResolvedValueOnce(jsonResponse({ status: "ng" }));
-  }
-  fetchMock.mockResolvedValueOnce(okResponse());
-}
-
 describe("connectivity-watcher", () => {
   let fetchMock: ReturnType<typeof vi.fn>;
   let reloadMock: ReturnType<typeof vi.fn>;
@@ -84,21 +73,31 @@ describe("connectivity-watcher", () => {
     document.body.innerHTML = "";
   });
 
-  // 同値分割: 連続失敗回数（閾値未満 / 閾値 / 閾値超過）
-  // 境界値: 1回・2回・3回（FAILURE_THRESHOLD=2 の前後）
-  // 連続2回失敗後の成功で復旧処理が走り、reload が呼ばれる
+  // 同値分割: 1回のヘルスチェック結果（失敗 / 成功）
+  // 連続失敗カウントは撤廃済みで、1回失敗で即発火・1回成功で発火しないことを確認する
   it.each([
-    { label: "1回失敗", failCount: 1, expectReload: false },
-    { label: "2回失敗", failCount: 2, expectReload: true },
-    { label: "3回失敗", failCount: 3, expectReload: true },
+    {
+      label: "失敗",
+      respond: (mock: ReturnType<typeof vi.fn>) =>
+        mock.mockResolvedValueOnce(jsonResponse({ status: "ng" })),
+      expectReload: true,
+    },
+    {
+      label: "成功",
+      respond: (mock: ReturnType<typeof vi.fn>) =>
+        mock.mockResolvedValueOnce(okResponse()),
+      expectReload: false,
+    },
   ])(
-    "連続失敗 $label 後の成功で復旧処理発火=$expectReload",
-    async ({ failCount, expectReload }) => {
-      queueFailuresThenOk(fetchMock, failCount);
+    "ヘルスチェック1回 $label → reload発火=$expectReload",
+    async ({ respond, expectReload }) => {
+      respond(fetchMock);
+      // 後続ポーリングは安定して成功扱い
+      fetchMock.mockResolvedValue(okResponse());
 
       currentWatcher = await import("./connectivity-watcher.svelte");
       currentWatcher.start();
-      await tickPoll(failCount + 1);
+      await tickPoll(1);
 
       if (expectReload) {
         expect(reloadMock).toHaveBeenCalledTimes(1);
@@ -108,7 +107,7 @@ describe("connectivity-watcher", () => {
     },
   );
 
-  // 同値分割: 復旧時の入力中判定パターン
+  // 同値分割: 検知時の入力中判定パターン
   // 非入力中は即時 reload、入力中は pendingReload=true でバナー待機に分岐する
   it.each([
     {
@@ -160,14 +159,15 @@ describe("connectivity-watcher", () => {
       expectPending: true,
     },
   ])(
-    "復旧時の分岐: $label → reload=$expectReload / pendingReload=$expectPending",
+    "検知時の分岐: $label → reload=$expectReload / pendingReload=$expectPending",
     async ({ setup, expectReload, expectPending }) => {
       setup();
-      queueFailuresThenOk(fetchMock, 2);
+      fetchMock.mockResolvedValueOnce(jsonResponse({ status: "ng" }));
+      fetchMock.mockResolvedValue(okResponse());
 
       currentWatcher = await import("./connectivity-watcher.svelte");
       currentWatcher.start();
-      await tickPoll(3);
+      await tickPoll(1);
 
       if (expectReload) {
         expect(reloadMock).toHaveBeenCalledTimes(1);
@@ -182,8 +182,7 @@ describe("connectivity-watcher", () => {
 
   // 同値分割: 切断判定条件
   // fetch がネットワークエラー・HTTP ステータス 200 以外・Content-Type が
-  // application/json 以外・JSON の status が "ok" 以外、いずれも失敗扱い
-  // 判定対象の応答を連続2回与え、3回目の成功で復旧発火するかを観測する
+  // application/json 以外・JSON の status が "ok" 以外、いずれも失敗扱いで即発火
   it.each([
     {
       label: "ネットワークエラー",
@@ -223,17 +222,14 @@ describe("connectivity-watcher", () => {
       isFailure: false,
     },
   ])(
-    "判定条件: $label は失敗扱い=$isFailure",
+    "判定条件: $label は失敗扱い=$isFailure（1回で即発火）",
     async ({ respond, isFailure }) => {
-      // 判定対象の応答を2回連続で積む（失敗扱いなら failureCount=2 で切断確定）
       respond(fetchMock);
-      respond(fetchMock);
-      // 3回目以降は成功扱い固定 → 失敗扱いケースのみ復旧発火
       fetchMock.mockResolvedValue(okResponse());
 
       currentWatcher = await import("./connectivity-watcher.svelte");
       currentWatcher.start();
-      await tickPoll(3);
+      await tickPoll(1);
 
       if (isFailure) {
         expect(reloadMock).toHaveBeenCalledTimes(1);

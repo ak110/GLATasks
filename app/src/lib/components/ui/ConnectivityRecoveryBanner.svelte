@@ -1,8 +1,8 @@
 <script lang="ts">
     /**
-     * @fileoverview キャプティブポータル復帰時の手動リロード通知バナー
+     * @fileoverview キャプティブポータル検知時の手動リロード通知バナー
      *
-     * connectivity-watcher が「切断 → 復旧」を検知した時点で、
+     * connectivity-watcher がヘルスチェック失敗を検知した時点で、
      * ユーザーが入力中だった場合のみ表示される。入力作業の中断を避けるため、
      * リロードボタン押下まで自動操作は行わない。
      */
@@ -20,7 +20,7 @@
         role="status"
         data-testid="connectivity-recovery-banner"
     >
-        <span>ネットワークが復帰しました。</span>
+        <span>サーバーに接続できません。</span>
         <button
             type="button"
             class="cursor-pointer rounded bg-white px-3 py-1 font-semibold text-blue-700 hover:bg-blue-50 dark:bg-blue-100 dark:hover:bg-white"

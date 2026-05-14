@@ -3,16 +3,26 @@
  *
  * Cookie 認証済みユーザーに対して SSE 接続を提供する。
  * mutation 完了時にイベント種別（lists:updated 等）のみを配信する。
+ *
+ * 再接続時はリクエストの `Last-Event-ID` ヘッダー（EventSource 自動再接続）
+ * または URL クエリーパラメータ `lastEventId`（明示再接続）を読み取り、
+ * `replayEvents()` でサーバー側バッファから差分をcatchupする。
+ * 両方が提供された場合はヘッダーを優先する。
  */
 
 import type { RequestHandler } from "./$types";
-import { addConnection, removeConnection } from "$lib/server/sse";
+import { addConnection, removeConnection, replayEvents } from "$lib/server/sse";
 
-export const GET: RequestHandler = async ({ locals }) => {
+export const GET: RequestHandler = async ({ locals, request, url }) => {
   const userId = locals.user_id;
   if (!userId) {
     return new Response("Unauthorized", { status: 401 });
   }
+
+  const lastEventId = parseLastEventId(
+    request.headers.get("Last-Event-ID"),
+    url.searchParams.get("lastEventId"),
+  );
 
   let savedController: ReadableStreamDefaultController | null = null;
   let heartbeatInterval: ReturnType<typeof setInterval> | null = null;
@@ -21,10 +31,15 @@ export const GET: RequestHandler = async ({ locals }) => {
     start(controller) {
       savedController = controller;
       addConnection(userId, controller);
-      // 接続確立を通知（暫定オフセット計算用にサーバー時刻を含む）
-      controller.enqueue(
-        new TextEncoder().encode(`event: connected\ndata: ${Date.now()}\n\n`),
-      );
+      if (lastEventId !== null) {
+        // 差分catchup: バッファ外れの場合は `reset` イベントが送信される
+        replayEvents(userId, lastEventId, controller);
+      } else {
+        // 初回接続: 既存挙動を維持し connected で全 invalidate を促す
+        controller.enqueue(
+          new TextEncoder().encode(`event: connected\ndata: ${Date.now()}\n\n`),
+        );
+      }
       // 30秒間隔でハートビートイベントを送出する
       // 設計は docs/development/architecture.md のリアルタイム同期節を参照
       heartbeatInterval = setInterval(() => {
@@ -53,3 +68,15 @@ export const GET: RequestHandler = async ({ locals }) => {
     },
   });
 };
+
+/** Last-Event-ID をヘッダー優先で数値解釈する。無効値や負数は null とする */
+function parseLastEventId(
+  headerValue: string | null,
+  queryValue: string | null,
+): number | null {
+  const raw = headerValue ?? queryValue;
+  if (raw === null || raw === "") return null;
+  const parsed = Number(raw);
+  if (!Number.isInteger(parsed) || parsed < 0) return null;
+  return parsed;
+}

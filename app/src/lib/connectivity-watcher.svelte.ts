@@ -1,12 +1,13 @@
 /**
- * @fileoverview キャプティブポータル復帰時の自動リロード監視
+ * @fileoverview キャプティブポータル検知時の自動リロード監視
  *
- * フリーWiFiのキャプティブポータル下では、認証セッション期限切れで定期的に
- * ログイン画面へリダイレクトされる。この期間中はSSEの自動再接続も成立せず、
- * 認証復帰時にデータが古いまま放置される。本モジュールはSSEとは独立した検出経路として、
- * ヘルスチェックエンドポイントへの定期fetchで切断・復旧を検知し、復旧時にページをリロードする。
+ * フリーWiFiのキャプティブポータル下では、認証セッション期限切れで
+ * ログイン画面へリダイレクトされ、SSEの自動再接続も成立しない。
+ * 本モジュールはSSEとは独立した検出経路として、ヘルスチェックエンドポイントへ
+ * 定期fetchを行い、応答が成功条件を満たさない時点で即時にページをリロードする。
+ * リロードは認証画面への遷移を兼ねる導線となる。
  *
- * 入力中ユーザーへの操作妨害を避けるため、復旧時は入力中の有無で動作を分岐する。
+ * 入力中ユーザーへの操作妨害を避けるため、検知時は入力中の有無で動作を分岐する。
  *
  * - 非入力中: 即時に `location.reload()` を呼ぶ
  * - 入力中:   `connectivityState.pendingReload` を真にしてバナーから手動リロードを促す
@@ -14,8 +15,6 @@
 
 // サーバー側 SSE heartbeat 周期 30秒の倍を採用し、既存ウォッチドッグと役割を分離する
 const POLL_INTERVAL_MS = 60_000;
-// 一過性のネットワークエラー1回で誤検知しないよう、連続2回失敗で切断確定とする
-const FAILURE_THRESHOLD = 2;
 
 const state = $state({
   pendingReload: false,
@@ -24,7 +23,6 @@ const state = $state({
 /** バナー側から購読するリアクティブ状態 */
 export const connectivityState = state;
 
-let failureCount = 0;
 let pollingTimer: ReturnType<typeof setInterval> | null = null;
 let visibilityHandler: (() => void) | null = null;
 let running = false;
@@ -33,7 +31,6 @@ let running = false;
 export function start(): void {
   if (running) return;
   running = true;
-  failureCount = 0;
   state.pendingReload = false;
   visibilityHandler = handleVisibilityChange;
   document.addEventListener("visibilitychange", visibilityHandler);
@@ -51,7 +48,6 @@ export function stop(): void {
     document.removeEventListener("visibilitychange", visibilityHandler);
     visibilityHandler = null;
   }
-  failureCount = 0;
   state.pendingReload = false;
 }
 
@@ -82,13 +78,8 @@ function stopPolling(): void {
 
 async function checkHealth(): Promise<void> {
   const ok = await fetchHealth();
-  if (ok) {
-    if (failureCount >= FAILURE_THRESHOLD) {
-      onRecovery();
-    }
-    failureCount = 0;
-  } else {
-    failureCount += 1;
+  if (!ok) {
+    triggerReload();
   }
 }
 
@@ -107,7 +98,7 @@ async function fetchHealth(): Promise<boolean> {
   }
 }
 
-function onRecovery(): void {
+function triggerReload(): void {
   if (isUserBusy()) {
     state.pendingReload = true;
   } else {
