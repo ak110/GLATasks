@@ -6,8 +6,8 @@
 
 - LinuxまたはmacOS
 - Docker / Docker Compose
-- [uv](https://docs.astral.sh/uv/)（pyfltr・pre-commitなどPython製ツールの実行に使用）
-- Node.js（pnpmは`corepack`経由で取得するため事前インストール不要）
+- uv
+- Node.js
 
 ### セットアップ手順
 
@@ -15,13 +15,7 @@
 （`app/`へ移動して実行すると`${PWD}`がずれてMakefile内のパス解決が誤動作する）。
 
 1. 本リポジトリをclone
-2. uvをインストール
-
-   ```bash
-   curl -LsSf https://astral.sh/uv/install.sh | sh
-   ```
-
-3. `.env-example`を`.env`にコピーして環境変数を設定
+2. `.env-example`を`.env`にコピーして環境変数を設定
 
    ```bash
    cp .env-example .env
@@ -29,13 +23,13 @@
 
    `COMPOSE_PROFILE`・`DATA_DIR`・`UID`・`GID`を環境に合わせて編集する
 
-4. 開発環境のセットアップを実行
+3. 開発環境のセットアップを実行
 
    ```bash
    make setup
    ```
 
-5. 起動
+4. 起動
 
    ```bash
    make deploy
@@ -89,17 +83,10 @@ DBが半端な状態になった場合は`make sql`から`__drizzle_migrations`�
 ## CI/CD
 
 masterへのpushおよびPR時に`ci.yaml`が自動実行される（`.github/workflows/ci.yaml`参照）。
-
-- `test` job: lint・型チェック・ユニットテスト・svelte-checkをpyfltr経由で一括実行する
-- `integration` job: Docker Composeを起動してバックアップテストとPlaywright e2eテストを実行する
-
 masterへのpushで`docs/`配下に変更があれば`docs.yaml`ワークフローが自動実行され、
 GitHub Pagesへデプロイされる。
 
 ## ドキュメントサイト運用
-
-[VitePress](https://vitepress.dev/)を使用する。
-`docs/`ディレクトリ直下のMarkdownファイルがページ、`docs/.vitepress/config.ts`でサイト設定を管理する。
 
 ```bash
 make docs
@@ -121,17 +108,8 @@ DBコンテナが停止中の場合はエラー終了する。初回デプロイ
 
 ### リストア
 
-```bash
-# DB 復元
-docker compose exec -T db mariadb -uglatasks -pglatasks glatasks < ${DATA_DIR}/backups/YYYYMMDD_HHMMSS/glatasks.sql
-
-# キーファイル復元
-cp -p ${DATA_DIR}/backups/YYYYMMDD_HHMMSS/.encrypt_key ${DATA_DIR}/
-cp -p ${DATA_DIR}/backups/YYYYMMDD_HHMMSS/.secret_key ${DATA_DIR}/
-
-# app 再起動（キーファイルを反映）
-make restart-app
-```
+`${DATA_DIR}/backups/YYYYMMDD_HHMMSS/`配下のSQLとキーファイルをDBコンテナへリストア後、
+`make restart-app`を実行する。
 
 ## リリース手順
 

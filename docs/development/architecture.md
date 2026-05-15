@@ -1,20 +1,5 @@
 # アーキテクチャ
 
-## スタック
-
-| レイヤー         | 技術                  | 役割                                    |
-| ---------------- | --------------------- | --------------------------------------- |
-| アプリケーション | SvelteKit             | UI・ルーティング・SSR・API・DB アクセス |
-| API              | tRPC v11              | 型安全な RPC（難読化ミドルウェア付き）  |
-| バリデーション   | Zod                   | スキーマバリデーション                  |
-| データ取得       | TanStack Svelte Query | クライアント側キャッシュ・状態管理      |
-| ORM              | Drizzle ORM           | DB アクセス（型安全）                   |
-| DB               | MariaDB               | データ永続化                            |
-| リバースプロキシ | nginx                 | HTTPS 終端                              |
-| CSS              | Tailwind CSS          | スタイリング                            |
-| 難読化           | Web Crypto API        | ブラウザ ↔ SvelteKit 間 AES-GCM         |
-| 認証             | JWT/HS256 (`jose`)    | Cookie セッション管理                   |
-
 ## アーキテクチャ図（Docker Compose 内部構成）
 
 ```mermaid
