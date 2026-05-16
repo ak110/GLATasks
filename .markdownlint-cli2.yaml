@@ -1,17 +1,27 @@
 $schema: https://raw.githubusercontent.com/DavidAnson/markdownlint-cli2/v0.20.0/schema/markdownlint-cli2-config-schema.json
 config:
+  # コードブロック/表を除外し、127文字を上限とする
   line-length:
     line_length: 127
     code_blocks: false
+    tables: false
+  # コードブロック内でタブ文字を許可(Makefileなど用)
+  no-hard-tabs:
+    code_blocks: false
+  # インラインHTMLを許可
   no-inline-html:
     allowed_elements:
       - a
       - br
       - details
       - summary
+  # リンクのフラグメント識別子を検査しない
   link-fragments: false
+  # テーブルのスタイルに関するルールを無効化
   table-column-style: false
+  # テーブルのパイプスタイルに関するルールを無効化
   table-pipe-style: false
+  # テーブルの列数に関するルールを無効化
   table-column-count: false
 ignores:
   - "**/node_modules/**"
