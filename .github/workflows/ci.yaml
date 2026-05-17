@@ -44,7 +44,7 @@ jobs:
         run: pnpm run build
 
       - name: Lint with pyfltr
-        run: pyfltr ci
+        run: pyfltr ci --output-format=github-annotations
 
   integration:
     runs-on: ubuntu-latest
