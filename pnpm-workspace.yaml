@@ -4,3 +4,12 @@ storeDir: .cache/pnpm-store
 minimumReleaseAge: 1440
 allowBuilds:
   esbuild: true
+ignoredBuiltDependencies:
+  - "@tailwindcss/oxide"
+  - bcrypt
+  - esbuild
+  - unrs-resolver
+overrides:
+  cookie@<0.7.0: ^0.7.0
+  esbuild@<0.25.0: ^0.25.0
+  postcss@<8.5.10: ^8.5.10
