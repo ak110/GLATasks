@@ -24,6 +24,16 @@
  * ブラウザのネットワークタイマー減速・スリープ・瞬断などで EventSource が
  * OPEN のまま実通信が停止する「ゾンビ化」を検知するため、
  * 受信ウォッチドッグとエラー時即時再接続を組み合わせる。
+ *
+ * ## ポーリングフォールバック連携
+ *
+ * 外部要因でSSE応答が長期間届かない経路（キャプティブポータル経由の遮断、
+ * 中継機器のMITM応答バッファリング等）に備え、健全性状態 `HealthState` を
+ * ウォッチドッグとは別経路で管理する。`connect()` 直後は `"initial"` 状態で
+ * 10秒タイマーをセットし、何らかのイベント受信時に `"healthy"` へ遷移して
+ * 60秒タイマーへ切り替える。タイマー発火時に `"unhealthy"` へ遷移する。
+ * `sse-subscribe.ts` はこの状態変化を購読し、`"unhealthy"` 遷移直後に
+ * フォールバックを1回即時実行し、以後30秒間隔のポーリングを継続する。
  */
 
 import type { QueryClient } from "@tanstack/svelte-query";
@@ -58,13 +68,26 @@ export function onOffsetChange(cb: (offset: number) => void): () => void {
 const WATCHDOG_INTERVAL_MS = 30_000;
 const RECEIVE_TIMEOUT_MS = 75_000;
 
+// ポーリングフォールバック連携用の健全性閾値（ms）
+// 初回接続後10秒・接続後の受信途絶60秒で `"unhealthy"` 判定する
+const HEALTH_INITIAL_TIMEOUT_MS = 10_000;
+const HEALTH_RECEIVE_TIMEOUT_MS = 60_000;
+
+/** SSE 健全性状態 */
+export type HealthState = "initial" | "healthy" | "unhealthy";
+
 // SSE 接続管理
 let eventSource: EventSource | null = null;
 let queryClientRef: QueryClient | null = null;
 let lastReceivedAt = 0;
 let watchdogTimer: ReturnType<typeof setInterval> | null = null;
+// 不健全判定用タイマー（閾値到達時刻に直接発火する）
+let unhealthyTimer: ReturnType<typeof setTimeout> | null = null;
 // 受信した最新の Last-Event-ID（数値文字列。未受信時は null）
 let lastEventId: string | null = null;
+// 健全性状態（初期値は "initial" だが、connect 前は外部観測されない）
+let healthState: HealthState = "initial";
+const healthListeners = new Set<(state: HealthState) => void>();
 type EventCallback = (event: MessageEvent) => void;
 const subscribers = new Map<string, Set<EventCallback>>();
 
@@ -74,6 +97,8 @@ export function connect(queryClient: QueryClient): void {
 
   queryClientRef = queryClient;
   lastReceivedAt = Date.now();
+  // 接続開始時は "initial" 状態へ戻し、10秒タイマーをセットする
+  resetHealthForConnect();
 
   const es = new EventSource(buildConnectUrl());
   eventSource = es;
@@ -135,6 +160,7 @@ export function connect(queryClient: QueryClient): void {
 /** SSE 接続を切断する */
 export function disconnect(): void {
   stopWatchdog();
+  clearUnhealthyTimer();
   if (eventSource) {
     eventSource.close();
     eventSource = null;
@@ -202,6 +228,17 @@ export function checkConnection(): void {
   }
 }
 
+/** 現在の健全性状態を取得する */
+export function getHealth(): HealthState {
+  return healthState;
+}
+
+/** 健全性状態の変化を購読する（戻り値は解除関数） */
+export function onHealthChange(cb: (state: HealthState) => void): () => void {
+  healthListeners.add(cb);
+  return () => healthListeners.delete(cb);
+}
+
 /** 受信イベントから lastEventId を取り出して保持する（空文字・欠落は無視） */
 function captureEventId(e: MessageEvent): void {
   // MessageEvent.lastEventId は仕様上 string で、SSEに `id:` が無いと空文字
@@ -217,9 +254,14 @@ function buildConnectUrl(): string {
   return `/api/events?lastEventId=${encodeURIComponent(lastEventId)}`;
 }
 
-/** 最終受信時刻を現在時刻で更新する */
+/**
+ * 最終受信時刻を現在時刻で更新する。
+ * 健全性状態を `"healthy"` へ遷移させ、不健全判定タイマーを60秒タイマーへリセットする。
+ */
 function touchReceived(): void {
   lastReceivedAt = Date.now();
+  scheduleUnhealthyTimer(HEALTH_RECEIVE_TIMEOUT_MS);
+  setHealthState("healthy");
 }
 
 /** ウォッチドッグを起動する（既に動作中なら何もしない） */
@@ -233,6 +275,38 @@ function stopWatchdog(): void {
   if (watchdogTimer) {
     clearInterval(watchdogTimer);
     watchdogTimer = null;
+  }
+}
+
+/** 接続開始時に健全性状態と不健全判定タイマーを初期化する */
+function resetHealthForConnect(): void {
+  setHealthState("initial");
+  scheduleUnhealthyTimer(HEALTH_INITIAL_TIMEOUT_MS);
+}
+
+/** 不健全判定タイマーをセット（既存タイマーがあれば置き換える） */
+function scheduleUnhealthyTimer(timeoutMs: number): void {
+  clearUnhealthyTimer();
+  unhealthyTimer = setTimeout(() => {
+    unhealthyTimer = null;
+    setHealthState("unhealthy");
+  }, timeoutMs);
+}
+
+/** 不健全判定タイマーを停止する */
+function clearUnhealthyTimer(): void {
+  if (unhealthyTimer) {
+    clearTimeout(unhealthyTimer);
+    unhealthyTimer = null;
+  }
+}
+
+/** 健全性状態を更新し、変化があればリスナーへ通知する */
+function setHealthState(next: HealthState): void {
+  if (healthState === next) return;
+  healthState = next;
+  for (const cb of healthListeners) {
+    cb(next);
   }
 }
 

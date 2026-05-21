@@ -1,13 +1,13 @@
 <script lang="ts">
     /**
-     * @fileoverview キャプティブポータル検知時の手動リロード通知バナー
+     * @fileoverview 接続不全検知時の手動リロード通知バナー
      *
-     * connectivity-watcher がヘルスチェック失敗を検知した時点で、
+     * SSE経由の同期が成立しない状況をポーリングfallback機構が検知した時点で、
      * ユーザーが入力中だった場合のみ表示される。入力作業の中断を避けるため、
      * リロードボタン押下まで自動操作は行わない。
      */
 
-    import { connectivityState } from "$lib/connectivity-watcher.svelte";
+    import { connectivityState } from "$lib/connection-recovery.svelte";
 
     function reload() {
         location.reload();

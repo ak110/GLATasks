@@ -14,10 +14,6 @@
         type Theme,
     } from "$lib/theme";
     import { connect, disconnect, checkConnection } from "$lib/sse-client";
-    import {
-        start as startConnectivityWatcher,
-        stop as stopConnectivityWatcher,
-    } from "$lib/connectivity-watcher.svelte";
     import TimerAlarmMonitor from "$lib/components/timers/TimerAlarmMonitor.svelte";
     import Toast from "$lib/components/ui/Toast.svelte";
     import UpdateBanner from "$lib/components/ui/UpdateBanner.svelte";
@@ -48,10 +44,6 @@
     });
 
     onMount(() => {
-        // キャプティブポータル監視はログイン状態に関わらず起動する
-        // （未ログイン時もキャプティブポータル現象は発生するため）
-        startConnectivityWatcher();
-
         // SSE 接続と可視復帰トリガ（ログイン済みの場合のみ）
         // visibilitychange は SSE 接続の健全性を前倒し判定するためのトリガであり、
         // 未ログイン時は購読対象が存在しないため connect と同じ条件ブロックに統合する
@@ -101,7 +93,6 @@
                 );
             }
             disconnect();
-            stopConnectivityWatcher();
         };
     });
 

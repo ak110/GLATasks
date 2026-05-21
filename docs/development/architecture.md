@@ -81,14 +81,20 @@ sequenceDiagram
 ```
 
 - エンドポイント: `GET /api/events`（Cookie認証）
-- データは含めずイベント種別のみ送信（`lists:updated` / `tasks:updated` / `timers:updated`）
+- データは含めずイベント種別のみ送信
+ （`lists:updated` / `tasks:updated` / `timers:updated` / `users:preferences:updated` / `reset`）
 - クライアントはイベント受信時にTanStack Queryの `invalidateQueries` で該当データを再取得
 - 再接続は`EventSource`の自動再接続に加え、クライアント側で接続の健全性を監視する。
   受信ウォッチドッグ（30秒周期で判定、最終受信から75秒経過で強制再接続）・
   `error`イベント発火時の`readyState=CLOSED`即時再接続・
   `visibilitychange`での可視復帰時の前倒し判定を組み合わせ、
-  ブラウザのネットワークタイマー減速等で接続がゾンビ化した際の差分sync取りこぼしを防ぐ
+  ブラウザのネットワークタイマー減速等で接続がゾンビ化した際の差分同期取りこぼしを防ぐ
 - nginx: `/api/events` に `proxy_buffering off` を設定（SSEがバッファされると配信遅延が発生するため）
+- 外部要因でSSE応答が長期間届かない経路に備え、ポーリングフォールバック機構を併設する。
+  初回接続後10秒または受信途絶60秒で不健全と判定し、SSE経由で再取得対象となる全クエリーへ
+  即時1回のフォールバック実行と30秒間隔の継続ポーリングを起動する。
+  SSE側で何らかのイベントを受信した時点で健全へ復帰しポーリングを停止する。
+  SSE接続自体はポーリング期間中も維持する
 
 ## タイマー時刻同期
 

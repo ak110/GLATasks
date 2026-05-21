@@ -60,9 +60,13 @@
     });
     // SSE: タイマー更新通知でデータを再取得
     // （/timers ページ以外でもトースト消去・favicon 復元が即座に反映されるように）
+    // 全ページに常駐するため、/timers 以外の画面でもフォールバック経由で ["timers"] が同期される
+    const invalidateTimers = () =>
+        queryClient.invalidateQueries({ queryKey: ["timers"] });
     subscribeOnMount({
-        [SSE_EVENTS.timersUpdated]: () => {
-            queryClient.invalidateQueries({ queryKey: ["timers"] });
+        [SSE_EVENTS.timersUpdated]: {
+            handler: invalidateTimers,
+            fallback: invalidateTimers,
         },
     });
 

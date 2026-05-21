@@ -177,81 +177,91 @@
         }),
     );
 
-    // SSE: サーバーからの通知でクエリを再取得
-    subscribeOnMount({
-        [SSE_EVENTS.listsUpdated]: () => {
-            // リスト集合の id+status に変化があった場合のみアクティブタスクキャッシュをリセットする
-            // rename はリセット不要、archive/unarchive/delete/merge はリセット要
-            void (async () => {
-                const prevLists =
-                    queryClient.getQueryData<RouterOutputs["lists"]["list"]>([
-                        "lists",
-                        showType,
-                    ]) ?? [];
-                const prevKey = JSON.stringify(
-                    prevLists.map((l) => `${l.id}:${l.status}`).sort(),
-                );
-                await queryClient.invalidateQueries({ queryKey: ["lists"] });
-                const newLists =
-                    queryClient.getQueryData<RouterOutputs["lists"]["list"]>([
-                        "lists",
-                        showType,
-                    ]) ?? [];
-                const newKey = JSON.stringify(
-                    newLists.map((l) => `${l.id}:${l.status}`).sort(),
-                );
-                if (prevKey !== newKey) {
-                    // 物理削除追従のためアクティブタスクキャッシュをundefined化し、
-                    // 次のfetchで since 未指定の fullモードリクエストを走らせる。
-                    queryClient.setQueryData<ActiveTasksCache | undefined>(
-                        ["activeTasks"],
-                        () => undefined,
-                    );
-                    await queryClient.invalidateQueries({
-                        queryKey: ["activeTasks"],
-                    });
-                    // 注: 本ハンドラは async で動作するため、tasksUpdated と並走した場合
-                    // updatedTaskIds の差分検知が空キャッシュを参照する可能性がある。
-                    // その場合 updatedTaskIds が一時的に空になるが、後続のSSE/操作で復元されるので許容。
-                }
-            })();
-        },
-        [SSE_EVENTS.tasksUpdated]: (e) => {
-            // アーカイブモード時は archived 用クエリも無効化する
-            if (showType === "archived") {
-                queryClient.invalidateQueries({
-                    queryKey: ["tasks", selectedListId, "archived"],
-                });
-            }
-            // 自分のタブからのイベント → 差分 sync で取り直すのみ
-            if (e.data === tabId) {
-                queryClient.invalidateQueries({ queryKey: ["activeTasks"] });
-                return;
-            }
-            // 他タブ/他端末からの更新 → スナップショット比較で変更タスクを検出
-            const oldCache = queryClient.getQueryData<ActiveTasksCache>([
-                "activeTasks",
-            ]);
-            const oldMap = new Map(
-                (oldCache?.tasks ?? []).map((t) => [
-                    t.id,
-                    `${t.title}\0${t.notes}\0${t.status}`,
-                ]),
+    // リスト集合の id+status に変化があった場合のみアクティブタスクキャッシュをリセットする
+    // rename はリセット不要、archive/unarchive/delete/merge はリセット要
+    async function syncLists(): Promise<void> {
+        const prevLists =
+            queryClient.getQueryData<RouterOutputs["lists"]["list"]>([
+                "lists",
+                showType,
+            ]) ?? [];
+        const prevKey = JSON.stringify(
+            prevLists.map((l) => `${l.id}:${l.status}`).sort(),
+        );
+        await queryClient.invalidateQueries({ queryKey: ["lists"] });
+        const newLists =
+            queryClient.getQueryData<RouterOutputs["lists"]["list"]>([
+                "lists",
+                showType,
+            ]) ?? [];
+        const newKey = JSON.stringify(
+            newLists.map((l) => `${l.id}:${l.status}`).sort(),
+        );
+        if (prevKey !== newKey) {
+            // 物理削除追従のためアクティブタスクキャッシュをundefined化し、
+            // 次のfetchで since 未指定の fullモードリクエストを走らせる。
+            queryClient.setQueryData<ActiveTasksCache | undefined>(
+                ["activeTasks"],
+                () => undefined,
             );
-            queryClient
-                .invalidateQueries({ queryKey: ["activeTasks"] })
-                .then(() => {
-                    const newCache = queryClient.getQueryData<ActiveTasksCache>(
-                        ["activeTasks"],
-                    );
-                    for (const task of newCache?.tasks ?? []) {
-                        const oldKey = oldMap.get(task.id);
-                        const newKey = `${task.title}\0${task.notes}\0${task.status}`;
-                        if (oldKey === undefined || oldKey !== newKey) {
-                            updatedTaskIds.add(task.id);
-                        }
-                    }
-                });
+            await queryClient.invalidateQueries({
+                queryKey: ["activeTasks"],
+            });
+            // 注: 本ハンドラは async で動作するため、tasksUpdated と並走した場合
+            // updatedTaskIds の差分検知が空キャッシュを参照する可能性がある。
+            // その場合 updatedTaskIds が一時的に空になるが、後続のSSE/操作で復元されるので許容。
+        }
+    }
+
+    // タスク更新の再取得。自分のタブ発のSSEは差分同期のみ、それ以外（他タブ/他端末・
+    // フォールバック経路）はスナップショット比較で変更タスクIDを `updatedTaskIds` へ反映する。
+    async function syncTasks(fromOwnTab: boolean): Promise<void> {
+        // アーカイブモード時は archived 用クエリも無効化する
+        if (showType === "archived") {
+            await queryClient.invalidateQueries({
+                queryKey: ["tasks", selectedListId, "archived"],
+            });
+        }
+        if (fromOwnTab) {
+            await queryClient.invalidateQueries({ queryKey: ["activeTasks"] });
+            return;
+        }
+        const oldCache = queryClient.getQueryData<ActiveTasksCache>([
+            "activeTasks",
+        ]);
+        const oldMap = new Map(
+            (oldCache?.tasks ?? []).map((t) => [
+                t.id,
+                `${t.title}\0${t.notes}\0${t.status}`,
+            ]),
+        );
+        await queryClient.invalidateQueries({ queryKey: ["activeTasks"] });
+        const newCache = queryClient.getQueryData<ActiveTasksCache>([
+            "activeTasks",
+        ]);
+        for (const task of newCache?.tasks ?? []) {
+            const oldKey = oldMap.get(task.id);
+            const newKey = `${task.title}\0${task.notes}\0${task.status}`;
+            if (oldKey === undefined || oldKey !== newKey) {
+                updatedTaskIds.add(task.id);
+            }
+        }
+    }
+
+    // SSE: サーバーからの通知でクエリを再取得（フォールバックはSSE不健全時のポーリング経路）
+    subscribeOnMount({
+        [SSE_EVENTS.listsUpdated]: {
+            handler: () => {
+                void syncLists();
+            },
+            fallback: syncLists,
+        },
+        [SSE_EVENTS.tasksUpdated]: {
+            handler: (e) => {
+                void syncTasks(e.data === tabId);
+            },
+            // フォールバック経路は発信元タブを判別できないため、常に他端末扱いで差分検出する
+            fallback: () => syncTasks(false),
         },
     });
     // ドラッグ終了時にサイドバーのハイライトをリセット

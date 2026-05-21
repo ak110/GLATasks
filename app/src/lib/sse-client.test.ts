@@ -286,6 +286,137 @@ describe("sse-client", () => {
     },
   );
 
+  // 同値分割: 初回接続フェーズの経過時間（閾値以内 / 閾値超過）
+  // 境界値: 9秒（直前）・10秒（境界）・11秒（直後）
+  // `"initial"` 状態のまま閾値10秒に達した時点で `"unhealthy"` へ遷移する
+  it.each([
+    { label: "9秒（直前）", elapsedMs: 9_000, expectUnhealthy: false },
+    { label: "10秒（境界）", elapsedMs: 10_000, expectUnhealthy: true },
+    { label: "11秒（直後）", elapsedMs: 11_000, expectUnhealthy: true },
+  ])(
+    "健全性: 初回接続フェーズ $label で unhealthy=$expectUnhealthy",
+    async ({ elapsedMs, expectUnhealthy }) => {
+      vi.useFakeTimers();
+      const { connect, disconnect, getHealth } = await import("./sse-client");
+      const queryClient = {
+        invalidateQueries: vi.fn().mockResolvedValue(undefined),
+      } as unknown as import("@tanstack/svelte-query").QueryClient;
+
+      connect(queryClient);
+      expect(getHealth()).toBe("initial");
+
+      await vi.advanceTimersByTimeAsync(elapsedMs);
+      expect(getHealth()).toBe(expectUnhealthy ? "unhealthy" : "initial");
+
+      disconnect();
+    },
+  );
+
+  // 同値分割: 接続後フェーズの受信途絶経過時間（閾値以内 / 閾値超過）
+  // 境界値: 59秒（直前）・60秒（境界）・61秒（直後）
+  // イベント受信で `"healthy"` に遷移後、閾値60秒に達した時点で `"unhealthy"` へ遷移する
+  it.each([
+    { label: "59秒（直前）", elapsedMs: 59_000, expectUnhealthy: false },
+    { label: "60秒（境界）", elapsedMs: 60_000, expectUnhealthy: true },
+    { label: "61秒（直後）", elapsedMs: 61_000, expectUnhealthy: true },
+  ])(
+    "健全性: 接続後フェーズ 受信から $label で unhealthy=$expectUnhealthy",
+    async ({ elapsedMs, expectUnhealthy }) => {
+      vi.useFakeTimers();
+      const { connect, disconnect, getHealth } = await import("./sse-client");
+      const queryClient = {
+        invalidateQueries: vi.fn().mockResolvedValue(undefined),
+      } as unknown as import("@tanstack/svelte-query").QueryClient;
+
+      connect(queryClient);
+      MockEventSource.instances[0].dispatch("heartbeat");
+      expect(getHealth()).toBe("healthy");
+
+      await vi.advanceTimersByTimeAsync(elapsedMs);
+      expect(getHealth()).toBe(expectUnhealthy ? "unhealthy" : "healthy");
+
+      disconnect();
+    },
+  );
+
+  // 健全性状態の遷移パターン
+  // - `"initial"` → 受信 → `"healthy"`
+  // - `"healthy"` → 受信途絶60秒 → `"unhealthy"`
+  // - `"unhealthy"` → 受信 → `"healthy"`
+  it.each([
+    {
+      label: "initial → 受信 → healthy",
+      steps: async (es: MockEventSource): Promise<void> => {
+        es.dispatch("heartbeat");
+      },
+      expectStates: ["initial", "healthy"],
+    },
+    {
+      label: "healthy → 受信途絶60秒 → unhealthy",
+      steps: async (es: MockEventSource): Promise<void> => {
+        es.dispatch("heartbeat");
+        await vi.advanceTimersByTimeAsync(60_000);
+      },
+      expectStates: ["initial", "healthy", "unhealthy"],
+    },
+    {
+      label: "unhealthy → 受信 → healthy",
+      steps: async (es: MockEventSource): Promise<void> => {
+        es.dispatch("heartbeat");
+        await vi.advanceTimersByTimeAsync(60_000);
+        es.dispatch("heartbeat");
+      },
+      expectStates: ["initial", "healthy", "unhealthy", "healthy"],
+    },
+  ])("健全性遷移: $label", async ({ steps, expectStates }) => {
+    vi.useFakeTimers();
+    const { connect, disconnect, onHealthChange, getHealth } =
+      await import("./sse-client");
+    const queryClient = {
+      invalidateQueries: vi.fn().mockResolvedValue(undefined),
+    } as unknown as import("@tanstack/svelte-query").QueryClient;
+
+    const recorded: string[] = [];
+    const unsub = onHealthChange((s) => recorded.push(s));
+
+    connect(queryClient);
+    recorded.push(getHealth());
+    await steps(MockEventSource.instances[0]);
+
+    expect(recorded).toEqual(expectStates);
+
+    unsub();
+    disconnect();
+  });
+
+  it("イベント受信で不健全判定タイマーが60秒へリセットされる", async () => {
+    // 接続から9秒経過後、heartbeat 受信で60秒タイマーへ切り替わる。
+    // その後さらに60秒経過するまで unhealthy 遷移しないことを境界値で確認する。
+    vi.useFakeTimers();
+    const { connect, disconnect, getHealth } = await import("./sse-client");
+    const queryClient = {
+      invalidateQueries: vi.fn().mockResolvedValue(undefined),
+    } as unknown as import("@tanstack/svelte-query").QueryClient;
+
+    connect(queryClient);
+    await vi.advanceTimersByTimeAsync(9_000);
+    expect(getHealth()).toBe("initial");
+
+    // 受信で healthy へ遷移し、60秒タイマーへ切り替わる
+    MockEventSource.instances[0].dispatch("heartbeat");
+    expect(getHealth()).toBe("healthy");
+
+    // さらに59秒経過 → healthy 維持（10秒タイマーが残っていたら unhealthy になるはず）
+    await vi.advanceTimersByTimeAsync(59_000);
+    expect(getHealth()).toBe("healthy");
+
+    // 60秒経過 → unhealthy
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(getHealth()).toBe("unhealthy");
+
+    disconnect();
+  });
+
   it("heartbeat イベント受信でウォッチドッグの最終受信時刻が更新される", async () => {
     // heartbeat 受信時刻が最終受信時刻として記録され、
     // 以降のウォッチドッグ判定基準時刻となる。

@@ -92,13 +92,19 @@
         },
     }));
 
-    // SSE: サーバーからの通知でクエリを再取得
+    // SSE: サーバーからの通知でクエリを再取得（フォールバックはSSE不健全時のポーリング経路）
+    const invalidateTimers = () =>
+        queryClient.invalidateQueries({ queryKey: ["timers"] });
+    const invalidatePreferences = () =>
+        queryClient.invalidateQueries({ queryKey: ["user-preferences"] });
     subscribeOnMount({
-        [SSE_EVENTS.timersUpdated]: () => {
-            queryClient.invalidateQueries({ queryKey: ["timers"] });
+        [SSE_EVENTS.timersUpdated]: {
+            handler: invalidateTimers,
+            fallback: invalidateTimers,
         },
-        [SSE_EVENTS.usersPreferencesUpdated]: () => {
-            queryClient.invalidateQueries({ queryKey: ["user-preferences"] });
+        [SSE_EVENTS.usersPreferencesUpdated]: {
+            handler: invalidatePreferences,
+            fallback: invalidatePreferences,
         },
     });
 
