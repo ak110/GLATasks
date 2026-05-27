@@ -14,6 +14,10 @@
         type Theme,
     } from "$lib/theme";
     import { connect, disconnect, checkConnection } from "$lib/sse-client";
+    import {
+        startConnectivityWatch,
+        stopConnectivityWatch,
+    } from "$lib/connection-recovery.svelte";
     import TimerAlarmMonitor from "$lib/components/timers/TimerAlarmMonitor.svelte";
     import Toast from "$lib/components/ui/Toast.svelte";
     import UpdateBanner from "$lib/components/ui/UpdateBanner.svelte";
@@ -44,12 +48,15 @@
     });
 
     onMount(() => {
-        // SSE 接続と可視復帰トリガ（ログイン済みの場合のみ）
+        // SSE 接続・能動検出監視・可視復帰トリガ（ログイン済みの場合のみ）
         // visibilitychange は SSE 接続の健全性を前倒し判定するためのトリガであり、
-        // 未ログイン時は購読対象が存在しないため connect と同じ条件ブロックに統合する
+        // 未ログイン時は購読対象が存在しないため connect と同じ条件ブロックに統合する。
+        // 能動検出監視（connection-recovery）はポーリングと可視・オンライン復帰の
+        // 検出トリガを自前で持つため、ここでは起動・停止のみを担う。
         let visibilityHandler: (() => void) | null = null;
         if (data.logged_in) {
             connect(queryClient);
+            startConnectivityWatch();
             visibilityHandler = () => {
                 if (document.visibilityState === "visible") {
                     checkConnection();
@@ -92,6 +99,7 @@
                     visibilityHandler,
                 );
             }
+            stopConnectivityWatch();
             disconnect();
         };
     });

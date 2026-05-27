@@ -2,10 +2,16 @@
  * @fileoverview Tanstack Query クライアント設定
  */
 
-import { QueryClient } from "@tanstack/svelte-query";
+import { QueryClient, QueryCache, MutationCache } from "@tanstack/svelte-query";
 import { showErrorToast } from "$lib/toast-store.svelte";
+import { checkConnectivity } from "$lib/connection-recovery.svelte";
 
 export const queryClient = new QueryClient({
+  // 個別 onError は既定の onError を上書きするが、Cache のグローバル onError は
+  // 個別処理の有無に左右されず全 query・mutation のエラーで必ず呼ばれる。
+  // エラー通知と接続の能動チェックをここへ集約し、保存失敗時の通知欠落を解消する。
+  queryCache: new QueryCache({ onError: handleError }),
+  mutationCache: new MutationCache({ onError: handleError }),
   defaultOptions: {
     queries: {
       staleTime: 5 * 60 * 1000, // 5分間はキャッシュ有効
@@ -13,13 +19,16 @@ export const queryClient = new QueryClient({
       refetchOnWindowFocus: "always",
       retry: 1,
     },
-    mutations: {
-      onError: (error) => {
-        showErrorToast(extractErrorMessage(error));
-      },
-    },
   },
 });
+
+/** query・mutation のエラー共通処理。トースト通知し、接続を能動チェックする */
+function handleError(error: unknown): void {
+  showErrorToast(extractErrorMessage(error));
+  // 操作失敗を起点に接続を能動チェックする。
+  // 正当なアプリエラー時は判定基盤が ok を返すため検出は誤発火しない。
+  void checkConnectivity();
+}
 
 /** tRPCエラーからユーザー向けメッセージを抽出する */
 function extractErrorMessage(error: unknown): string {

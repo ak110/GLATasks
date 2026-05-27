@@ -9,9 +9,9 @@
  * 購読してポーリングフォールバックを切り替える。健全性が `"unhealthy"` へ遷移した
  * 直後にフォールバックを1回即時実行し、以後30秒間隔のポーリングを継続する。
  * `"healthy"` へ復帰した時点でポーリングを停止する。
- * フォールバック呼び出しがエラーを送出した場合は接続不全とみなし、
- * `connection-recovery.svelte.ts` の `triggerReload` で
- * 入力中はバナー表示、非入力中は即時リロードへ誘導する。
+ * フォールバックはデータ再取得に専念し、リロード誘導は行わない。
+ * 接続不全の検出と回復誘導は `connection-recovery.svelte.ts` の能動チェックが担い、
+ * `"unhealthy"` 遷移を前倒しトリガーとして同チェックへ通知する。
  */
 
 import { onMount } from "svelte";
@@ -21,7 +21,7 @@ import {
   getHealth,
   type HealthState,
 } from "./sse-client";
-import { triggerReload } from "./connection-recovery.svelte";
+import { checkConnectivity } from "./connection-recovery.svelte";
 import type { SseEventName } from "./sse-events";
 
 type SseHandler = (event: MessageEvent) => void;
@@ -64,10 +64,8 @@ export function setupSseSubscriptions(
         try {
           await fn();
         } catch {
-          // tRPC呼び出しの失敗（HTTPステータス非200・JSON以外・認証失効など）は
-          // 接続不全とみなし、入力中ならバナー表示、非入力中なら即時リロードへ誘導する
-          triggerReload();
-          return;
+          // 再取得の失敗は同期の一時的失敗として無視する。
+          // 接続不全の検出と回復誘導は connection-recovery 側の能動チェックが担う。
         }
       }
     } finally {
@@ -91,7 +89,9 @@ export function setupSseSubscriptions(
 
   const handleHealth = (state: HealthState): void => {
     if (state === "unhealthy") {
-      // "unhealthy" 遷移直後に1回即時実行し、以後30秒間隔のポーリングへ移行する
+      // 不健全遷移を能動チェックの前倒しトリガーとして検出側へ通知する
+      void checkConnectivity();
+      // SSE途絶中もデータ同期を保つため、即時1回実行し以後30秒間隔のポーリングへ移行する
       void runFallbacks();
       startPolling();
     } else if (state === "healthy") {

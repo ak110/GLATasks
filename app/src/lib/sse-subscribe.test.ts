@@ -3,7 +3,8 @@
  *
  * `setupSseSubscriptions` の発火タイミングを境界値（0秒・29秒・30秒・31秒・60秒）と
  * 状態遷移（`"unhealthy"` 即時実行 → 30秒間隔 → `"healthy"` で停止）で検証する。
- * sse-clientは `vi.hoisted` 経由で生やしたコントロール変数で差し替える。
+ * フォールバックはデータ再取得に専念し、`"unhealthy"` 遷移時に能動チェックへ通知する。
+ * sse-clientは `vi.hoisted` で定義したコントロール変数で差し替える。
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
@@ -14,7 +15,7 @@ const FALLBACK_POLL_INTERVAL_MS = 30_000;
 const hoisted = vi.hoisted(() => ({
   healthListeners: [] as Array<(state: HealthState) => void>,
   mockHealth: "initial" as HealthState,
-  triggerReloadMock: vi.fn(),
+  checkConnectivityMock: vi.fn(),
 }));
 
 vi.mock("./sse-client", () => ({
@@ -30,7 +31,7 @@ vi.mock("./sse-client", () => ({
 }));
 
 vi.mock("./connection-recovery.svelte", () => ({
-  triggerReload: () => hoisted.triggerReloadMock(),
+  checkConnectivity: () => hoisted.checkConnectivityMock(),
 }));
 
 /** 健全性状態を変更し、登録済みリスナーへ通知する */
@@ -45,7 +46,7 @@ describe("setupSseSubscriptions", () => {
     vi.resetModules();
     hoisted.healthListeners = [];
     hoisted.mockHealth = "initial";
-    hoisted.triggerReloadMock.mockReset();
+    hoisted.checkConnectivityMock.mockReset();
   });
 
   afterEach(() => {
@@ -126,11 +127,27 @@ describe("setupSseSubscriptions", () => {
 
     await vi.advanceTimersByTimeAsync(0);
     expect(fallback).toHaveBeenCalledTimes(1);
+    // マウント時に既存 unhealthy でも能動チェックへ通知する
+    expect(hoisted.checkConnectivityMock).toHaveBeenCalledTimes(1);
 
     cleanup();
   });
 
-  it("フォールバックエラー時に triggerReload を呼ぶ", async () => {
+  it("unhealthy 遷移時に能動チェックへ通知する", async () => {
+    const { setupSseSubscriptions } = await import("./sse-subscribe");
+    const fallback = vi.fn().mockResolvedValue(undefined);
+    const cleanup = setupSseSubscriptions({
+      "lists:updated": { handler: vi.fn(), fallback },
+    });
+
+    setHealth("unhealthy");
+    await vi.advanceTimersByTimeAsync(0);
+    expect(hoisted.checkConnectivityMock).toHaveBeenCalledTimes(1);
+
+    cleanup();
+  });
+
+  it("フォールバックエラーでもリロード誘導せず能動チェックに委ねる", async () => {
     const { setupSseSubscriptions } = await import("./sse-subscribe");
     const fallback = vi.fn().mockRejectedValue(new TypeError("network error"));
     const cleanup = setupSseSubscriptions({
@@ -139,7 +156,9 @@ describe("setupSseSubscriptions", () => {
 
     setHealth("unhealthy");
     await vi.advanceTimersByTimeAsync(0);
-    expect(hoisted.triggerReloadMock).toHaveBeenCalledTimes(1);
+    // フォールバックのエラーは無視し、検出は能動チェックの通知1回に集約される
+    expect(fallback).toHaveBeenCalledTimes(1);
+    expect(hoisted.checkConnectivityMock).toHaveBeenCalledTimes(1);
 
     cleanup();
   });
@@ -166,7 +185,7 @@ describe("setupSseSubscriptions", () => {
   });
 
   it("フォールバックエラー後もポーリングは継続する", async () => {
-    // エラーで早期returnしてもポーリングタイマー自体は停止しないため、
+    // フォールバックのエラーを無視してもポーリングタイマー自体は停止しないため、
     // SSE復帰までは30秒間隔で再試行され続ける。
     const { setupSseSubscriptions } = await import("./sse-subscribe");
     const fallback = vi
@@ -178,15 +197,13 @@ describe("setupSseSubscriptions", () => {
     });
 
     setHealth("unhealthy");
-    // 1回目（即時実行）はエラー → triggerReload 1回
+    // 1回目（即時実行）はエラーだが無視される
     await vi.advanceTimersByTimeAsync(0);
     expect(fallback).toHaveBeenCalledTimes(1);
-    expect(hoisted.triggerReloadMock).toHaveBeenCalledTimes(1);
 
     // 30秒経過で2回目のポーリングが走り、今度は成功する
     await vi.advanceTimersByTimeAsync(FALLBACK_POLL_INTERVAL_MS);
     expect(fallback).toHaveBeenCalledTimes(2);
-    expect(hoisted.triggerReloadMock).toHaveBeenCalledTimes(1);
 
     cleanup();
   });
@@ -212,16 +229,16 @@ describe("setupSseSubscriptions", () => {
     cleanup();
   });
 
-  it("フォールバック未指定のイベントは購読のみ行う", async () => {
+  it("フォールバック未指定でも unhealthy 遷移で能動チェックへ通知する", async () => {
     const { setupSseSubscriptions } = await import("./sse-subscribe");
     const cleanup = setupSseSubscriptions({
       "lists:updated": { handler: vi.fn() },
     });
 
     setHealth("unhealthy");
-    await vi.advanceTimersByTimeAsync(FALLBACK_POLL_INTERVAL_MS);
-    // フォールバックがないのでポーリングは起動するが、空ループで何も呼ばない
-    expect(hoisted.triggerReloadMock).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(0);
+    // フォールバックは空ループで何も再取得しないが、検出は能動チェックへ委ねられる
+    expect(hoisted.checkConnectivityMock).toHaveBeenCalledTimes(1);
 
     cleanup();
   });
