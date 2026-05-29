@@ -1,8 +1,7 @@
 /**
  * @fileoverview SSE 共有接続管理 + サーバー時刻オフセット管理 + 差分catchup連携
  *
- * 各ページが個別に EventSource を作成していた仕組みを統合し、
- * +layout.svelte で1つの接続を管理する。
+ * +layout.svelte で単一の EventSource 接続を管理し、各ページはこの共有接続を購読する。
  * サーバー時刻オフセットもここで一元管理する。
  *
  * ## 差分catchup連携
@@ -38,6 +37,7 @@
 
 import type { QueryClient } from "@tanstack/svelte-query";
 import { SSE_EVENTS, type SseEventName } from "./sse-events";
+import { debugLog } from "./debug-log";
 
 // サーバー時刻オフセット（ms）: サーバー時刻 = Date.now() + offset
 let serverOffset = 0;
@@ -90,6 +90,10 @@ let healthState: HealthState = "initial";
 const healthListeners = new Set<(state: HealthState) => void>();
 type EventCallback = (event: MessageEvent) => void;
 const subscribers = new Map<string, Set<EventCallback>>();
+// eventType → EventSource へ登録した単一ディスパッチャー。
+// 配送経路を eventType ごとに1つへ集約し、発火時に購読者集合を都度参照して全購読者へ配る。
+// 同一 eventType のディスパッチャーは1つだけ登録し、多重配送を避ける。
+const dispatchers = new Map<string, EventCallback>();
 
 /** SSE 接続を開始する */
 export function connect(queryClient: QueryClient): void {
@@ -100,7 +104,9 @@ export function connect(queryClient: QueryClient): void {
   // 接続開始時は "initial" 状態へ戻し、10秒タイマーをセットする
   resetHealthForConnect();
 
-  const es = new EventSource(buildConnectUrl());
+  const url = buildConnectUrl();
+  debugLog("sse", "connect", { url, lastEventId });
+  const es = new EventSource(url);
   eventSource = es;
 
   // 接続確立時の処理:
@@ -108,6 +114,7 @@ export function connect(queryClient: QueryClient): void {
   // 2. 全クエリーを invalidate して、切断中に取りこぼしたイベントぶんを取り直す
   //    (EventSource は自動再接続するため、再接続時もこのハンドラが再発火する)
   es.addEventListener("connected", (e: MessageEvent) => {
+    debugLog("sse", "connected", { lastEventId: e.lastEventId });
     touchReceived();
     captureEventId(e);
     const serverMs = Number(e.data);
@@ -122,6 +129,7 @@ export function connect(queryClient: QueryClient): void {
   // 受信時点で保持中の lastEventId は破棄し、次回再接続を初回接続扱い（connected経路）に戻す。
   // これにより `reset` ループ（古い lastEventId を送り続けて毎回 reset が返る状態）を避ける。
   es.addEventListener(SSE_EVENTS.reset, () => {
+    debugLog("sse", "reset");
     touchReceived();
     lastEventId = null;
     void queryClient.invalidateQueries();
@@ -138,20 +146,18 @@ export function connect(queryClient: QueryClient): void {
   // EventSource の error イベント発火時、接続状態が CLOSED なら自動再接続が
   // 機能しない状態のため即時に再接続する。CONNECTING 中はブラウザの自動再接続に委ねる
   es.addEventListener("error", () => {
-    if (eventSource && eventSource.readyState === EventSource.CLOSED) {
+    const closed = eventSource?.readyState === EventSource.CLOSED;
+    debugLog("sse", "error", { readyState: eventSource?.readyState, closed });
+    if (closed) {
       forceReconnect();
     }
   });
 
-  // 登録済みイベントのリスナーを設定
-  for (const [eventType, callbacks] of subscribers) {
-    es.addEventListener(eventType, (e: MessageEvent) => {
-      touchReceived();
-      captureEventId(e);
-      for (const cb of callbacks) {
-        cb(e);
-      }
-    });
+  // 登録済みイベントのディスパッチャーを設定する。
+  // 既存接続のディスパッチャーは EventSource とともに失われるため作り直す。
+  dispatchers.clear();
+  for (const eventType of subscribers.keys()) {
+    ensureDispatcher(eventType as SseEventName);
   }
 
   startWatchdog();
@@ -159,12 +165,14 @@ export function connect(queryClient: QueryClient): void {
 
 /** SSE 接続を切断する */
 export function disconnect(): void {
+  debugLog("sse", "disconnect");
   stopWatchdog();
   clearUnhealthyTimer();
   if (eventSource) {
     eventSource.close();
     eventSource = null;
   }
+  dispatchers.clear();
   queryClientRef = null;
 }
 
@@ -186,32 +194,47 @@ export function subscribe(
   }
   callbacks.add(callback);
 
-  // 既に接続中なら EventSource にもリスナーを追加し、解除関数でアンマウント時に削除する
-  if (eventSource) {
-    const wrappedHandler = (e: MessageEvent) => {
-      touchReceived();
-      captureEventId(e);
-      if (callbacks!.has(callback)) {
-        callback(e);
-      }
-    };
-    eventSource.addEventListener(eventType, wrappedHandler);
-
-    return () => {
-      eventSource?.removeEventListener(eventType, wrappedHandler);
-      callbacks!.delete(callback);
-      if (callbacks!.size === 0) {
-        subscribers.delete(eventType);
-      }
-    };
-  }
+  // 接続中なら当該 eventType のディスパッチャーを用意する。
+  // 未接続時は connect 時に subscribers 全体へ一括登録されるため、ここでは不要。
+  ensureDispatcher(eventType);
 
   return () => {
     callbacks!.delete(callback);
     if (callbacks!.size === 0) {
       subscribers.delete(eventType);
+      removeDispatcher(eventType);
     }
   };
+}
+
+/**
+ * 指定 eventType の受信ディスパッチャーを EventSource へ登録する（未接続・登録済みなら何もしない）。
+ *
+ * ディスパッチャーは発火時に購読者集合を都度参照して配送するため、購読の増減に追従する。
+ * eventType ごとに1つだけ登録することで、同一イベントの多重配送を防ぐ。
+ */
+function ensureDispatcher(eventType: SseEventName): void {
+  if (!eventSource || dispatchers.has(eventType)) return;
+  const handler: EventCallback = (e: MessageEvent) => {
+    debugLog("sse", "event", { type: eventType, sourceTabId: e.data });
+    touchReceived();
+    captureEventId(e);
+    const callbacks = subscribers.get(eventType);
+    if (!callbacks) return;
+    for (const cb of callbacks) {
+      cb(e);
+    }
+  };
+  dispatchers.set(eventType, handler);
+  eventSource.addEventListener(eventType, handler);
+}
+
+/** 指定 eventType のディスパッチャーを EventSource から解除する（未登録なら何もしない） */
+function removeDispatcher(eventType: SseEventName): void {
+  const handler = dispatchers.get(eventType);
+  if (!handler) return;
+  dispatchers.delete(eventType);
+  eventSource?.removeEventListener(eventType, handler);
 }
 
 /**
@@ -304,6 +327,7 @@ function clearUnhealthyTimer(): void {
 /** 健全性状態を更新し、変化があればリスナーへ通知する */
 function setHealthState(next: HealthState): void {
   if (healthState === next) return;
+  debugLog("sse", "health", { from: healthState, to: next });
   healthState = next;
   for (const cb of healthListeners) {
     cb(next);
@@ -314,6 +338,7 @@ function setHealthState(next: HealthState): void {
 function forceReconnect(): void {
   const client = queryClientRef;
   if (!client) return;
+  debugLog("sse", "reconnect");
   disconnect();
   connect(client);
 }

@@ -417,6 +417,36 @@ describe("sse-client", () => {
     disconnect();
   });
 
+  it("connect 前後で同一イベントを購読しても各ハンドラーは1回ずつ呼ばれる", async () => {
+    // connect 前後どちらで購読しても、各購読者は受信ごとに1回だけ呼ばれることを確認する。
+    // 配送はイベント種別ごとの単一ディスパッチャーへ集約され、多重配送されない。
+    const { connect, subscribe, disconnect } = await import("./sse-client");
+    const queryClient = {
+      invalidateQueries: vi.fn().mockResolvedValue(undefined),
+    } as unknown as import("@tanstack/svelte-query").QueryClient;
+
+    const cbBeforeConnect = vi.fn();
+    const cbAfterConnect = vi.fn();
+
+    // connect 前に購読（onMount の子→親順で connect より先に走る経路）
+    subscribe("tasks:updated", cbBeforeConnect);
+    connect(queryClient);
+    // connect 後に同一イベントを購読（ページ再訪などで connect 後に走る経路）
+    const unsubAfter = subscribe("tasks:updated", cbAfterConnect);
+
+    MockEventSource.instances[0].dispatch("tasks:updated", "src-tab");
+    expect(cbBeforeConnect).toHaveBeenCalledTimes(1);
+    expect(cbAfterConnect).toHaveBeenCalledTimes(1);
+
+    // 解除後の購読者は配送対象から外れ、残る購読者のみ呼ばれる
+    unsubAfter();
+    MockEventSource.instances[0].dispatch("tasks:updated", "src-tab");
+    expect(cbBeforeConnect).toHaveBeenCalledTimes(2);
+    expect(cbAfterConnect).toHaveBeenCalledTimes(1);
+
+    disconnect();
+  });
+
   it("heartbeat イベント受信でウォッチドッグの最終受信時刻が更新される", async () => {
     // heartbeat 受信時刻が最終受信時刻として記録され、
     // 以降のウォッチドッグ判定基準時刻となる。

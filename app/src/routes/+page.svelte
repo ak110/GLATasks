@@ -11,6 +11,7 @@
     import { trpc, tabId, type RouterOutputs } from "$lib/trpc";
     import { subscribeOnMount } from "$lib/sse-subscribe";
     import { SSE_EVENTS } from "$lib/sse-events";
+    import { debugLog } from "$lib/debug-log";
     import { onMount } from "svelte";
     import { SvelteSet, SvelteMap } from "svelte/reactivity";
     import type { TaskStatus } from "$lib/schemas";
@@ -180,6 +181,7 @@
     // リスト集合の id+status に変化があった場合のみアクティブタスクキャッシュをリセットする
     // rename はリセット不要、archive/unarchive/delete/merge はリセット要
     async function syncLists(): Promise<void> {
+        debugLog("sync", "lists");
         const prevLists =
             queryClient.getQueryData<RouterOutputs["lists"]["list"]>([
                 "lists",
@@ -198,6 +200,7 @@
             newLists.map((l) => `${l.id}:${l.status}`).sort(),
         );
         if (prevKey !== newKey) {
+            debugLog("sync", "lists-reset-cache");
             // 物理削除追従のためアクティブタスクキャッシュをundefined化し、
             // 次のfetchで since 未指定の fullモードリクエストを走らせる。
             queryClient.setQueryData<ActiveTasksCache | undefined>(
@@ -216,6 +219,7 @@
     // タスク更新の再取得。自分のタブ発のSSEは差分同期のみ、それ以外（他タブ/他端末・
     // フォールバック経路）はスナップショット比較で変更タスクIDを `updatedTaskIds` へ反映する。
     async function syncTasks(fromOwnTab: boolean): Promise<void> {
+        debugLog("sync", "tasks", { fromOwnTab });
         // アーカイブモード時は archived 用クエリも無効化する
         if (showType === "archived") {
             await queryClient.invalidateQueries({
@@ -258,7 +262,12 @@
         },
         [SSE_EVENTS.tasksUpdated]: {
             handler: (e) => {
-                void syncTasks(e.data === tabId);
+                const fromOwnTab = e.data === tabId;
+                debugLog("sync", "tasks-received", {
+                    fromOwnTab,
+                    sourceTabId: e.data,
+                });
+                void syncTasks(fromOwnTab);
             },
             // フォールバック経路は発信元タブを判別できないため、常に他端末扱いで差分検出する
             fallback: () => syncTasks(false),
@@ -1005,10 +1014,8 @@
 
 <!-- ボディ: サイドバー + メインコンテンツ -->
 <!--
-    参考: bootstrapのcontainer風にするなら
-    w-full px-3 sm:max-w-[540px] md:max-w-[720px] lg:max-w-[960px] xl:max-w-[1140px] 2xl:max-w-[1320px]
-    という感じ。
-    ここではそこまで細かくはしない。
+    レスポンシブ幅はbootstrapのcontainer風に各ブレークポイントで細かく刻む方法もあるが、
+    本画面では細かく刻まず、xl ブレークポイント以上での最大幅制限のみ行う。
 -->
 <div class="mx-auto flex h-[calc(100vh-3rem)] w-full xl:max-w-285">
     <ListSidebar

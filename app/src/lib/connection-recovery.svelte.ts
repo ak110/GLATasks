@@ -31,6 +31,8 @@
  *             入力を保ったまま、接続回復を検知した時点でバナーを自動解除する。
  */
 
+import { debugLog } from "./debug-log";
+
 // ポーリング周期（ms）。判定基盤の `/healthcheck` は認証もDBアクセスも持たず軽量で、
 // サーバー側 SSE heartbeat 周期30秒と同等の負荷に収まるため、同等の30秒間隔とする。
 const POLL_INTERVAL_MS = 30_000;
@@ -94,7 +96,9 @@ export async function checkConnectivity(
   if (checking) return;
   checking = true;
   try {
-    if (await isHealthy(fetchFn)) {
+    const healthy = await isHealthy(fetchFn);
+    debugLog("connectivity", "check", { healthy });
+    if (healthy) {
       // 回復検知: バナー待機中なら自動解除する
       state.pendingReload = false;
     } else {
@@ -153,8 +157,10 @@ async function isHealthy(fetchFn: typeof fetch): Promise<boolean> {
 /** 接続不全検知時に呼び出され、入力中ならバナー表示、非入力中なら即リロードする */
 function triggerReload(): void {
   if (isUserBusy()) {
+    debugLog("connectivity", "recover", { mode: "banner" });
     state.pendingReload = true;
   } else {
+    debugLog("connectivity", "recover", { mode: "reload" });
     location.reload();
   }
 }

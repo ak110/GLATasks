@@ -22,6 +22,7 @@ import {
   type HealthState,
 } from "./sse-client";
 import { checkConnectivity } from "./connection-recovery.svelte";
+import { debugLog } from "./debug-log";
 import type { SseEventName } from "./sse-events";
 
 type SseHandler = (event: MessageEvent) => void;
@@ -58,6 +59,7 @@ export function setupSseSubscriptions(
   const runFallbacks = async (): Promise<void> => {
     // 直前回のフォールバックがまだ走っている場合は重複起動しない
     if (running) return;
+    debugLog("fallback", "run", { count: fallbacks.length });
     running = true;
     try {
       for (const fn of fallbacks) {
@@ -75,6 +77,9 @@ export function setupSseSubscriptions(
 
   const startPolling = (): void => {
     if (pollTimer) return;
+    debugLog("fallback", "polling-start", {
+      intervalMs: FALLBACK_POLL_INTERVAL_MS,
+    });
     pollTimer = setInterval(() => {
       void runFallbacks();
     }, FALLBACK_POLL_INTERVAL_MS);
@@ -82,12 +87,14 @@ export function setupSseSubscriptions(
 
   const stopPolling = (): void => {
     if (pollTimer) {
+      debugLog("fallback", "polling-stop");
       clearInterval(pollTimer);
       pollTimer = null;
     }
   };
 
   const handleHealth = (state: HealthState): void => {
+    debugLog("fallback", "health", { state });
     if (state === "unhealthy") {
       // 不健全遷移を能動チェックの前倒しトリガーとして検出側へ通知する
       void checkConnectivity();
