@@ -19,8 +19,11 @@ SvelteKit + tRPC + Drizzleで構築し、Docker Composeで運用する。
     - 利用可能なコマンドは`pyproject.toml`の`[tool.pyfltr]`設定とJS/TS連携で有効になるもの。
       例: `eslint`・`prettier`・`oxlint`・`vitest`・カスタムコマンドの`svelte-check`
   - バックアップ/E2E系に変更を加えた場合は`make test-backup test-e2e`も実行する
-  - 注意: 本プロジェクトのDocker Compose環境は開発マシン上で常時稼働している。
-    `make test`（backup/e2eテスト含む）は問題なく実行可能。
+  - 注意: 本プロジェクトのDocker Compose環境は通常は開発マシン上で常時稼働しており、
+    `make test`（backup/e2eテスト含む）を実行できる。
+    停止している場合は`make start`で起動し、
+    `docker compose --profile=development exec app curl --fail http://localhost:3000/healthcheck`で
+    疎通を確認してからテストを実行する。
     `uvx pyfltr run-for-agent`を使うのはJSON Lines出力で診断結果を効率的に解釈するためであり、
     環境制約によるものではない
 

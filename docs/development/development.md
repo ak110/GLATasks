@@ -80,6 +80,15 @@ npm / PyPIレジストリへの悪意あるパッケージ公開に対し、次�
 DBが半端な状態になった場合は`make sql`から`__drizzle_migrations`テーブルと実DB状態を整合させる。
 整合手順を実行する前に必ず`make backup`を取得する。
 
+典型例として、`make start`時に`migrate-dev`がexit 1で失敗し
+`ALTER TABLE ... ADD ... Duplicate column name`が出る場合がある。
+`drizzle-kit push`でスキーマを先行適用すると実スキーマは最新だが
+`__drizzle_migrations`に当該マイグレーションが記録されず、再適用で重複エラーになる。
+実スキーマが当該マイグレーション到達済みであることを確認したうえで、
+`__drizzle_migrations`へ記録行を1行挿入して整合させる。
+`hash`は当該マイグレーションSQLファイル全文のsha256、`created_at`は
+`drizzle/migrations/meta/_journal.json`の当該エントリの`when`値を用いる。
+
 ## CI/CD
 
 masterへのpushおよびPR時に`ci.yaml`が自動実行される（`.github/workflows/ci.yaml`参照）。
