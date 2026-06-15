@@ -109,8 +109,11 @@ shell:
 node-shell:
 	$(call RUN_NODE, bash, --rm --interactive --tty)
 
+# 依存更新後はSvelteKit生成物（app/.svelte-kit）も再生成する。
+# SvelteKit・Viteのメジャー更新が含まれる場合、古い生成物が新バージョンの公開モジュール群と
+# 整合せずdev SSRが500を返すため、削除してsyncで再生成する。
 update:
-	$(call RUN_NODE, corepack prepare pnpm@latest --activate && corepack use pnpm@latest && pnpm update --latest --recursive && pnpm prune && pnpm store prune, --rm)
+	$(call RUN_NODE, corepack prepare pnpm@latest --activate && corepack use pnpm@latest && pnpm update --latest --recursive && pnpm prune && pnpm store prune && rm -rf app/.svelte-kit && cd app && svelte-kit sync, --rm)
 	$(MAKE) update-actions
 	$(MAKE) test
 
@@ -186,4 +189,4 @@ test-e2e:
 			pnpm install --frozen-lockfile && pnpm run test:e2e\
 		'
 
-.PHONY: help setup sync backup deploy build start stop restart-app logs ps healthcheck shell node-shell update update-actions format test test-unit test-backup test-e2e start-app logs-app migrate db-studio docs
+.PHONY: help setup sync backup deploy build start stop restart-app logs ps healthcheck shell node-shell update update-actions format test test-unit test-backup test-e2e start-app logs-app migrate db-studio sql docs
