@@ -8,17 +8,29 @@ import { vitePreprocess } from "@sveltejs/vite-plugin-svelte";
  * git short hash を第一候補とし、.git が無い環境 (CI の shallow clone やコンテナ内ビルド) では
  * 環境変数 GIT_COMMIT、最終手段として現在時刻を使う。ここで取得した値はクライアントの
  * __sveltekit/version.json に書き出され、updated store によるデプロイ検知に利用される。
+ *
+ * SvelteKit は SSR ビルドの後に同一プロセスでクライアントビルドを起動する際、
+ * svelte.config.js を再評価する。`Date.now()` フォールバック時に評価ごとの値が異なると
+ * SSR HTML と client チャンクで __sveltekit_<hash> 識別子が不一致となり、ハイドレーション時に
+ * `globalThis.__sveltekit_<hash>.data` で TypeError が発生して全 tRPC リクエストが発火しない。
+ * 同一プロセス内の再評価を吸収するため、初回解決値を env var に保存して再利用する。
  */
 function resolveVersion() {
+  if (process.env.SVELTEKIT_VERSION_NAME) {
+    return process.env.SVELTEKIT_VERSION_NAME;
+  }
+  let resolved;
   try {
-    return execFileSync("git", ["rev-parse", "--short", "HEAD"], {
+    resolved = execFileSync("git", ["rev-parse", "--short", "HEAD"], {
       stdio: ["ignore", "pipe", "ignore"],
     })
       .toString()
       .trim();
   } catch {
-    return process.env.GIT_COMMIT ?? String(Date.now());
+    resolved = process.env.GIT_COMMIT ?? String(Date.now());
   }
+  process.env.SVELTEKIT_VERSION_NAME = resolved;
+  return resolved;
 }
 
 /** @type {import('@sveltejs/kit').Config} */
