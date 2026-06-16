@@ -4,7 +4,7 @@ export default defineConfig({
   testDir: "./app/tests",
   testIgnore: /global-setup\.ts/,
   fullyParallel: false,
-  retries: 0,
+  retries: process.env.CI ? 2 : 0,
   workers: 1,
   reporter: "list",
   globalSetup: "./app/tests/global-setup.ts",
