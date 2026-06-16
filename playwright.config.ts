@@ -11,6 +11,9 @@ export default defineConfig({
   use: {
     baseURL: process.env.BASE_URL ?? "https://localhost:38180",
     ignoreHTTPSErrors: true,
+    trace: "retain-on-failure",
+    video: "retain-on-failure",
+    screenshot: "only-on-failure",
   },
   projects: [
     {
