@@ -33,7 +33,9 @@ services:
       - MARIADB_ROOT_PASSWORD=glatasks
       - MARIADB_AUTO_UPGRADE=1
     healthcheck:
-      test: mariadb-admin ping --password=glatasks | grep 'is alive'
+      test:
+        - CMD-SHELL
+        - mariadb-admin ping --protocol=tcp --host=127.0.0.1 --user=root --password=glatasks | grep 'is alive'
       start_period: 30s
       start_interval: 1s
     networks:
