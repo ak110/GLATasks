@@ -22,6 +22,35 @@
 本アプリはセルフホスト型であり、Docker Composeが動作する環境が必要となる。
 セットアップ手順やシステム要件の詳細は[はじめに](https://ak110.github.io/GLATasks/guide/getting-started)を参照。
 
+## MCPサーバー
+
+LLMクライアント（Claude Desktop・Claude Code・MCP Inspector等）から
+GLATasksをリモート操作するためのModel Context Protocolサーバーを内蔵する。
+Streamable HTTPトランスポートとOAuth 2.1認証で動作する。
+
+接続情報:
+
+- エンドポイント: `https://<デプロイ先ホスト>/mcp`
+- 認可サーバー: 同一オリジン（`/.well-known/oauth-authorization-server` で公開）
+- Dynamic Client Registration（RFC 7591）に対応するため、対応クライアントは
+  上記URLを設定するだけで利用できる
+
+利用手順:
+
+1. MCPクライアントの設定で「リモートMCPサーバー」として `/mcp` のURLを登録する
+2. クライアントが自動でOAuth認可フローを開始し、ブラウザでGLATasksのログイン画面が開く
+3. GLATasksにログインし「許可」を押す
+4. クライアントがアクセストークンを取得し、以降のMCPリクエストで利用する
+
+提供ツール（24件）:
+
+- `lists.*`: list / create / rename / delete / archive / unarchive / clear / merge
+- `tasks.*`: list / listActive / create / update / search / reorder
+- `timers.*`: list / create / update / delete / start / pause / reset / adjust / setTime / stop / reorder
+- `users.*`: getPreferences / updatePreferences
+
+各ツールの入力スキーマはMCPクライアント側で自動取得できる。
+
 ## ドキュメント
 
 - <https://ak110.github.io/GLATasks/guide/getting-started> — はじめに（セルフホスト手順）

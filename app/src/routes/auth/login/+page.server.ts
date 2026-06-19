@@ -7,15 +7,25 @@ import * as api from "$lib/server/api";
 import { createSessionToken, setSessionCookie } from "$lib/server/session";
 import type { Actions, PageServerLoad } from "./$types";
 
-export const load: PageServerLoad = async ({ locals }) => {
+/**
+ * `returnTo` を相対パス（先頭が `/` で `//` で始まらないもの）に限定する。
+ * 外部URLへリダイレクトする open redirect 脆弱性を防ぐ。
+ */
+function safeReturnTo(value: string | null): string {
+  if (!value) return "/";
+  if (!value.startsWith("/") || value.startsWith("//")) return "/";
+  return value;
+}
+
+export const load: PageServerLoad = async ({ locals, url }) => {
   if (locals.user_id) {
-    redirect(302, "/");
+    redirect(302, safeReturnTo(url.searchParams.get("returnTo")));
   }
   return {};
 };
 
 export const actions: Actions = {
-  default: async ({ request, cookies }) => {
+  default: async ({ request, cookies, url }) => {
     const data = await request.formData();
     const user = data.get("user") as string;
     const password = data.get("password") as string;
@@ -32,6 +42,6 @@ export const actions: Actions = {
     const token = await createSessionToken(userInfo.id);
     setSessionCookie(cookies, token);
 
-    redirect(302, "/");
+    redirect(302, safeReturnTo(url.searchParams.get("returnTo")));
   },
 };
