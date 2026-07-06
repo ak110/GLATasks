@@ -151,6 +151,30 @@ Chrome拡張のポップアップ内iframeからのアクセスを許可する�
 Cookieに `sameSite: "none"` + `secure: true` を設定している。
 この設定はCSRF対策を弱めるため、上記のオリジンチェックで補完している。
 
+## tRPCミドルウェア設計
+
+tRPC v11のミドルウェア（`t.middleware`）内で下流のprocedureが投げた例外を捕捉するには、
+`try/catch` ではなく `await next()` の戻り値の `result.ok` を判定する。
+tRPC v11の `next()` は例外を再送出せず `{ok: false, error}` で返す仕様のため、
+`try/catch` 側は到達しない。
+
+実例は `app/src/lib/server/trpc.ts` の `withApiErrors` にある。
+同ミドルウェアは機械可読な識別子をUI文言へ変換する。
+要点を簡略化すると次の形になる。
+
+```ts
+const withApiErrors = t.middleware(async ({ next }) => {
+  const result = await next();
+  if (!result.ok) {
+    // result.error を検査してマッピングする
+  }
+  return result;
+});
+```
+
+`withEncryption` も同じ `result.ok` パターンを使う。
+新しいミドルウェアを追加・改修する際は同じ判定形式に揃える。
+
 ## DB 設計方針
 
 テーブル定義は `app/src/lib/server/schema.ts` を参照。以下はコードから読み取りにくい設計判断:
@@ -165,3 +189,15 @@ Cookieに `sameSite: "none"` + `secure: true` を設定している。
 - タイマーの `ephemeral` カラムは1回限り使用するタイマーを識別するフラグ。
   作成時のみ設定でき、`adjust` / `reset` / `setTime` などの操作で変更されない。
   クライアント側では満了到達時に削除ボタンを強調し、確認ダイアログを省略して削除できる体験に用いる
+
+### バイナリ保存と `max_allowed_packet`
+
+`mediumblob`・`longblob` カラムへバイナリを保存する場合、
+drizzle-orm mysql2ドライバーの `db.transaction` は
+内部で `client.query()`（テキストプロトコル）を採用する。
+`Buffer` パラメーターは16進数リテラルへ変換されて送信されるため、
+実バイト数の約2倍のSQLテキストがサーバーへ流れる。
+`db/my.cnf` の `max_allowed_packet` は元の想定バイナリサイズの3倍以上に設定する
+（現行値は `64M`）。添付ファイル上限が10 MiBのため、
+テキスト膨張とプロトコルオーバーヘッドを吸収する余裕を確保している。
+新しいBLOB系カラムを追加する場合は同基準で再点検する。

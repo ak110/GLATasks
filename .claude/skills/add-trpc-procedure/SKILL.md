@@ -43,6 +43,10 @@ description: >-
 - イベント種別は `lists:updated` / `tasks:updated` / `timers:updated` の3種のみ。
   影響ドメインが複数なら複数送る（`lists.merge` を参照）
 - 新しい機械可読エラー識別子を導入した場合は `API_ERRORS` にマッピング追加
+- ミドルウェアを追加または改修する場合、下流のprocedureが投げた例外を捕捉するには、
+  `try/catch` ではなく `await next()` の戻り値の `result.ok` を判定する
+  （tRPC v11の `next()` は例外を再送出せず `{ok: false, error}` で返すため）
+  - 詳細は `docs/development/architecture.md` の「tRPCミドルウェア設計」節を参照する
 
 ### 4. クライアント側の反映
 
@@ -57,6 +61,11 @@ description: >-
 - ユニットテスト: `app/src/**/*.test.ts` に追加（近傍の既存テストを雛形にする）
   - 非決定値（現在時刻・乱数）は固定値を注入する
   - 市民時刻を扱うprocedureは固定 `tz_offset_minutes` でケースを書く
+  - `encryptedProcedure` を `createCaller` で呼ぶルーターテストでは、
+    `vi.mock('$lib/server/crypto')`・`vi.mock('$lib/server/sse')`・
+    `vi.mock('$lib/server/api')` をセットで書く
+    - `getEncryptKey` が `DATABASE_URL` を要求する連鎖と副作用を全て切る目的
+    - 雛形は `app/src/lib/server/trpc.test.ts` を参照する
 - e2eテスト: ユーザーフローに絡む場合は `app/tests/` にPlaywrightテストを追加
   - `page.goto` + `waitForResponse(res => res.url().includes("/api/trpc"))` パターンを使う（development.md参照）
   - `main button:has-text("...")` のようにセレクタをスコープする
@@ -80,7 +89,7 @@ description: >-
 - `app/src/lib/server/api/{ドメイン}.ts` — DB操作関数（`api.ts` は呼び出し側向けの再エクスポートバレル）
 - `app/src/lib/server/sse.ts` — SSE送信
 - `app/src/lib/trpc.ts` — クライアント側tRPCクライアント
-- `docs/development/architecture.md` — SSE / 時刻同期 / 難読化設計
+- `docs/development/architecture.md` — SSE / 時刻同期 / 認証 / tRPCミドルウェア / DB設計
 - `docs/development/development.md` — テスト・開発環境の注意点
 - `.claude/skills/sveltekit/SKILL.md` — tRPC実装規約とアーキテクチャ前提
 - `.claude/skills/e2etest/SKILL.md` — Playwrightテスト実装の注意点
