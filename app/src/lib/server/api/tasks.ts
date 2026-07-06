@@ -16,6 +16,7 @@ import type {
 } from "$lib/types";
 import { getDb } from "../db";
 import { lists, tasks } from "../schema";
+import { listAttachmentsForTasks } from "./attachments";
 import {
   toUtcIso,
   fromUtcIso,
@@ -89,6 +90,9 @@ export async function getActiveTasks(
     mode = "full";
   }
 
+  const attachmentsByTask = await listAttachmentsForTasks(
+    rows.map((t) => t.id),
+  );
   const taskList: TaskListItem[] = rows.map((t) => ({
     _key: t.id,
     id: t.id,
@@ -99,6 +103,7 @@ export async function getActiveTasks(
     tags: parseTags(t.tags),
     sort_order: t.sort_order,
     updated: toUtcIso(t.updated),
+    attachments: attachmentsByTask.get(t.id) ?? [],
   }));
 
   // 1秒overlap: DB の TIMESTAMP 秒精度に合わせ、現在時刻からミリ秒を切り捨てた上で
@@ -137,20 +142,23 @@ export async function getListTasks(
     .where(eq(tasks.list_id, listId))
     .orderBy(asc(tasks.sort_order));
 
-  const data: TaskInfo[] = allTasks
-    .filter((t) => {
-      if (showType === "all") return true;
-      if (showType === "active") return t.status !== "archived";
-      if (showType === "archived") return t.status === "archived";
-      return true;
-    })
-    .map((t) => ({
-      id: t.id,
-      title: splitTitle(t.text),
-      notes: splitNotes(t.text),
-      status: t.status,
-      tags: parseTags(t.tags),
-    }));
+  const filteredTasks = allTasks.filter((t) => {
+    if (showType === "all") return true;
+    if (showType === "active") return t.status !== "archived";
+    if (showType === "archived") return t.status === "archived";
+    return true;
+  });
+  const attachmentsByTask = await listAttachmentsForTasks(
+    filteredTasks.map((t) => t.id),
+  );
+  const data: TaskInfo[] = filteredTasks.map((t) => ({
+    id: t.id,
+    title: splitTitle(t.text),
+    notes: splitNotes(t.text),
+    status: t.status,
+    tags: parseTags(t.tags),
+    attachments: attachmentsByTask.get(t.id) ?? [],
+  }));
 
   const lastModified = toUtcIso(list.last_updated);
   return { status: 200, data, lastModified };
@@ -301,17 +309,20 @@ export async function searchTasks(
 
   // listId → title のマップ
   const listMap = new Map(userLists.map((l) => [l.id, l.title]));
-  return rows
-    .filter((t) => t.status !== "archived")
-    .map((t) => ({
-      id: t.id,
-      title: splitTitle(t.text),
-      notes: splitNotes(t.text),
-      status: t.status,
-      tags: parseTags(t.tags),
-      listId: t.list_id,
-      listTitle: listMap.get(t.list_id) ?? "",
-    }));
+  const matchedTasks = rows.filter((t) => t.status !== "archived");
+  const attachmentsByTask = await listAttachmentsForTasks(
+    matchedTasks.map((t) => t.id),
+  );
+  return matchedTasks.map((t) => ({
+    id: t.id,
+    title: splitTitle(t.text),
+    notes: splitNotes(t.text),
+    status: t.status,
+    tags: parseTags(t.tags),
+    listId: t.list_id,
+    listTitle: listMap.get(t.list_id) ?? "",
+    attachments: attachmentsByTask.get(t.id) ?? [],
+  }));
 }
 
 /** タスクの並び順を更新する */

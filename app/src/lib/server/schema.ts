@@ -9,6 +9,8 @@ import {
   mediumtext,
   timestamp,
   tinyint,
+  index,
+  customType,
 } from "drizzle-orm/mysql-core";
 import { TIMER_DEFAULT_ADJUST_MINUTES } from "$lib/schemas";
 
@@ -72,3 +74,34 @@ export const timers = mysqlTable("timer", {
   created: timestamp("created").notNull(),
   updated: timestamp("updated").notNull(),
 });
+
+// drizzle-orm 0.45.2 の mysql-core に mediumblob ビルダーが存在しないため、
+// customType で MEDIUMBLOB 型を定義する。
+const mediumblob = customType<{ data: Uint8Array; driverData: Buffer }>({
+  dataType() {
+    return "mediumblob";
+  },
+  toDriver(value) {
+    return Buffer.from(value);
+  },
+  fromDriver(value) {
+    return new Uint8Array(value);
+  },
+});
+
+/** attachment テーブル */
+export const attachments = mysqlTable(
+  "attachment",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    task_id: int("task_id").notNull(),
+    filename: varchar("filename", { length: 255 }).notNull(),
+    mime_type: varchar("mime_type", { length: 255 }).notNull(),
+    size: int("size").notNull(),
+    data: mediumblob("data").notNull(),
+    created: timestamp("created").notNull(),
+  },
+  (t) => ({
+    task_id_idx: index("task_id_idx").on(t.task_id),
+  }),
+);

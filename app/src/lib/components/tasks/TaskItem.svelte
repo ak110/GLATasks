@@ -6,6 +6,9 @@
     import type { TaskListItem } from "$lib/types";
     import { linkify } from "$lib/linkify";
     import { getTagColorClass } from "$lib/tag-palette";
+    import { downloadAttachment } from "$lib/attachment-download";
+    import { showErrorToast } from "$lib/toast-store.svelte";
+    import { extractErrorMessage } from "$lib/extract-error-message";
 
     type Props = {
         task: TaskListItem;
@@ -81,6 +84,14 @@
     function copyNotes() {
         copyText(task.notes);
     }
+
+    async function handleDownloadClick(attachmentId: number) {
+        try {
+            await downloadAttachment(attachmentId);
+        } catch (error) {
+            showErrorToast(extractErrorMessage(error));
+        }
+    }
 </script>
 
 <div
@@ -132,17 +143,31 @@
                 （空のタスク）
             </p>
         {/if}
-        {#if task.tags.length > 0}
-            <div class="mt-1 flex flex-wrap gap-1" data-testid="task-tags">
-                {#each task.tags as tag (tag.name)}
-                    <span
-                        class="inline-flex items-center rounded px-1.5 py-0.5 text-[11px] leading-tight {getTagColorClass(
-                            tag.color,
-                        )}"
+        {#if task.attachments.length > 0 || task.tags.length > 0}
+            <div class="mt-1 flex flex-wrap items-center gap-1">
+                {#each task.attachments as attachment (attachment.id)}
+                    <button
+                        onclick={() => handleDownloadClick(attachment.id)}
+                        class="cursor-pointer rounded p-0.5 text-xs hover:bg-gray-100 dark:hover:bg-gray-700"
+                        data-testid="task-attachment-icon"
+                        title={attachment.filename}
+                        aria-label={`${attachment.filename}をダウンロード`}
+                        >📎</button
                     >
-                        {tag.name}
-                    </span>
                 {/each}
+                {#if task.tags.length > 0}
+                    <div class="flex flex-wrap gap-1" data-testid="task-tags">
+                        {#each task.tags as tag (tag.name)}
+                            <span
+                                class="inline-flex items-center rounded px-1.5 py-0.5 text-[11px] leading-tight {getTagColorClass(
+                                    tag.color,
+                                )}"
+                            >
+                                {tag.name}
+                            </span>
+                        {/each}
+                    </div>
+                {/if}
             </div>
         {/if}
     </div>

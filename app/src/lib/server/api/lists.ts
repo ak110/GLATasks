@@ -2,12 +2,12 @@
  * @fileoverview リスト関連API（CRUD・統合・アーカイブ）
  */
 
-import { and, asc, eq, min } from "drizzle-orm";
+import { and, asc, eq, inArray, min } from "drizzle-orm";
 
 import type { ListInfo } from "$lib/types";
 import { adjustUpdatedTimestamps, mergeByTimestamp } from "../merge-utils";
 import { getDb } from "../db";
-import { lists, tasks } from "../schema";
+import { attachments, lists, tasks } from "../schema";
 import { toUtcIso, touchListUpdated, getOwnedList } from "./common";
 
 export type { ListInfo };
@@ -82,7 +82,7 @@ export async function renameList(
   await touchListUpdated(listId);
 }
 
-/** リストとその全タスクを削除する。 */
+/** リストとその全タスク・添付を削除する。 */
 export async function deleteList(
   userId: number,
   listId: number,
@@ -90,16 +90,31 @@ export async function deleteList(
   // 冪等な削除: 対象が無い・他ユーザーのものは no-op (NOT_FOUND を返さない)。
   // 別端末で先に削除されていた場合のレース時に、こちらの削除がエラーにならず
   // クライアントの状態を確実に整合させるため。
-  // schema.ts に ON DELETE CASCADE が無いため、子テーブル (tasks) を明示削除する。
+  // schema.ts に ON DELETE CASCADE が無いため、子テーブル (attachment・task) を明示削除する。
   const db = getDb();
-  const owned = await db
-    .select({ id: lists.id })
-    .from(lists)
-    .where(and(eq(lists.id, listId), eq(lists.user_id, userId)))
-    .limit(1);
-  if (owned.length === 0) return;
-  await db.delete(tasks).where(eq(tasks.list_id, listId));
-  await db.delete(lists).where(eq(lists.id, listId));
+  await db.transaction(async (tx) => {
+    const owned = await tx
+      .select({ id: lists.id })
+      .from(lists)
+      .where(and(eq(lists.id, listId), eq(lists.user_id, userId)))
+      .limit(1);
+    if (owned.length === 0) return;
+
+    // task行を FOR UPDATE でロックし、createAttachment 側の同一行ロックと
+    // 順序を揃えて競合を防ぐ。
+    const taskRows = await tx
+      .select({ id: tasks.id })
+      .from(tasks)
+      .where(eq(tasks.list_id, listId))
+      .for("update");
+    const taskIds = taskRows.map((t) => t.id);
+
+    if (taskIds.length > 0) {
+      await tx.delete(attachments).where(inArray(attachments.task_id, taskIds));
+      await tx.delete(tasks).where(inArray(tasks.id, taskIds));
+    }
+    await tx.delete(lists).where(eq(lists.id, listId));
+  });
 }
 
 /** リストを archived にする。 */

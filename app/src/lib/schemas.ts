@@ -249,6 +249,28 @@ export const ReorderTimersSchema = z.object({
   timerIds: z.array(z.number().int().positive()),
 });
 
+// ── 添付スキーマ ──
+
+export const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+export const MAX_ATTACHMENTS_PER_TASK = 99;
+export const MAX_ATTACHMENT_BASE64_LENGTH =
+  Math.ceil((MAX_ATTACHMENT_BYTES * 4) / 3) + 32;
+
+export const CreateAttachmentSchema = z.object({
+  taskId: z.number().int().positive(),
+  filename: z.string().min(1).max(255),
+  mimeType: z.string().max(255),
+  data: z.string().max(MAX_ATTACHMENT_BASE64_LENGTH),
+});
+
+export const DeleteAttachmentSchema = z.object({
+  attachmentId: z.number().int().positive(),
+});
+
+export const DownloadAttachmentInputSchema = z.object({
+  attachmentId: z.number().int().positive(),
+});
+
 // ── 型エクスポート ──
 
 export type TaskStatus = z.infer<typeof TaskStatusSchema>;
@@ -276,3 +298,8 @@ export type ReorderTimersInput = z.infer<typeof ReorderTimersSchema>;
 export type RegisterUserInput = z.infer<typeof RegisterUserSchema>;
 export type LoginInput = z.infer<typeof LoginSchema>;
 export type GetActiveTasksInput = z.infer<typeof GetActiveTasksSchema>;
+export type CreateAttachmentInput = z.infer<typeof CreateAttachmentSchema>;
+export type DeleteAttachmentInput = z.infer<typeof DeleteAttachmentSchema>;
+export type DownloadAttachmentInput = z.infer<
+  typeof DownloadAttachmentInputSchema
+>;

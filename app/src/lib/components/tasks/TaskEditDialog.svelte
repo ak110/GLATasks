@@ -3,7 +3,10 @@
      * @fileoverview タスク編集ダイアログ（内容編集・タグ設定・リスト移動・完了状態変更）
      */
 
-    import type { TagInfo } from "$lib/types";
+    import type { AttachmentMeta, TagInfo } from "$lib/types";
+    import { trpc } from "$lib/trpc";
+    import { showErrorToast } from "$lib/toast-store.svelte";
+    import { extractErrorMessage } from "$lib/extract-error-message";
     import TagEditor from "./TagEditor.svelte";
     import ConfirmDialog from "$lib/components/dialogs/ConfirmDialog.svelte";
 
@@ -15,6 +18,9 @@
         tags: TagInfo[];
         listTagCandidates: TagInfo[];
         lists: Array<{ id: number; title: string }>;
+        taskId: number;
+        attachments: AttachmentMeta[];
+        onAttachmentChange: () => void;
         onSubmit: (data: {
             text: string;
             moveTo: string;
@@ -33,6 +39,9 @@
         tags,
         listTagCandidates,
         lists,
+        taskId,
+        attachments,
+        onAttachmentChange,
         onSubmit,
         onClose,
     }: Props = $props();
@@ -53,6 +62,14 @@
     let baselineCompleted = $state(false);
     // タグは順序込みで比較したいため JSON 文字列化して扱う
     let baselineTagsKey = $state("[]");
+
+    // 添付一覧はダイアログ内の編集状態として保持し、追加・削除の更新処理成功後に
+    // onAttachmentChange 経由で親側キャッシュが更新され次第、プロパティ経由で反映する
+    let localAttachments = $state<AttachmentMeta[]>([]);
+    $effect(() => {
+        if (!open) return;
+        localAttachments = attachments;
+    });
 
     const isDirty = $derived(
         localText !== baselineText ||
@@ -99,6 +116,55 @@
             tags: localTags,
             closeAfter,
         });
+    }
+
+    /** ファイルをbase64（data URLのプレフィックスを除いた部分）として読み込む */
+    function readFileAsBase64(file: File): Promise<string> {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+                const result = reader.result as string;
+                resolve(result.slice(result.indexOf(",") + 1));
+            };
+            reader.onerror = () => reject(reader.error as Error);
+            reader.readAsDataURL(file);
+        });
+    }
+
+    async function handleFileChange(e: Event) {
+        const input = e.currentTarget as HTMLInputElement;
+        const files = input.files ? Array.from(input.files) : [];
+        // 複数ファイル選択時は順次アップロードする（並列は不要）
+        for (const file of files) {
+            let data: string;
+            try {
+                data = await readFileAsBase64(file);
+            } catch {
+                showErrorToast("ファイルの読み込みに失敗しました");
+                continue;
+            }
+            try {
+                await trpc.attachments.create.mutate({
+                    taskId,
+                    filename: file.name,
+                    mimeType: file.type || "application/octet-stream",
+                    data,
+                });
+                onAttachmentChange();
+            } catch (error) {
+                showErrorToast(extractErrorMessage(error));
+            }
+        }
+        input.value = "";
+    }
+
+    async function handleDeleteAttachment(attachmentId: number) {
+        try {
+            await trpc.attachments.delete.mutate({ attachmentId });
+            onAttachmentChange();
+        } catch (error) {
+            showErrorToast(extractErrorMessage(error));
+        }
     }
 
     function requestClose() {
@@ -195,6 +261,42 @@
                     <TagEditor
                         bind:tags={localTags}
                         candidates={listTagCandidates}
+                    />
+                </div>
+                <div class="mb-4">
+                    <span
+                        class="mb-1 block font-medium text-gray-700 dark:text-gray-200"
+                        >添付ファイル</span
+                    >
+                    {#if localAttachments.length > 0}
+                        <ul class="mb-2 flex flex-col gap-1">
+                            {#each localAttachments as attachment (attachment.id)}
+                                <li
+                                    class="flex items-center justify-between gap-2 rounded border border-gray-200 px-2 py-1 text-sm dark:border-gray-600"
+                                >
+                                    <span
+                                        class="min-w-0 flex-1 truncate text-gray-700 dark:text-gray-200"
+                                        title={attachment.filename}
+                                        >{attachment.filename}</span
+                                    >
+                                    <button
+                                        onclick={() =>
+                                            handleDeleteAttachment(
+                                                attachment.id,
+                                            )}
+                                        class="cursor-pointer rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-400"
+                                        aria-label={`${attachment.filename}を削除`}
+                                        title="削除">🗑️</button
+                                    >
+                                </li>
+                            {/each}
+                        </ul>
+                    {/if}
+                    <input
+                        type="file"
+                        multiple
+                        onchange={handleFileChange}
+                        class="block w-full text-sm text-gray-700 file:mr-3 file:cursor-pointer file:rounded file:border-0 file:bg-gray-100 file:px-3 file:py-1.5 file:text-gray-700 hover:file:bg-gray-200 dark:text-gray-200 dark:file:bg-gray-700 dark:file:text-gray-200 dark:hover:file:bg-gray-600"
                     />
                 </div>
                 <div class="mb-4">

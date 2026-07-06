@@ -336,6 +336,7 @@
                         tags: tags ?? [],
                         sort_order: minOrder - 1000,
                         updated: new Date().toISOString(),
+                        attachments: [],
                     };
                     return { ...old, tasks: [...old.tasks, optimisticTask] };
                 },
@@ -564,6 +565,7 @@
                 tags: t.tags,
                 sort_order: 0,
                 updated: "",
+                attachments: t.attachments,
             }));
         }
         const cache = tasksQuery.data;
@@ -572,6 +574,10 @@
             filterByList(cache.tasks, selectedListId, showType),
         );
     });
+    // 編集ダイアログ対象タスクの添付一覧。tasksキャッシュから常に最新値を導出する
+    const editDialogAttachments = $derived(
+        tasks.find((t) => t.id === editDialog.taskId)?.attachments ?? [],
+    );
     // 同一リスト内で既に使われているタグ候補（名前ユニーク、同名は最初の色を採用）
     const listTagCandidates = $derived.by(() => {
         const seen = new SvelteMap<string, TagInfo>();
@@ -750,6 +756,14 @@
         } catch {
             // グローバルエラーハンドラがトースト表示を担当
         }
+    }
+
+    // 添付ファイル追加・削除完了後の呼び出し。SSE経由の反映を待たず同一タブへ即時反映する
+    function handleAttachmentChange() {
+        queryClient.invalidateQueries({ queryKey: ["activeTasks"] });
+        queryClient.invalidateQueries({
+            queryKey: ["tasks", selectedListId, "archived"],
+        });
     }
 
     function openEditDialog(task: TaskListItem) {
@@ -1095,6 +1109,9 @@
     completed={editDialog.completed}
     tags={editDialog.tags}
     {listTagCandidates}
+    taskId={editDialog.taskId}
+    attachments={editDialogAttachments}
+    onAttachmentChange={handleAttachmentChange}
     onSubmit={submitTaskEdit}
     onClose={() => (editDialog.open = false)}
 />

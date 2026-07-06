@@ -5,6 +5,7 @@
 import { QueryClient, QueryCache, MutationCache } from "@tanstack/svelte-query";
 import { showErrorToast } from "$lib/toast-store.svelte";
 import { checkConnectivity } from "$lib/connection-recovery.svelte";
+import { extractErrorMessage } from "$lib/extract-error-message";
 
 export const queryClient = new QueryClient({
   // 個別 onError は既定の onError を上書きするが、Cache のグローバル onError は
@@ -28,21 +29,4 @@ function handleError(error: unknown): void {
   // 操作失敗を起点に接続を能動チェックする。
   // 正当なアプリエラー時は判定基盤が ok を返すため検出は誤発火しない。
   void checkConnectivity();
-}
-
-/** tRPCエラーからユーザー向けメッセージを抽出する */
-function extractErrorMessage(error: unknown): string {
-  if (!(error instanceof Error)) return "エラーが発生しました";
-
-  // tRPC の ZodValidationError: message が JSON 配列文字列になっている
-  try {
-    const parsed = JSON.parse(error.message);
-    if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].message) {
-      return parsed[0].message;
-    }
-  } catch {
-    // JSON でなければそのまま使う
-  }
-
-  return error.message || "エラーが発生しました";
 }

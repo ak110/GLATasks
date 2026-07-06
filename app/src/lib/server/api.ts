@@ -38,6 +38,12 @@ export {
 } from "./api/tasks";
 
 export {
+  createAttachment,
+  deleteAttachment,
+  downloadAttachment,
+} from "./api/attachments";
+
+export {
   getTimers,
   createTimer,
   updateTimer,

@@ -24,6 +24,7 @@ function makeTask(overrides: Partial<TaskListItem> = {}): TaskListItem {
     tags: [],
     sort_order: 0,
     updated: "2024-01-01T00:00:00.000Z",
+    attachments: [],
     ...overrides,
   };
 }
@@ -54,6 +55,31 @@ describe("TaskItem", () => {
     });
 
     expect(screen.getByText("重要")).toBeInTheDocument();
+  });
+
+  it("添付ファイルがあるとき📎アイコンが表示される", () => {
+    render(TaskItem, {
+      props: {
+        task: makeTask({
+          attachments: [
+            {
+              id: 1,
+              filename: "資料.pdf",
+              mimeType: "application/pdf",
+              size: 1234,
+              created: "2024-01-01T00:00:00.000Z",
+            },
+          ],
+        }),
+        onToggle: vi.fn(),
+        onEdit: vi.fn(),
+      },
+    });
+
+    expect(screen.getByTestId("task-attachment-icon")).toHaveAttribute(
+      "title",
+      "資料.pdf",
+    );
   });
 
   it("completed 状態のタスクはチェックボックスが checked になる", () => {

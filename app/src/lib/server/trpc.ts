@@ -5,9 +5,12 @@
 import { initTRPC, TRPCError } from "@trpc/server";
 import type { RequestEvent } from "@sveltejs/kit";
 import {
+  CreateAttachmentSchema,
   CreateListSchema,
   CreateTaskSchema,
   CreateTimerSchema,
+  DeleteAttachmentSchema,
+  DownloadAttachmentInputSchema,
   GetActiveTasksSchema,
   GetListTasksSchema,
   MergeListSchema,
@@ -123,6 +126,18 @@ const API_ERRORS: Record<
     message: "対象が見つかりません",
   },
   task_not_found: { code: "NOT_FOUND", message: "タスクが見つかりません" },
+  attachment_not_found: {
+    code: "NOT_FOUND",
+    message: "添付ファイルが見つかりません",
+  },
+  attachment_too_large: {
+    code: "BAD_REQUEST",
+    message: "ファイルサイズが上限を超えています",
+  },
+  attachment_limit_exceeded: {
+    code: "BAD_REQUEST",
+    message: "添付ファイルの件数上限に達しています",
+  },
   same_list: { code: "BAD_REQUEST", message: "同じリストは統合できません" },
   list_not_active: {
     code: "BAD_REQUEST",
@@ -146,18 +161,31 @@ const API_ERRORS: Record<
 /**
  * API エラー変換ミドルウェア:
  * api.ts の機械可読な識別子を適切な TRPCError に変換する
+ *
+ * tRPC v11 の `next()` は例外を再送出せず `{ok: false, error}` で返すため、
+ * `!result.ok` 分岐のみで判定する。
  */
 const withApiErrors = t.middleware(async ({ next }) => {
-  try {
-    return await next();
-  } catch (err) {
-    if (err instanceof TRPCError) throw err;
+  const result = await next();
+  if (!result.ok) {
+    const err = result.error;
+    if (err instanceof TRPCError && err.cause instanceof Error) {
+      const msg = err.cause.message;
+      if (msg in API_ERRORS) {
+        const mapped = API_ERRORS[msg];
+        throw new TRPCError({
+          code: mapped.code,
+          message: mapped.message,
+          cause: err.cause,
+        });
+      }
+    }
     if (err instanceof Error && err.message in API_ERRORS) {
       const mapped = API_ERRORS[err.message];
       throw new TRPCError({ code: mapped.code, message: mapped.message });
     }
-    throw err;
   }
+  return result;
 });
 
 // ── ヘルパー関数 ──
@@ -387,6 +415,33 @@ export const appRouter = t.router({
         await api.reorderTasks(ctx.userId, input.listId, input.taskIds);
       }),
     ),
+  }),
+
+  // ── 添付ファイル操作 ──
+  attachments: t.router({
+    create: encryptedProcedure.input(CreateAttachmentSchema).mutation(
+      eventMutationHandler(SSE_EVENTS.tasksUpdated, async ({ ctx, input }) => {
+        await api.createAttachment({ userId: ctx.userId, ...input });
+      }),
+    ),
+
+    delete: encryptedProcedure.input(DeleteAttachmentSchema).mutation(
+      eventMutationHandler(SSE_EVENTS.tasksUpdated, async ({ ctx, input }) => {
+        await api.deleteAttachment({
+          userId: ctx.userId,
+          attachmentId: input.attachmentId,
+        });
+      }),
+    ),
+
+    download: encryptedProcedure
+      .input(DownloadAttachmentInputSchema)
+      .query(async ({ ctx, input }) => {
+        return api.downloadAttachment({
+          userId: ctx.userId,
+          attachmentId: input.attachmentId,
+        });
+      }),
   }),
 
   // ── タイマー操作 ──

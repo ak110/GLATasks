@@ -23,6 +23,7 @@ function makeTask(overrides: Partial<TaskListItem> = {}): TaskListItem {
     tags: [],
     sort_order: 0,
     updated: "2024-01-01T00:00:00.000Z",
+    attachments: [],
     ...overrides,
   };
 }

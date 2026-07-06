@@ -19,6 +19,15 @@ export type ListInfo = {
   status: string;
 };
 
+/** 添付ファイルメタ情報 */
+export type AttachmentMeta = {
+  id: number;
+  filename: string;
+  mimeType: string;
+  size: number;
+  created: string;
+};
+
 /** タスク情報 */
 export type TaskInfo = {
   id: number;
@@ -26,6 +35,7 @@ export type TaskInfo = {
   notes: string;
   status: string;
   tags: TagInfo[];
+  attachments: AttachmentMeta[];
 };
 
 /** 検索結果タスク情報 */
@@ -59,6 +69,7 @@ export type TaskListItem = {
   sort_order: number;
   /** UTC ISO 文字列 */
   updated: string;
+  attachments: AttachmentMeta[];
 };
 
 /** 全アクティブタスク取得レスポンス（差分 sync 対応） */
