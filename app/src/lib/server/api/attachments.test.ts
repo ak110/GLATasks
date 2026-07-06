@@ -101,7 +101,9 @@ async function seedAttachments(taskId: number, count: number): Promise<void> {
     );
 }
 
-describe("createAttachment", () => {
+const describeDb = process.env.DATABASE_URL ? describe : describe.skip;
+
+describeDb("createAttachment", () => {
   const createdUserIds: number[] = [];
 
   afterAll(async () => {
@@ -210,7 +212,7 @@ describe("createAttachment", () => {
   });
 });
 
-describe("deleteAttachment", () => {
+describeDb("deleteAttachment", () => {
   const createdUserIds: number[] = [];
 
   afterAll(async () => {
@@ -255,7 +257,7 @@ describe("deleteAttachment", () => {
   });
 });
 
-describe("downloadAttachment", () => {
+describeDb("downloadAttachment", () => {
   const createdUserIds: number[] = [];
 
   afterAll(async () => {
@@ -299,7 +301,7 @@ describe("downloadAttachment", () => {
   });
 });
 
-describe("listAttachmentsForTasks", () => {
+describeDb("listAttachmentsForTasks", () => {
   const createdUserIds: number[] = [];
 
   afterAll(async () => {

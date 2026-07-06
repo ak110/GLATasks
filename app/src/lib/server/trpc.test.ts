@@ -27,6 +27,13 @@ vi.mock("$lib/server/sse", async (importOriginal) => {
   };
 });
 
+vi.mock("$lib/server/crypto", () => ({
+  encryptObject: vi
+    .fn()
+    .mockImplementation(async (data: unknown) => JSON.stringify(data)),
+  decryptToString: vi.fn().mockImplementation(async (s: string) => s),
+}));
+
 const { appRouter } = await import("./trpc");
 const { createAttachment, deleteAttachment } = await import("$lib/server/api");
 const { sendEvent } = await import("$lib/server/sse");
