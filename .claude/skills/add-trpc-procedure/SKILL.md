@@ -1,4 +1,9 @@
 ---
+# 編集者向け同期手順: 本スキル本文にschemas.tsの命名規約
+# （`*Schema`・`*InputSchema`等の総称パターン・代表例列挙・命名慣行など）を一般化して
+# 記述または改訂する場合は、事前に
+# `grep -oE 'export const [A-Za-z]+Schema' app/src/lib/schemas.ts` 等でexport実態を確認し、
+# 実際の命名分布と一致した表現に整える。
 name: add-trpc-procedure
 description: >-
   GLATasks に新しい tRPC procedure を追加するとき、
@@ -41,15 +46,11 @@ description: >-
 
 `app/src/lib/server/trpc.ts` の `appRouter` にprocedureを追加する:
 
-- 原則として `encryptedProcedure` を使用する（認証 + APIエラー変換 + 難読化）
-- `publicProcedure` は `auth.login` / `auth.register` のような未認証前提のものに限る
-- mutation完了後にSSEイベントを送信して `{ success: true }` を返すパターンは
-  `eventMutationHandler`（共通builder）を使い、SSEイベント種別を引数で渡す。
-  直接 `sendEvent` を呼び出すのは複数イベントや固有の戻り値が必要な場合に限る
-- イベント種別の一覧は `docs/development/architecture.md` の
-  `## リアルタイム同期（SSE）` 節を参照する。
-  影響ドメインが複数なら複数送る（`lists.merge` を参照）
-- 新しい機械可読エラー識別子を導入した場合は `API_ERRORS` にマッピング追加
+- procedure種別選択（`encryptedProcedure`・`publicProcedure`使い分け）・
+  `eventMutationHandler`共通builder使用方針は`sveltekit`スキルのtRPC実装規約節をSSOTとする
+- SSEイベント種別一覧は`docs/development/architecture.md`の`## リアルタイム同期（SSE）`節を参照する
+- 影響ドメインが複数なら複数のSSEイベントを送る（`lists.merge`を参照）
+- 新しい機械可読エラー識別子を導入した場合は`API_ERRORS`にマッピング追加
 - ミドルウェアを追加または改修する場合、下流のprocedureが投げた例外を捕捉するには、
   `try/catch` ではなく `await next()` の戻り値の `result.ok` を判定する
   （tRPC v11の `next()` は例外を再送出せず `{ok: false, error}` で返すため）
@@ -105,7 +106,7 @@ description: >-
 
 ### 9. コミット
 
-- 変更内容が既存の未プッシュコミットの延長ならamendを検討、そうでなければ新規コミット
+- 新規コミットを作成する。amendはユーザーが明示的に指示した場合に限る
 - コミット前に `git status ; git log --oneline --decorate -5` で状態確認
 
 ## 既存procedure呼び出し時の確認

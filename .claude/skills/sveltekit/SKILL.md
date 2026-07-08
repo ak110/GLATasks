@@ -1,4 +1,7 @@
 ---
+# 同期注記: 本ファイルの`## tRPC 実装規約`節（`### アーキテクチャ前提`・
+# `### mutation の共通 builder`を含む）は`add-trpc-procedure`スキル「### 3. tRPC ルーター登録」節から
+# SSOTとして参照される。改訂時は両ファイルの整合を確認する。
 name: sveltekit
 description: >-
   GLATasks の SvelteKit コーディングスタイルと規約リファレンス。
@@ -103,8 +106,12 @@ Svelteはkey値の変化でコンポーネントインスタンスを再生成�
 
 ## サーバー・クライアント共有モジュール
 
+クライアント側専用のユーティリティは本節の対象外とする。
+サーバー側に対応実装が存在しないもの（`.svelte.ts`のrune状態管理等）と、
+サーバー側が異なる実装を持つもの（`base64.ts`に対し`Buffer.from`ベースの処理等）の双方を含む。
+
 サーバー・クライアント両方から参照する純粋関数は`$lib`直下に置き、
-サーバー固有モジュール（`$lib/server/api/common.ts`等）からはre-exportのみを行う。
+サーバー固有モジュール（`$lib/server/api/common.ts`等）からはre-exportのみとする。
 片側に再実装するとロジック乖離の温床になる。
 
 代表例: タスクテキスト分割の`splitTitle` / `splitNotes`は`$lib/text-split.ts`がSSOT。
@@ -132,7 +139,7 @@ tRPC v11 + Zod v3経路全体の前提条件。
   mutation完了後、return前に送信する
 - 日時はUTCに統一する。
   DB（TIMESTAMP）→ サーバー（Date）→ クライアント（ISO8601文字列）の変換は自動である。
-  タイマー起動時刻のように「市民時刻」を扱う場合は、既存のタイマー系procedureを参考に
+  タイマー起動時刻のように「市民時刻」を扱う場合は、既存のタイマー系プロシージャを参考に
   `tz_offset_minutes`を入力スキーマに含める
 - 数値はJSONボディで文字列として届くことがあるため、Zod側で`z.coerce.number()`もしくは
   `z.number()` + 上流での`Number()`変換のどちらか一方を明示的に採用する
