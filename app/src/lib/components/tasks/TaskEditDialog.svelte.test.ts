@@ -33,6 +33,7 @@ function makeDefaultProps() {
     moveTo: "1",
     completed: false,
     tags: [],
+    kind: "normal" as const,
     listTagCandidates: [],
     lists: [{ id: 1, title: "テストリスト" }],
     taskId: 42,

@@ -78,6 +78,13 @@
       "when": 1783319739669,
       "tag": "0010_add_attachment",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "5",
+      "when": 1783482709095,
+      "tag": "0011_add_task_kind_and_schedule",
+      "breakpoints": true
     }
   ]
 }

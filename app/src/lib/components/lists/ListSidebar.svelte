@@ -21,6 +21,7 @@
         onUnarchive: (listId: number) => void;
         onMerge: (listId: number) => void;
         onDelete: (listId: number) => void;
+        onOpenSchedules: (listId: number) => void;
         onAddList: (title: string) => void;
         onTaskDragOver?: (listId: number) => void;
         onTaskDrop?: (taskId: number, targetListId: number) => void;
@@ -41,6 +42,7 @@
         onUnarchive,
         onMerge,
         onDelete,
+        onOpenSchedules,
         onAddList,
         onTaskDragOver,
         onTaskDrop,
@@ -75,6 +77,7 @@
                 {onUnarchive}
                 {onMerge}
                 {onDelete}
+                {onOpenSchedules}
                 onTaskDragOver={() => onTaskDragOver?.(list.id)}
                 onTaskDrop={(taskId) => onTaskDrop?.(taskId, list.id)}
             />

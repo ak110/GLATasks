@@ -31,6 +31,12 @@ import {
   ReorderTimersSchema,
   UserPreferencesSchema,
 } from "$lib/schemas";
+import {
+  CreateScheduleSchema,
+  DeleteScheduleSchema,
+  ListSchedulesSchema,
+  UpdateScheduleSchema,
+} from "./schedule-schemas";
 import * as api from "./api";
 import { decryptToString, encryptObject } from "./crypto";
 import { sendEvent } from "./sse";
@@ -129,6 +135,10 @@ const API_ERRORS: Record<
   attachment_not_found: {
     code: "NOT_FOUND",
     message: "添付ファイルが見つかりません",
+  },
+  schedule_not_found: {
+    code: "NOT_FOUND",
+    message: "定期TODOが見つかりません",
   },
   attachment_too_large: {
     code: "BAD_REQUEST",
@@ -347,7 +357,7 @@ export const appRouter = t.router({
         ),
       ),
 
-    // 2つのリソース（listsUpdated + tasksUpdated）に影響するため
+    // 3つのリソース（listsUpdated + tasksUpdated + schedulesUpdated）に影響するため
     // eventMutationHandler（単一イベントのみ対応）は使わず、sendEvent を直接呼ぶ
     merge: encryptedProcedure
       .input(MergeListSchema)
@@ -359,6 +369,7 @@ export const appRouter = t.router({
         );
         sendEvent(ctx.userId, SSE_EVENTS.listsUpdated, ctx.tabId);
         sendEvent(ctx.userId, SSE_EVENTS.tasksUpdated, ctx.tabId);
+        sendEvent(ctx.userId, SSE_EVENTS.schedulesUpdated, ctx.tabId);
         return { success: true as const };
       }),
   }),
@@ -392,6 +403,7 @@ export const appRouter = t.router({
           input.listId,
           input.text,
           input.tags,
+          input.kind,
         );
         sendEvent(ctx.userId, SSE_EVENTS.tasksUpdated, ctx.tabId);
         return { success: true as const, taskId };
@@ -442,6 +454,41 @@ export const appRouter = t.router({
           attachmentId: input.attachmentId,
         });
       }),
+  }),
+
+  // ── 定期TODOスケジュール操作 ──
+  schedules: t.router({
+    list: encryptedProcedure
+      .input(ListSchedulesSchema)
+      .query(async ({ ctx, input }) => {
+        return api.listSchedules(ctx.userId, input.listId);
+      }),
+
+    create: encryptedProcedure
+      .input(CreateScheduleSchema)
+      .mutation(async ({ ctx, input }) => {
+        const schedule = await api.createSchedule(ctx.userId, input);
+        sendEvent(ctx.userId, SSE_EVENTS.schedulesUpdated, ctx.tabId);
+        return { success: true as const, schedule };
+      }),
+
+    update: encryptedProcedure
+      .input(UpdateScheduleSchema)
+      .mutation(async ({ ctx, input }) => {
+        const { scheduleId, ...data } = input;
+        const schedule = await api.updateSchedule(ctx.userId, scheduleId, data);
+        sendEvent(ctx.userId, SSE_EVENTS.schedulesUpdated, ctx.tabId);
+        return { success: true as const, schedule };
+      }),
+
+    delete: encryptedProcedure.input(DeleteScheduleSchema).mutation(
+      eventMutationHandler(
+        SSE_EVENTS.schedulesUpdated,
+        async ({ ctx, input }) => {
+          await api.deleteSchedule(ctx.userId, input.scheduleId);
+        },
+      ),
+    ),
   }),
 
   // ── タイマー操作 ──

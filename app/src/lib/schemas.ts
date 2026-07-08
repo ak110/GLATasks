@@ -29,6 +29,10 @@ export const TaskStatusSchema = z.enum(["active", "completed", "archived"]);
 export const ShowTypeSchema = z.enum(["active", "archived", "all"]);
 export const ListStatusSchema = z.enum(["active", "archived"]);
 
+/** タスク区分。"todo" は通知バッジ集計・定期TODO発火の対象となる。 */
+export const TaskKindSchema = z.enum(["normal", "todo"]);
+export type TaskKind = z.infer<typeof TaskKindSchema>;
+
 // ── タグスキーマ ──
 
 /** タスクに付与する個別タグ */
@@ -52,6 +56,7 @@ export const CreateTaskSchema = z.object({
   listId: z.number().int().positive(),
   text: z.string().min(1, "タスク内容は必須です").max(100000),
   tags: TagsSchema.optional(),
+  kind: TaskKindSchema.optional(),
 });
 
 export const UpdateTaskSchema = z
@@ -64,13 +69,15 @@ export const UpdateTaskSchema = z
     move_to: z.number().int().positive().optional(),
     keep_order: z.boolean().default(false),
     tags: TagsSchema.optional(),
+    kind: TaskKindSchema.optional(),
   })
   .refine(
     (data) =>
       data.text !== undefined ||
       data.status !== undefined ||
       data.move_to !== undefined ||
-      data.tags !== undefined,
+      data.tags !== undefined ||
+      data.kind !== undefined,
     { message: "更新する項目が指定されていません" },
   );
 

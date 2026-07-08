@@ -21,6 +21,7 @@
         moveTo: string;
         completed: boolean;
         tags: TagInfo[];
+        kind: "normal" | "todo";
         listTagCandidates: TagInfo[];
         lists: Array<{ id: number; title: string }>;
         taskId: number;
@@ -31,6 +32,7 @@
             moveTo: string;
             completed: boolean;
             tags: TagInfo[];
+            kind: "normal" | "todo";
             closeAfter: boolean;
         }) => void;
         onClose: () => void;
@@ -42,6 +44,7 @@
         moveTo,
         completed,
         tags,
+        kind,
         listTagCandidates,
         lists,
         taskId,
@@ -55,6 +58,7 @@
     let localMoveTo = $state("");
     let localCompleted = $state(false);
     let localTags = $state<TagInfo[]>([]);
+    let localKind = $state<"normal" | "todo">("normal");
     let textareaEl = $state<HTMLTextAreaElement | null>(null);
     // 未保存変更がある状態で閉じようとしたときの確認ダイアログ
     let confirmCloseOpen = $state(false);
@@ -69,6 +73,7 @@
     let baselineCompleted = $state(false);
     // タグは順序込みで比較したいため JSON 文字列化して扱う
     let baselineTagsKey = $state("[]");
+    let baselineKind = $state<"normal" | "todo">("normal");
 
     // 添付一覧はダイアログ内の編集状態として保持し、追加・削除の更新処理成功後に
     // onAttachmentChange 経由で親側キャッシュが更新され次第、プロパティ経由で反映する
@@ -82,7 +87,8 @@
         localText !== baselineText ||
             localMoveTo !== baselineMoveTo ||
             localCompleted !== baselineCompleted ||
-            JSON.stringify(localTags) !== baselineTagsKey,
+            JSON.stringify(localTags) !== baselineTagsKey ||
+            localKind !== baselineKind,
     );
 
     // open が偽から真へ遷移した瞬間のみローカル状態を初期化する
@@ -94,6 +100,7 @@
             localMoveTo = moveTo;
             localCompleted = completed;
             localTags = [...tags];
+            localKind = kind;
             // tick 後にフォーカス
             queueMicrotask(() => textareaEl?.focus());
         }
@@ -108,6 +115,7 @@
         baselineMoveTo = moveTo;
         baselineCompleted = completed;
         baselineTagsKey = JSON.stringify(tags);
+        baselineKind = kind;
     });
 
     function handleSubmit(closeAfter: boolean) {
@@ -121,6 +129,7 @@
             moveTo: localMoveTo,
             completed: localCompleted,
             tags: localTags,
+            kind: localKind,
             closeAfter,
         });
     }
@@ -216,6 +225,8 @@
             class="w-full max-w-2xl rounded-lg shadow-xl {isDragOver
                 ? FILE_DROP_HIGHLIGHT_CLASSES
                 : 'bg-white dark:bg-gray-800'}"
+            role="group"
+            aria-label="タスク編集フォーム（ファイルドロップ対応）"
             ondragover={handleDialogBodyDragOver}
             ondragleave={handleDialogBodyDragLeave}
             ondrop={handleDialogBodyDrop}
@@ -235,7 +246,7 @@
                     ✕
                 </button>
             </div>
-            <div class="p-6">
+            <div class="max-h-[80vh] overflow-y-auto p-6">
                 <div class="mb-4 flex items-center gap-2">
                     <input
                         id="edit-completed"
@@ -261,6 +272,21 @@
                         bind:this={textareaEl}
                         class="w-full rounded border border-gray-200 px-3 py-2 wrap-break-word break-all focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
                     ></textarea>
+                </div>
+                <div class="mb-4">
+                    <label
+                        class="mb-1 block cursor-pointer font-medium text-gray-700 dark:text-gray-200"
+                        for="edit-kind">区分</label
+                    >
+                    <select
+                        id="edit-kind"
+                        bind:value={localKind}
+                        class="w-full cursor-pointer rounded border border-gray-200 px-3 py-2 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+                        data-testid="edit-kind-select"
+                    >
+                        <option value="normal">通常</option>
+                        <option value="todo">TODO</option>
+                    </select>
                 </div>
                 <div class="mb-4">
                     <span

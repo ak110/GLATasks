@@ -82,7 +82,8 @@ sequenceDiagram
 
 - エンドポイント: `GET /api/events`（Cookie認証）
 - データは含めずイベント種別のみ送信
- （`lists:updated` / `tasks:updated` / `timers:updated` / `users:preferences:updated` / `reset`）
+ （`lists:updated` / `tasks:updated` / `timers:updated` / `schedules:updated` /
+  `users:preferences:updated` / `reset`）
 - クライアントはイベント受信時にTanStack Queryの `invalidateQueries` で該当データを再取得
 - 接続の健全性はクライアント側で監視する。`EventSource`の自動再接続に加え、
   受信ウォッチドッグ（30秒周期で判定、最終受信から75秒経過で強制再接続）・
@@ -135,6 +136,42 @@ heartbeatの送出形式には名前付きイベント（`event: heartbeat`）�
 クライアント側の受信ウォッチドッグが`addEventListener("heartbeat", ...)`で
 最終受信時刻を更新できない。
 
+## 定期TODOスケジューラー
+
+`schedules`テーブルのRRULE（`app/src/lib/server/schema.ts`）を起点に、
+サーバー内`setInterval`が定期的にTODOタスクを自動生成する。実装は`app/src/lib/server/scheduler.ts`。
+
+```mermaid
+sequenceDiagram
+    participant K as SvelteKit init
+    participant T as setInterval (60秒)
+    participant D as DB
+
+    K->>D: 起動時フィルフォワード（未発火分の遡り生成）
+    loop 60秒ごと
+        T->>D: enabledなscheduleを走査し発火判定
+        T->>D: 発火予定ごとにtasks/schedulesを更新
+    end
+```
+
+- 起動時と定期ポーリングの双方でfill-forward方式を採る。
+  各スケジュールの`last_fired`（未設定時は`created`）を起点に、現在時刻までの未発火分を遡って生成する
+- fill-forwardは`rrule`のiterator経路で発火予定を1件ずつ検出し、
+  上限30件に達した時点で走査を打ち切る。
+  長期未発火の日次スケジュールでも全発火予定を配列化せずメモリ使用量を抑える
+- 上限30件を超える発火予定は31件目以降を生成せずスキップする。
+  この方式は上限の範囲内で重複発火を許容する設計であり、
+  上限を超えるフィルフォワードでは一部の発火予定が生成されずに終わる場合がある
+- 全発火予定の生成後に1回、`rule.before(now, true)`で求めた直近の発火予定を対象スケジュールの`last_fired`へ設定し、次回ポーリングでの再検出（二重発火）を防ぐ
+- 発火機構は単一プロセスを前提とする。
+  現行のDocker Compose構成はアプリケーションサーバーが単一プロセスであるため、
+  複数プロセスワーカー間の発火競合は考慮しない。
+  複数プロセス構成へ拡張する場合、同一スケジュールへの並行発火は
+  `list.user_id`と`last_fired`の更新競合により上記の重複許容範囲に収まる
+- スケジュールの`rrule`列は`DTSTART;TZID=Asia/Tokyo`形式でタイムゾーンを保持する。
+  `rrule`の`between()`が返す`Date`はAsia/Tokyoのローカル時刻をUTCとしてマークした値であるため、
+  市民時刻の時・分の取り出しには`getHours()`ではなく`getUTCHours()`等のUTC系アクセサを使う
+
 ## 認証設計
 
 CookieベースのJWT/HS256セッション。実装詳細は `hooks.server.ts` / `session.ts` を参照。
@@ -180,7 +217,10 @@ const withApiErrors = t.middleware(async ({ next }) => {
 テーブル定義は `app/src/lib/server/schema.ts` を参照。以下はコードから読み取りにくい設計判断:
 
 - 日時カラムはすべてTIMESTAMP型でUTC保存。タイムゾーン変換はクライアント側で行い、
-  サーバー・DB層ではタイムゾーンを意識しない設計
+  サーバー・DB層ではタイムゾーンを意識しない設計。
+  例外として、定期TODOスケジュール（`schedules.rrule`）はRRULE文字列自体に
+  `DTSTART;TZID=Asia/Tokyo`形式でタイムゾーンを持たせる`rrule`ライブラリの
+  タイムゾーン扱いを採用する
 - 並び順は `sort_order` INTカラム（昇順、1000刻み）。刻み幅を大きくすることで、挿入時に周囲のレコードを更新せずに済む。
   ドメインごとの挿入位置: タスク（`tasks.create`）は `sort_order = 既存最小値 - 1000` で先頭挿入、
   タイマー（`timers.create`）は `sort_order = 既存最大値 + 1000` で末尾追加

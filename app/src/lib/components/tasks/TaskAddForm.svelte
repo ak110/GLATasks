@@ -15,6 +15,7 @@
             text: string;
             tags: TagInfo[];
             attachments: File[];
+            kind: "normal" | "todo";
         }) => Promise<boolean>;
     };
 
@@ -22,6 +23,7 @@
     let formFocused = $state(false);
     let tags = $state<TagInfo[]>([]);
     let selectedAttachments = $state<File[]>([]);
+    let isTodo = $state(false);
     // フォームルート要素へのファイルドラッグアンドドロップ中かどうか
     let isDragOver = $state(false);
 
@@ -55,12 +57,14 @@
             text,
             tags,
             attachments: selectedAttachments,
+            kind: isTodo ? "todo" : "normal",
         });
-        // 送信成功時のみタグ・添付をリセットしフォームを折りたたむ。失敗時は
+        // 送信成功時のみタグ・添付・区分をリセットしフォームを折りたたむ。失敗時は
         // テキスト・タグ・添付・フォーカス状態を残し、ユーザーが修正して再送信できるようにする
         if (ok) {
             tags = [];
             selectedAttachments = [];
+            isTodo = false;
             formFocused = false;
         }
     }
@@ -106,6 +110,8 @@
         ? FILE_DROP_HIGHLIGHT_CLASSES
         : 'bg-white dark:bg-gray-800'}"
     data-testid="task-add-form"
+    role="group"
+    aria-label="タスク追加フォーム（ファイルドロップ対応）"
     ondragover={handleFormDragOver}
     ondragleave={handleFormDragLeave}
     ondrop={handleFormDrop}
@@ -133,6 +139,19 @@
             {/if}
         </div>
         {#if expanded}
+            <label
+                class="flex w-fit cursor-pointer items-center gap-1.5 text-sm text-gray-600 dark:text-gray-300"
+                onfocusin={() => (formFocused = true)}
+                onfocusout={handleBlur}
+            >
+                <input
+                    type="checkbox"
+                    bind:checked={isTodo}
+                    class="cursor-pointer"
+                    data-testid="task-add-todo-checkbox"
+                />
+                TODO
+            </label>
             <div
                 onfocusin={() => (formFocused = true)}
                 onfocusout={handleBlur}

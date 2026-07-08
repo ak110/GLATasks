@@ -1,5 +1,16 @@
-import type { Handle } from "@sveltejs/kit";
+import type { Handle, ServerInit } from "@sveltejs/kit";
+import { building } from "$app/environment";
 import { verifySessionToken } from "$lib/server/session";
+import { startScheduler } from "$lib/server/scheduler";
+
+/**
+ * サーバー起動時に定期TODOスケジューラーを起動する。
+ * `building` が真の間（ビルド時）は意図しない初期化処理を避けるため起動しない。
+ */
+export const init: ServerInit = () => {
+  if (building) return;
+  startScheduler();
+};
 
 export const handle: Handle = async ({ event, resolve }) => {
   // CSRF対策: cross-site リクエストを API ルートでブロック（Fetch Metadata）

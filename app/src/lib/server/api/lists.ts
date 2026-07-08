@@ -2,15 +2,42 @@
  * @fileoverview リスト関連API（CRUD・統合・アーカイブ）
  */
 
-import { and, asc, eq, inArray, min } from "drizzle-orm";
+import { and, asc, count, eq, inArray, min } from "drizzle-orm";
 
 import type { ListInfo } from "$lib/types";
 import { adjustUpdatedTimestamps, mergeByTimestamp } from "../merge-utils";
 import { getDb } from "../db";
-import { attachments, lists, tasks } from "../schema";
+import { attachments, lists, schedules, tasks } from "../schema";
 import { toUtcIso, touchListUpdated, getOwnedList } from "./common";
 
 export type { ListInfo };
+
+/**
+ * ユーザーの全リストについて、未完了（status="active"）かつ kind="todo" の
+ * タスク件数を list_id ごとに集計する。
+ *
+ * `getLists` の既存クエリ（lists 単独取得 + JS側フィルタ）とは別クエリとして扱う。
+ * 1クエリのJOIN + GROUP BYへ統合せず2クエリ構成とすることで、
+ * MySQLのGROUP BY厳格モードの影響を避ける。
+ */
+async function countTodoTasksByList(
+  userId: number,
+): Promise<Map<number, number>> {
+  const db = getDb();
+  const rows = await db
+    .select({ listId: tasks.list_id, todoCount: count() })
+    .from(tasks)
+    .innerJoin(lists, eq(tasks.list_id, lists.id))
+    .where(
+      and(
+        eq(lists.user_id, userId),
+        eq(tasks.status, "active"),
+        eq(tasks.kind, "todo"),
+      ),
+    )
+    .groupBy(tasks.list_id);
+  return new Map(rows.map((r) => [r.listId, r.todoCount]));
+}
 
 /** リスト一覧を取得する。タイトル昇順で返す。 */
 export async function getLists(
@@ -23,6 +50,7 @@ export async function getLists(
     .from(lists)
     .where(eq(lists.user_id, userId))
     .orderBy(asc(lists.title));
+  const todoCounts = await countTodoTasksByList(userId);
   return rows
     .filter((r) => {
       if (showType === "active") return r.status === "active";
@@ -36,6 +64,7 @@ export async function getLists(
       sort_order: r.sort_order,
       last_updated: toUtcIso(r.last_updated),
       status: r.status,
+      todo_count: todoCounts.get(r.id) ?? 0,
     }));
 }
 
@@ -82,7 +111,7 @@ export async function renameList(
   await touchListUpdated(listId);
 }
 
-/** リストとその全タスク・添付を削除する。 */
+/** リストとその全タスク・添付・スケジュールを削除する。 */
 export async function deleteList(
   userId: number,
   listId: number,
@@ -90,7 +119,7 @@ export async function deleteList(
   // 冪等な削除: 対象が無い・他ユーザーのものは no-op (NOT_FOUND を返さない)。
   // 別端末で先に削除されていた場合のレース時に、こちらの削除がエラーにならず
   // クライアントの状態を確実に整合させるため。
-  // schema.ts に ON DELETE CASCADE が無いため、子テーブル (attachment・task) を明示削除する。
+  // schema.ts に ON DELETE CASCADE が無いため、子テーブル (attachment・task・schedule) を明示削除する。
   const db = getDb();
   await db.transaction(async (tx) => {
     const owned = await tx
@@ -113,6 +142,7 @@ export async function deleteList(
       await tx.delete(attachments).where(inArray(attachments.task_id, taskIds));
       await tx.delete(tasks).where(inArray(tasks.id, taskIds));
     }
+    await tx.delete(schedules).where(eq(schedules.list_id, listId));
     await tx.delete(lists).where(eq(lists.id, listId));
   });
 }
@@ -193,6 +223,12 @@ export async function mergeLists(
         .where(eq(tasks.id, task.id));
     }),
   );
+
+  // source リストに紐づく schedule を target リストへ移動
+  await db
+    .update(schedules)
+    .set({ list_id: targetListId })
+    .where(eq(schedules.list_id, sourceListId));
 
   // source リストを削除
   await db.delete(lists).where(eq(lists.id, sourceListId));

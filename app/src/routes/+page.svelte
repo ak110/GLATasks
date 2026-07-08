@@ -17,7 +17,7 @@
     import { uploadAttachment } from "$lib/attachment-utils";
     import { onMount } from "svelte";
     import { SvelteSet, SvelteMap } from "svelte/reactivity";
-    import type { TaskStatus } from "$lib/schemas";
+    import type { TaskStatus, TaskKind } from "$lib/schemas";
     import type {
         TagInfo,
         SearchTaskResult,
@@ -40,6 +40,7 @@
     import TaskListHeader from "$lib/components/tasks/TaskListHeader.svelte";
     import TaskEditDialog from "$lib/components/tasks/TaskEditDialog.svelte";
     import MergeListDialog from "$lib/components/lists/MergeListDialog.svelte";
+    import ScheduleDialog from "$lib/components/schedules/ScheduleDialog.svelte";
     import SearchResults from "$lib/components/search/SearchResults.svelte";
     import ConfirmDialog from "$lib/components/dialogs/ConfirmDialog.svelte";
     import PromptDialog from "$lib/components/dialogs/PromptDialog.svelte";
@@ -68,6 +69,7 @@
         moveTo: string;
         completed: boolean;
         tags: TagInfo[];
+        kind: TaskKind;
     };
     let editDialog = $state<EditDialog>({
         open: false,
@@ -77,7 +79,11 @@
         moveTo: "",
         completed: false,
         tags: [],
+        kind: "normal",
     });
+
+    // 定期TODOスケジュール管理ダイアログの対象リストID（null は非表示）
+    let schedulesDialogListId = $state<number | null>(null);
 
     // リスト統合ダイアログの状態
     type MergeDialog = {
@@ -229,6 +235,9 @@
                 queryKey: ["tasks", selectedListId, "archived"],
             });
         }
+        // TODO件数バッジはリスト一覧クエリ由来のため、タスクの完了/未完了切替や
+        // kind変更の都度、リスト一覧も再取得して反映する
+        await queryClient.invalidateQueries({ queryKey: ["lists"] });
         if (fromOwnTab) {
             await queryClient.invalidateQueries({ queryKey: ["activeTasks"] });
             return;
@@ -255,6 +264,12 @@
         }
     }
 
+    // 定期TODOスケジュール一覧の再取得
+    async function syncSchedules(): Promise<void> {
+        debugLog("sync", "schedules");
+        await queryClient.invalidateQueries({ queryKey: ["schedules"] });
+    }
+
     // SSE: サーバーからの通知でクエリを再取得（フォールバックはSSE不健全時のポーリング経路）
     subscribeOnMount({
         [SSE_EVENTS.listsUpdated]: {
@@ -274,6 +289,12 @@
             },
             // フォールバック経路は発信元タブを判別できないため、常に他端末扱いで差分検出する
             fallback: () => syncTasks(false),
+        },
+        [SSE_EVENTS.schedulesUpdated]: {
+            handler: () => {
+                void syncSchedules();
+            },
+            fallback: syncSchedules,
         },
     });
     // ドラッグ終了時にサイドバーのハイライトをリセット
@@ -300,19 +321,23 @@
             listId,
             text,
             tags,
+            kind,
         }: {
             listId: number;
             text: string;
             tags?: TagInfo[];
-        }) => trpc.tasks.create.mutate({ listId, text, tags }),
+            kind?: TaskKind;
+        }) => trpc.tasks.create.mutate({ listId, text, tags, kind }),
         onMutate: async ({
             listId,
             text,
             tags,
+            kind,
         }: {
             listId: number;
             text: string;
             tags?: TagInfo[];
+            kind?: TaskKind;
         }) => {
             await queryClient.cancelQueries({ queryKey: ["activeTasks"] });
             const prev = queryClient.getQueryData<ActiveTasksCache>([
@@ -336,6 +361,7 @@
                         title: splitTitle(text),
                         notes: splitNotes(text),
                         status: "active",
+                        kind: kind ?? "normal",
                         tags: tags ?? [],
                         sort_order: minOrder - 1000,
                         updated: new Date().toISOString(),
@@ -375,6 +401,8 @@
                 }
             }
             queryClient.invalidateQueries({ queryKey: ["activeTasks"] });
+            // TODO区分で作成された場合の通知バッジ反映のため、リスト一覧も再取得する
+            queryClient.invalidateQueries({ queryKey: ["lists"] });
             addTaskText = "";
         },
     }));
@@ -390,6 +418,7 @@
             move_to?: number;
             keep_order?: boolean;
             tags?: TagInfo[];
+            kind?: TaskKind;
         }) => trpc.tasks.update.mutate(input),
         onMutate: async (variables: {
             listId: number;
@@ -400,6 +429,7 @@
             move_to?: number;
             keep_order?: boolean;
             tags?: TagInfo[];
+            kind?: TaskKind;
         }) => {
             await queryClient.cancelQueries({ queryKey: ["activeTasks"] });
             const prev = queryClient.getQueryData<ActiveTasksCache>([
@@ -456,6 +486,9 @@
                                 ...(variables.tags !== undefined
                                     ? { tags: variables.tags }
                                     : {}),
+                                ...(variables.kind !== undefined
+                                    ? { kind: variables.kind }
+                                    : {}),
                                 ...(variables.move_to !== undefined
                                     ? { listId: variables.move_to }
                                     : {}),
@@ -477,10 +510,13 @@
         },
         onSuccess: (_data, variables) => {
             queryClient.invalidateQueries({ queryKey: ["activeTasks"] });
-            // タスクが別リストへ移動された場合はリスト一覧も更新する
+            // タスクが別リストへ移動された場合、または TODO 件数バッジに影響する
+            // kind・status の変更を伴う場合はリスト一覧も更新する
             if (
-                variables.move_to !== undefined &&
-                variables.move_to !== variables.listId
+                (variables.move_to !== undefined &&
+                    variables.move_to !== variables.listId) ||
+                variables.kind !== undefined ||
+                variables.status !== undefined
             ) {
                 queryClient.invalidateQueries({ queryKey: ["lists"] });
             }
@@ -534,6 +570,7 @@
             trpc.lists.merge.mutate(input),
         onSuccess: async () => {
             queryClient.invalidateQueries({ queryKey: ["lists"] });
+            queryClient.invalidateQueries({ queryKey: ["schedules"] });
             // リスト統合は物理削除を伴うためキャッシュをundefined化してフル再取得する
             queryClient.setQueryData<ActiveTasksCache | undefined>(
                 ["activeTasks"],
@@ -565,6 +602,7 @@
                 title: t.title,
                 notes: t.notes,
                 status: t.status,
+                kind: t.kind,
                 tags: t.tags,
                 sort_order: 0,
                 updated: "",
@@ -729,6 +767,7 @@
         text: string;
         tags: TagInfo[];
         attachments: File[];
+        kind: TaskKind;
     }): Promise<boolean> {
         if (!selectedListId) return false;
         const text = data.text.trimEnd();
@@ -739,6 +778,7 @@
                 listId,
                 text,
                 tags: data.tags,
+                kind: data.kind,
             });
             await uploadTaskAttachments(result.taskId, data.attachments);
             return true;
@@ -794,6 +834,7 @@
             moveTo: String(selectedListId!),
             completed: task.status === "completed",
             tags: task.tags,
+            kind: task.kind,
         };
     }
 
@@ -802,6 +843,7 @@
         moveTo: string;
         completed: boolean;
         tags: TagInfo[];
+        kind: TaskKind;
         closeAfter: boolean;
     }) {
         const { listId, taskId, completed: wasCompleted } = editDialog;
@@ -826,6 +868,7 @@
                 // keep_order に関わらず移動先リストの先頭へ配置される
                 keep_order: !data.closeAfter,
                 tags: data.tags,
+                kind: data.kind,
                 ...statusChange,
             });
 
@@ -839,6 +882,7 @@
                 editDialog.text = data.text;
                 editDialog.moveTo = data.moveTo;
                 editDialog.tags = data.tags;
+                editDialog.kind = data.kind;
             }
 
             if (Number(data.moveTo) !== listId) {
@@ -1067,6 +1111,7 @@
         onUnarchive={unarchiveList}
         onMerge={openMergeDialog}
         onDelete={deleteList}
+        onOpenSchedules={(listId) => (schedulesDialogListId = listId)}
         onAddList={addList}
         onTaskDragOver={(listId) => (dragOverListId = listId)}
         onTaskDrop={handleTaskDropToList}
@@ -1126,12 +1171,19 @@
     moveTo={editDialog.moveTo}
     completed={editDialog.completed}
     tags={editDialog.tags}
+    kind={editDialog.kind}
     {listTagCandidates}
     taskId={editDialog.taskId}
     attachments={editDialogAttachments}
     onAttachmentChange={handleAttachmentChange}
     onSubmit={submitTaskEdit}
     onClose={() => (editDialog.open = false)}
+/>
+
+<ScheduleDialog
+    open={schedulesDialogListId !== null}
+    listId={schedulesDialogListId}
+    onClose={() => (schedulesDialogListId = null)}
 />
 
 <MergeListDialog

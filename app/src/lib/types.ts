@@ -6,9 +6,9 @@
  */
 
 export { TAG_COLOR_KEYS } from "./schemas";
-export type { TagColorKey, TagInfo } from "./schemas";
+export type { TagColorKey, TagInfo, TaskKind } from "./schemas";
 
-import type { TagInfo } from "./schemas";
+import type { TagInfo, TaskKind } from "./schemas";
 
 /** リスト情報 */
 export type ListInfo = {
@@ -17,6 +17,8 @@ export type ListInfo = {
   sort_order: number;
   last_updated: string;
   status: string;
+  /** 未完了かつ kind="todo" のタスク件数（通知バッジ用） */
+  todo_count: number;
 };
 
 /** 添付ファイルメタ情報 */
@@ -34,6 +36,7 @@ export type TaskInfo = {
   title: string;
   notes: string;
   status: string;
+  kind: TaskKind;
   tags: TagInfo[];
   attachments: AttachmentMeta[];
 };
@@ -65,6 +68,7 @@ export type TaskListItem = {
   title: string;
   notes: string;
   status: string;
+  kind: TaskKind;
   tags: TagInfo[];
   sort_order: number;
   /** UTC ISO 文字列 */
@@ -102,4 +106,23 @@ export type TimerInfo = {
 export type TimersResult = {
   timers: TimerInfo[];
   server_time: string;
+};
+
+/**
+ * 定期TODOスケジュール情報。
+ *
+ * 新設型のため、既存の `TaskListItem` 等が持つスネークケース混在フィールド命名
+ * （`sort_order` 等）を踏襲せず、全フィールドをキャメルケースへ統一する。
+ */
+export type ScheduleInfo = {
+  id: number;
+  listId: number;
+  title: string;
+  tags: TagInfo[];
+  /** RFC5545形式のRRULE文字列（DTSTART;TZID=Asia/Tokyo:... を含む） */
+  rrule: string;
+  /** UTC ISO 文字列。未発火なら null */
+  lastFired: string | null;
+  enabled: boolean;
+  sortOrder: number;
 };

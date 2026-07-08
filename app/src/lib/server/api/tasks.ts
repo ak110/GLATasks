@@ -9,6 +9,7 @@ import type { UpdateTaskSchema } from "$lib/schemas";
 import type {
   TagInfo,
   TaskInfo,
+  TaskKind,
   TaskListItem,
   SearchTaskResult,
   GetTasksResult,
@@ -100,6 +101,7 @@ export async function getActiveTasks(
     title: splitTitle(t.text),
     notes: splitNotes(t.text),
     status: t.status,
+    kind: t.kind as TaskKind,
     tags: parseTags(t.tags),
     sort_order: t.sort_order,
     updated: toUtcIso(t.updated),
@@ -156,6 +158,7 @@ export async function getListTasks(
     title: splitTitle(t.text),
     notes: splitNotes(t.text),
     status: t.status,
+    kind: t.kind as TaskKind,
     tags: parseTags(t.tags),
     attachments: attachmentsByTask.get(t.id) ?? [],
   }));
@@ -170,6 +173,7 @@ export async function postTask(
   listId: number,
   text: string,
   tagList: TagInfo[] = [],
+  kind: TaskKind = "normal",
 ): Promise<number> {
   await getOwnedList(listId, userId);
   const cleanText = text.trimEnd();
@@ -186,6 +190,7 @@ export async function postTask(
     .values({
       list_id: listId,
       status: "active",
+      kind,
       text: cleanText,
       tags: serializeTags(tagList),
       sort_order: sortOrder,
@@ -260,6 +265,10 @@ export async function patchTask(
     updates.tags = serializeTags(data.tags);
     updates.updated = new Date();
   }
+  if (data.kind !== undefined) {
+    updates.kind = data.kind;
+    updates.updated = new Date();
+  }
 
   if (data.move_to !== undefined) {
     const moveTo = data.move_to;
@@ -318,6 +327,7 @@ export async function searchTasks(
     title: splitTitle(t.text),
     notes: splitNotes(t.text),
     status: t.status,
+    kind: t.kind as TaskKind,
     tags: parseTags(t.tags),
     listId: t.list_id,
     listTitle: listMap.get(t.list_id) ?? "",

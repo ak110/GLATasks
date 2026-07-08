@@ -43,6 +43,14 @@ export {
   downloadAttachment,
 } from "./api/attachments";
 
+export type { ScheduleInfo } from "./api/schedules";
+export {
+  listSchedules,
+  createSchedule,
+  updateSchedule,
+  deleteSchedule,
+} from "./api/schedules";
+
 export {
   getTimers,
   createTimer,

@@ -42,6 +42,8 @@ export const tasks = mysqlTable("task", {
   id: int("id").primaryKey().autoincrement(),
   list_id: int("list_id").notNull(),
   status: varchar("status", { length: 255 }).notNull().default("active"),
+  // タスク区分（"normal" | "todo"）。既存タスクには "normal" が自動的に入る
+  kind: varchar("kind", { length: 255 }).notNull().default("normal"),
   text: mediumtext("text").notNull(),
   // タグ配列のJSON文字列（要素は { name, color }）
   tags: mediumtext("tags").notNull().default("[]"),
@@ -103,5 +105,27 @@ export const attachments = mysqlTable(
   },
   (t) => ({
     task_id_idx: index("task_id_idx").on(t.task_id),
+  }),
+);
+
+/** schedule テーブル（定期TODOの繰り返しルールを保持する） */
+export const schedules = mysqlTable(
+  "schedule",
+  {
+    id: int("id").primaryKey().autoincrement(),
+    list_id: int("list_id").notNull(),
+    title: varchar("title", { length: 255 }).notNull(),
+    // タグ配列のJSON文字列（tasks.tags と同形式）
+    tags: mediumtext("tags").notNull().default("[]"),
+    // RFC5545形式のRRULE文字列（DTSTART;TZID=Asia/Tokyo:... と RRULE:FREQ=... を改行連結）
+    rrule: mediumtext("rrule").notNull(),
+    last_fired: timestamp("last_fired"),
+    enabled: tinyint("enabled").notNull().default(1),
+    sort_order: int("sort_order").notNull().default(0),
+    created: timestamp("created").notNull(),
+    updated: timestamp("updated").notNull(),
+  },
+  (t) => ({
+    list_id_idx: index("list_id_idx").on(t.list_id),
   }),
 );

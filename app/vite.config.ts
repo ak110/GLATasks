@@ -12,4 +12,11 @@ export default defineConfig({
       allow: [".."],
     },
   },
+  ssr: {
+    // rrule は "exports" フィールドを持たない CommonJS パッケージであり、
+    // Vite の既定の外部化判定では named export（rrulestr 等）を正しく解決できない
+    // （SyntaxError: Named export 'rrulestr' not found）。noExternal で
+    // Viteの変換パイプラインを通すことで interop を正しく機能させる。
+    noExternal: ["rrule"],
+  },
 });

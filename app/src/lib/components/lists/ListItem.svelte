@@ -17,6 +17,7 @@
         onUnarchive: (listId: number) => void;
         onMerge: (listId: number) => void;
         onDelete: (listId: number) => void;
+        onOpenSchedules: (listId: number) => void;
         onTaskDragOver?: () => void;
         onTaskDrop?: (taskId: number) => void;
     };
@@ -33,6 +34,7 @@
         onUnarchive,
         onMerge,
         onDelete,
+        onOpenSchedules,
         onTaskDragOver,
         onTaskDrop,
     }: Props = $props();
@@ -60,12 +62,20 @@
     }}
 >
     <button
-        class="min-w-0 flex-1 cursor-pointer truncate px-4 py-2.5 text-left"
+        class="flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 truncate px-4 py-2.5 text-left"
         class:font-medium={isSelected}
         data-testid="list-select-btn"
         onclick={() => onSelect(list.id)}
     >
-        {list.title}
+        <span class="min-w-0 flex-1 truncate">{list.title}</span>
+        {#if list.todo_count > 0}
+            <span
+                class="inline-flex shrink-0 items-center rounded-full bg-red-500 px-1.5 py-0.5 text-xs text-white"
+                data-testid="todo-badge"
+            >
+                {list.todo_count}
+            </span>
+        {/if}
     </button>
     <!-- ⋮ メニュー -->
     <div class="relative flex-shrink-0">
@@ -126,6 +136,16 @@
                         他のリストに統合
                     </button>
                 {/if}
+                <button
+                    class="block w-full cursor-pointer px-4 py-1.5 text-left hover:bg-gray-100 dark:text-gray-100 dark:hover:bg-gray-700"
+                    data-testid="list-schedules-btn"
+                    onclick={() => {
+                        onOpenSchedules(list.id);
+                        onToggleMenu(list.id);
+                    }}
+                >
+                    定期TODO
+                </button>
                 <hr class="my-1 border-gray-200 dark:border-gray-600" />
                 <button
                     class="block w-full cursor-pointer px-4 py-1.5 text-left text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/30"

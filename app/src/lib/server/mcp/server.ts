@@ -214,6 +214,7 @@ export function createMcpServer(): McpServer {
         input.listId,
         input.text,
         input.tags,
+        input.kind,
       );
       sendEvent(userId, SSE_EVENTS.tasksUpdated, null);
       return jsonResult({ success: true, taskId });

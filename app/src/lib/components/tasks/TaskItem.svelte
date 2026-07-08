@@ -116,6 +116,14 @@
         class:line-through={task.status === "completed"}
         data-testid="task-text"
     >
+        {#if task.kind === "todo"}
+            <span
+                class="mb-0.5 inline-flex items-center rounded bg-red-100 px-1.5 py-0.5 text-[11px] leading-tight text-red-700 dark:bg-red-900/40 dark:text-red-400"
+                data-testid="task-kind-todo"
+            >
+                TODO
+            </span>
+        {/if}
         {#if task.title}
             <p
                 class="leading-tight {task.status === 'completed'
