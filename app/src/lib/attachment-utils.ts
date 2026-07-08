@@ -35,3 +35,53 @@ export async function uploadAttachment(
     data,
   });
 }
+
+/** 添付ファイルのMIMEタイプが画像かどうかを判定する */
+export function isImageAttachment(mimeType: string): boolean {
+  return mimeType.startsWith("image/");
+}
+
+let clipboardSequence = 0;
+let clipboardSequenceKey = "";
+
+/**
+ * ClipboardEventから画像ファイルを抽出する。
+ * ペースト経由の画像は`File.name`が空になり得るため
+ * `clipboard-<yyyymmdd-HHMMSS>-<seq>.<ext>`で自動命名する。
+ * `seq`は同一秒内の連番でファイル名重複を防止する。
+ */
+export function extractImageFilesFromClipboard(event: ClipboardEvent): File[] {
+  const items = event.clipboardData?.files;
+  if (!items || items.length === 0) return [];
+  const results: File[] = [];
+  for (const file of Array.from(items)) {
+    if (!isImageAttachment(file.type)) continue;
+    if (file.name) {
+      results.push(file);
+      continue;
+    }
+    results.push(renameClipboardFile(file));
+  }
+  return results;
+}
+
+function renameClipboardFile(file: File): File {
+  const ext = file.type.split("/")[1] ?? "bin";
+  const now = new Date();
+  const yyyymmdd =
+    `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}` +
+    `${String(now.getDate()).padStart(2, "0")}`;
+  const hhmmss =
+    `${String(now.getHours()).padStart(2, "0")}` +
+    `${String(now.getMinutes()).padStart(2, "0")}` +
+    `${String(now.getSeconds()).padStart(2, "0")}`;
+  const key = `${yyyymmdd}-${hhmmss}`;
+  if (clipboardSequenceKey !== key) {
+    clipboardSequenceKey = key;
+    clipboardSequence = 0;
+  }
+  clipboardSequence += 1;
+  const seq = String(clipboardSequence).padStart(3, "0");
+  const name = `clipboard-${key}-${seq}.${ext}`;
+  return new File([file], name, { type: file.type });
+}

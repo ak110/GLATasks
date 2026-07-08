@@ -7,6 +7,9 @@
     import { linkify } from "$lib/linkify";
     import { getTagColorClass } from "$lib/tag-palette";
     import { downloadAttachment } from "$lib/attachment-download";
+    import { isImageAttachment } from "$lib/attachment-utils";
+    import { createThumbnailManager } from "$lib/image-attachment-utils.svelte";
+    import ImageLightbox from "$lib/components/dialogs/ImageLightbox.svelte";
     import { showErrorToast } from "$lib/toast-store.svelte";
     import { extractErrorMessage } from "$lib/extract-error-message";
 
@@ -92,6 +95,26 @@
             showErrorToast(extractErrorMessage(error));
         }
     }
+
+    async function handleThumbnailOpen(attachmentId: number) {
+        try {
+            await thumbnails.open(attachmentId);
+        } catch (error) {
+            showErrorToast(extractErrorMessage(error));
+        }
+    }
+
+    const thumbnails = createThumbnailManager();
+
+    $effect(() => {
+        thumbnails.sync(task.attachments.map((a) => a.id));
+    });
+
+    $effect(() => {
+        return () => {
+            thumbnails.dispose();
+        };
+    });
 </script>
 
 <div
@@ -154,14 +177,42 @@
         {#if task.attachments.length > 0 || task.tags.length > 0}
             <div class="mt-1 flex flex-wrap items-center gap-1">
                 {#each task.attachments as attachment (attachment.id)}
-                    <button
-                        onclick={() => handleDownloadClick(attachment.id)}
-                        class="cursor-pointer rounded p-0.5 text-xs hover:bg-gray-100 dark:hover:bg-gray-700"
-                        data-testid="task-attachment-icon"
-                        title={attachment.filename}
-                        aria-label={`${attachment.filename}をダウンロード`}
-                        >📎</button
-                    >
+                    {#if isImageAttachment(attachment.mimeType)}
+                        {#await thumbnails.ensure(attachment.id) then imageUrl}
+                            <button
+                                type="button"
+                                onclick={() =>
+                                    handleThumbnailOpen(attachment.id)}
+                                class="cursor-pointer shrink-0 rounded p-0.5"
+                                data-testid="task-attachment-thumbnail"
+                                title={attachment.filename}
+                                aria-label={`${attachment.filename}を拡大表示`}
+                            >
+                                <img
+                                    src={imageUrl}
+                                    alt={attachment.filename}
+                                    class="h-8 w-8 rounded object-cover"
+                                />
+                            </button>
+                        {:catch}
+                            <span
+                                class="text-xs text-gray-400"
+                                title={attachment.filename}
+                                aria-label={`${attachment.filename}の画像取得に失敗`}
+                                >⚠️</span
+                            >
+                        {/await}
+                    {:else}
+                        <button
+                            type="button"
+                            onclick={() => handleDownloadClick(attachment.id)}
+                            class="cursor-pointer rounded p-0.5 text-xs hover:bg-gray-100 dark:hover:bg-gray-700"
+                            data-testid="task-attachment-icon"
+                            title={attachment.filename}
+                            aria-label={`${attachment.filename}をダウンロード`}
+                            >📎</button
+                        >
+                    {/if}
                 {/each}
                 {#if task.tags.length > 0}
                     <div class="flex flex-wrap gap-1" data-testid="task-tags">
@@ -274,3 +325,10 @@
         </div>
     {/if}
 </div>
+
+{#if thumbnails.lightboxImageUrl}
+    <ImageLightbox
+        imageUrl={thumbnails.lightboxImageUrl}
+        onClose={() => thumbnails.close()}
+    />
+{/if}

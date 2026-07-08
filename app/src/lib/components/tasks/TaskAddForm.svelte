@@ -4,7 +4,10 @@
      */
 
     import type { TagInfo } from "$lib/types";
-    import { FILE_DROP_HIGHLIGHT_CLASSES } from "$lib/attachment-utils";
+    import {
+        FILE_DROP_HIGHLIGHT_CLASSES,
+        extractImageFilesFromClipboard,
+    } from "$lib/attachment-utils";
     import TagEditor from "./TagEditor.svelte";
     import AttachmentPicker from "./AttachmentPicker.svelte";
 
@@ -103,6 +106,13 @@
             addAttachments(Array.from(files));
         }
     }
+
+    function handleTextareaPaste(event: ClipboardEvent) {
+        const images = extractImageFilesFromClipboard(event);
+        if (images.length === 0) return;
+        event.preventDefault();
+        addAttachments(images);
+    }
 </script>
 
 <div
@@ -125,6 +135,7 @@
                 onfocus={() => (formFocused = true)}
                 onblur={handleBlur}
                 onkeydown={handleKeydown}
+                onpaste={handleTextareaPaste}
                 class="flex-1 resize-none rounded border border-gray-200 px-3 py-1.5 text-sm focus:border-blue-400 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
             ></textarea>
             {#if expanded}

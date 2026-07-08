@@ -10,7 +10,11 @@
     import {
         uploadAttachment,
         FILE_DROP_HIGHLIGHT_CLASSES,
+        extractImageFilesFromClipboard,
+        isImageAttachment,
     } from "$lib/attachment-utils";
+    import { createThumbnailManager } from "$lib/image-attachment-utils.svelte";
+    import ImageLightbox from "$lib/components/dialogs/ImageLightbox.svelte";
     import TagEditor from "./TagEditor.svelte";
     import AttachmentPicker from "./AttachmentPicker.svelte";
     import ConfirmDialog from "$lib/components/dialogs/ConfirmDialog.svelte";
@@ -188,6 +192,33 @@
         onClose();
     }
 
+    const thumbnails = createThumbnailManager();
+
+    $effect(() => {
+        thumbnails.sync(localAttachments.map((a) => a.id));
+    });
+
+    $effect(() => {
+        return () => {
+            thumbnails.dispose();
+        };
+    });
+
+    async function handleThumbnailOpen(attachmentId: number) {
+        try {
+            await thumbnails.open(attachmentId);
+        } catch (error) {
+            showErrorToast(extractErrorMessage(error));
+        }
+    }
+
+    function handleTextareaPaste(event: ClipboardEvent) {
+        const images = extractImageFilesFromClipboard(event);
+        if (images.length === 0) return;
+        event.preventDefault();
+        handleAddAttachments(images);
+    }
+
     function handleDialogKeydown(e: KeyboardEvent) {
         if ((e.ctrlKey || e.metaKey) && e.key === "s") {
             e.preventDefault();
@@ -270,6 +301,7 @@
                         rows={10}
                         bind:value={localText}
                         bind:this={textareaEl}
+                        onpaste={handleTextareaPaste}
                         class="w-full rounded border border-gray-200 px-3 py-2 wrap-break-word break-all focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
                     ></textarea>
                 </div>
@@ -309,6 +341,34 @@
                                 <li
                                     class="flex items-center justify-between gap-2 rounded border border-gray-200 px-2 py-1 text-sm dark:border-gray-600"
                                 >
+                                    {#if isImageAttachment(attachment.mimeType)}
+                                        {#await thumbnails.ensure(attachment.id) then imageUrl}
+                                            <button
+                                                type="button"
+                                                onclick={() =>
+                                                    handleThumbnailOpen(
+                                                        attachment.id,
+                                                    )}
+                                                class="shrink-0 cursor-pointer"
+                                                data-testid="task-attachment-thumbnail"
+                                                title={attachment.filename}
+                                                aria-label={`${attachment.filename}を拡大表示`}
+                                            >
+                                                <img
+                                                    src={imageUrl}
+                                                    alt={attachment.filename}
+                                                    class="h-12 w-12 rounded object-cover"
+                                                />
+                                            </button>
+                                        {:catch}
+                                            <span
+                                                class="shrink-0 text-sm text-gray-400"
+                                                title={attachment.filename}
+                                                aria-label={`${attachment.filename}の画像取得に失敗`}
+                                                >⚠️</span
+                                            >
+                                        {/await}
+                                    {/if}
                                     <span
                                         class="min-w-0 flex-1 truncate text-gray-700 dark:text-gray-200"
                                         title={attachment.filename}
@@ -359,4 +419,11 @@
             </div>
         </div>
     </div>
+{/if}
+
+{#if thumbnails.lightboxImageUrl}
+    <ImageLightbox
+        imageUrl={thumbnails.lightboxImageUrl}
+        onClose={() => thumbnails.close()}
+    />
 {/if}

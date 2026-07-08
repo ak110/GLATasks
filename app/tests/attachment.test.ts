@@ -9,7 +9,7 @@ import { MAX_ATTACHMENT_BYTES } from "../src/lib/schemas";
 
 const LIST_NAME = `添付テスト_${Date.now()}`;
 
-// 1x1 透過PNGの最小バイナリ（アイコン表示件数の確認用）
+// 1x1 透過PNGの最小バイナリ（添付テストのサンプル画像として使用）
 const TINY_PNG_BASE64 =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
 
@@ -79,7 +79,10 @@ test.describe("attachments", () => {
 
     await expect(
       taskRow.locator('[data-testid="task-attachment-icon"]'),
-    ).toHaveCount(2, { timeout: 15000 });
+    ).toHaveCount(1, { timeout: 15000 });
+    await expect(
+      taskRow.locator('[data-testid="task-attachment-thumbnail"]'),
+    ).toHaveCount(1, { timeout: 15000 });
   });
 
   test("添付アイコンのtitle属性でファイル名を確認できる", async ({ page }) => {
@@ -293,6 +296,83 @@ test.describe("attachments", () => {
     await expect(
       taskRow.locator('[data-testid="task-attachment-icon"]'),
     ).toHaveCount(0);
+  });
+
+  test("追加フォームでクリップボードから画像を貼り付けて添付できる", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await page.locator('[data-testid="task-add-form"] textarea').focus();
+    await page.evaluate((base64) => {
+      const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+      const file = new File([bytes], "", { type: "image/png" });
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      const event = new ClipboardEvent("paste", {
+        clipboardData: dt,
+        bubbles: true,
+        cancelable: true,
+      });
+      const el = document.querySelector<HTMLTextAreaElement>(
+        '[data-testid="task-add-form"] textarea',
+      );
+      el?.dispatchEvent(event);
+    }, TINY_PNG_BASE64);
+    await expect(
+      page.locator('[data-testid="task-add-form"]').getByText(/^clipboard-/),
+    ).toBeVisible();
+  });
+
+  test("編集ダイアログでクリップボードから画像を貼り付けて添付できる", async ({
+    page,
+  }) => {
+    await addTaskAndOpenEditDialog(page, `編集ダイアログ貼付_${Date.now()}`);
+    await page.locator('[role="dialog"] textarea#edit-text').focus();
+    await page.evaluate((base64) => {
+      const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+      const file = new File([bytes], "", { type: "image/png" });
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      const event = new ClipboardEvent("paste", {
+        clipboardData: dt,
+        bubbles: true,
+        cancelable: true,
+      });
+      const el = document.querySelector<HTMLTextAreaElement>(
+        '[role="dialog"] textarea#edit-text',
+      );
+      el?.dispatchEvent(event);
+    }, TINY_PNG_BASE64);
+    await expect(
+      page
+        .locator('[role="dialog"]')
+        .locator('[data-testid="task-attachment-thumbnail"]'),
+    ).toBeVisible();
+  });
+
+  test("画像添付は一覧でサムネイル表示され、クリックで原寸ポップアップが開く", async ({
+    page,
+  }) => {
+    const title = `画像プレビュー_${Date.now()}`;
+    await addTaskAndOpenEditDialog(page, title);
+    await page.locator('[role="dialog"] input[type="file"]').setInputFiles({
+      name: "sample.png",
+      mimeType: "image/png",
+      buffer: Buffer.from(TINY_PNG_BASE64, "base64"),
+    });
+    await expect(
+      page
+        .locator('[role="dialog"]')
+        .locator('[data-testid="task-attachment-thumbnail"]'),
+    ).toBeVisible();
+    await page.keyboard.press("Escape");
+    const listThumbnail = page
+      .locator('[data-testid="task-attachment-thumbnail"]')
+      .first();
+    await listThumbnail.click();
+    await expect(page.locator('[data-testid="image-lightbox"]')).toBeVisible();
+    await page.locator('[data-testid="image-lightbox-close"]').click();
+    await expect(page.locator('[data-testid="image-lightbox"]')).toBeHidden();
   });
 
   test("タスク編集ダイアログ本体へファイルをドラッグアンドドロップすると添付として追加される", async ({

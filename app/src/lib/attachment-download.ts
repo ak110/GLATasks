@@ -14,7 +14,7 @@ import { trpc } from "$lib/trpc";
  * 10 MiB相当の大きな配列では呼び出しスタック上限を超えるため、
  * `atob`後の1バイトずつのfor-loop書き込みで代替する。
  */
-function base64ToBytes(base64: string): Uint8Array<ArrayBuffer> {
+export function base64ToBytes(base64: string): Uint8Array<ArrayBuffer> {
   const binary = atob(base64);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) {
