@@ -7,9 +7,9 @@ SvelteKit + tRPC + Drizzleで構築し、Docker Composeで運用する。
 
 よく使う`make`コマンド:
 
-- `make test-e2e` — E2Eテスト
-- `make test-backup` — バックアップのリストアと検証
-- `make deploy` — ビルド → 停止 → 起動
+- `make test-e2e`（E2Eテスト）
+- `make test-backup`（バックアップのリストアと検証）
+- `make deploy`（ビルド・停止・起動を順に実行）
 
 全ターゲットの一覧は`make help`で確認できる。
 
@@ -19,12 +19,11 @@ SvelteKit + tRPC + Drizzleで構築し、Docker Composeで運用する。
     - 利用可能なコマンドは`pyproject.toml`の`[tool.pyfltr]`設定とJS/TS連携で有効になるもの。
       例: `eslint`・`prettier`・`oxlint`・`vitest`・カスタムコマンドの`svelte-check`
   - バックアップ/E2E系に変更を加えた場合は`make test-backup test-e2e`も実行する
-  - 注意: 本プロジェクトのDocker Compose環境は通常は開発マシン上で常時稼働しており、
-    `make test`（backup/e2eテスト含む）を実行できる。
-    停止している場合は`make start`で起動し、
-    `docker compose --profile=development exec app curl --fail http://localhost:3000/healthcheck`で
-    疎通を確認してからテストを実行する。
-    `uvx pyfltr run-for-agent`を使うのはJSON Lines出力で診断結果を効率的に解釈するためであり、
+  - Docker Compose環境は通常は開発マシン上で常時稼働しており`make test`（backup/e2eテスト含む）を実行できる
+    - 停止している場合は`make start`で起動し、疎通を確認してからテストを実行する
+      （疎通確認コマンド:
+      `docker compose --profile=development exec app curl --fail http://localhost:3000/healthcheck`）
+  - `uvx pyfltr run-for-agent`を使う理由はJSON Lines出力で診断結果を効率的に解釈するためであり、
     環境制約によるものではない
 
 ## 実装上の不変条件・コーディング規約
@@ -36,10 +35,12 @@ Prettierには`prettier-plugin-svelte`と`prettier-plugin-tailwindcss`を併用�
 ESLint側は`typescript-eslint`と`eslint-plugin-svelte`を組み合わせる。
 Biomeへの移行は次の阻害要因により見送っている。
 
-- Svelteマークアップ非対応 — Biomeは`.svelte`のマークアップ部分のフォーマットに対応していない。
-  現在は`prettier-plugin-svelte`が全体を統一的に処理する
-- Tailwind CSSクラスソート非対応 — `prettier-plugin-tailwindcss`に相当する機能がBiomeに存在しない。
-  当該機能はプロジェクト全体で使用している
+- Svelteマークアップ非対応。
+  Biomeは`.svelte`のマークアップ部分のフォーマットに対応していない
+  （現在は`prettier-plugin-svelte`が全体を統一的に処理する）
+- Tailwind CSSクラスソート非対応。
+  `prettier-plugin-tailwindcss`に相当する機能がBiomeに存在しない
+  （当該機能はプロジェクト全体で使用している）
 
 `svelte-check`はpyfltrの`custom-commands`機能で統合されている。
 `uvx pyfltr run`から自動実行され、設定は`pyproject.toml`の
@@ -59,3 +60,13 @@ Biomeへの移行は次の阻害要因により見送っている。
 - 特定のe2eテストだけを実行したい場合、`make test-e2e`はフィルタ引数を受け付けない。
   `make -n test-e2e`でドライラン展開した`docker compose`コマンドを直接呼び、
   末尾の`pnpm run test:e2e`を`pnpm exec playwright test -g "パターン"`へ差し替える
+- 新規依存を追加する`pnpm add`はプロジェクトルートから実行する。
+  `app/package.json`はルート`package.json`へのシンボリックリンクであり、
+  `app/`配下から実行すると`pnpm-lock.yaml`に不正な`app:` importerセクションが生成され
+  `--frozen-lockfile`検証が失敗する
+- `app/src/lib/schemas.ts`はクライアント・サーバー双方から読み込まれる。
+  Vite変換を経ない`app/tests/`配下のPlaywrightテストからも直接importされる。
+  - CJSのみ提供の外部依存（`rrule`等）を追加する場合は
+    `app/src/lib/server/`配下のserver専用ファイルへスキーマを分離する
+    （既存パターンとその制約詳細は`app/src/lib/server/schedule-schemas.ts`冒頭コメントを参照）
+  - 併せて`app/vite.config.ts`に`ssr.noExternal: ["該当パッケージ"]`を追加する

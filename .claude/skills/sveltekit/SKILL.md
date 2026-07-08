@@ -127,7 +127,8 @@ tRPC v11 + Zod v3経路全体の前提条件。
 - 難読化ミドルウェア`withEncryption`は`getRawInput()`で暗号文を復号し、戻り値を`{ encrypted: ... }`で包む。
   ミューテーション・クエリを問わず、ユーザーデータに触るプロシージャは必ず`encryptedProcedure`を使用する
 - SSEイベントは`sendEvent(ctx.userId, "<domain>:updated", ctx.tabId)`で送信する。
-  イベント名は`lists:updated` / `tasks:updated` / `timers:updated`の3種のみ。
+  イベント名の一覧は`docs/development/architecture.md`の
+  `## リアルタイム同期（SSE）`節を参照する。
   mutation完了後、return前に送信する
 - 日時はUTCに統一する。
   DB（TIMESTAMP）→ サーバー（Date）→ クライアント（ISO8601文字列）の変換は自動である。
