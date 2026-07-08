@@ -6,7 +6,7 @@
  */
 
 import { trpc } from "$lib/trpc";
-import { base64ToBytes } from "$lib/attachment-download";
+import { base64ToBytes } from "$lib/base64";
 
 export interface BlobUrlCache {
   ensure(attachmentId: number): Promise<string>;

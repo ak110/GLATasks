@@ -2,10 +2,12 @@
 name: add-trpc-procedure
 description: >-
   GLATasks に新しい tRPC procedure を追加するとき、
-  または既存ドメインのスキーマへフィールドを追加するときの定型チェックリスト。
-  Zod スキーマ → ルーター登録 → 難読化ミドルウェア → SSE 通知 → クライアント側 invalidate → テストの漏れを防ぐ。
+  または既存ドメインのスキーマへフィールドを追加するとき、
+  もしくは既存 tRPC procedure を新規箇所（新規UIコンポーネント・新規ライブラリ関数など）から呼び出すときの定型チェックリスト。
+  Zod スキーマ → ルーター登録 → 難読化ミドルウェア → SSE 通知 → クライアント側 invalidate → テスト、
+  および既存 procedure 呼び出し時の入力スキーマ引数キー整合の漏れを防ぐ。
   ユーザーが "tRPC procedure 追加" や "/add-trpc-procedure" を実行したとき、
-  もしくは新しい router エントリを書く前・既存スキーマを拡張する前に呼び出す。
+  もしくは新しい router エントリを書く前・既存スキーマを拡張する前・既存 procedure を新規箇所から呼び出す前に呼び出す。
 ---
 
 # tRPC Procedure 追加手順 (GLATasks)
@@ -105,6 +107,20 @@ description: >-
 
 - 変更内容が既存の未プッシュコミットの延長ならamendを検討、そうでなければ新規コミット
 - コミット前に `git status ; git log --oneline --decorate -5` で状態確認
+
+## 既存procedure呼び出し時の確認
+
+既存procedureを新規箇所から呼び出す場合、入力スキーマの引数キー名を
+`app/src/lib/schemas.ts`の対応するスキーマ定義で必ず参照する。
+schemas.tsの命名規約は`<Verb><Domain>Schema`を基本とする（例: `CreateTaskSchema`・`StartTimerSchema`）。
+一部に`InputSchema`接尾辞を用いる（例: `DownloadAttachmentInputSchema`）。
+既存呼び出し例（`app/src/lib/attachment-download.ts`の
+`trpc.attachments.download.query({ attachmentId })`等）と一致確認する。
+
+型迂回箇所（`as any`・`@ts-ignore`、および`vi.mock()`のモックファクトリで
+戻り値の型情報を失った状態の呼び出し等）では、引数キー不整合をTypeScript型検査で
+自動検出できない。当該箇所は`app/src/lib/schemas.ts`の対応するスキーマ定義と
+引数キーが一致しているかを目視確認する。
 
 ## 参考ファイル
 

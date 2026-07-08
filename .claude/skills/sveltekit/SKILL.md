@@ -166,6 +166,17 @@ tRPCの戻り値型は`AppRouter`から推論する。
 内部リンク用の`<a href="/...">`・`goto("/...")`は`$app/paths`の`resolve()`経由で書く。
 `<!-- svelte-ignore -->`HTMLコメントは当該ルールには効かないため、`resolve()`が使えない場合は`<button type="button" onclick>`等のbutton要素へ置換する。
 
+## rune使用時のファイル拡張子
+
+rune（`$state`・`$effect`等）を使うユーティリティは`.svelte.ts`拡張子で作成する。
+プレーンな`.ts`ではSvelteコンパイラがrune構文を解釈しない。
+既存例は次のとおり。
+
+- `$lib/dnd-reorder.svelte.ts`
+- `$lib/toast-store.svelte.ts`
+- `$lib/connection-recovery.svelte.ts`
+- `$lib/image-attachment-utils.svelte.ts`
+
 ## D&D 並び替えユーティリティ
 
 並び替え可能なリストには共通D&Dユーティリティ（`$lib/dnd-reorder.svelte.ts`）を利用する。
