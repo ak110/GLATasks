@@ -4,21 +4,33 @@
      */
 
     import type { TagInfo } from "$lib/types";
+    import { FILE_DROP_HIGHLIGHT_CLASSES } from "$lib/attachment-utils";
     import TagEditor from "./TagEditor.svelte";
+    import AttachmentPicker from "./AttachmentPicker.svelte";
 
     type Props = {
         value: string;
         listTagCandidates: TagInfo[];
-        onSubmit: (data: { text: string; tags: TagInfo[] }) => Promise<boolean>;
+        onSubmit: (data: {
+            text: string;
+            tags: TagInfo[];
+            attachments: File[];
+        }) => Promise<boolean>;
     };
 
     let { value = $bindable(), listTagCandidates, onSubmit }: Props = $props();
     let formFocused = $state(false);
     let tags = $state<TagInfo[]>([]);
+    let selectedAttachments = $state<File[]>([]);
+    // フォームルート要素へのファイルドラッグアンドドロップ中かどうか
+    let isDragOver = $state(false);
 
-    // タグ削除などでフォーカスを失っても、入力中のテキストやタグがあれば展開を維持する
+    // タグ削除などでフォーカスを失っても、入力中のテキストやタグ・添付があれば展開を維持する
     const expanded = $derived(
-        formFocused || value.length > 0 || tags.length > 0,
+        formFocused ||
+            value.length > 0 ||
+            tags.length > 0 ||
+            selectedAttachments.length > 0,
     );
 
     /** フォーム内のどこかにフォーカスがあるかを遅延チェック */
@@ -39,11 +51,16 @@
         e.preventDefault();
         const text = value.trimEnd();
         if (!text) return;
-        const ok = await onSubmit({ text, tags });
-        // 送信成功時のみタグをリセットしフォームを折りたたむ。失敗時は
-        // テキスト・タグ・フォーカス状態を残し、ユーザーが修正して再送信できるようにする
+        const ok = await onSubmit({
+            text,
+            tags,
+            attachments: selectedAttachments,
+        });
+        // 送信成功時のみタグ・添付をリセットしフォームを折りたたむ。失敗時は
+        // テキスト・タグ・添付・フォーカス状態を残し、ユーザーが修正して再送信できるようにする
         if (ok) {
             tags = [];
+            selectedAttachments = [];
             formFocused = false;
         }
     }
@@ -54,11 +71,44 @@
             void handleSubmit(e);
         }
     }
+
+    function addAttachments(files: File[]) {
+        selectedAttachments = [...selectedAttachments, ...files];
+    }
+
+    function removeAttachment(index: number) {
+        selectedAttachments = selectedAttachments.filter((_, i) => i !== index);
+    }
+
+    function handleFormDragOver(e: DragEvent) {
+        if (e.dataTransfer?.types.includes("Files")) {
+            e.preventDefault();
+            isDragOver = true;
+        }
+    }
+
+    function handleFormDragLeave() {
+        isDragOver = false;
+    }
+
+    function handleFormDrop(e: DragEvent) {
+        e.preventDefault();
+        isDragOver = false;
+        const files = e.dataTransfer?.files;
+        if (files && files.length > 0) {
+            addAttachments(Array.from(files));
+        }
+    }
 </script>
 
 <div
-    class="border-b border-gray-200 bg-white px-3 py-2 sm:px-4 dark:border-gray-700 dark:bg-gray-800"
+    class="border-b border-gray-200 px-3 py-2 sm:px-4 dark:border-gray-700 {isDragOver
+        ? FILE_DROP_HIGHLIGHT_CLASSES
+        : 'bg-white dark:bg-gray-800'}"
     data-testid="task-add-form"
+    ondragover={handleFormDragOver}
+    ondragleave={handleFormDragLeave}
+    ondrop={handleFormDrop}
 >
     <form onsubmit={handleSubmit} class="flex flex-col gap-2">
         <div class="flex items-start gap-2">
@@ -90,6 +140,13 @@
                 aria-label="タグ"
             >
                 <TagEditor bind:tags candidates={listTagCandidates} />
+            </div>
+            <div onfocusin={() => (formFocused = true)} onfocusout={handleBlur}>
+                <AttachmentPicker
+                    attachments={selectedAttachments}
+                    onAdd={addAttachments}
+                    onRemove={removeAttachment}
+                />
             </div>
         {/if}
     </form>

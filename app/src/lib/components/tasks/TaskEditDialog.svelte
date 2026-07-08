@@ -7,7 +7,12 @@
     import { trpc } from "$lib/trpc";
     import { showErrorToast } from "$lib/toast-store.svelte";
     import { extractErrorMessage } from "$lib/extract-error-message";
+    import {
+        uploadAttachment,
+        FILE_DROP_HIGHLIGHT_CLASSES,
+    } from "$lib/attachment-utils";
     import TagEditor from "./TagEditor.svelte";
+    import AttachmentPicker from "./AttachmentPicker.svelte";
     import ConfirmDialog from "$lib/components/dialogs/ConfirmDialog.svelte";
 
     type Props = {
@@ -53,6 +58,8 @@
     let textareaEl = $state<HTMLTextAreaElement | null>(null);
     // 未保存変更がある状態で閉じようとしたときの確認ダイアログ
     let confirmCloseOpen = $state(false);
+    // ダイアログ本体へのファイルドラッグアンドドロップ中かどうか
+    let isDragOver = $state(false);
 
     // 未保存判定の基準値。本文・リスト・完了状態・タグの4項目について、
     // ダイアログ初期化時または直近の保存後に同期された props を記録し、
@@ -118,44 +125,41 @@
         });
     }
 
-    /** ファイルをbase64（data URLのプレフィックスを除いた部分）として読み込む */
-    function readFileAsBase64(file: File): Promise<string> {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => {
-                const result = reader.result as string;
-                resolve(result.slice(result.indexOf(",") + 1));
-            };
-            reader.onerror = () => reject(reader.error as Error);
-            reader.readAsDataURL(file);
-        });
-    }
-
-    async function handleFileChange(e: Event) {
-        const input = e.currentTarget as HTMLInputElement;
-        const files = input.files ? Array.from(input.files) : [];
+    /** ファイル群を順次アップロードする（`<input type="file">`経路とドラッグアンドドロップ経路の共通処理） */
+    async function uploadFiles(files: FileList | File[]) {
         // 複数ファイル選択時は順次アップロードする（並列は不要）
-        for (const file of files) {
-            let data: string;
+        for (const file of Array.from(files)) {
             try {
-                data = await readFileAsBase64(file);
-            } catch {
-                showErrorToast("ファイルの読み込みに失敗しました");
-                continue;
-            }
-            try {
-                await trpc.attachments.create.mutate({
-                    taskId,
-                    filename: file.name,
-                    mimeType: file.type || "application/octet-stream",
-                    data,
-                });
+                await uploadAttachment(taskId, file);
                 onAttachmentChange();
             } catch (error) {
                 showErrorToast(extractErrorMessage(error));
             }
         }
-        input.value = "";
+    }
+
+    function handleAddAttachments(files: File[]) {
+        void uploadFiles(files);
+    }
+
+    function handleDialogBodyDragOver(e: DragEvent) {
+        if (e.dataTransfer?.types.includes("Files")) {
+            e.preventDefault();
+            isDragOver = true;
+        }
+    }
+
+    function handleDialogBodyDragLeave() {
+        isDragOver = false;
+    }
+
+    async function handleDialogBodyDrop(e: DragEvent) {
+        e.preventDefault();
+        isDragOver = false;
+        const files = e.dataTransfer?.files;
+        if (files && files.length > 0) {
+            await uploadFiles(files);
+        }
     }
 
     async function handleDeleteAttachment(attachmentId: number) {
@@ -209,7 +213,12 @@
         onkeydown={handleDialogKeydown}
     >
         <div
-            class="w-full max-w-2xl rounded-lg bg-white shadow-xl dark:bg-gray-800"
+            class="w-full max-w-2xl rounded-lg shadow-xl {isDragOver
+                ? FILE_DROP_HIGHLIGHT_CLASSES
+                : 'bg-white dark:bg-gray-800'}"
+            ondragover={handleDialogBodyDragOver}
+            ondragleave={handleDialogBodyDragLeave}
+            ondrop={handleDialogBodyDrop}
         >
             <div class="flex items-center justify-between px-6 py-4">
                 <h2
@@ -292,12 +301,7 @@
                             {/each}
                         </ul>
                     {/if}
-                    <input
-                        type="file"
-                        multiple
-                        onchange={handleFileChange}
-                        class="block w-full text-sm text-gray-700 file:mr-3 file:cursor-pointer file:rounded file:border-0 file:bg-gray-100 file:px-3 file:py-1.5 file:text-gray-700 hover:file:bg-gray-200 dark:text-gray-200 dark:file:bg-gray-700 dark:file:text-gray-200 dark:hover:file:bg-gray-600"
-                    />
+                    <AttachmentPicker onAdd={handleAddAttachments} />
                 </div>
                 <div class="mb-4">
                     <label

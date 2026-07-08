@@ -12,6 +12,9 @@
     import { subscribeOnMount } from "$lib/sse-subscribe";
     import { SSE_EVENTS } from "$lib/sse-events";
     import { debugLog } from "$lib/debug-log";
+    import { showErrorToast } from "$lib/toast-store.svelte";
+    import { extractErrorMessage } from "$lib/extract-error-message";
+    import { uploadAttachment } from "$lib/attachment-utils";
     import { onMount } from "svelte";
     import { SvelteSet, SvelteMap } from "svelte/reactivity";
     import type { TaskStatus } from "$lib/schemas";
@@ -725,21 +728,36 @@
     async function addTask(data: {
         text: string;
         tags: TagInfo[];
+        attachments: File[];
     }): Promise<boolean> {
         if (!selectedListId) return false;
         const text = data.text.trimEnd();
         if (!text) return false;
+        const listId = selectedListId;
         try {
-            await createTaskMutation.mutateAsync({
-                listId: selectedListId,
+            const result = await createTaskMutation.mutateAsync({
+                listId,
                 text,
                 tags: data.tags,
             });
+            await uploadTaskAttachments(result.taskId, data.attachments);
             return true;
         } catch {
             // グローバルエラーハンドラがトースト表示を担当
             return false;
         }
+    }
+
+    /** タスク作成成功後、選択済み添付ファイルを順次送信する。個別失敗はタスク自体を残したまま通知する */
+    async function uploadTaskAttachments(taskId: number, files: File[]) {
+        for (const file of files) {
+            try {
+                await uploadAttachment(taskId, file);
+            } catch (error) {
+                showErrorToast(extractErrorMessage(error));
+            }
+        }
+        if (files.length > 0) handleAttachmentChange();
     }
 
     async function toggleTask(taskId: number, checked: boolean) {

@@ -5,6 +5,7 @@
 import { test, expect, type Page, type Locator } from "@playwright/test";
 import * as fs from "node:fs/promises";
 import { setupTestList, cleanupTestList } from "./helpers/common";
+import { MAX_ATTACHMENT_BYTES } from "../src/lib/schemas";
 
 const LIST_NAME = `添付テスト_${Date.now()}`;
 
@@ -190,5 +191,135 @@ test.describe("attachments", () => {
     await expect(
       reloadedRow.locator('[data-testid="task-attachment-icon"]'),
     ).toHaveCount(0);
+  });
+
+  test("タスク追加時にファイルを指定するとタスク行にアイコンが表示される", async ({
+    page,
+  }) => {
+    const title = `追加時添付_${Date.now()}`;
+    await page.fill('textarea[placeholder*="タスクを追加"]', title);
+    await page
+      .locator('[data-testid="task-add-form"] input[type="file"]')
+      .setInputFiles({
+        name: "attach.txt",
+        mimeType: "text/plain",
+        buffer: Buffer.from("追加時添付の内容"),
+      });
+    await page
+      .locator('[data-testid="task-add-form"] li')
+      .filter({ hasText: "attach.txt" })
+      .waitFor({ timeout: 15000 });
+
+    await Promise.all([
+      page.click('[data-testid="task-add-form"] button[type="submit"]'),
+      page.waitForResponse((res) => res.url().includes("/api/trpc")),
+    ]);
+    const taskRow = page
+      .locator('[data-testid="task-item"]')
+      .filter({ hasText: title });
+    await taskRow.waitFor({ timeout: 15000 });
+    await expect(
+      taskRow.locator('[data-testid="task-attachment-icon"]'),
+    ).toHaveCount(1, { timeout: 15000 });
+  });
+
+  test("タスク追加フォームへファイルをドラッグアンドドロップすると添付として追加される", async ({
+    page,
+  }) => {
+    const title = `DnD追加_${Date.now()}`;
+    await page.fill('textarea[placeholder*="タスクを追加"]', title);
+
+    const dataTransfer = await page.evaluateHandle(() => {
+      const dt = new DataTransfer();
+      const file = new File(["DnD追加の内容"], "dnd-add.txt", {
+        type: "text/plain",
+      });
+      dt.items.add(file);
+      return dt;
+    });
+    const form = page.locator('[data-testid="task-add-form"]');
+    await form.dispatchEvent("dragover", { dataTransfer });
+    await form.dispatchEvent("drop", { dataTransfer });
+    await page
+      .locator('[data-testid="task-add-form"] li')
+      .filter({ hasText: "dnd-add.txt" })
+      .waitFor({ timeout: 15000 });
+
+    await Promise.all([
+      page.click('[data-testid="task-add-form"] button[type="submit"]'),
+      page.waitForResponse((res) => res.url().includes("/api/trpc")),
+    ]);
+    const taskRow = page
+      .locator('[data-testid="task-item"]')
+      .filter({ hasText: title });
+    await taskRow.waitFor({ timeout: 15000 });
+    await expect(
+      taskRow.locator('[data-testid="task-attachment-icon"]'),
+    ).toHaveCount(1, { timeout: 15000 });
+  });
+
+  test("タスク追加フォームでサイズ超過ファイルを添付した際のエラートースト検証", async ({
+    page,
+  }) => {
+    const title = `追加時サイズ超過_${Date.now()}`;
+    await page.fill('textarea[placeholder*="タスクを追加"]', title);
+
+    const oversized = Buffer.alloc(MAX_ATTACHMENT_BYTES + 1, 0x41);
+    await page
+      .locator('[data-testid="task-add-form"] input[type="file"]')
+      .setInputFiles({
+        name: "oversized.bin",
+        mimeType: "application/octet-stream",
+        buffer: oversized,
+      });
+    await page
+      .locator('[data-testid="task-add-form"] li')
+      .filter({ hasText: "oversized.bin" })
+      .waitFor({ timeout: 15000 });
+
+    await Promise.all([
+      page.click('[data-testid="task-add-form"] button[type="submit"]'),
+      page.waitForResponse((res) => res.url().includes("/api/trpc")),
+    ]);
+
+    await expect(page.locator('[data-testid="toast-error"]')).toContainText(
+      "ファイルサイズが上限を超えています",
+      { timeout: 15000 },
+    );
+    const taskRow = page
+      .locator('[data-testid="task-item"]')
+      .filter({ hasText: title });
+    await taskRow.waitFor({ timeout: 15000 });
+    await expect(
+      taskRow.locator('[data-testid="task-attachment-icon"]'),
+    ).toHaveCount(0);
+  });
+
+  test("タスク編集ダイアログ本体へファイルをドラッグアンドドロップすると添付として追加される", async ({
+    page,
+  }) => {
+    const title = `DnD編集_${Date.now()}`;
+    const taskRow = await addTaskAndOpenEditDialog(page, title);
+
+    const dataTransfer = await page.evaluateHandle(() => {
+      const dt = new DataTransfer();
+      const file = new File(["DnD編集の内容"], "dnd-edit.txt", {
+        type: "text/plain",
+      });
+      dt.items.add(file);
+      return dt;
+    });
+    const dialogBody = page.locator('[role="dialog"] > div').first();
+    await dialogBody.dispatchEvent("dragover", { dataTransfer });
+    await dialogBody.dispatchEvent("drop", { dataTransfer });
+    await page
+      .locator('[role="dialog"] li')
+      .filter({ hasText: "dnd-edit.txt" })
+      .waitFor({ timeout: 15000 });
+    await page.keyboard.press("Escape");
+
+    await expect(
+      taskRow.locator('[data-testid="task-attachment-icon"]'),
+    ).toHaveCount(1, { timeout: 15000 });
   });
 });
