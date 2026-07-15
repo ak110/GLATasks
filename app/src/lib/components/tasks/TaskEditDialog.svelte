@@ -1,6 +1,6 @@
 <script lang="ts">
     /**
-     * @fileoverview タスク編集ダイアログ（内容編集・タグ設定・リスト移動・完了状態変更）
+     * @fileoverview タスク編集ダイアログ（内容編集・区分切替・タグ設定・リスト移動・完了状態変更）
      */
 
     import type { AttachmentMeta, TagInfo } from "$lib/types";
@@ -18,6 +18,9 @@
     import TagEditor from "./TagEditor.svelte";
     import AttachmentPicker from "./AttachmentPicker.svelte";
     import ConfirmDialog from "$lib/components/dialogs/ConfirmDialog.svelte";
+
+    // role="dialog"のaria-labelledby参照先として<h2>を識別する
+    const titleId = crypto.randomUUID();
 
     type Props = {
         open: boolean;
@@ -249,6 +252,7 @@
         class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 sm:p-0"
         role="dialog"
         aria-modal="true"
+        aria-labelledby={titleId}
         tabindex="-1"
         onkeydown={handleDialogKeydown}
     >
@@ -264,6 +268,7 @@
         >
             <div class="flex items-center justify-between px-6 py-4">
                 <h2
+                    id={titleId}
                     class="text-lg font-semibold text-gray-800 dark:text-gray-100"
                 >
                     タスクの編集
@@ -278,63 +283,51 @@
                 </button>
             </div>
             <div class="max-h-[80vh] overflow-y-auto p-6">
-                <div class="mb-4 flex items-center gap-2">
-                    <input
-                        id="edit-completed"
-                        type="checkbox"
-                        bind:checked={localCompleted}
-                        class="cursor-pointer"
-                    />
+                <div class="mb-4 flex items-center gap-4">
                     <label
-                        for="edit-completed"
-                        class="cursor-pointer text-gray-700 dark:text-gray-200"
-                        >完了</label
+                        class="flex cursor-pointer items-center gap-2 text-gray-700 dark:text-gray-200"
                     >
+                        <input
+                            type="checkbox"
+                            bind:checked={localCompleted}
+                            class="cursor-pointer"
+                        />
+                        完了
+                    </label>
+                    <label
+                        class="flex cursor-pointer items-center gap-2 text-gray-700 dark:text-gray-200"
+                    >
+                        <input
+                            type="checkbox"
+                            checked={localKind === "todo"}
+                            onchange={(e) =>
+                                (localKind = e.currentTarget.checked
+                                    ? "todo"
+                                    : "normal")}
+                            class="cursor-pointer"
+                            data-testid="task-edit-todo-checkbox"
+                        />
+                        TODO
+                    </label>
                 </div>
                 <div class="mb-4">
-                    <label
-                        class="mb-1 block cursor-pointer font-medium text-gray-700 dark:text-gray-200"
-                        for="edit-text">内容</label
-                    >
                     <textarea
                         id="edit-text"
                         rows={10}
                         bind:value={localText}
                         bind:this={textareaEl}
                         onpaste={handleTextareaPaste}
+                        aria-label="内容"
                         class="w-full rounded border border-gray-200 px-3 py-2 wrap-break-word break-all focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
                     ></textarea>
                 </div>
-                <div class="mb-4">
-                    <label
-                        class="mb-1 block cursor-pointer font-medium text-gray-700 dark:text-gray-200"
-                        for="edit-kind">区分</label
-                    >
-                    <select
-                        id="edit-kind"
-                        bind:value={localKind}
-                        class="w-full cursor-pointer rounded border border-gray-200 px-3 py-2 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
-                        data-testid="edit-kind-select"
-                    >
-                        <option value="normal">通常</option>
-                        <option value="todo">TODO</option>
-                    </select>
-                </div>
-                <div class="mb-4">
-                    <span
-                        class="mb-1 block font-medium text-gray-700 dark:text-gray-200"
-                        >タグ</span
-                    >
+                <div class="mb-4" role="group" aria-label="タグ">
                     <TagEditor
                         bind:tags={localTags}
                         candidates={listTagCandidates}
                     />
                 </div>
-                <div class="mb-4">
-                    <span
-                        class="mb-1 block font-medium text-gray-700 dark:text-gray-200"
-                        >添付ファイル</span
-                    >
+                <div class="mb-4" role="group" aria-label="添付ファイル">
                     {#if localAttachments.length > 0}
                         <ul class="mb-2 flex flex-col gap-1">
                             {#each localAttachments as attachment (attachment.id)}
@@ -390,13 +383,10 @@
                     <AttachmentPicker onAdd={handleAddAttachments} />
                 </div>
                 <div class="mb-4">
-                    <label
-                        class="mb-1 block cursor-pointer font-medium text-gray-700 dark:text-gray-200"
-                        for="edit-move-to">リスト</label
-                    >
                     <select
                         id="edit-move-to"
                         bind:value={localMoveTo}
+                        aria-label="リスト"
                         class="w-full rounded border border-gray-200 px-3 py-2 wrap-break-word break-all focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
                     >
                         {#each lists as l (l.id)}
