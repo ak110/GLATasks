@@ -88,13 +88,14 @@ Tailwind CSS v4の `@custom-variant dark` を使用。`<html>` に `.dark` ク�
   - キャンセルボタンを持つことは許容される（汎用ダイアログの「キャンセルボタンは使わない」ルールの適用除外）
 - ネストするダイアログは外側より高いz-indexを使う
   - 例: 外側が `z-50` なら内側は `z-60`（`z-[60]`）にする
-- `role="dialog"` を付けた要素には `tabindex="-1"` を併記し、
-  WAI-ARIAのフォーカス受け取り要件に適合させる
+- `role="dialog"`要素にはWAI-ARIAフォーカス要件のため`tabindex="-1"`を併記する
   - タイトルが存在する場合は見出し要素に `id` を振り `aria-labelledby` で参照し、
     タイトルが無い場合は `aria-label` を併記する
 - `role="dialog"`要素の編集時は、ダイアログARIA規約の既存充足を事前確認する
   - 対象は`aria-labelledby`または`aria-label`の付与とタイトル見出しへの`id`付与
   - 未充足なら同一計画内で修正する
+- `role="dialog"`要素上のwindow keydownリスナーまたはネストするダイアログの追加・変更時は、事前にkeydown競合を確認する
+  - 競合時はガード条件（`confirmDeleteTarget === null`等）を付与するか、要素スコープ`onkeydown` + `stopPropagation`（`ImageLightbox.svelte`パターン）へ切り替える
 - ダイアログの`aria-label`・`role`・`<label for>`・`id`属性の変更・削除では、参照テストの照合対象名を事前検査する
   - 対象は`*.svelte.test.ts`・`*.spec.ts`の`getByRole`・`getByLabel`の`name`引数
   - 衝突するアクセシブル名変更が計画に無いかを確認する
