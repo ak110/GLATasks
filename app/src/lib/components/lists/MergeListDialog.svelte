@@ -27,12 +27,21 @@
     // ダイアログが開くたびに選択をリセット
     $effect(() => {
         if (open) {
-            const candidates = allLists.filter(
-                (l) => l.status === "active" && l.id !== sourceList.id,
-            );
             selectedTargetId =
-                candidates.length > 0 ? String(candidates[0].id) : "";
+                targetCandidates.length > 0
+                    ? String(targetCandidates[0].id)
+                    : "";
         }
+    });
+
+    // Escape キーでダイアログを閉じる
+    $effect(() => {
+        if (!open) return;
+        const handler = (e: KeyboardEvent) => {
+            if (e.key === "Escape") onClose();
+        };
+        window.addEventListener("keydown", handler);
+        return () => window.removeEventListener("keydown", handler);
     });
 
     function handleSubmit() {
@@ -40,6 +49,8 @@
             onSubmit(Number(selectedTargetId));
         }
     }
+
+    const titleId = crypto.randomUUID();
 </script>
 
 {#if open}
@@ -47,6 +58,7 @@
         class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 sm:p-0"
         role="dialog"
         aria-modal="true"
+        aria-labelledby={titleId}
         tabindex="-1"
     >
         <div
@@ -54,6 +66,7 @@
         >
             <div class="flex items-center justify-between px-6 py-4">
                 <h2
+                    id={titleId}
                     class="text-lg font-semibold text-gray-800 dark:text-gray-100"
                 >
                     リストの統合

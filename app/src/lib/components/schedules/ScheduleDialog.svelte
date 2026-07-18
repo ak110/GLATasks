@@ -145,6 +145,18 @@
             showErrorToast(extractErrorMessage(error));
         }
     }
+
+    const titleId = crypto.randomUUID();
+
+    // Escape キーでダイアログを閉じる（ネストする ConfirmDialog 表示中は抑止する）
+    $effect(() => {
+        if (!open) return;
+        const handler = (e: KeyboardEvent) => {
+            if (e.key === "Escape" && confirmDeleteTarget === null) onClose();
+        };
+        window.addEventListener("keydown", handler);
+        return () => window.removeEventListener("keydown", handler);
+    });
 </script>
 
 <ConfirmDialog
@@ -162,6 +174,7 @@
         class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 sm:p-0"
         role="dialog"
         aria-modal="true"
+        aria-labelledby={titleId}
         tabindex="-1"
     >
         <div
@@ -170,6 +183,7 @@
         >
             <div class="flex items-center justify-between px-6 py-4">
                 <h2
+                    id={titleId}
                     class="text-lg font-semibold text-gray-800 dark:text-gray-100"
                 >
                     定期TODO

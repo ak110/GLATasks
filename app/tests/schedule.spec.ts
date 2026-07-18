@@ -117,4 +117,11 @@ test.describe("schedule", () => {
 
     await expect(item).not.toBeVisible({ timeout: 15000 });
   });
+
+  test("定期TODOダイアログが aria-labelledby でアクセシブル名を持つ", async ({
+    page,
+  }) => {
+    await openScheduleDialog(page);
+    await expect(page.getByRole("dialog", { name: "定期TODO" })).toBeVisible();
+  });
 });

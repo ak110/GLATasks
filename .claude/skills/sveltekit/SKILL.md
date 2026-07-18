@@ -85,34 +85,34 @@ Tailwind CSS v4の `@custom-variant dark` を使用。`<html>` に `.dark` ク�
   - 代わりに共通ダイアログコンポーネント（`ConfirmDialog`、`PromptDialog`）を使う
 - 確認・入力ダイアログのコールバックpropsは `onCancel` / `onConfirm` / `onSubmit` を使用し、
   汎用ダイアログの `onClose` / `onSubmit` 命名とは意図的に分離する
-  - キャンセルボタンを持つことは明示的に許容される（汎用ダイアログの「キャンセルボタンは使わない」
-    ルールの適用除外）
+  - キャンセルボタンを持つことは許容される（汎用ダイアログの「キャンセルボタンは使わない」ルールの適用除外）
 - ネストするダイアログは外側より高いz-indexを使う
   - 例: 外側が `z-50` なら内側は `z-60`（`z-[60]`）にする
 - `role="dialog"` を付けた要素には `tabindex="-1"` を併記し、
   WAI-ARIAのフォーカス受け取り要件に適合させる
   - タイトルが存在する場合は見出し要素に `id` を振り `aria-labelledby` で参照し、
     タイトルが無い場合は `aria-label` を併記する
+- `role="dialog"`要素の編集時は、ダイアログARIA規約の既存充足を事前確認する
+  - 対象は`aria-labelledby`または`aria-label`の付与とタイトル見出しへの`id`付与
+  - 未充足なら同一計画内で修正する
+- ダイアログの`aria-label`・`role`・`<label for>`・`id`属性の変更・削除では、参照テストの照合対象名を事前検査する
+  - 対象は`*.svelte.test.ts`・`*.spec.ts`の`getByRole`・`getByLabel`の`name`引数
+  - 衝突するアクセシブル名変更が計画に無いかを確認する
 
 ## TanStack Query 楽観的更新
 
-楽観追加・更新するリストの`{#each}` keyには`id`を直接渡さず、
-仮IDから実IDへ書き換わっても変わらない安定フィールド（`_key`等）を渡す。
-Svelteはkey値の変化でコンポーネントインスタンスを再生成するため、
-`id`を直接keyに渡すと、サーバー応答で実IDに置き換わったタイミングでメニュー開閉等の`$state`が初期化される。
+楽観追加・更新するリストの`{#each}` keyには`id`を直接渡さず、仮IDから実IDへ書き換わっても変わらない安定フィールド（`_key`等）を渡す。
+Svelteはkey値の変化でコンポーネントインスタンスを再生成するため、`id`直接渡しはサーバー応答で実IDに置き換わったタイミングでメニュー開閉等の`$state`を初期化する。
 
-型定義は`app/src/lib/types.ts`の`TaskListItem._key`を参照する。
-リスト側の使用例は`app/src/lib/components/tasks/TaskList.svelte`の`{#each tasks as task (task._key)}`にある。
+型定義は`app/src/lib/types.ts`の`TaskListItem._key`、使用例は`TaskList.svelte`の`{#each tasks as task (task._key)}`を参照する。
 
 ## サーバー・クライアント共有モジュール
 
-クライアント側専用のユーティリティは本節の対象外とする。
-サーバー側に対応実装が存在しないもの（`.svelte.ts`のrune状態管理等）と、
-サーバー側が異なる実装を持つもの（`base64.ts`に対し`Buffer.from`ベースの処理等）の双方を含む。
-
-サーバー・クライアント両方から参照する純粋関数は`$lib`直下に置き、
-サーバー固有モジュール（`$lib/server/api/common.ts`等）からはre-exportのみとする。
-片側に再実装するとロジック乖離の温床になる。
+サーバー・クライアント両方から参照する純粋関数は`$lib`直下に置く。
+サーバー固有モジュール（`$lib/server/api/common.ts`等）からはre-exportのみとし、
+片側に再実装するとロジックが乖離する原因になる。
+サーバー・クライアント両方参照の対象外は次の実装群とする。
+クライアント側専用（`.svelte.ts`のrune状態管理等）と、サーバー側が異なる実装を持つもの（`base64.ts`の`Buffer.from`版等）。
 
 代表例: タスクテキスト分割の`splitTitle` / `splitNotes`は`$lib/text-split.ts`がSSOT。
 `$lib/server/api/common.ts`はre-exportのみ。
