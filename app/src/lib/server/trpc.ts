@@ -505,17 +505,17 @@ export const appRouter = t.router({
 
     create: encryptedProcedure.input(CreateTimerSchema).mutation(
       eventMutationHandler(SSE_EVENTS.timersUpdated, async ({ ctx, input }) => {
-        await api.createTimer(
-          ctx.userId,
-          input.name,
-          input.base_seconds,
-          input.adjust_minutes,
-          input.mode,
-          input.target_minutes ?? null,
-          input.tz_offset_minutes ?? null,
-          input.ephemeral,
-          input.keep_ringing,
-        );
+        await api.createTimer({
+          userId: ctx.userId,
+          name: input.name,
+          baseSeconds: input.base_seconds,
+          adjustMinutes: input.adjust_minutes,
+          mode: input.mode,
+          targetMinutes: input.target_minutes ?? null,
+          tzOffsetMinutes: input.tz_offset_minutes ?? null,
+          ephemeral: input.ephemeral,
+          ringSeconds: input.ring_seconds,
+        });
       }),
     ),
 

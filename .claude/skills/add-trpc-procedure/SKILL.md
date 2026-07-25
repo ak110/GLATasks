@@ -34,13 +34,15 @@ description: >-
 - `app/src/lib/server/api/{ドメイン}.ts`（`lists.ts`・`tasks.ts`・`timers.ts`・`users.ts`等）に
   DB操作関数を追加する。Drizzle ORMを使用する
 - `app/src/lib/server/schema.ts`のテーブル定義と整合すること
+- `app/src/lib/server/schema.ts`のテーブル定義を変更した場合はマイグレーションファイルを生成する。
+  手順は`docs/development/development.md`「DBマイグレーション運用」節を参照する
 - 日時はUTCで保存、`sort_order`は1000刻み
 - エラーは`api/{ドメイン}.ts`内で機械可読な識別子を送出し、`trpc.ts`の`API_ERRORS`側でUI文言へ変換する
 - create系mutationでサーバー生成IDをクライアントへ返す場合は
   `db.insert(...).values(...).$returningId()`を使う（drizzle-orm/mysql慣用パターン）
 - api層関数のシグネチャ規約:
   - 新規関数は原則`userId`を第1位置引数に取る
-  - 例外: `attachments`はオブジェクト引数パターン
+  - 例外: `attachments`は全関数、`timers`は`createTimer`のみオブジェクト引数パターン
 
 ### 3. tRPC ルーター登録
 
@@ -104,11 +106,6 @@ description: >-
 - 開発環境で `make healthcheck` が通ることを確認
 - `trpc-zod-contract-reviewer` エージェントに差分レビューを依頼する (`.claude/agents/trpc-zod-contract-reviewer.md`)
 
-### 9. コミット
-
-- 新規コミットを作成する。amendはユーザーが明示的に指示した場合に限る
-- コミット前に `git status ; git log --oneline --decorate -5` で状態確認
-
 ## 既存procedure呼び出し時の確認
 
 既存procedureを新規箇所から呼び出す場合、入力スキーマの引数キー名を
@@ -120,8 +117,8 @@ schemas.tsの命名規約は`<Verb><Domain>Schema`を基本とする（例: `Cre
 
 型迂回箇所（`as any`・`@ts-ignore`、および`vi.mock()`のモックファクトリで
 戻り値の型情報を失った状態の呼び出し等）では、引数キー不整合をTypeScript型検査で
-自動検出できない。当該箇所は`app/src/lib/schemas.ts`の対応するスキーマ定義と
-引数キーが一致しているかを目視確認する。
+自動検出できない。
+当該箇所は`app/src/lib/schemas.ts`の対応するスキーマ定義と引数キーが一致しているかを目視確認する。
 
 ## 参考ファイル
 

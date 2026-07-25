@@ -12,7 +12,10 @@ import {
   index,
   customType,
 } from "drizzle-orm/mysql-core";
-import { TIMER_DEFAULT_ADJUST_MINUTES } from "$lib/schemas";
+import {
+  TIMER_DEFAULT_ADJUST_MINUTES,
+  TIMER_DEFAULT_RING_SECONDS,
+} from "$lib/schemas";
 
 /** user テーブル */
 export const users = mysqlTable("user", {
@@ -67,9 +70,10 @@ export const timers = mysqlTable("timer", {
   running: tinyint("running").notNull().default(0),
   expired: tinyint("expired").notNull().default(0),
   ephemeral: tinyint("ephemeral").notNull().default(0),
-  // 期限切れ後に利用者が能動的に止めるまでビープを鳴らし続けるか。
-  // 既定値は OFF（オプトイン）。タイマーごとに上書き可能。
-  keep_ringing: tinyint("keep_ringing").notNull().default(0),
+  // 期限切れ後にビープを鳴らす秒数。タイマーごとに上書き可能。
+  ring_seconds: int("ring_seconds")
+    .notNull()
+    .default(TIMER_DEFAULT_RING_SECONDS),
   remaining_seconds: int("remaining_seconds").notNull(),
   started_at: timestamp("started_at"),
   sort_order: int("sort_order").notNull().default(0),

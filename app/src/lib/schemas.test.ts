@@ -29,21 +29,41 @@ describe("CreateTimerSchema", () => {
     expect(parsed.ephemeral).toBe(true);
   });
 
-  it("keep_ringing は未指定だと false になる", () => {
+  it("ring_seconds は未指定だと既定値3になる", () => {
     const parsed = CreateTimerSchema.parse({
       name: "テスト",
       base_seconds: 300,
     });
-    expect(parsed.keep_ringing).toBe(false);
+    expect(parsed.ring_seconds).toBe(3);
   });
 
-  it("keep_ringing を true にできる", () => {
+  it("ring_seconds を1〜3600の範囲で指定できる", () => {
     const parsed = CreateTimerSchema.parse({
       name: "テスト",
       base_seconds: 300,
-      keep_ringing: true,
+      ring_seconds: 3600,
     });
-    expect(parsed.keep_ringing).toBe(true);
+    expect(parsed.ring_seconds).toBe(3600);
+  });
+
+  it("ring_seconds の0以下を拒否する", () => {
+    expect(() =>
+      CreateTimerSchema.parse({
+        name: "テスト",
+        base_seconds: 300,
+        ring_seconds: 0,
+      }),
+    ).toThrow();
+  });
+
+  it("ring_seconds の3600超を拒否する", () => {
+    expect(() =>
+      CreateTimerSchema.parse({
+        name: "テスト",
+        base_seconds: 300,
+        ring_seconds: 3601,
+      }),
+    ).toThrow();
   });
 
   it("alarm モードで ephemeral と必須項目を併用できる", () => {
@@ -91,12 +111,12 @@ describe("UserPreferencesSchema", () => {
 
   it("全フィールドを保持する", () => {
     const parsed = UserPreferencesSchema.parse({
-      keep_ringing: true,
+      ring_seconds: 1800,
       base_seconds: 600,
       adjust_minutes: 5,
       mode: "alarm",
     });
-    expect(parsed.keep_ringing).toBe(true);
+    expect(parsed.ring_seconds).toBe(1800);
     expect(parsed.base_seconds).toBe(600);
     expect(parsed.adjust_minutes).toBe(5);
     expect(parsed.mode).toBe("alarm");
@@ -111,6 +131,11 @@ describe("UserPreferencesSchema", () => {
     expect(() =>
       UserPreferencesSchema.parse({ adjust_minutes: 1000 }),
     ).toThrow();
+  });
+
+  it("ring_seconds の範囲外を拒否する", () => {
+    expect(() => UserPreferencesSchema.parse({ ring_seconds: 0 })).toThrow();
+    expect(() => UserPreferencesSchema.parse({ ring_seconds: 3601 })).toThrow();
   });
 });
 

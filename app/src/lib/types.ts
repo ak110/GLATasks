@@ -96,7 +96,7 @@ export type TimerInfo = {
   running: boolean;
   expired: boolean;
   ephemeral: boolean;
-  keep_ringing: boolean;
+  ring_seconds: number;
   remaining_seconds: number;
   started_at: string | null;
   sort_order: number;

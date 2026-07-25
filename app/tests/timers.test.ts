@@ -421,32 +421,30 @@ test.describe("timers", () => {
     await expect(card).not.toBeVisible({ timeout: 10000 });
   });
 
-  test("鳴り続けオプションと既定値保存が機能する", async ({ page }) => {
-    const timerName = `鳴り続け_${Date.now()}`;
+  test("鳴らす時間の秒数指定と既定値保存が機能する", async ({ page }) => {
+    const timerName = `鳴動秒数_${Date.now()}`;
 
     // 既定値テストは前回テスト失敗時の状態が残ると誤判定するため、
-    // 冒頭で確実にOFFへリセットしてから本題に入る
-    const checkbox = page.locator('[data-testid="timer-keep-ringing-input"]');
+    // 冒頭で確実に既定値（3秒）へリセットしてから本題に入る
+    const ringInput = page.locator('[data-testid="timer-ring-seconds-input"]');
     await page.click('[data-testid="timer-add-btn"]');
     await page.locator('[data-testid="timer-name-input"]').waitFor();
-    if (await checkbox.isChecked()) {
-      await checkbox.uncheck();
-      await page.fill('[data-testid="timer-adjust-input"]', "10");
-      await page.click('[data-testid="timer-save-default-btn"]');
-      await page.waitForResponse((res) => res.url().includes("/api/trpc"));
-    }
+    await ringInput.fill("3");
+    await page.fill('[data-testid="timer-adjust-input"]', "10");
+    await page.click('[data-testid="timer-save-default-btn"]');
+    await page.waitForResponse((res) => res.url().includes("/api/trpc"));
     await page.keyboard.press("Escape");
 
     // リセット後の状態でダイアログを再度開く
     await page.click('[data-testid="timer-add-btn"]');
     await page.locator('[data-testid="timer-name-input"]').waitFor();
 
-    // 鳴り続けチェックボックスは初期OFF
-    await expect(checkbox).not.toBeChecked();
+    // 鳴らす時間の初期値は3秒
+    await expect(ringInput).toHaveValue("3");
 
     // 値を変更し、既定として保存
     await page.fill('[data-testid="timer-adjust-input"]', "7");
-    await checkbox.check();
+    await ringInput.fill("120");
     await page.click('[data-testid="timer-save-default-btn"]');
     await page.waitForResponse((res) => res.url().includes("/api/trpc"));
 
@@ -464,7 +462,7 @@ test.describe("timers", () => {
     // ダイアログを再度開くと、既定値が反映される
     await page.click('[data-testid="timer-add-btn"]');
     await page.locator('[data-testid="timer-name-input"]').waitFor();
-    await expect(checkbox).toBeChecked();
+    await expect(ringInput).toHaveValue("120");
     await expect(
       page.locator('[data-testid="timer-adjust-input"]'),
     ).toHaveValue("7");
@@ -478,7 +476,7 @@ test.describe("timers", () => {
     // 既定値をリセットして次のテストへ影響を残さない
     await page.click('[data-testid="timer-add-btn"]');
     await page.locator('[data-testid="timer-name-input"]').waitFor();
-    await checkbox.uncheck();
+    await ringInput.fill("3");
     await page.fill('[data-testid="timer-adjust-input"]', "10");
     await page.click('[data-testid="timer-save-default-btn"]');
     await page.waitForResponse((res) => res.url().includes("/api/trpc"));

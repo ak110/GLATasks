@@ -23,7 +23,7 @@ function makeTimer(overrides?: Partial<TimerInfo>): TimerInfo {
     running: false,
     expired: false,
     ephemeral: false,
-    keep_ringing: false,
+    ring_seconds: 3,
     remaining_seconds: 1800,
     started_at: null,
     sort_order: 1000,

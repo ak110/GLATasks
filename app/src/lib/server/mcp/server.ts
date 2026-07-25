@@ -277,17 +277,17 @@ export function createMcpServer(): McpServer {
     { description: "タイマーを新規作成する", inputSchema: CreateTimerSchema },
     async (input, { authInfo }) => {
       const userId = getUserId(authInfo);
-      await api.createTimer(
+      await api.createTimer({
         userId,
-        input.name,
-        input.base_seconds,
-        input.adjust_minutes,
-        input.mode,
-        input.target_minutes ?? null,
-        input.tz_offset_minutes ?? null,
-        input.ephemeral,
-        input.keep_ringing,
-      );
+        name: input.name,
+        baseSeconds: input.base_seconds,
+        adjustMinutes: input.adjust_minutes,
+        mode: input.mode,
+        targetMinutes: input.target_minutes ?? null,
+        tzOffsetMinutes: input.tz_offset_minutes ?? null,
+        ephemeral: input.ephemeral,
+        ringSeconds: input.ring_seconds,
+      });
       sendEvent(userId, SSE_EVENTS.timersUpdated, null);
       return successResult();
     },

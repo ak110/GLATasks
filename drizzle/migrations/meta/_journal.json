@@ -85,6 +85,20 @@
       "when": 1783482709095,
       "tag": "0011_add_task_kind_and_schedule",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "5",
+      "when": 1785005388883,
+      "tag": "0012_add_timer_ring_seconds",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "5",
+      "when": 1785020661864,
+      "tag": "0013_fix_adjust_minutes_default",
+      "breakpoints": true
     }
   ]
 }

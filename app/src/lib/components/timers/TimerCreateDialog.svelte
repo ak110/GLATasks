@@ -5,7 +5,7 @@
 
     import {
         TIMER_DEFAULT_ADJUST_MINUTES,
-        TIMER_DEFAULT_KEEP_RINGING,
+        TIMER_DEFAULT_RING_SECONDS,
     } from "$lib/schemas";
     import type { TimerMode, UserPreferences } from "$lib/schemas";
     import {
@@ -24,7 +24,7 @@
         baseSeconds: number;
         targetMinutes: number | null;
         adjustMinutes: number;
-        keepRinging: boolean;
+        ringSeconds: number;
         onSubmit: (data: {
             name: string;
             mode: TimerMode;
@@ -32,7 +32,7 @@
             target_minutes: number | null;
             tz_offset_minutes: number | null;
             adjust_minutes: number;
-            keep_ringing: boolean;
+            ring_seconds: number;
         }) => void;
         onClose: () => void;
         onSaveAsDefault?: (preferences: UserPreferences) => void;
@@ -47,7 +47,7 @@
         baseSeconds: initialBaseSeconds,
         targetMinutes: initialTargetMinutes,
         adjustMinutes: initialAdjustMinutes,
-        keepRinging: initialKeepRinging,
+        ringSeconds: initialRingSeconds,
         onSubmit,
         onClose,
         onSaveAsDefault,
@@ -67,7 +67,7 @@
     let localBaseTime = $state("");
     let localTargetTime = $state("");
     let localAdjustMinutes = $state(TIMER_DEFAULT_ADJUST_MINUTES);
-    let localKeepRinging = $state(TIMER_DEFAULT_KEEP_RINGING);
+    let localRingSeconds = $state(TIMER_DEFAULT_RING_SECONDS);
     let nameInputEl = $state<HTMLInputElement | null>(null);
 
     // ダイアログ開閉時にローカル状態をリセット
@@ -81,7 +81,7 @@
                     ? formatTargetTime(initialTargetMinutes)
                     : "";
             localAdjustMinutes = initialAdjustMinutes;
-            localKeepRinging = initialKeepRinging;
+            localRingSeconds = initialRingSeconds;
             queueMicrotask(() => nameInputEl?.focus());
         }
     });
@@ -107,7 +107,7 @@
                 target_minutes: target,
                 tz_offset_minutes: -new Date().getTimezoneOffset(),
                 adjust_minutes: localAdjustMinutes,
-                keep_ringing: localKeepRinging,
+                ring_seconds: localRingSeconds,
             });
         } else {
             const baseSeconds = parseTimeInput(localBaseTime);
@@ -119,7 +119,7 @@
                 target_minutes: null,
                 tz_offset_minutes: null,
                 adjust_minutes: localAdjustMinutes,
-                keep_ringing: localKeepRinging,
+                ring_seconds: localRingSeconds,
             });
         }
     }
@@ -132,7 +132,7 @@
                 ? (parseTimeInput(localBaseTime) ?? undefined)
                 : undefined;
         onSaveAsDefault({
-            keep_ringing: localKeepRinging,
+            ring_seconds: localRingSeconds,
             base_seconds: baseSeconds,
             adjust_minutes: localAdjustMinutes,
             mode: localTimerMode,
@@ -273,16 +273,19 @@
 
                 <div>
                     <label
-                        class="flex cursor-pointer items-center gap-2 text-sm text-gray-700 dark:text-gray-200"
+                        for="timer-ring-seconds"
+                        class="mb-1 block text-sm text-gray-600 dark:text-gray-300"
+                        >鳴らす時間（秒）</label
                     >
-                        <input
-                            type="checkbox"
-                            bind:checked={localKeepRinging}
-                            class="cursor-pointer"
-                            data-testid="timer-keep-ringing-input"
-                        />
-                        止めるまで鳴り続ける
-                    </label>
+                    <input
+                        id="timer-ring-seconds"
+                        type="number"
+                        bind:value={localRingSeconds}
+                        min="1"
+                        max="3600"
+                        class="w-24 rounded border border-gray-200 px-3 py-2 text-center focus:border-blue-400 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+                        data-testid="timer-ring-seconds-input"
+                    />
                 </div>
 
                 <div class="flex items-center justify-between">

@@ -75,6 +75,10 @@ npm / PyPIレジストリへの悪意あるパッケージ公開に対し、次�
 `drizzle/migrations/meta/_journal.json`の`when`値（UNIXミリ秒）は直前エントリより大きくなければならない。
 別ブランチで生成したmigrationのmergeで順序が逆転する場合は、新しい側の`when`を再生成してからcommitする。
 
+既存行の値の読み替え・初期値の設定が必要な場合は、生成されたマイグレーションファイルへ値変換のSQLを書き足す。
+`pnpm run db:generate`はスキーマ定義の差分からDDLのみを生成し、既存行の値をどう埋めるかを表現できないためである。
+先例として`0003_sort_order_and_status.sql`（既存カラムの廃止に伴う値の読み替え）・`0004_add_timer_expired.sql`（新設カラムへの初期値の設定）が手書きの変換SQLを含む。
+
 ### 履歴整合のリカバリー
 
 DBが半端な状態になった場合は`make sql`から`__drizzle_migrations`テーブルと実DB状態を整合させる。

@@ -13,7 +13,7 @@
     import {
         TIMER_DEFAULT_BASE_MINUTES,
         TIMER_DEFAULT_ADJUST_MINUTES,
-        TIMER_DEFAULT_KEEP_RINGING,
+        TIMER_DEFAULT_RING_SECONDS,
     } from "$lib/schemas";
     import type { TimerMode, UserPreferences } from "$lib/schemas";
     import { playStartBeep } from "$lib/beep";
@@ -39,7 +39,7 @@
         baseSeconds: number;
         targetMinutes: number | null;
         adjustMinutes: number;
-        keepRinging: boolean;
+        ringSeconds: number;
     };
     let dialog = $state<DialogState>({
         open: false,
@@ -51,7 +51,7 @@
         baseSeconds: TIMER_DEFAULT_BASE_MINUTES * 60,
         targetMinutes: null,
         adjustMinutes: TIMER_DEFAULT_ADJUST_MINUTES,
-        keepRinging: TIMER_DEFAULT_KEEP_RINGING,
+        ringSeconds: TIMER_DEFAULT_RING_SECONDS,
     });
 
     // タイマー削除確認ダイアログの状態
@@ -126,7 +126,7 @@
             tz_offset_minutes?: number;
             adjust_minutes: number;
             ephemeral: boolean;
-            keep_ringing: boolean;
+            ring_seconds: number;
         }) => trpc.timers.create.mutate(input),
         onSuccess: () =>
             queryClient.invalidateQueries({ queryKey: ["timers"] }),
@@ -141,7 +141,7 @@
             target_minutes?: number;
             tz_offset_minutes?: number;
             adjust_minutes?: number;
-            keep_ringing?: boolean;
+            ring_seconds?: number;
         }) => trpc.timers.update.mutate(input),
         onSuccess: () =>
             queryClient.invalidateQueries({ queryKey: ["timers"] }),
@@ -245,7 +245,7 @@
             baseSeconds: prefs.base_seconds ?? TIMER_DEFAULT_BASE_MINUTES * 60,
             targetMinutes: null,
             adjustMinutes: prefs.adjust_minutes ?? TIMER_DEFAULT_ADJUST_MINUTES,
-            keepRinging: prefs.keep_ringing ?? TIMER_DEFAULT_KEEP_RINGING,
+            ringSeconds: prefs.ring_seconds ?? TIMER_DEFAULT_RING_SECONDS,
         };
     }
 
@@ -260,7 +260,7 @@
             baseSeconds: timer.base_seconds,
             targetMinutes: timer.target_minutes,
             adjustMinutes: timer.adjust_minutes,
-            keepRinging: timer.keep_ringing,
+            ringSeconds: timer.ring_seconds,
         };
     }
 
@@ -275,7 +275,7 @@
         target_minutes: number | null;
         tz_offset_minutes: number | null;
         adjust_minutes: number;
-        keep_ringing: boolean;
+        ring_seconds: number;
     }) {
         try {
             if (dialog.mode === "create") {
@@ -287,7 +287,7 @@
                     tz_offset_minutes: data.tz_offset_minutes ?? undefined,
                     adjust_minutes: data.adjust_minutes,
                     ephemeral: dialog.ephemeral,
-                    keep_ringing: data.keep_ringing,
+                    ring_seconds: data.ring_seconds,
                 });
             } else {
                 await updateTimerMutation.mutateAsync({
@@ -298,7 +298,7 @@
                     target_minutes: data.target_minutes ?? undefined,
                     tz_offset_minutes: data.tz_offset_minutes ?? undefined,
                     adjust_minutes: data.adjust_minutes,
-                    keep_ringing: data.keep_ringing,
+                    ring_seconds: data.ring_seconds,
                 });
             }
             dialog.open = false;
@@ -404,7 +404,7 @@
     baseSeconds={dialog.baseSeconds}
     targetMinutes={dialog.targetMinutes}
     adjustMinutes={dialog.adjustMinutes}
-    keepRinging={dialog.keepRinging}
+    ringSeconds={dialog.ringSeconds}
     onSubmit={handleDialogSubmit}
     onClose={() => (dialog.open = false)}
     onSaveAsDefault={dialog.mode === "create" ? handleSaveAsDefault : undefined}

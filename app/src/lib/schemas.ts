@@ -106,8 +106,12 @@ export const TIMER_DEFAULT_BASE_MINUTES = 30;
 /** 延長/削減のデフォルト分数 */
 export const TIMER_DEFAULT_ADJUST_MINUTES = 10;
 
-/** 鳴り続けオプションのデフォルト（オプトイン）*/
-export const TIMER_DEFAULT_KEEP_RINGING = false;
+/**
+ * ビープを鳴らす秒数のデフォルト値。
+ * 上限3600秒はユーザーフィードバックで提示された値、
+ * 既定値3秒は従来のオプトインOFF時の鳴動時間（実測約2.8秒）とほぼ同じ長さになるよう選定した。
+ */
+export const TIMER_DEFAULT_RING_SECONDS = 3;
 
 /** タイマーモード */
 export const TIMER_MODES = ["countdown", "alarm"] as const;
@@ -121,7 +125,7 @@ export type TimerMode = z.infer<typeof TimerModeSchema>;
  * 各フィールドはオプショナル。欠落時はコード側のフォールバック定数で補う。
  */
 export const UserPreferencesSchema = z.object({
-  keep_ringing: z.boolean().optional(),
+  ring_seconds: z.number().int().min(1).max(3600).optional(),
   base_seconds: z.number().int().min(0).max(359999).optional(),
   adjust_minutes: z.number().int().min(1).max(999).optional(),
   mode: TimerModeSchema.optional(),
@@ -145,8 +149,13 @@ export const CreateTimerSchema = z
       .default(TIMER_DEFAULT_ADJUST_MINUTES),
     // 1回限りのタイマー。満了時に削除ボタンを強調し、確認ダイアログを省略する
     ephemeral: z.boolean().default(false),
-    // 期限切れ後に利用者が止めるまでビープを鳴らし続けるかどうか
-    keep_ringing: z.boolean().default(TIMER_DEFAULT_KEEP_RINGING),
+    // 期限切れ後にビープを鳴らす秒数（上限・既定値の根拠は TIMER_DEFAULT_RING_SECONDS のコメントを参照）
+    ring_seconds: z
+      .number()
+      .int()
+      .min(1)
+      .max(3600)
+      .default(TIMER_DEFAULT_RING_SECONDS),
   })
   .refine(
     (data) =>
@@ -165,7 +174,7 @@ export const UpdateTimerSchema = z
     target_minutes: z.number().int().min(0).max(1439).optional(),
     tz_offset_minutes: z.number().int().min(-720).max(840).optional(),
     adjust_minutes: z.number().int().min(1).max(999).optional(),
-    keep_ringing: z.boolean().optional(),
+    ring_seconds: z.number().int().min(1).max(3600).optional(),
   })
   .refine(
     (data) =>

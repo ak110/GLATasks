@@ -18,13 +18,13 @@
     import { subscribeOnMount } from "$lib/sse-subscribe";
     import type { TimerInfo } from "$lib/types";
     import { calcTimerRemainingMs } from "$lib/timer-utils";
+    import { TIMER_DEFAULT_RING_SECONDS } from "$lib/schemas";
     import { onMount } from "svelte";
     import { resolve } from "$app/paths";
 
     type AlarmInfo = {
         timerId: number;
         timerName: string;
-        keepRinging: boolean;
     };
 
     const queryClient = useQueryClient();
@@ -235,21 +235,17 @@
         if (alarmedIds.has(timerId)) return;
         alarmedIds = new Set([...alarmedIds, timerId]);
 
-        // 当該タイマーの keep_ringing を見てループ/単発を切り替える
+        // 当該タイマーの ring_seconds 秒だけビープをループ再生する
         const timers = timersQuery.data?.timers ?? [];
         const timer = timers.find((t) => t.id === timerId);
-        const keepRinging = timer?.keep_ringing ?? false;
+        const ringSeconds = timer?.ring_seconds ?? TIMER_DEFAULT_RING_SECONDS;
 
         // ビープ音 + ブラウザ通知 + トースト
         import("$lib/beep").then((m) => {
-            if (keepRinging) {
-                m.startLoopBeep(timerId);
-            } else {
-                m.playBeep();
-            }
+            m.startLoopBeep(timerId, ringSeconds);
         });
         showNotification(timerName);
-        alarms = [...alarms, { timerId, timerName, keepRinging }];
+        alarms = [...alarms, { timerId, timerName }];
 
         // サーバーに停止報告（started_at でリセット/再開されていないことを確認）
         trpc.timers.stop

@@ -19,7 +19,7 @@ describe("TimerCreateDialog", () => {
         baseSeconds: 300,
         targetMinutes: null,
         adjustMinutes: 0,
-        keepRinging: false,
+        ringSeconds: 3,
         onSubmit: vi.fn(),
         onClose: vi.fn(),
       },

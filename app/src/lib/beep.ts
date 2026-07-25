@@ -37,11 +37,6 @@ async function beep(
   }
 }
 
-/** タイマー完了時のビープ（低め・長め「ぽーっ、ぽーっ」） */
-export async function playBeep(count = 5, interval = 200): Promise<void> {
-  await beep(count, 440, 400, interval);
-}
-
 /** タイマー開始時の確認ビープ（高め・短い「ぴぴっ」） */
 export async function playStartBeep(): Promise<void> {
   await beep(2, 880, 80, 60);
@@ -51,28 +46,33 @@ export async function playStartBeep(): Promise<void> {
 
 /**
  * タイマーIDごとのループビープハンドル。
- * stop が呼ばれるかタイマー画面/SSE経由で停止検知されるまで鳴り続ける。
+ * stop が呼ばれるか ringSeconds 経過の自動停止タイマーが発火するまで鳴り続ける。
  */
 type LoopHandle = {
   ctx: AudioContext;
   stopped: boolean;
+  autoStopTimeoutId: ReturnType<typeof setTimeout>;
 };
 
 const loopHandles = new Map<number, LoopHandle>();
 
 /**
- * 指定タイマーIDに対しビープをループ再生する。
+ * 指定タイマーIDに対しビープを ringSeconds 秒間ループ再生する。
  * 既にループ中の場合は何もしない（多重起動防止）。
  * AudioContext が無い環境では警告を出力して終了する。
  */
-export function startLoopBeep(timerId: number): void {
+export function startLoopBeep(timerId: number, ringSeconds: number): void {
   if (loopHandles.has(timerId)) return;
   if (typeof AudioContext === "undefined") {
     console.warn("AudioContext が利用できないためビープ音を再生できません");
     return;
   }
   const ctx = new AudioContext();
-  const handle: LoopHandle = { ctx, stopped: false };
+  const autoStopTimeoutId = setTimeout(
+    () => stopLoopBeep(timerId),
+    ringSeconds * 1000,
+  );
+  const handle: LoopHandle = { ctx, stopped: false, autoStopTimeoutId };
   loopHandles.set(timerId, handle);
   // バックグラウンドで非同期にループ
   void runLoop(timerId, handle);
@@ -83,6 +83,7 @@ export function stopLoopBeep(timerId: number): void {
   const handle = loopHandles.get(timerId);
   if (!handle) return;
   handle.stopped = true;
+  clearTimeout(handle.autoStopTimeoutId);
   loopHandles.delete(timerId);
   // close は失敗しても無視（既に閉じている場合がある）
   handle.ctx.close().catch(() => {});

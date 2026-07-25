@@ -5,6 +5,7 @@
 import { and, eq, max } from "drizzle-orm";
 import type { z } from "zod";
 
+import { TIMER_DEFAULT_RING_SECONDS } from "$lib/schemas";
 import type { UpdateTimerSchema } from "$lib/schemas";
 import type { TimerInfo } from "$lib/types";
 import { getDb } from "../db";
@@ -74,7 +75,7 @@ function toTimerInfo(row: typeof timers.$inferSelect): TimerInfo {
     running: row.running === 1,
     expired: row.expired === 1,
     ephemeral: row.ephemeral === 1,
-    keep_ringing: row.keep_ringing === 1,
+    ring_seconds: row.ring_seconds,
     remaining_seconds: row.remaining_seconds,
     started_at: row.started_at ? toUtcIso(row.started_at) : null,
     sort_order: row.sort_order,
@@ -140,17 +141,28 @@ export async function getTimers(
 }
 
 /** タイマーを作成する（sort_order は既存の最大値 + 1000 で末尾追加） */
-export async function createTimer(
-  userId: number,
-  name: string,
-  baseSeconds: number,
-  adjustMinutes: number,
-  mode: string = "countdown",
-  targetMinutes: number | null = null,
-  tzOffsetMinutes: number | null = null,
-  ephemeral: boolean = false,
-  keepRinging: boolean = false,
-): Promise<void> {
+export async function createTimer(params: {
+  userId: number;
+  name: string;
+  baseSeconds: number;
+  adjustMinutes: number;
+  mode?: string;
+  targetMinutes?: number | null;
+  tzOffsetMinutes?: number | null;
+  ephemeral?: boolean;
+  ringSeconds?: number;
+}): Promise<void> {
+  const {
+    userId,
+    name,
+    baseSeconds,
+    adjustMinutes,
+    mode = "countdown",
+    targetMinutes = null,
+    tzOffsetMinutes = null,
+    ephemeral = false,
+    ringSeconds = TIMER_DEFAULT_RING_SECONDS,
+  } = params;
   const isAlarm = mode === "alarm";
   const remainingSeconds = isAlarm
     ? calcAlarmSecondsOrThrow(targetMinutes, tzOffsetMinutes)
@@ -173,7 +185,7 @@ export async function createTimer(
     target_minutes: targetMinutes,
     running: isAlarm ? 1 : 0,
     ephemeral: ephemeral ? 1 : 0,
-    keep_ringing: keepRinging ? 1 : 0,
+    ring_seconds: ringSeconds,
     started_at: isAlarm ? now : null,
     sort_order: sortOrder,
     created: now,
@@ -193,8 +205,7 @@ export async function updateTimer(
   if (data.name !== undefined) updates.name = data.name;
   if (data.adjust_minutes !== undefined)
     updates.adjust_minutes = data.adjust_minutes;
-  if (data.keep_ringing !== undefined)
-    updates.keep_ringing = data.keep_ringing ? 1 : 0;
+  if (data.ring_seconds !== undefined) updates.ring_seconds = data.ring_seconds;
 
   // モード変更処理
   if (data.mode !== undefined && data.mode !== timer.mode) {
