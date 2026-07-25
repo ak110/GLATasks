@@ -69,6 +69,7 @@
     let localAdjustMinutes = $state(TIMER_DEFAULT_ADJUST_MINUTES);
     let localRingSeconds = $state(TIMER_DEFAULT_RING_SECONDS);
     let nameInputEl = $state<HTMLInputElement | null>(null);
+    let formEl = $state<HTMLFormElement | null>(null);
 
     // ダイアログ開閉時にローカル状態をリセット
     $effect(() => {
@@ -127,6 +128,8 @@
     /** 現在のフォーム値を利用者既定値として保存する */
     function handleSaveAsDefault() {
         if (!onSaveAsDefault) return;
+        // 送信ボタンと異なりブラウザ標準の制約検証を経由しないため明示的に呼び出す
+        if (formEl && !formEl.reportValidity()) return;
         const baseSeconds =
             localTimerMode === "countdown"
                 ? (parseTimeInput(localBaseTime) ?? undefined)
@@ -171,6 +174,7 @@
                 </button>
             </div>
             <form
+                bind:this={formEl}
                 onsubmit={(e) => {
                     e.preventDefault();
                     handleSubmit();
@@ -266,6 +270,7 @@
                         bind:value={localAdjustMinutes}
                         min="1"
                         max="999"
+                        required
                         class="w-24 rounded border border-gray-200 px-3 py-2 text-center focus:border-blue-400 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
                         data-testid="timer-adjust-input"
                     />
@@ -283,6 +288,7 @@
                         bind:value={localRingSeconds}
                         min="1"
                         max="3600"
+                        required
                         class="w-24 rounded border border-gray-200 px-3 py-2 text-center focus:border-blue-400 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
                         data-testid="timer-ring-seconds-input"
                     />

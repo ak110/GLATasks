@@ -2,7 +2,13 @@
  * @fileoverview タイマー機能の e2e テスト
  */
 
-import { test, expect, type Page, type Locator } from "@playwright/test";
+import {
+  test,
+  expect,
+  type Page,
+  type Locator,
+  type Request,
+} from "@playwright/test";
 import { BASE_URL, STORAGE_STATE_PATH } from "./helpers/common";
 
 /**
@@ -481,6 +487,83 @@ test.describe("timers", () => {
     await page.click('[data-testid="timer-save-default-btn"]');
     await page.waitForResponse((res) => res.url().includes("/api/trpc"));
     await page.keyboard.press("Escape");
+  });
+
+  test("数値入力欄の未入力・範囲外はブラウザ側の検証で送信が止まる", async ({
+    page,
+  }) => {
+    const timerName = `入力検証_${Date.now()}`;
+    const adjustInput = page.locator('[data-testid="timer-adjust-input"]');
+    const ringInput = page.locator('[data-testid="timer-ring-seconds-input"]');
+    const dialogTitle = page.locator('[data-testid="timer-dialog-title"]');
+
+    // 検証で止まる場合はサーバーへ送信しないことを確認するため mutation を数える。
+    // クエリの定期再取得は GET のため POST に限定して数える。
+    let trpcMutationCount = 0;
+    const countTrpcMutation = (req: Request) => {
+      if (req.method() === "POST" && req.url().includes("/api/trpc")) {
+        trpcMutationCount += 1;
+      }
+    };
+    page.on("request", countTrpcMutation);
+
+    try {
+      await page.click('[data-testid="timer-add-btn"]');
+      await page.locator('[data-testid="timer-name-input"]').waitFor();
+      await page.fill('[data-testid="timer-name-input"]', timerName);
+      await page.fill('[data-testid="timer-base-time-input"]', "00:05:00");
+
+      // 鳴らす時間が未入力の場合は送信ボタンで入力を促す検証エラーになる
+      await ringInput.fill("");
+      await page.click('[data-testid="timer-submit-btn"]');
+      expect(
+        await ringInput.evaluate(
+          (el: HTMLInputElement) => el.validity.valueMissing,
+        ),
+      ).toBe(true);
+      await expect(dialogTitle).toBeVisible();
+
+      // 鳴らす時間が上限超過の場合は範囲の検証エラーになる
+      await ringInput.fill("5000");
+      await page.click('[data-testid="timer-submit-btn"]');
+      expect(
+        await ringInput.evaluate(
+          (el: HTMLInputElement) => el.validity.rangeOverflow,
+        ),
+      ).toBe(true);
+      await expect(dialogTitle).toBeVisible();
+
+      // 延長/削減の単位が未入力の場合は既定値保存ボタンでも検証エラーになる
+      await ringInput.fill("3");
+      await adjustInput.fill("");
+      await page.click('[data-testid="timer-save-default-btn"]');
+      expect(
+        await adjustInput.evaluate(
+          (el: HTMLInputElement) => el.validity.valueMissing,
+        ),
+      ).toBe(true);
+
+      // 延長/削減の単位が下限未満の場合も既定値保存ボタンで検証エラーになる
+      await adjustInput.fill("0");
+      await page.click('[data-testid="timer-save-default-btn"]');
+      expect(
+        await adjustInput.evaluate(
+          (el: HTMLInputElement) => el.validity.rangeUnderflow,
+        ),
+      ).toBe(true);
+
+      // いずれの操作もサーバーへ送信していない
+      expect(trpcMutationCount).toBe(0);
+    } finally {
+      page.off("request", countTrpcMutation);
+    }
+
+    // ダイアログを閉じ、タイマーが作成されていないことを確認する
+    await page.keyboard.press("Escape");
+    await expect(dialogTitle).not.toBeVisible();
+    await expect(
+      page.locator('[data-testid="timer-card"]').filter({ hasText: timerName }),
+    ).toHaveCount(0);
   });
 
   test("一時タイマーは未満了だと通常どおり確認ダイアログが出る", async ({
