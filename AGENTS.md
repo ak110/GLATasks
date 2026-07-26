@@ -13,8 +13,8 @@ SvelteKit + tRPC + Drizzleで構築し、Docker Composeで運用する。
 
 全ターゲットの一覧は`make help`で確認できる。
 
-- コミット前の検証方法: `uvx pyfltr run-for-agent`
-  - テストコードの単体実行なども極力`uvx pyfltr run-for-agent <path>`を使う（直接呼び出さない）
+- コミット前の検証方法: `uvx pyfltr run`
+  - テストコードの単体実行なども極力`uvx pyfltr run <path>`を使う（直接呼び出さない）
   - 修正後の再実行時は`--commands=eslint,prettier`等で限定して実行する（最終検証はCIに委ねる前提）
     - 利用可能なコマンドは`pyproject.toml`の`[tool.pyfltr]`設定とJS/TS連携で有効になるもの。
       例: `eslint`・`prettier`・`oxlint`・`vitest`・カスタムコマンドの`svelte-check`
@@ -23,8 +23,8 @@ SvelteKit + tRPC + Drizzleで構築し、Docker Composeで運用する。
     - 停止している場合は`make start`で起動し、疎通を確認してからテストを実行する
       （疎通確認コマンド:
       `docker compose --profile=development exec app curl --fail http://localhost:3000/healthcheck`）
-  - `uvx pyfltr run-for-agent`を使う理由はJSON Lines出力で診断結果を効率的に解釈するためであり、
-    環境制約によるものではない
+  - エージェント実行を示す環境変数がある環境では`run`がJSON Lines出力を既定で採用するため、
+    診断結果をそのまま解釈できる。環境制約による指定ではない
 
 ## 実装上の不変条件・コーディング規約
 
