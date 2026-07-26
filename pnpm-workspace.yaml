@@ -9,10 +9,23 @@ ignoredBuiltDependencies:
   - bcrypt
   - esbuild
   - unrs-resolver
+# 推移的依存（直接インストールしていない依存の依存）の脆弱性は、依存元パッケージの要求範囲内に
+# 安全版が無い場合、依存の自動更新（minimumReleaseAge・pnpm update）だけでは解消できず、
+# この設定で依存元の要求範囲を上書きして引き上げる必要がある。
+# pnpm installは既存のロックファイル解決を保持するため、許容範囲の右辺を各勧告の修正済み
+# バージョン下限より新しい値へ更新しない限り追随しない。
+# 各バージョン境界は各勧告が示す修正済みバージョンの下限に由来する。
+# 引き上げ後の陳腐化（新たな脆弱性の再出現）は.github/workflows/audit.yamlの定期監査で検知する。
 overrides:
+  "@hono/node-server@<2.0.5": ^2.0.5
+  body-parser@<2.3.0: ^2.3.0
+  brace-expansion@<5.0.8: ^5.0.8
   cookie@<0.7.0: ^0.7.0
   esbuild@<0.28.1: ^0.28.1
-  js-yaml@<4.2.0: ^4.2.0
+  fast-uri@<3.1.4: ^3.1.4
+  hono@<4.12.27: ^4.12.27
+  js-yaml@<4.3.0: ^4.3.0
+  linkify-it@<5.0.2: ^5.0.2
   markdown-it@<14.2.0: ^14.2.0
-  postcss@<8.5.10: ^8.5.10
+  postcss@<8.5.18: ^8.5.18
   vite@<6.4.3: ^6.4.3

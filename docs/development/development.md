@@ -51,11 +51,15 @@ e2eテスト（`make test-e2e`）は開発環境（`make deploy`）が起動し�
 npm / PyPIレジストリへの悪意あるパッケージ公開に対し、次の方針を採用する。
 
 - npmパッケージ: `pnpm-workspace.yaml`の`minimumReleaseAge: 1440`で公開から1日未満のインストールを禁止する
-- PyPIパッケージ: `uv.toml`の`exclude-newer = "1 day"`で公開から1日未満のインストールを禁止する
+- PyPIパッケージ: `pyproject.toml`の`[tool.uv]`節`exclude-newer = "1 day"`で公開から1日未満のインストールを禁止する
 - `pnpm install`は`--frozen-lockfile`を明示してロックファイル乖離時の再resolveを禁止する
-- `.pre-commit-config.yaml`の`additional_dependencies`はバージョンを固定する（`@latest`は使わない）
+- GitHub Actionsの`uses:`はコミットSHAとバージョンコメントで固定する（`.github/workflows/`配下全ファイル）
 
 依存更新は`make update`を使う。
+
+推移的依存（直接インストールしていない依存の依存）の脆弱性は、上記の自動更新対策だけでは解消されない場合がある。
+`pnpm-workspace.yaml`の`overrides`で安全なバージョンへ引き上げて対処し、`.github/workflows/audit.yaml`の
+定期監査で再出現を検知する。
 
 ## Docker構成
 
@@ -98,6 +102,8 @@ DBが半端な状態になった場合は`make sql`から`__drizzle_migrations`�
 masterへのpushおよびPR時に`ci.yaml`が自動実行される（`.github/workflows/ci.yaml`参照）。
 masterへのpushで`docs/`配下に変更があれば`docs.yaml`ワークフローが自動実行され、
 GitHub Pagesへデプロイされる。
+依存の脆弱性監査は`audit.yaml`が毎日06:00 UTC（JST 15:00）に定期実行し、
+検出結果をGitHub Code Scanningへアップロードする（`.github/workflows/audit.yaml`参照）。
 
 ## ドキュメントサイト運用
 
