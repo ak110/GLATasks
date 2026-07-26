@@ -52,14 +52,14 @@ Biomeへの移行は次の阻害要因により見送っている。
   ライブラリ仕様を確認する際はcontext7 MCPなどで最新版のドキュメントを参照する
 - 開発環境はDocker Composeで動作する。ホストから`localhost:3000`に直接アクセスできない場合は次のいずれかを使う
   - nginx経由: `curl -k https://localhost:38180/healthcheck`
-  - appコンテナ経由: `docker compose exec app curl --fail http://localhost:3000/healthcheck`
+  - appコンテナ経由: `docker compose --profile=development exec app curl --fail http://localhost:3000/healthcheck`
   - `docker compose --profile=development exec web curl -fLk https://localhost/`
   - `make healthcheck`はホスト直接 → コンテナ経由の順にフォールバックする
-- 現在の`COMPOSE_PROFILE`を確認したいときは`make -n deploy`のドライラン出力で判別できる。
-  `.env`を直接読み取れないことがあるため
-- 特定のe2eテストだけを実行したい場合、`make test-e2e`はフィルタ引数を受け付けない。
-  `make -n test-e2e`でドライラン展開した`docker compose`コマンドを直接呼び、
-  末尾の`pnpm run test:e2e`を`pnpm exec playwright test -g "パターン"`へ差し替える
+- 現在の`COMPOSE_PROFILE`を確認したいときは`make -p 2>/dev/null | grep -m1 '^COMPOSE_PROFILE '`で判別できる
+  （`.env`を直接読み取れないことがあるため）。
+  プロファイル指定は`COMPOSE_PROFILES`環境変数へ一括export済みであり、
+  個別ターゲットのドライラン出力にはプロファイル値が現れない
+- 特定のe2eテストだけを実行したい場合、`make test-e2e E2E_GREP="パターン"`で絞り込める
 - 新規依存を追加する`pnpm add`はプロジェクトルートから実行する。
   `app/package.json`はルート`package.json`へのシンボリックリンクであり、
   `app/`配下から実行すると`pnpm-lock.yaml`に不正な`app:` importerセクションが生成され
@@ -70,3 +70,7 @@ Biomeへの移行は次の阻害要因により見送っている。
     `app/src/lib/server/`配下のserver専用ファイルへスキーマを分離する
     （既存パターンとその制約詳細は`app/src/lib/server/schedule-schemas.ts`冒頭コメントを参照）
   - 併せて`app/vite.config.ts`に`ssr.noExternal: ["該当パッケージ"]`を追加する
+- DBスキーマを変更する`pnpm run db:generate`（`drizzle-kit generate`）は、列の新規追加か既存列の改名かを判別できない場合に対話プロンプトを表示する。
+  対話端末を持たない実行では当該プロンプトの表示時点で例外終了するため、
+  `script -qec "pnpm run db:generate" /dev/null`のように疑似端末を割り当てたうえで
+  列の追加か改名かの問いに応答し、生成されたマイグレーションファイルの内容を確認して手直しする

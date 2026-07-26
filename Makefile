@@ -3,6 +3,10 @@ ifndef COMPOSE_PROFILE
 $(error COMPOSE_PROFILE が定義されていません)
 endif
 
+# 個別ターゲットでの `--profile=$(COMPOSE_PROFILE)` 手書き重複を避けるため、
+# Docker Composeが公式に解釈する環境変数へ一括指定する。
+export COMPOSE_PROFILES = $(COMPOSE_PROFILE)
+
 RUN_ARGS += --user=$(shell id --user):$(shell id --group) --ulimit="core=0"
 
 export DOCKER_BUILDKIT=1
@@ -28,8 +32,12 @@ RUN_NODE = docker run $(2) \
 help:
 	@cat Makefile
 
+# prekはworkspace rootから再帰的に配下の`.pre-commit-config.yaml`を探索するため、
+# `--config`で対象を本リポジトリの設定ファイルへ限定する。
+# `--overwrite`は、pre-commit時代に導入済みのgitフックが残る環境で
+# レガシーフックとの二重実行状態（migration mode）へ陥るのを避けるため付与する
 setup:  # 開発環境のセットアップ
-	uvx pre-commit install
+	uvx prek --config=.pre-commit-config.yaml install --overwrite
 	git config --local commit.template .gitmessage
 
 sync:  # 最新化と各種更新
@@ -48,8 +56,8 @@ backup:  # デプロイ前バックアップ（DB + キーファイル）
 	@# DBダンプ実行（停止中はエラー。SKIP_DB_DUMP=1 でスキップ可）
 	@if [ "$(SKIP_DB_DUMP)" = "1" ]; then \
 		echo "SKIP_DB_DUMP=1: DBダンプをスキップします"; \
-	elif docker compose --profile=$(COMPOSE_PROFILE) ps db --format='{{.State}}' 2>/dev/null | grep -q running; then \
-		docker compose --profile=$(COMPOSE_PROFILE) exec -T db \
+	elif docker compose ps db --format='{{.State}}' 2>/dev/null | grep -q running; then \
+		docker compose exec -T db \
 			mariadb-dump -uglatasks -pglatasks --single-transaction --routines --triggers glatasks \
 			> $(BACKUP_DIR)/glatasks.sql \
 		&& echo "DBダンプが完了しました" \
@@ -70,41 +78,43 @@ deploy:
 	$(MAKE) start
 
 build:
-	docker compose --profile=$(COMPOSE_PROFILE) pull
+	docker compose pull
 ifeq ($(COMPOSE_PROFILE), development)
-	docker compose --profile=$(COMPOSE_PROFILE) --progress=plain build --pull
+	docker compose --progress=plain build --pull
 endif
 
 start:
-	docker compose --profile=$(COMPOSE_PROFILE) up -d
+	docker compose up -d
 
 stop:
-	docker compose --profile=$(COMPOSE_PROFILE) down
+	docker compose down
 
 restart-app:
-	docker compose --profile=$(COMPOSE_PROFILE) restart app
+	docker compose restart app
 
 logs:
-	docker compose --profile=$(COMPOSE_PROFILE) logs -ft
+	docker compose logs -ft
 
 ps:
-	docker compose --profile=$(COMPOSE_PROFILE) ps
+	docker compose ps
 
 healthcheck:
-	curl --fail http://localhost:3000/healthcheck 2>/dev/null || docker compose --profile=$(COMPOSE_PROFILE) exec app curl --fail http://localhost:3000/healthcheck
+	curl --fail http://localhost:3000/healthcheck 2>/dev/null || docker compose exec app curl --fail http://localhost:3000/healthcheck
 
 start-app:
-	docker compose --profile=$(COMPOSE_PROFILE) down app
-	docker compose --profile=$(COMPOSE_PROFILE) up -d app
+	docker compose down app
+	docker compose up -d app
 
 logs-app:
-	docker compose --profile=$(COMPOSE_PROFILE) logs -ft app
+	docker compose logs -ft app
 
-sql:
-	docker compose --profile=$(COMPOSE_PROFILE) exec db mariadb -uglatasks -pglatasks -Dglatasks
+# SQLの値に`$`や`"`を含む複雑な問い合わせは、Make・シェルの二重展開で意図しない結果になるため、
+# `docker compose exec db mariadb -uglatasks -pglatasks -Dglatasks`を直接呼び出すこと
+sql:  # DBへの問い合わせ（対話用途。SQL=... 指定時は非対話で1回だけ実行する）
+	docker compose exec $(if $(SQL),-T) db mariadb -uglatasks -pglatasks -Dglatasks $(if $(SQL),-e "$(SQL)")
 
 shell:
-	docker compose --profile=$(COMPOSE_PROFILE) exec app bash
+	docker compose exec app bash
 
 node-shell:
 	$(call RUN_NODE, bash, --rm --interactive --tty)
@@ -176,8 +186,9 @@ test-backup:  # バックアップ機能のテスト（Docker環境が起動し�
 docs:  # ドキュメントサイトをローカルで起動
 	$(call RUN_NODE, cd docs && pnpm dev --host=0.0.0.0 --port=5173, --rm --interactive --tty -p 5173:5173)
 
-test-e2e:
-	docker compose --profile=$(COMPOSE_PROFILE) run --rm \
+# E2E_GREPの値に`$`や`"`を含む場合は`sql`ターゲットと同じ制約が生じる
+test-e2e:  # E2Eテスト（E2E_GREP=... 指定で対象限定実行）
+	docker compose run --rm \
 		--env=BASE_URL=https://web \
 		--env=COREPACK_ENABLE_DOWNLOAD_PROMPT=0 \
 		playwright \
@@ -186,7 +197,7 @@ test-e2e:
 			corepack enable --install-directory=${PWD}/.cache/playwright/bin &&\
 			export PATH=${PWD}/.cache/playwright/bin:${PWD}/node_modules/.bin:$$PATH &&\
 			corepack prepare pnpm@$(PNPM_VERSION) --activate &&\
-			pnpm install --frozen-lockfile && pnpm run test:e2e\
+			pnpm install --frozen-lockfile && pnpm run test:e2e $(if $(E2E_GREP),-g "$(E2E_GREP)")\
 		'
 
 .PHONY: help setup sync backup deploy build start stop restart-app logs ps healthcheck shell node-shell update update-actions format test test-unit test-backup test-e2e start-app logs-app migrate db-studio sql docs
