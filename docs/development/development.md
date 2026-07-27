@@ -58,8 +58,13 @@ npm / PyPIレジストリへの悪意あるパッケージ公開に対し、次�
 依存更新は`make update`を使う。
 
 推移的依存（直接インストールしていない依存の依存）の脆弱性は、上記の自動更新対策だけでは解消されない場合がある。
-`pnpm-workspace.yaml`の`overrides`で安全なバージョンへ引き上げて対処し、`.github/workflows/audit.yaml`の
-定期監査で再出現を検知する。
+脆弱性はDependabotアラートと`.github/workflows/audit.yaml`の定期監査で検知し、
+`pnpm-workspace.yaml`の`overrides`で安全なバージョンへ引き上げて対処する。
+
+GitHubリポジトリ設定のDependabot security updates（自動修正PRの作成）は無効にしている。
+Dependabotのアップデーターが本リポジトリのpnpmロックファイル環境では推移的依存を
+安全なバージョンへ引き上げられず、自動修正の試行が繰り返し`security_update_not_possible`で
+失敗していたためである。
 
 ## Docker構成
 
