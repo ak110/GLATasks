@@ -183,7 +183,7 @@
                                 type="button"
                                 onclick={() =>
                                     handleThumbnailOpen(attachment.id)}
-                                class="cursor-pointer shrink-0 rounded p-0.5"
+                                class="shrink-0 cursor-pointer rounded p-0.5"
                                 data-testid="task-attachment-thumbnail"
                                 title={attachment.filename}
                                 aria-label={`${attachment.filename}を拡大表示`}

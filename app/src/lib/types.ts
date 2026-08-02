@@ -49,8 +49,7 @@ export type SearchTaskResult = TaskInfo & {
 
 /** タスク一覧取得レスポンス（304 は未変更） */
 export type GetTasksResult =
-  | { status: 304 }
-  | { status: 200; data: TaskInfo[]; lastModified: string };
+  { status: 304 } | { status: 200; data: TaskInfo[]; lastModified: string };
 
 /**
  * 差分 sync 用タスク項目。

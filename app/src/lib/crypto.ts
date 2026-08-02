@@ -9,9 +9,8 @@ export async function encrypt(
   plaintext: string,
   keyString: string,
 ): Promise<string> {
-  const keyBuffer = Uint8Array.from(
-    globalThis.atob(keyString),
-    (c) => c.codePointAt(0)!,
+  const keyBuffer = Uint8Array.from(globalThis.atob(keyString), (c) =>
+    c.codePointAt(0)!,
   );
   const key = await globalThis.crypto.subtle.importKey(
     "raw",
@@ -41,9 +40,8 @@ export async function decrypt(
   ciphertext: string,
   keyString: string,
 ): Promise<string> {
-  const keyBuffer = Uint8Array.from(
-    globalThis.atob(keyString),
-    (c) => c.codePointAt(0)!,
+  const keyBuffer = Uint8Array.from(globalThis.atob(keyString), (c) =>
+    c.codePointAt(0)!,
   );
   const key = await globalThis.crypto.subtle.importKey(
     "raw",
@@ -52,9 +50,8 @@ export async function decrypt(
     false,
     ["decrypt"],
   );
-  const data = Uint8Array.from(
-    globalThis.atob(ciphertext),
-    (c) => c.codePointAt(0)!,
+  const data = Uint8Array.from(globalThis.atob(ciphertext), (c) =>
+    c.codePointAt(0)!,
   );
   const iv = data.slice(0, 12);
   const encryptedData = data.slice(12);

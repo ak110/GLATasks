@@ -57,8 +57,7 @@
     // タイマー削除確認ダイアログの状態
     // open=true の場合のみ timer が有効な値を持つ前提で管理する
     type ConfirmDeleteTimerDialog =
-        | { open: false; timer?: TimerInfo }
-        | { open: true; timer: TimerInfo };
+        { open: false; timer?: TimerInfo } | { open: true; timer: TimerInfo };
     let confirmDeleteTimerDialog = $state<ConfirmDeleteTimerDialog>({
         open: false,
     });

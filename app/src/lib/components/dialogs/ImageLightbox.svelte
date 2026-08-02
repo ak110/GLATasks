@@ -52,7 +52,7 @@
         onclick={onClose}
         aria-label="閉じる"
         data-testid="image-lightbox-close"
-        class="absolute right-4 top-4 cursor-pointer rounded-full bg-white/80 px-3 py-1 text-lg text-gray-900 hover:bg-white dark:bg-gray-800/80 dark:text-gray-100 dark:hover:bg-gray-700"
+        class="absolute top-4 right-4 cursor-pointer rounded-full bg-white/80 px-3 py-1 text-lg text-gray-900 hover:bg-white dark:bg-gray-800/80 dark:text-gray-100 dark:hover:bg-gray-700"
     >
         ×
     </button>

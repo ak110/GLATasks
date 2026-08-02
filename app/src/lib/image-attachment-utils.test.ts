@@ -111,8 +111,7 @@ describe("createBlobUrlCache", () => {
   it("ensure中に対象がsyncWithで非アクティブになった場合はrevoke＋キャッシュ登録しない", async () => {
     const { revoked } = installUrlSpies();
     let resolveDownload:
-      | ((v: ReturnType<typeof makeDownloadResponse>) => void)
-      | undefined;
+      ((v: ReturnType<typeof makeDownloadResponse>) => void) | undefined;
     downloadQueryMock.mockImplementation(
       () =>
         new Promise((resolve) => {

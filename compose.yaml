@@ -118,7 +118,7 @@ services:
     profiles:
       - development
       - ci
-    image: mcr.microsoft.com/playwright:v1.60.0-noble
+    image: mcr.microsoft.com/playwright:v1.62.1-noble
     # Chromiumは共有メモリを多用するため、Dockerの既定の共有メモリサイズ（64MB）では
     # 不足時にブラウザプロセスが異常終了する。Playwright公式のDocker運用ガイドが
     # 推奨する構成に合わせ、ホストのIPC名前空間を共有する。

@@ -159,8 +159,6 @@ migrate:  # DBマイグレーション実行
 db-studio:  # Drizzle Studio起動
 	$(call RUN_NODE, pnpm run db:studio, --rm --interactive --tty)
 
-PLAYWRIGHT_IMAGE = mcr.microsoft.com/playwright:v1.59.1-noble
-
 PNPM_VERSION = $(shell node -e "const p=require('./package.json'); console.log((p.packageManager||'').split('@')[1]?.split('+')[0]||'latest')" 2>/dev/null || echo latest)
 
 test-backup:  # バックアップ機能のテスト（Docker環境が起動していること）

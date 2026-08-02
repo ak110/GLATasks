@@ -46,6 +46,23 @@
 
 e2eテスト（`make test-e2e`）は開発環境（`make deploy`）が起動している必要がある。
 
+### 依存更新後の追随作業
+
+`make update`は`pnpm update --latest`により`package.json`の指定範囲を超えて更新する。
+実行後は次の2点を確認する。
+
+TypeScriptの版を6系に留める。
+`typescript-eslint`がTypeScript 7を未サポートであり、
+`svelte-check`もTypeScript 7では6系との併存インストールと専用フラグを要求するためである。
+7系へ上がった場合は`pnpm add -D 'typescript@^6.0.3'`で戻す。
+両ツールがTypeScript 7へ対応した時点で本運用を解除する。
+
+Playwrightのイメージ版を揃える。
+`@playwright/test`が更新された場合は、`compose.yaml`の`playwright`サービスが指す
+`mcr.microsoft.com/playwright`のタグを同じ版へ更新する。
+イメージ同梱のブラウザバイナリはパッケージの版ごとに配置が変わるため、
+食い違うと`make test-e2e`がブラウザ起動時に失敗する。
+
 ## サプライチェーン攻撃対策
 
 npm / PyPIレジストリへの悪意あるパッケージ公開に対し、次の方針を採用する。
