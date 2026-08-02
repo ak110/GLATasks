@@ -35,7 +35,12 @@ jobs:
       - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: /cache
-          key: pyfltr-cache-${{ runner.os }}
+          # 固定キーでは一度保存されると更新されないため、run_idを含めて毎回保存させる。
+          # /cache配下にはmiseの導入済みツール実体（MISE_DATA_DIR）が含まれるため、固定キーのままでは
+          # コンテナイメージ側でツールが更新されても復元内容が古い版のまま据え置かれ、
+          # 上流ツールの変更をCIで検知できなくなる。
+          key: pyfltr-cache-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: pyfltr-cache-${{ runner.os }}-
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
