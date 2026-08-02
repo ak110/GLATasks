@@ -56,12 +56,16 @@ TypeScriptの版を6系に留める。
 `svelte-check`もTypeScript 7では6系との併存インストールと専用フラグを要求するためである。
 7系へ上がった場合は`pnpm add -D 'typescript@^6.0.3'`で戻す。
 両ツールがTypeScript 7へ対応した時点で本運用を解除する。
+対応状況は次の2点で判定する。
+
+- `typescript-eslint`: 対応issue（<https://github.com/typescript-eslint/typescript-eslint/issues/10940>）がcloseされていること
+- `svelte-check`: `node_modules/svelte-check/bin/ts-version-check.js`がTypeScript 7の単独構成で例外を送出しないこと
 
 Playwrightのイメージ版を揃える。
 `@playwright/test`が更新された場合は、`compose.yaml`の`playwright`サービスが指す
 `mcr.microsoft.com/playwright`のタグを同じ版へ更新する。
 イメージ同梱のブラウザバイナリはパッケージの版ごとに配置が変わるため、
-食い違うと`make test-e2e`がブラウザ起動時に失敗する。
+一致しないと`make test-e2e`がブラウザ起動時に失敗する。
 
 ## サプライチェーン攻撃対策
 
