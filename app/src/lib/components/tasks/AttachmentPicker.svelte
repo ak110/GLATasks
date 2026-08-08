@@ -28,7 +28,10 @@
 </script>
 
 {#if attachments && attachments.length > 0}
-    <ul class="mb-2 flex flex-col gap-1">
+    <ul
+        class="mb-2 flex max-h-48 flex-col gap-1 overflow-y-auto"
+        data-testid="selected-attachments"
+    >
         {#each attachments as file, i (i)}
             <li
                 class="flex items-center justify-between gap-2 rounded border border-gray-200 px-2 py-1 text-sm dark:border-gray-600"

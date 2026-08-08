@@ -10,6 +10,7 @@ import {
   type Page,
 } from "@playwright/test";
 import { BASE_URL, STORAGE_STATE_PATH } from "./helpers/common";
+import { MAX_ATTACHMENTS_PER_TASK } from "../src/lib/schemas";
 
 const LIST_NAME = `モバイルスクロール_${Date.now()}`;
 
@@ -146,6 +147,45 @@ async function verifyTaskListInternalScroll(
   await expect(page.locator("main")).toHaveCSS("overflow-y", "auto");
 }
 
+async function verifyAttachmentListKeepsTaskListAvailable(
+  page: Page,
+): Promise<void> {
+  const form = page.getByTestId("task-add-form");
+  const attachmentList = form.getByTestId("selected-attachments");
+  const taskList = page.getByTestId("task-list-scroll");
+
+  await form.locator("textarea").focus();
+  await form.locator('input[type="file"]').setInputFiles(
+    Array.from({ length: MAX_ATTACHMENTS_PER_TASK }, (_, index) => ({
+      name: `attachment-${index}.txt`,
+      mimeType: "text/plain",
+      buffer: Buffer.from("添付"),
+    })),
+  );
+  await expect(attachmentList.locator("li")).toHaveCount(
+    MAX_ATTACHMENTS_PER_TASK,
+  );
+
+  const attachmentListDimensions = await attachmentList.evaluate((element) => ({
+    clientHeight: element.clientHeight,
+    scrollHeight: element.scrollHeight,
+  }));
+  expect(attachmentListDimensions.scrollHeight).toBeGreaterThan(
+    attachmentListDimensions.clientHeight,
+  );
+
+  const taskListBox = await requireBoundingBox(taskList);
+  expect(taskListBox.height).toBeGreaterThan(0);
+
+  await attachmentList.evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+  });
+  await expect
+    .poll(() => attachmentList.evaluate((element) => element.scrollTop))
+    .toBeGreaterThan(0);
+  await expect(form.locator("textarea")).toBeVisible();
+}
+
 test.describe("task list scroll", () => {
   test.beforeAll(async ({ browser }) => {
     await setupMobileTestList(browser, LIST_NAME);
@@ -172,5 +212,9 @@ test.describe("task list scroll", () => {
     page,
   }) => {
     await verifyTaskListInternalScroll(page, LIST_NAME);
+  });
+
+  test("選択済み添付が上限件数でもタスク一覧を操作できる", async ({ page }) => {
+    await verifyAttachmentListKeepsTaskListAvailable(page);
   });
 });
