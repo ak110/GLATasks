@@ -180,7 +180,10 @@ async function addTags(input: Locator, tagNames: string[]): Promise<void> {
   }
 }
 
-async function verifyTagListsKeepTaskListAvailable(page: Page): Promise<void> {
+async function verifyTagListsKeepTaskListAvailable(
+  page: Page,
+  includeMaximumAttachments = false,
+): Promise<void> {
   const form = page.getByTestId("task-add-form");
   const tagEditor = form.getByTestId("tag-editor");
   const tagInput = tagEditor.getByTestId("tag-editor-input");
@@ -217,6 +220,20 @@ async function verifyTagListsKeepTaskListAvailable(page: Page): Promise<void> {
     }),
   ).toHaveCount(MAX_TAGS_PER_TASK);
 
+  const attachmentList = form.getByTestId("selected-attachments");
+  if (includeMaximumAttachments) {
+    await form.locator('input[type="file"]').setInputFiles(
+      Array.from({ length: MAX_ATTACHMENTS_PER_TASK }, (_, index) => ({
+        name: `attachment-${index}.txt`,
+        mimeType: "text/plain",
+        buffer: Buffer.from("添付"),
+      })),
+    );
+    await expect(attachmentList.locator("li")).toHaveCount(
+      MAX_ATTACHMENTS_PER_TASK,
+    );
+  }
+
   const currentTagsArea = tagEditor.getByTestId("tag-editor-current-list");
   const candidateTagsArea = tagEditor.getByTestId("tag-editor-candidates-list");
   for (const tagArea of [currentTagsArea, candidateTagsArea]) {
@@ -233,8 +250,29 @@ async function verifyTagListsKeepTaskListAvailable(page: Page): Promise<void> {
       .toBeGreaterThan(0);
   }
 
+  if (includeMaximumAttachments) {
+    const formDimensions = await form.evaluate((element) => ({
+      clientHeight: element.clientHeight,
+      scrollHeight: element.scrollHeight,
+    }));
+    expect(formDimensions.scrollHeight).toBeGreaterThan(
+      formDimensions.clientHeight,
+    );
+    await form.evaluate((element) => {
+      element.scrollTop = element.scrollHeight;
+    });
+    await expect
+      .poll(() => form.evaluate((element) => element.scrollTop))
+      .toBeGreaterThan(0);
+  }
+
   const taskListBox = await requireBoundingBox(taskList);
   expect(taskListBox.height).toBeGreaterThan(0);
+  if (includeMaximumAttachments) {
+    const checkbox = taskList.getByRole("checkbox").first();
+    await checkbox.check();
+    await expect(checkbox).toBeChecked();
+  }
   await expect(tagInput).toBeVisible();
 }
 
@@ -454,6 +492,10 @@ test.describe("tasks", () => {
     page,
   }) => {
     await verifyTagListsKeepTaskListAvailable(page);
+  });
+
+  test("添付とタグが上限件数でもタスク一覧を操作できる", async ({ page }) => {
+    await verifyTagListsKeepTaskListAvailable(page, true);
   });
 
   test("編集ダイアログでタグを追加できる", async ({ page }) => {
