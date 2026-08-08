@@ -59,7 +59,7 @@ export type TaskListItem = {
   /**
    * Svelte の `{#each}` keying 用の安定値。楽観追加時は仮IDを保持し、
    * サーバー応答後にidが実IDへ書き換わっても同じ値を維持してDOM identityを保つ。
-   * サーバー応答経由のタスクでは id と同値を入れる。
+   * サーバー応答経由のタスクでは id と同値を設定する。
    */
   _key: number;
   id: number;

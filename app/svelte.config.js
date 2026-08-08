@@ -7,7 +7,7 @@ import { vitePreprocess } from "@sveltejs/vite-plugin-svelte";
  *
  * git short hash を第一候補とし、.git が無い環境 (CI の shallow clone やコンテナ内ビルド) では
  * 環境変数 GIT_COMMIT、最終手段として現在時刻を使う。ここで取得した値はクライアントの
- * __sveltekit/version.json に書き出され、updated store によるデプロイ検知に利用される。
+ * __sveltekit/version.json に出力され、updated store によるデプロイ検知に利用される。
  *
  * SvelteKit は SSR ビルドの後に同一プロセスでクライアントビルドを起動する際、
  * svelte.config.js を再評価する。`Date.now()` フォールバック時に評価ごとの値が異なると

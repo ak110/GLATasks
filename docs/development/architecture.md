@@ -154,7 +154,7 @@ sequenceDiagram
     end
 ```
 
-- 起動時と定期ポーリングの双方でfill-forward方式を採る。
+- 起動時と定期ポーリングの双方でfill-forward方式を採用する。
   各スケジュールの`last_fired`（未設定時は`created`）を起点に、現在時刻までの未発火分を遡って生成する
 - fill-forwardは`rrule`のiterator経路で発火予定を1件ずつ検出し、
   上限30件に達した時点で走査を打ち切る。
@@ -190,7 +190,7 @@ Cookieに `sameSite: "none"` + `secure: true` を設定している。
 
 ## tRPCミドルウェア設計
 
-tRPC v11のミドルウェア（`t.middleware`）内で下流のprocedureが投げた例外を捕捉するには、
+tRPC v11のミドルウェア（`t.middleware`）内で下流のprocedureが送出した例外を捕捉するには、
 `try/catch` ではなく `await next()` の戻り値の `result.ok` を判定する。
 tRPC v11の `next()` は例外を再送出せず `{ok: false, error}` で返す仕様のため、
 `try/catch` 側は到達しない。
@@ -236,7 +236,7 @@ const withApiErrors = t.middleware(async ({ next }) => {
 drizzle-orm mysql2ドライバーの `db.transaction` は
 内部で `client.query()`（テキストプロトコル）を採用する。
 `Buffer` パラメーターは16進数リテラルへ変換されて送信されるため、
-実バイト数の約2倍のSQLテキストがサーバーへ流れる。
+実バイト数の約2倍のSQLテキストがサーバーへ送信される。
 `db/my.cnf` の `max_allowed_packet` は元の想定バイナリサイズの3倍以上に設定する
 （現行値は `64M`）。添付ファイル上限が10 MiBのため、
 テキスト膨張とプロトコルオーバーヘッドを吸収する余裕を確保している。

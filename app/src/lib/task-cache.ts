@@ -64,7 +64,7 @@ export function sortByListAndOrder(tasks: TaskListItem[]): TaskListItem[] {
 }
 
 /**
- * タスク配列を listId と showType で絞り込む。
+ * タスク配列を listId と showType で抽出する。
  */
 export function filterByList(
   tasks: TaskListItem[],

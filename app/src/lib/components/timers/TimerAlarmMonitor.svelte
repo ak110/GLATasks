@@ -133,7 +133,7 @@
             if (!keep) stopLoopBeepFor(alarm.timerId);
             return keep;
         });
-        // 新しい配列参照を毎回作ると Svelte が変更検知して無限ループするため、変化があるときだけ更新
+        // 新しい配列参照を毎回生成すると Svelte が変更検知して無限ループするため、変化があるときだけ更新
         if (filtered.length !== alarms.length) {
             alarms = filtered;
         }
@@ -272,7 +272,7 @@
         const runningTimers = timers.filter((t) => t.running);
 
         // running タイマーがなければ alarmedIds をリセット
-        // 新しい Set 参照を毎回作ると Svelte が変更検知して無限ループするため、空でないときだけ更新
+        // 新しい Set 参照を毎回生成すると Svelte が変更検知して無限ループするため、空でないときだけ更新
         if (runningTimers.length === 0) {
             if (alarmedIds.size > 0) {
                 alarmedIds = new Set();
@@ -289,7 +289,7 @@
             // started_at をキャプチャしてリセット/再開の検出に使用
             const startedAt = timer.started_at;
             if (remainingMs <= 0) {
-                // 既に時間切れ → サーバー確認してからアラーム
+                // 既に満了済み → サーバー確認してからアラーム
                 checkAndAlarm(timer.id, timer.name, startedAt);
             } else {
                 const id = setTimeout(

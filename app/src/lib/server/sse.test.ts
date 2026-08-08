@@ -10,7 +10,7 @@ import { SSE_EVENTS } from "$lib/sse-events";
 
 type SseModule = typeof import("./sse");
 
-/** 指定ユーザーの enqueue 呼び出し履歴を捕捉するスタブコントローラーを作る */
+/** 指定ユーザーの enqueue 呼び出し履歴を捕捉するスタブコントローラーを生成する */
 function makeController(): {
   controller: ReadableStreamDefaultController;
   payloads: string[];
@@ -158,8 +158,8 @@ describe("SSEバッファとリプレイ", () => {
     const userId = 1;
     const { controller: srcCtl } = makeController();
     sse.addConnection(userId, srcCtl);
-    // 5件発行後、上限超過を起こさずに先頭2件を捨てる代わりに、別途userの大量発行で連番を進める
-    // 連番を進めるため別ユーザーで投入してからuser1のバッファに3件追加する
+    // 別ユーザーへ2件を送信してプロセス内IDを進め、対象ユーザーへ3件を送信する
+    // 対象ユーザーのバッファに保持される最古IDは3となる
     const otherId = 99;
     sse.sendEvent(otherId, SSE_EVENTS.tasksUpdated, "tab-x");
     sse.sendEvent(otherId, SSE_EVENTS.tasksUpdated, "tab-x");

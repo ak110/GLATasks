@@ -116,7 +116,7 @@ test.describe("activeTasks 差分sync・楽観的更新", () => {
           .filter({ hasText: taskBTitle }),
       ).toBeVisible({ timeout: 500 });
 
-      // 切替によって tasks.listActive（差分sync）が走らないことを検証する
+      // 切替によって tasks.listActive（差分sync）が実行されないことを検証する
       // 切替後の短い時間だけ待機してからリクエスト数が0であることを確認する
       await page.waitForTimeout(300);
       // listActive リクエストが発火した場合は count > 0 になる

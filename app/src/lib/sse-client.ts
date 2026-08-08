@@ -154,7 +154,7 @@ export function connect(queryClient: QueryClient): void {
   });
 
   // 登録済みイベントのディスパッチャーを設定する。
-  // 既存接続のディスパッチャーは EventSource とともに失われるため作り直す。
+  // 既存接続のディスパッチャーは EventSource とともに失われるため再生成する。
   dispatchers.clear();
   for (const eventType of subscribers.keys()) {
     ensureDispatcher(eventType as SseEventName);

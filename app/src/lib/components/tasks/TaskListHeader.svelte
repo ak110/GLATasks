@@ -13,7 +13,7 @@
 </script>
 
 <div
-    class="flex items-center justify-between border-b border-gray-200 bg-blue-50 px-4 py-3 dark:border-gray-700 dark:bg-blue-900/30"
+    class="flex shrink-0 items-center justify-between border-b border-gray-200 bg-blue-50 px-4 py-3 dark:border-gray-700 dark:bg-blue-900/30"
 >
     <div class="flex items-center gap-1">
         <!-- モバイル用戻るボタン -->

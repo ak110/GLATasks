@@ -108,7 +108,7 @@ export async function getActiveTasks(
     attachments: attachmentsByTask.get(t.id) ?? [],
   }));
 
-  // 1秒overlap: DB の TIMESTAMP 秒精度に合わせ、現在時刻からミリ秒を切り捨てた上で
+  // 1秒overlap: DB の TIMESTAMP 秒精度に合わせ、現在時刻のミリ秒を除去した上で
   // さらに1秒以上前の値を返す。リクエスト間隔に応じて最大で約2秒前にずれるが、
   // gte(updated, since) は包含比較なので同秒内の更新を取り逃さない。
   const now = new Date();

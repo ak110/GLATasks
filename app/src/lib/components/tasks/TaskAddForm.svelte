@@ -116,7 +116,7 @@
 </script>
 
 <div
-    class="border-b border-gray-200 px-3 py-2 sm:px-4 dark:border-gray-700 {isDragOver
+    class="shrink-0 border-b border-gray-200 px-3 py-2 sm:px-4 dark:border-gray-700 {isDragOver
         ? FILE_DROP_HIGHLIGHT_CLASSES
         : 'bg-white dark:bg-gray-800'}"
     data-testid="task-add-form"

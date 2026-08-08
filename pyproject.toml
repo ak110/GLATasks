@@ -5,6 +5,8 @@ exclude-newer = "1 day"
 
 [tool.pyfltr]
 preset = "latest"
+colloquial-check = true
+colloquial-check-exclude = ["app/src/routes/timers/+page.svelte"]
 # JS/TS 系ツール（eslint / prettier / vitest / oxlint / biome）を一括で有効化する。
 javascript = true
 # JS 系ツールは package.json で管理するため pnpm runner を使う。

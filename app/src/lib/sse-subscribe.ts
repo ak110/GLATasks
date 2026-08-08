@@ -57,7 +57,7 @@ export function setupSseSubscriptions(
   let running = false;
 
   const runFallbacks = async (): Promise<void> => {
-    // 直前回のフォールバックがまだ走っている場合は重複起動しない
+    // 直前回のフォールバックを実行中の場合は重複起動しない
     if (running) return;
     debugLog("fallback", "run", { count: fallbacks.length });
     running = true;

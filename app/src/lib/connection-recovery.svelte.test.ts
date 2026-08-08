@@ -10,7 +10,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 type Recovery = typeof import("./connection-recovery.svelte");
 
-/** 注入用の fetch スタブを作る。`reject` 指定時はネットワークエラー相当で失敗させる */
+/** 注入用の fetch スタブを生成する。`reject` 指定時はネットワークエラー相当で失敗させる */
 function makeFetch(opts: {
   status?: number;
   contentType?: string;

@@ -32,7 +32,7 @@
     );
 </script>
 
-<div class="flex-1">
+<div class="min-h-0 flex-1 overflow-y-auto" data-testid="task-list-scroll">
     {#if isLoading}
         <p class="p-4 text-gray-400 dark:text-gray-500">読み込み中...</p>
     {:else if tasks.length === 0}

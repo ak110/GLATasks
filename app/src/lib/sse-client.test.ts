@@ -428,10 +428,10 @@ describe("sse-client", () => {
     const cbBeforeConnect = vi.fn();
     const cbAfterConnect = vi.fn();
 
-    // connect 前に購読（onMount の子→親順で connect より先に走る経路）
+    // connect 前に購読（onMount の子→親順で connect より先に実行される経路）
     subscribe("tasks:updated", cbBeforeConnect);
     connect(queryClient);
-    // connect 後に同一イベントを購読（ページ再訪などで connect 後に走る経路）
+    // connect 後に同一イベントを購読（ページ再訪などで connect 後に実行される経路）
     const unsubAfter = subscribe("tasks:updated", cbAfterConnect);
 
     MockEventSource.instances[0].dispatch("tasks:updated", "src-tab");

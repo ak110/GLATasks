@@ -128,7 +128,7 @@ describe("sortByListAndOrder", () => {
 });
 
 describe("filterByList", () => {
-  it("listId で絞り込む", () => {
+  it("listId で抽出する", () => {
     const tasks = [
       makeTask({ id: 1, listId: 1 }),
       makeTask({ id: 2, listId: 2 }),

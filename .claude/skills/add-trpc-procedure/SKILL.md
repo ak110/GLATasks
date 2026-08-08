@@ -53,7 +53,7 @@ description: >-
 - SSEイベント種別一覧は`docs/development/architecture.md`の`## リアルタイム同期（SSE）`節を参照する
 - 影響ドメインが複数なら複数のSSEイベントを送る（`lists.merge`を参照）
 - 新しい機械可読エラー識別子を導入した場合は`API_ERRORS`にマッピング追加
-- ミドルウェアを追加または改修する場合、下流のprocedureが投げた例外を捕捉するには、
+- ミドルウェアを追加または改修する場合、下流のprocedureが送出した例外を捕捉するには、
   `try/catch` ではなく `await next()` の戻り値の `result.ok` を判定する
   （tRPC v11の `next()` は例外を再送出せず `{ok: false, error}` で返すため）
   - 詳細は `docs/development/architecture.md` の「tRPCミドルウェア設計」節を参照する
@@ -94,7 +94,7 @@ description: >-
   - `encryptedProcedure` を `createCaller` で呼ぶルーターテストでは、
     `vi.mock('$lib/server/crypto')`・`vi.mock('$lib/server/sse')`・
     `vi.mock('$lib/server/api')` をセットで書く
-    - `getEncryptKey` が `DATABASE_URL` を要求する連鎖と副作用を全て切る目的
+    - `getEncryptKey`が`DATABASE_URL`を要求する連鎖と副作用をすべて遮断する目的
     - 雛形は `app/src/lib/server/trpc.test.ts` を参照する
 - e2eテスト: ユーザーフローに絡む場合は `app/tests/` にPlaywrightテストを追加
   - `page.goto` + `waitForResponse(res => res.url().includes("/api/trpc"))` パターンを使う（development.md参照）

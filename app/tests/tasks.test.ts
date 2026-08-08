@@ -2,10 +2,127 @@
  * @fileoverview タスク CRUD の e2e テスト
  */
 
-import { test, expect } from "@playwright/test";
-import { setupTestList, cleanupTestList } from "./helpers/common";
+import {
+  test,
+  expect,
+  type Browser,
+  type Locator,
+  type Page,
+} from "@playwright/test";
+import { BASE_URL, STORAGE_STATE_PATH, setupTestList } from "./helpers/common";
 
 const LIST_NAME = `タスクテスト_${Date.now()}`;
+
+async function cleanupTaskList(
+  browser: Browser,
+  listName: string,
+): Promise<void> {
+  const context = await browser.newContext({
+    baseURL: BASE_URL,
+    storageState: STORAGE_STATE_PATH,
+    ignoreHTTPSErrors: true,
+  });
+  try {
+    const page = await context.newPage();
+    await Promise.all([
+      page.goto("/"),
+      page.waitForResponse((response) => response.url().includes("/api/trpc")),
+    ]);
+    const listRow = page.getByTestId("list-item").filter({ hasText: listName });
+    await listRow.getByTestId("list-menu-btn").click();
+    await page.getByTestId("list-delete-btn").click();
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: "削除" })
+      .click();
+    await expect(listRow).toHaveCount(0);
+  } finally {
+    await context.close();
+  }
+}
+
+const MINIMUM_TASK_ROWS = 18;
+
+async function requireBoundingBox(locator: Locator) {
+  const box = await locator.boundingBox();
+  if (!box) throw new Error("要素の境界ボックスを取得できません");
+  return box;
+}
+
+async function verifyTaskListInternalScroll(
+  page: Page,
+  listName: string,
+): Promise<void> {
+  const taskList = page.getByTestId("task-list-scroll");
+  const taskItems = page.getByTestId("task-item");
+  const form = page.getByTestId("task-add-form");
+  const textarea = form.locator("textarea");
+  const submitButton = form.locator('button[type="submit"]');
+  const stamp = Date.now();
+
+  for (let i = await taskItems.count(); i < MINIMUM_TASK_ROWS; i++) {
+    const title = `スクロール_${stamp}_${i}`;
+    await textarea.click();
+    await textarea.fill(title);
+    await expect(submitButton).toBeVisible();
+    await submitButton.click();
+    await expect(taskItems.filter({ hasText: title })).toBeVisible({
+      timeout: 15000,
+    });
+  }
+
+  const heading = page.getByRole("heading", { name: listName, exact: true });
+  const firstTask = taskItems.first();
+  await expect(heading).toBeVisible();
+  await expect(form).toBeVisible();
+  await expect(taskList).toBeVisible();
+
+  await taskList.evaluate((element) => {
+    element.scrollTop = 0;
+  });
+  const dimensions = await taskList.evaluate((element) => ({
+    clientHeight: element.clientHeight,
+    scrollHeight: element.scrollHeight,
+  }));
+  expect(dimensions.scrollHeight).toBeGreaterThan(dimensions.clientHeight);
+
+  const headingBefore = await requireBoundingBox(heading);
+  const formBefore = await requireBoundingBox(form);
+  const firstTaskBefore = await requireBoundingBox(firstTask);
+
+  await taskList.evaluate((element) => {
+    element.scrollTop = Math.min(
+      160,
+      element.scrollHeight - element.clientHeight,
+    );
+  });
+  await expect
+    .poll(() => taskList.evaluate((element) => element.scrollTop))
+    .toBeGreaterThan(0);
+
+  const headingAfter = await requireBoundingBox(heading);
+  const formAfter = await requireBoundingBox(form);
+  const firstTaskAfter = await requireBoundingBox(firstTask);
+  expect(headingAfter.y).toBeCloseTo(headingBefore.y, 1);
+  expect(formAfter.y).toBeCloseTo(formBefore.y, 1);
+  expect(firstTaskAfter.y).toBeLessThan(firstTaskBefore.y);
+
+  await textarea.focus();
+  await expect(submitButton).toBeVisible();
+  await expect(heading).toBeVisible();
+  await expect(form).toBeVisible();
+  await expect(taskList).toBeVisible();
+
+  const expandedForm = await requireBoundingBox(form);
+  const remainingList = await requireBoundingBox(taskList);
+  expect(remainingList.height).toBeGreaterThan(0);
+  expect(remainingList.y).toBeGreaterThanOrEqual(
+    expandedForm.y + expandedForm.height - 1,
+  );
+
+  await page.getByTestId("search-input").fill(`該当なし_${stamp}`);
+  await expect(page.locator("main")).toHaveCSS("overflow-y", "auto");
+}
 
 test.describe("tasks", () => {
   test.beforeAll(async ({ browser }) => {
@@ -13,7 +130,7 @@ test.describe("tasks", () => {
   });
 
   test.afterAll(async ({ browser }) => {
-    await cleanupTestList(browser, LIST_NAME);
+    await cleanupTaskList(browser, LIST_NAME);
   });
 
   test.beforeEach(async ({ page }) => {
@@ -209,6 +326,12 @@ test.describe("tasks", () => {
     ).toBeVisible({ timeout: 15000 });
   });
 
+  test("タスク一覧だけをスクロールし見出しと追加フォームを表示したままにする", async ({
+    page,
+  }) => {
+    await verifyTaskListInternalScroll(page, LIST_NAME);
+  });
+
   test("編集ダイアログでタグを追加できる", async ({ page }) => {
     const title = `タグ編集_${Date.now()}`;
     const tagName = `編集タグ_${Date.now()}`;
@@ -311,7 +434,7 @@ test.describe("tasks", () => {
     await expect(items.nth(2)).toContainText(`C_${stamp}`, { timeout: 10000 });
 
     // 後片付け: 並び替え用リストを削除
-    await cleanupTestList(page.context().browser()!, reorderListName);
+    await cleanupTaskList(page.context().browser()!, reorderListName);
   });
 
   test("編集ダイアログでテキストを変更できる", async ({ page }) => {

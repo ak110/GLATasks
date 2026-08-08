@@ -211,7 +211,7 @@
         if (prevKey !== newKey) {
             debugLog("sync", "lists-reset-cache");
             // 物理削除追従のためアクティブタスクキャッシュをundefined化し、
-            // 次のfetchで since 未指定の fullモードリクエストを走らせる。
+            // 次のfetchで since 未指定の fullモードリクエストを実行する。
             queryClient.setQueryData<ActiveTasksCache | undefined>(
                 ["activeTasks"],
                 () => undefined,
@@ -1119,9 +1119,12 @@
 
     <!-- メインコンテンツ: 選択リストのタスク or 検索結果 -->
     <main
-        class="flex-1 flex-col overflow-y-auto bg-white sm:flex dark:bg-gray-800"
+        class="flex-1 flex-col bg-white sm:flex dark:bg-gray-800"
         class:flex={mobileView === "tasks"}
         class:hidden={mobileView !== "tasks"}
+        class:min-h-0={!isSearching}
+        class:overflow-hidden={!isSearching}
+        class:overflow-y-auto={isSearching}
     >
         {#if isSearching}
             <SearchResults

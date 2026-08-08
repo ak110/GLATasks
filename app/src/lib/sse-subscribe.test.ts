@@ -201,7 +201,7 @@ describe("setupSseSubscriptions", () => {
     await vi.advanceTimersByTimeAsync(0);
     expect(fallback).toHaveBeenCalledTimes(1);
 
-    // 30秒経過で2回目のポーリングが走り、今度は成功する
+    // 30秒経過で2回目のポーリングが実行され、今度は成功する
     await vi.advanceTimersByTimeAsync(FALLBACK_POLL_INTERVAL_MS);
     expect(fallback).toHaveBeenCalledTimes(2);
 

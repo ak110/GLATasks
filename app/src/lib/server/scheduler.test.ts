@@ -207,7 +207,7 @@ describeDb("processSchedules", () => {
     createdUserIds.push(userId);
 
     // Zodバリデーション（rrulestrによる構文検証）を経ないDB直接投入を想定し、
-    // rrulestrが例外を投げる不正な文字列を1件混在させる
+    // rrulestrが例外を送出する不正な文字列を1件混在させる
     await insertSchedule({
       listId,
       rrule: "DTSTART:INVALID\nRRULE:FREQ=DAILY",

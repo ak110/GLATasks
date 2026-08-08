@@ -34,14 +34,14 @@ describe("TaskItem", () => {
   it("タスクのタイトルとチェックボックスが表示される", () => {
     render(TaskItem, {
       props: {
-        task: makeTask({ title: "買い物リストを作る" }),
+        task: makeTask({ title: "買い物リストを作成する" }),
         onToggle: vi.fn(),
         onEdit: vi.fn(),
       },
     });
 
     expect(screen.getByRole("checkbox")).toBeInTheDocument();
-    expect(screen.getByText("買い物リストを作る")).toBeInTheDocument();
+    expect(screen.getByText("買い物リストを作成する")).toBeInTheDocument();
   });
 
   it("タグが指定されているときタグバッジが表示される", () => {

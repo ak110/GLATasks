@@ -172,7 +172,7 @@ tRPCの戻り値型は`AppRouter`から推論する。
 ### svelte/no-navigation-without-resolve
 
 内部リンク用の`<a href="/...">`・`goto("/...")`は`$app/paths`の`resolve()`経由で書く。
-`<!-- svelte-ignore -->`HTMLコメントは当該ルールには効かないため、`resolve()`が使えない場合は`<button type="button" onclick>`等のbutton要素へ置換する。
+`<!-- svelte-ignore -->`HTMLコメントは当該ルールには作用しないため、`resolve()`を利用できない場合は`<button type="button" onclick>`等のbutton要素へ置換する。
 
 ## rune使用時のファイル拡張子
 
