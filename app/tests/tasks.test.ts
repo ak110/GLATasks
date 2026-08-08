@@ -43,6 +43,15 @@ async function cleanupTaskList(
 }
 
 const MINIMUM_TASK_ROWS = 18;
+const MAX_TAGS_PER_TASK = 32;
+
+function makeLongTagNames(prefix: string, stamp: number): string[] {
+  return Array.from(
+    { length: MAX_TAGS_PER_TASK },
+    (_, index) =>
+      `${prefix}_${stamp}_${index.toString().padStart(2, "0")}_${"長".repeat(12)}`,
+  );
+}
 
 async function requireBoundingBox(locator: Locator) {
   const box = await locator.boundingBox();
@@ -162,6 +171,71 @@ async function verifyAttachmentListKeepsTaskListAvailable(
     .poll(() => attachmentList.evaluate((element) => element.scrollTop))
     .toBeGreaterThan(0);
   await expect(form.locator("textarea")).toBeVisible();
+}
+
+async function addTags(input: Locator, tagNames: string[]): Promise<void> {
+  for (const tagName of tagNames) {
+    await input.fill(tagName);
+    await input.press("Enter");
+  }
+}
+
+async function verifyTagListsKeepTaskListAvailable(page: Page): Promise<void> {
+  const form = page.getByTestId("task-add-form");
+  const tagEditor = form.getByTestId("tag-editor");
+  const tagInput = tagEditor.getByTestId("tag-editor-input");
+  const taskList = page.getByTestId("task-list-scroll");
+  const stamp = Date.now();
+  const candidateTags = makeLongTagNames("候補", stamp);
+  const currentTags = makeLongTagNames("現在", stamp);
+  const candidatePrefix = `候補_${stamp}_`;
+  const currentPrefix = `現在_${stamp}_`;
+  const sourceTaskTitle = `候補タグ源_${stamp}`;
+
+  await form.locator("textarea").fill(sourceTaskTitle);
+  await addTags(tagInput, candidateTags);
+  await expect(
+    tagEditor.getByTestId("tag-editor-current").filter({
+      hasText: candidatePrefix,
+    }),
+  ).toHaveCount(MAX_TAGS_PER_TASK);
+  await form.locator('button[type="submit"]').click();
+  await expect(
+    page.getByTestId("task-item").filter({ hasText: sourceTaskTitle }),
+  ).toBeVisible({ timeout: 15000 });
+
+  await form.locator("textarea").focus();
+  await expect(
+    tagEditor.getByTestId("tag-editor-candidate").filter({
+      hasText: candidatePrefix,
+    }),
+  ).toHaveCount(MAX_TAGS_PER_TASK);
+  await addTags(tagInput, currentTags);
+  await expect(
+    tagEditor.getByTestId("tag-editor-current").filter({
+      hasText: currentPrefix,
+    }),
+  ).toHaveCount(MAX_TAGS_PER_TASK);
+
+  const currentTagsArea = tagEditor.getByTestId("tag-editor-current-list");
+  const candidateTagsArea = tagEditor.getByTestId("tag-editor-candidates-list");
+  for (const tagArea of [currentTagsArea, candidateTagsArea]) {
+    const dimensions = await tagArea.evaluate((element) => ({
+      clientHeight: element.clientHeight,
+      scrollHeight: element.scrollHeight,
+    }));
+    expect(dimensions.scrollHeight).toBeGreaterThan(dimensions.clientHeight);
+    await tagArea.evaluate((element) => {
+      element.scrollTop = element.scrollHeight;
+    });
+    await expect
+      .poll(() => tagArea.evaluate((element) => element.scrollTop))
+      .toBeGreaterThan(0);
+  }
+
+  const taskListBox = await requireBoundingBox(taskList);
+  expect(taskListBox.height).toBeGreaterThan(0);
+  await expect(tagInput).toBeVisible();
 }
 
 test.describe("tasks", () => {
@@ -374,6 +448,12 @@ test.describe("tasks", () => {
 
   test("選択済み添付が上限件数でもタスク一覧を操作できる", async ({ page }) => {
     await verifyAttachmentListKeepsTaskListAvailable(page);
+  });
+
+  test("多数の現在タグと候補があってもタスク一覧を操作できる", async ({
+    page,
+  }) => {
+    await verifyTagListsKeepTaskListAvailable(page);
   });
 
   test("編集ダイアログでタグを追加できる", async ({ page }) => {

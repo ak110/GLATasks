@@ -53,7 +53,10 @@
 
 <div class="flex flex-col gap-1.5" data-testid="tag-editor">
     {#if tags.length > 0}
-        <div class="flex flex-wrap gap-1">
+        <div
+            class="flex max-h-32 flex-wrap gap-1 overflow-y-auto"
+            data-testid="tag-editor-current-list"
+        >
             {#each tags as tag (tag.name)}
                 <span
                     class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] leading-tight {getTagColorClass(
@@ -76,22 +79,30 @@
         </div>
     {/if}
     {#if availableCandidates.length > 0}
-        <div class="flex flex-wrap items-center gap-1">
+        <div class="flex flex-col gap-1">
             <span class="text-[11px] text-gray-500 dark:text-gray-400">
                 候補:
             </span>
-            {#each availableCandidates as candidate (candidate.name)}
-                <button
-                    type="button"
-                    onclick={() => addTag(candidate.name, candidate.color)}
-                    class="inline-flex cursor-pointer items-center rounded px-1.5 py-0.5 text-[11px] leading-tight opacity-70 hover:opacity-100 {getTagColorClass(
-                        candidate.color,
-                    )}"
-                    data-testid="tag-editor-candidate"
-                >
-                    + {candidate.name}
-                </button>
-            {/each}
+            <div
+                class="max-h-32 overflow-y-auto"
+                data-testid="tag-editor-candidates-list"
+            >
+                <div class="flex flex-wrap items-center gap-1">
+                    {#each availableCandidates as candidate (candidate.name)}
+                        <button
+                            type="button"
+                            onclick={() =>
+                                addTag(candidate.name, candidate.color)}
+                            class="inline-flex cursor-pointer items-center rounded px-1.5 py-0.5 text-[11px] leading-tight opacity-70 hover:opacity-100 {getTagColorClass(
+                                candidate.color,
+                            )}"
+                            data-testid="tag-editor-candidate"
+                        >
+                            + {candidate.name}
+                        </button>
+                    {/each}
+                </div>
+            </div>
         </div>
     {/if}
     <div class="flex items-center gap-1">
