@@ -6,7 +6,7 @@
  * 不統一なパス形式（絶対パスと相対パスの混在）を解消する。
  */
 
-import type { Browser } from "@playwright/test";
+import { expect, type Browser } from "@playwright/test";
 import * as path from "node:path";
 
 /** テスト対象のベースURL */
@@ -68,17 +68,22 @@ export async function cleanupTestList(
   listName: string,
 ): Promise<void> {
   const ctx = await browser.newContext(makeContextOptions());
-  const page = await ctx.newPage();
-  await Promise.all([
-    page.goto("/"),
-    page.waitForResponse((res) => res.url().includes("/api/trpc")),
-  ]);
-  page.once("dialog", (dialog) => dialog.accept());
-  const listRow = page
-    .locator('[data-testid="list-item"]')
-    .filter({ hasText: listName });
-  await listRow.locator('[data-testid="list-menu-btn"]').click();
-  await page.click('[data-testid="list-delete-btn"]');
-  await page.waitForTimeout(1000);
-  await ctx.close();
+  try {
+    const page = await ctx.newPage();
+    await Promise.all([
+      page.goto("/"),
+      page.waitForResponse((res) => res.url().includes("/api/trpc")),
+    ]);
+    const listRow = page.getByTestId("list-item").filter({ hasText: listName });
+    await listRow.getByTestId("list-menu-btn").click();
+    await page.getByTestId("list-delete-btn").click();
+    await page
+      .getByRole("dialog")
+      .last()
+      .getByRole("button", { name: "削除", exact: true })
+      .click();
+    await expect(listRow).toHaveCount(0);
+  } finally {
+    await ctx.close();
+  }
 }

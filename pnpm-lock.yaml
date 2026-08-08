@@ -11,10 +11,11 @@ overrides:
   cookie@<0.7.0: ^0.7.0
   esbuild@<0.28.1: ^0.28.1
   fast-uri@<3.1.4: ^3.1.4
-  hono@<4.12.27: ^4.12.27
+  hono@<4.12.34: ^4.12.34
   js-yaml@<4.3.0: ^4.3.0
   linkify-it@<5.0.2: ^5.0.2
   markdown-it@<14.2.0: ^14.2.0
+  nanoid@<3.3.17: ^3.3.17
   postcss@<8.5.18: ^8.5.18
   vite@<6.4.3: ^6.4.3
 
@@ -426,7 +427,7 @@ packages:
     resolution: {integrity: sha512-eWpQYr67tqJLeaSUl0Q+TquuYfUdTibpOJlUMV2FfUP7+KqCC5TufnwnlXL6mobZBJbGAYRd7ZvEBDCbLInjhg==}
     engines: {node: '>=20'}
     peerDependencies:
-      hono: ^4.12.27
+      hono: ^4.12.34
 
   '@humanfs/core@0.19.2':
     resolution: {integrity: sha512-UhXNm+CFMWcbChXywFwkmhqjs3PRCmcSa/hfBgLIb7oQ5HNb1wS0icWsGtSAUNgefHeI+eBrA8I1fxmbHsGdvA==}
@@ -2414,8 +2415,8 @@ packages:
   hastscript@5.1.2:
     resolution: {integrity: sha512-WlztFuK+Lrvi3EggsqOkQ52rKbxkXL3RwB6t5lwoa8QLMemoWfBuL43eDrwOamJyR7uKQKdmKYaBH1NZBiIRrQ==}
 
-  hono@4.12.33:
-    resolution: {integrity: sha512-+SwvkaiJtxsiPjhy9LivY/1m7UsNqCJetM1BrZl9A5DkQhlbHQDU730mMiDPWjnoCYOM8Chf3WrCJw27kNTPFQ==}
+  hono@4.13.0:
+    resolution: {integrity: sha512-jhunvfHWxd7J5EFfSgH4xsYJzSe/lfqbUCxiyyeaQasUsXeEHXtzVid+7EOGByc5JnFa23SSFL3Y2RV/z1T+eQ==}
     engines: {node: '>=16.9.0'}
 
   hookable@5.5.3:
@@ -3199,8 +3200,8 @@ packages:
     resolution: {integrity: sha512-Tz09sEL2EEuv5fFowm419c1+a/jSMiBjI9gHxVLrVdbUkkNUUfjsVYs9pVZu5oCon/kmRh9TfLEObFtkVxmY0w==}
     engines: {node: '>=8.0.0'}
 
-  nanoid@3.3.16:
-    resolution: {integrity: sha512-bzlKTyNJ7+LdGIIwy8ijFpIqEQIvafahV7eYykJ8Cvh42EdJeODoJ6gUJXpQJvej1BddH8OqTXZNE/KfbWAu8Q==}
+  nanoid@3.3.17:
+    resolution: {integrity: sha512-xQLf0A3HOMlgHq0n247/LRuAOYmB7dXJ/DvAxGvsSBij45XtBSmQycu+F8ODbHwns/XyFZagyL1+J0Offw1E0g==}
     engines: {node: ^10 || ^12 || ^13.7 || ^14 || >=15.0.1}
     hasBin: true
 
@@ -4554,9 +4555,9 @@ snapshots:
       '@eslint/core': 1.2.1
       levn: 0.4.1
 
-  '@hono/node-server@2.0.12(hono@4.12.33)':
+  '@hono/node-server@2.0.12(hono@4.13.0)':
     dependencies:
-      hono: 4.12.33
+      hono: 4.13.0
 
   '@humanfs/core@0.19.2':
     dependencies:
@@ -4638,7 +4639,7 @@ snapshots:
 
   '@modelcontextprotocol/sdk@1.30.0(supports-color@7.2.0)(zod@4.4.3)':
     dependencies:
-      '@hono/node-server': 2.0.12(hono@4.12.33)
+      '@hono/node-server': 2.0.12(hono@4.13.0)
       ajv: 8.20.0
       ajv-formats: 3.0.1(ajv@8.20.0)
       content-type: 1.0.5
@@ -4648,7 +4649,7 @@ snapshots:
       eventsource-parser: 3.1.0
       express: 5.2.1(supports-color@7.2.0)
       express-rate-limit: 8.6.1(express@5.2.1(supports-color@7.2.0))(supports-color@7.2.0)
-      hono: 4.12.33
+      hono: 4.13.0
       jose: 6.2.6
       json-schema-typed: 8.0.2
       pkce-challenge: 5.0.1
@@ -6559,7 +6560,7 @@ snapshots:
       property-information: 5.6.0
       space-separated-tokens: 1.1.5
 
-  hono@4.12.33: {}
+  hono@4.13.0: {}
 
   hookable@5.5.3: {}
 
@@ -7429,7 +7430,7 @@ snapshots:
     dependencies:
       lru.min: 1.1.4
 
-  nanoid@3.3.16: {}
+  nanoid@3.3.17: {}
 
   natural-compare@1.4.0: {}
 
@@ -7618,7 +7619,7 @@ snapshots:
 
   postcss@8.5.25:
     dependencies:
-      nanoid: 3.3.16
+      nanoid: 3.3.17
       picocolors: 1.1.1
       source-map-js: 1.2.1
 

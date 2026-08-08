@@ -57,6 +57,11 @@ SSEイベントを受信しない状態を再現する場合は、
 
 ## UI操作
 
+ページ全体のスクロールを内部スクロールへ変更する場合など、高さ制約を変える作業では次をテスト設計時に確認する。
+
+- 可変高の子要素を列挙し、各要素の公開上限と複数要素が同時に上限へ達する組合せを検証する
+- 高さ制約の領域に隣接する主要操作が表示され、操作できることを検証する
+
 ### ダイアログ操作の規約
 
 確認・入力ダイアログは共通コンポーネント（`ConfirmDialog` / `PromptDialog`）に統一されている。
@@ -92,6 +97,10 @@ expect(copied).toBe(`${title}\n\n${notes}`);
 `viewport`のみPixel 5サイズへoverrideする構成を採用している（完全なmobile emulationではない）。
 実タッチ入力でのD&D動作確認はChrome DevToolsのデバイスエミュレーション等で手動検証する。
 
+高さ制約の回帰テストを追加または変更する前に、`playwright.config.ts`の`testMatch`と`testIgnore`を照合し、
+対象ファイルがデスクトップとモバイルのどちらで実行されるかを確認する。
+高さ制約の領域と隣接する主要操作への到達性は、デスクトップと該当するモバイルテストの双方で検証する。
+
 ## 状態依存テストのリセット
 
 ユーザー既定値（`users.preferences`等のサーバー側状態）に依存するテストは、
@@ -106,7 +115,7 @@ e2eテストでは共通ヘルパー（`app/tests/helpers/common.ts`）を利用
 
 公開シンボル一覧:
 
-- `BASE_URL` — テスト対象のベースURL（環境変数`BASE_URL`優先、既定値`https://localhost:38180`）
-- `STORAGE_STATE_PATH` — 認証状態ファイルの絶対パス（`import.meta.dirname`基準）
-- `setupTestList(browser, listName)` — `beforeAll`からテスト用リストを作成する
-- `cleanupTestList(browser, listName)` — `afterAll`からテスト用リストを削除する
+- `BASE_URL`はテスト対象のベースURL（環境変数`BASE_URL`優先、既定値`https://localhost:38180`）
+- `STORAGE_STATE_PATH`は認証状態ファイルの絶対パス（`import.meta.dirname`基準）
+- `setupTestList(browser, listName)`は`beforeAll`からテスト用リストを作成する
+- `cleanupTestList(browser, listName)`は`afterAll`からテスト用リストを削除する
