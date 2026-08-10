@@ -38,7 +38,6 @@
     "@sveltejs/vite-plugin-svelte": "^7.3.0",
     "@testing-library/jest-dom": "^7.0.0",
     "@testing-library/svelte": "^5.4.2",
-    "@types/bcryptjs": "^3.0.0",
     "@types/node": "^26.2.0",
     "@vitest/ui": "^4.1.10",
     "drizzle-kit": "^0.31.10",
