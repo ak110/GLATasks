@@ -15,7 +15,7 @@ repos:
         exclude: pnpm-lock\.yaml
       - id: detect-private-key
       - id: end-of-file-fixer
-        exclude: ^dist/.*$
+        exclude: ^dist/.*$|^app/package\.json$|(^|/)\.agents/skills$
       - id: mixed-line-ending
       - id: trailing-whitespace
         exclude: ^dist/.*$
