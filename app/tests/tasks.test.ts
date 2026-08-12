@@ -2,15 +2,62 @@
  * @fileoverview タスク CRUD の e2e テスト
  */
 
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 import { cleanupTestList, setupTestList } from "./helpers/common";
 import {
   verifyAttachmentListKeepsTaskListAvailable,
+  prepareScrollableTaskList,
+  scrollTaskListDown,
   verifyTagListsKeepTaskListAvailable,
+  verifyTaskAdditionScrollsToTop,
   verifyTaskListInternalScroll,
 } from "./helpers/task-list-scroll";
 
 const LIST_NAME = `タスクテスト_${Date.now()}`;
+
+function isTaskCreateUrl(url: string): boolean {
+  return url.includes("/api/trpc/tasks.create");
+}
+
+async function createListFromPage(page: Page, listName: string): Promise<void> {
+  await page.fill('aside input[placeholder="新しいリスト"]', listName);
+  await page.click('aside button[type="submit"]');
+  const listButton = page
+    .getByTestId("list-select-btn")
+    .filter({ hasText: listName });
+  await listButton.waitFor({ timeout: 15000 });
+  await listButton.click();
+  await expect(
+    page.getByRole("heading", { name: listName, exact: true }),
+  ).toBeVisible({ timeout: 15000 });
+  await page.getByTestId("task-add-form").waitFor({ timeout: 15000 });
+}
+
+async function holdTaskCreate(page: Page): Promise<{
+  intercepted: Promise<void>;
+  release: () => void;
+}> {
+  let notifyIntercepted!: () => void;
+  let release!: () => void;
+  const intercepted = new Promise<void>((resolve) => {
+    notifyIntercepted = resolve;
+  });
+  const released = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+
+  await page.route("**/api/trpc/**", async (route) => {
+    if (!isTaskCreateUrl(route.request().url())) {
+      await route.continue();
+      return;
+    }
+    notifyIntercepted();
+    await released;
+    await route.continue();
+  });
+
+  return { intercepted, release };
+}
 
 test.describe("tasks", () => {
   test.beforeAll(async ({ browser }) => {
@@ -218,6 +265,214 @@ test.describe("tasks", () => {
     page,
   }) => {
     await verifyTaskListInternalScroll(page, LIST_NAME);
+  });
+
+  test("タスク追加後に一覧先頭へ戻る", async ({ page }) => {
+    await verifyTaskAdditionScrollsToTop(page);
+  });
+
+  test("すべて表示でタスク追加後に一覧先頭へ戻る", async ({ page }) => {
+    await page.locator("header select").selectOption("all");
+    await verifyTaskAdditionScrollsToTop(page);
+  });
+
+  test("タスク追加に失敗した場合は一覧位置を維持する", async ({ page }) => {
+    await prepareScrollableTaskList(page);
+    await scrollTaskListDown(page);
+    const form = page.getByTestId("task-add-form");
+    const title = `追加失敗_${Date.now()}`;
+
+    await page.route("**/api/trpc/**", async (route) => {
+      if (isTaskCreateUrl(route.request().url())) {
+        await route.abort();
+      } else {
+        await route.continue();
+      }
+    });
+    try {
+      const failedRequest = page.waitForRequest((request) =>
+        isTaskCreateUrl(request.url()),
+      );
+      await form.locator("textarea").fill(title);
+      await form.locator('button[type="submit"]').click();
+      await failedRequest;
+      await expect(page.getByTestId("toast-error")).toBeVisible();
+      await expect(
+        page.getByTestId("task-item").filter({ hasText: title }),
+      ).toHaveCount(0);
+      await expect
+        .poll(() =>
+          page
+            .getByTestId("task-list-scroll")
+            .evaluate((element) => element.scrollTop),
+        )
+        .toBeGreaterThan(0);
+    } finally {
+      await page.unroute("**/api/trpc/**");
+    }
+  });
+
+  test("タスク追加完了時に別リストを表示している場合は一覧位置を維持する", async ({
+    page,
+    browser,
+  }) => {
+    const otherListName = `追加中切替_${Date.now()}`;
+    await createListFromPage(page, otherListName);
+    try {
+      await prepareScrollableTaskList(page);
+      await page
+        .getByTestId("list-select-btn")
+        .filter({ hasText: LIST_NAME })
+        .click();
+      await prepareScrollableTaskList(page);
+      await scrollTaskListDown(page);
+
+      const { intercepted, release } = await holdTaskCreate(page);
+      const createResponse = page.waitForResponse((response) =>
+        isTaskCreateUrl(response.url()),
+      );
+      const title = `切替中追加_${Date.now()}`;
+      let createStarted = false;
+      let createFinished = false;
+      try {
+        const form = page.getByTestId("task-add-form");
+        await form.locator("textarea").fill(title);
+        await form.locator('button[type="submit"]').click();
+        createStarted = true;
+        await intercepted;
+        await page
+          .getByTestId("list-select-btn")
+          .filter({ hasText: otherListName })
+          .click();
+        await scrollTaskListDown(page);
+        release();
+        await createResponse;
+        createFinished = true;
+
+        await expect(
+          page.getByTestId("task-item").filter({ hasText: title }),
+        ).toHaveCount(0);
+        await expect
+          .poll(() =>
+            page
+              .getByTestId("task-list-scroll")
+              .evaluate((element) => element.scrollTop),
+          )
+          .toBeGreaterThan(0);
+      } finally {
+        release();
+        if (createStarted && !createFinished) {
+          await createResponse.catch(() => undefined);
+        }
+        await page.unroute("**/api/trpc/**");
+      }
+    } finally {
+      await cleanupTestList(browser, otherListName);
+    }
+  });
+
+  test("タスク追加完了前に追加先リストへ戻った場合は一覧先頭へ戻る", async ({
+    page,
+    browser,
+  }) => {
+    const otherListName = `追加中往復_${Date.now()}`;
+    await createListFromPage(page, otherListName);
+    try {
+      await prepareScrollableTaskList(page);
+      await page
+        .getByTestId("list-select-btn")
+        .filter({ hasText: LIST_NAME })
+        .click();
+      await prepareScrollableTaskList(page);
+      await scrollTaskListDown(page);
+
+      const { intercepted, release } = await holdTaskCreate(page);
+      const createResponse = page.waitForResponse((response) =>
+        isTaskCreateUrl(response.url()),
+      );
+      const title = `往復中追加_${Date.now()}`;
+      let createStarted = false;
+      let createFinished = false;
+      try {
+        const form = page.getByTestId("task-add-form");
+        await form.locator("textarea").fill(title);
+        await form.locator('button[type="submit"]').click();
+        createStarted = true;
+        await intercepted;
+        await page
+          .getByTestId("list-select-btn")
+          .filter({ hasText: otherListName })
+          .click();
+        await page
+          .getByTestId("list-select-btn")
+          .filter({ hasText: LIST_NAME })
+          .click();
+        await scrollTaskListDown(page);
+        release();
+        await createResponse;
+        createFinished = true;
+
+        await expect(page.getByTestId("task-item").first()).toContainText(
+          title,
+          { timeout: 15000 },
+        );
+        await expect
+          .poll(() =>
+            page
+              .getByTestId("task-list-scroll")
+              .evaluate((element) => element.scrollTop),
+          )
+          .toBe(0);
+      } finally {
+        release();
+        if (createStarted && !createFinished) {
+          await createResponse.catch(() => undefined);
+        }
+        await page.unroute("**/api/trpc/**");
+      }
+    } finally {
+      await cleanupTestList(browser, otherListName);
+    }
+  });
+
+  test("アーカイブ表示でタスク追加した場合は一覧位置を維持する", async ({
+    page,
+  }) => {
+    await prepareScrollableTaskList(page);
+    const taskItems = page.getByTestId("task-item");
+    const taskCount = await taskItems.count();
+    for (let index = 0; index < taskCount; index++) {
+      const checkbox = taskItems.nth(index).getByRole("checkbox");
+      await checkbox.check();
+      await expect(checkbox).toBeChecked();
+    }
+    await Promise.all([
+      page.getByTitle("完了済みタスクを非表示にする").click(),
+      page.waitForResponse((response) =>
+        response.url().includes("/api/trpc/lists.clear"),
+      ),
+    ]);
+    await expect(taskItems).toHaveCount(0, { timeout: 15000 });
+
+    await page.locator("header select").selectOption("archived");
+    await expect(taskItems).toHaveCount(taskCount, { timeout: 15000 });
+    await scrollTaskListDown(page);
+
+    const title = `アーカイブ中追加_${Date.now()}`;
+    const form = page.getByTestId("task-add-form");
+    await form.locator("textarea").fill(title);
+    await Promise.all([
+      form.locator('button[type="submit"]').click(),
+      page.waitForResponse((response) => isTaskCreateUrl(response.url())),
+    ]);
+    await expect(taskItems.filter({ hasText: title })).toHaveCount(0);
+    await expect
+      .poll(() =>
+        page
+          .getByTestId("task-list-scroll")
+          .evaluate((element) => element.scrollTop),
+      )
+      .toBeGreaterThan(0);
   });
 
   test("選択済み添付が上限件数でもタスク一覧を操作できる", async ({ page }) => {

@@ -11,6 +11,7 @@ import {
 import {
   verifyAttachmentListKeepsTaskListAvailable,
   verifyTagListsKeepTaskListAvailable,
+  verifyTaskAdditionScrollsToTop,
   verifyTaskListInternalScroll,
 } from "./helpers/task-list-scroll";
 
@@ -64,6 +65,10 @@ test.describe("task list scroll", () => {
     page,
   }) => {
     await verifyTaskListInternalScroll(page, LIST_NAME);
+  });
+
+  test("タスク追加後に一覧先頭へ戻る", async ({ page }) => {
+    await verifyTaskAdditionScrollsToTop(page);
   });
 
   test("選択済み添付が上限件数でもタスク一覧を操作できる", async ({ page }) => {

@@ -25,6 +25,12 @@
         updatedTaskIds,
     }: Props = $props();
 
+    let scrollElement: HTMLDivElement | undefined;
+
+    export function scrollToTop(): void {
+        if (scrollElement) scrollElement.scrollTop = 0;
+    }
+
     // D&D 状態管理（onReorder が渡された場合のみ有効化）
     const dnd = createDragReorder(
         () => tasks,
@@ -32,7 +38,11 @@
     );
 </script>
 
-<div class="min-h-0 flex-1 overflow-y-auto" data-testid="task-list-scroll">
+<div
+    bind:this={scrollElement}
+    class="min-h-0 flex-1 overflow-y-auto"
+    data-testid="task-list-scroll"
+>
     {#if isLoading}
         <p class="p-4 text-gray-400 dark:text-gray-500">読み込み中...</p>
     {:else if tasks.length === 0}

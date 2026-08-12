@@ -22,11 +22,7 @@ async function requireBoundingBox(locator: Locator) {
   return box;
 }
 
-export async function verifyTaskListInternalScroll(
-  page: Page,
-  listName: string,
-): Promise<void> {
-  const taskList = page.getByTestId("task-list-scroll");
+export async function prepareScrollableTaskList(page: Page): Promise<void> {
   const taskItems = page.getByTestId("task-item");
   const form = page.getByTestId("task-add-form");
   const textarea = form.locator("textarea");
@@ -43,6 +39,34 @@ export async function verifyTaskListInternalScroll(
       timeout: 15000,
     });
   }
+}
+
+export async function scrollTaskListDown(page: Page): Promise<number> {
+  const taskList = page.getByTestId("task-list-scroll");
+  await taskList.evaluate((element) => {
+    element.scrollTop = Math.min(
+      160,
+      element.scrollHeight - element.clientHeight,
+    );
+  });
+  await expect
+    .poll(() => taskList.evaluate((element) => element.scrollTop))
+    .toBeGreaterThan(0);
+  return taskList.evaluate((element) => element.scrollTop);
+}
+
+export async function verifyTaskListInternalScroll(
+  page: Page,
+  listName: string,
+): Promise<void> {
+  const taskList = page.getByTestId("task-list-scroll");
+  const taskItems = page.getByTestId("task-item");
+  const form = page.getByTestId("task-add-form");
+  const textarea = form.locator("textarea");
+  const submitButton = form.locator('button[type="submit"]');
+  const stamp = Date.now();
+
+  await prepareScrollableTaskList(page);
 
   const heading = page.getByRole("heading", { name: listName, exact: true });
   const firstTask = taskItems.first();
@@ -63,15 +87,7 @@ export async function verifyTaskListInternalScroll(
   const formBefore = await requireBoundingBox(form);
   const firstTaskBefore = await requireBoundingBox(firstTask);
 
-  await taskList.evaluate((element) => {
-    element.scrollTop = Math.min(
-      160,
-      element.scrollHeight - element.clientHeight,
-    );
-  });
-  await expect
-    .poll(() => taskList.evaluate((element) => element.scrollTop))
-    .toBeGreaterThan(0);
+  await scrollTaskListDown(page);
 
   const headingAfter = await requireBoundingBox(heading);
   const formAfter = await requireBoundingBox(form);
@@ -95,6 +111,25 @@ export async function verifyTaskListInternalScroll(
 
   await page.getByTestId("search-input").fill(`該当なし_${stamp}`);
   await expect(page.locator("main")).toHaveCSS("overflow-y", "auto");
+}
+
+export async function verifyTaskAdditionScrollsToTop(
+  page: Page,
+): Promise<void> {
+  await prepareScrollableTaskList(page);
+  await scrollTaskListDown(page);
+
+  const taskList = page.getByTestId("task-list-scroll");
+  const taskItems = page.getByTestId("task-item");
+  const form = page.getByTestId("task-add-form");
+  const title = `追加後スクロール_${Date.now()}`;
+  await form.locator("textarea").fill(title);
+  await form.locator('button[type="submit"]').click();
+
+  await expect(taskItems.first()).toContainText(title, { timeout: 15000 });
+  await expect
+    .poll(() => taskList.evaluate((element) => element.scrollTop))
+    .toBe(0);
 }
 
 export async function verifyAttachmentListKeepsTaskListAvailable(

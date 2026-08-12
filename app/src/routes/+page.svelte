@@ -56,6 +56,7 @@
     let hasHash = $state(false);
     let searchQuery = $state("");
     let debouncedQuery = $state("");
+    let taskList = $state<{ scrollToTop: () => void }>();
     const mobileView = $derived(
         hasHash ? ("tasks" as const) : ("lists" as const),
     );
@@ -781,6 +782,9 @@
                 kind: data.kind,
             });
             await uploadTaskAttachments(result.taskId, data.attachments);
+            if (selectedListId === listId && showType !== "archived") {
+                taskList?.scrollToTop();
+            }
             return true;
         } catch {
             // グローバルエラーハンドラがトースト表示を担当
@@ -1150,6 +1154,7 @@
             />
 
             <TaskList
+                bind:this={taskList}
                 {tasks}
                 isLoading={tasksQuery.isLoading}
                 onToggle={toggleTask}
