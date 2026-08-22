@@ -4,7 +4,11 @@
 
 import { test, expect, type Page, type Locator } from "@playwright/test";
 import * as fs from "node:fs/promises";
-import { setupTestList, cleanupTestList } from "./helpers/common";
+import {
+  setupTestList,
+  cleanupTestList,
+  waitForPersistedTask,
+} from "./helpers/common";
 import { MAX_ATTACHMENT_BYTES } from "../src/lib/schemas";
 
 const LIST_NAME = `添付テスト_${Date.now()}`;
@@ -24,6 +28,7 @@ async function addTaskAndOpenEditDialog(
     .locator('[data-testid="task-item"]')
     .filter({ hasText: title });
   await taskRow.waitFor({ timeout: 15000 });
+  await waitForPersistedTask(taskRow);
   await taskRow.locator('[data-testid="task-edit-btn"]').dispatchEvent("click");
   await page
     .locator('[role="dialog"] input[type="file"]')

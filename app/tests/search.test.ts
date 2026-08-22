@@ -2,14 +2,23 @@
  * @fileoverview 検索表示種別と選択中リスト優先表示のe2eテスト
  */
 
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page, type Response } from "@playwright/test";
 import {
-  cleanupTestList,
-  setupTestList,
-  toggleTaskAndWaitForUpdate,
+  cleanupTestLists,
+  setupTestLists,
+  waitForPersistedTask,
 } from "./helpers/common";
 
 const STAMP = Date.now();
+
+function requireSuccessfulResponse(
+  response: Response,
+  procedure: string,
+): void {
+  if (!response.ok()) {
+    throw new Error(`${procedure}がHTTP ${response.status()}で失敗した`);
+  }
+}
 
 async function selectList(page: Page, listName: string): Promise<void> {
   await page
@@ -22,26 +31,36 @@ async function selectList(page: Page, listName: string): Promise<void> {
 async function addTask(page: Page, title: string): Promise<void> {
   const form = page.getByTestId("task-add-form");
   await form.locator("textarea").fill(title);
+  const responsePromise = page.waitForResponse((response) =>
+    response.url().includes("/api/trpc/tasks.create"),
+  );
   await form.locator('button[type="submit"]').click();
-  await expect(
-    page.getByTestId("task-item").filter({ hasText: title }),
-  ).toBeVisible({
-    timeout: 15000,
-  });
+  const response = await responsePromise;
+  requireSuccessfulResponse(response, "tasks.create");
+  const row = page.getByTestId("task-item").filter({ hasText: title });
+  await expect(row).toBeVisible({ timeout: 15000 });
+  await waitForPersistedTask(row);
 }
 
 async function archiveMatchingTasks(page: Page, title: string): Promise<void> {
   const row = page.getByTestId("task-item").filter({ hasText: title });
-  const checkbox = row.getByRole("checkbox");
-  await toggleTaskAndWaitForUpdate(page, checkbox);
-  await toggleTaskAndWaitForUpdate(page, checkbox);
-  await expect(checkbox).toBeChecked();
-  await Promise.all([
-    page.getByTitle("完了済みタスクを非表示にする").click(),
+  await row.getByTestId("task-edit-btn").click();
+  const dialog = page.getByRole("dialog").last();
+  await dialog.getByRole("checkbox", { name: "完了" }).check();
+  const updateResponsePromise = page.waitForResponse((response) =>
+    response.url().includes("/api/trpc/tasks.update"),
+  );
+  await dialog.getByRole("button", { name: "保存して閉じる" }).click();
+  const updateResponse = await updateResponsePromise;
+  requireSuccessfulResponse(updateResponse, "tasks.update");
+  await expect(row.getByRole("checkbox")).toBeChecked();
+  const [clearResponse] = await Promise.all([
     page.waitForResponse((response) =>
       response.url().includes("/api/trpc/lists.clear"),
     ),
+    page.getByTitle("完了済みタスクを非表示にする").click(),
   ]);
+  requireSuccessfulResponse(clearResponse, "lists.clear");
   await expect(row).toHaveCount(0, { timeout: 15000 });
 }
 
@@ -59,8 +78,7 @@ test("検索の表示種別と選択リスト優先表示が反映される", as
   const archivedTask = `${keyword}_B1`;
   const archivedArchivedTask = `${keyword}_B2`;
 
-  await setupTestList(browser, activeListName);
-  await setupTestList(browser, archivedListName);
+  await setupTestLists(browser, [activeListName, archivedListName]);
   let archivedList = false;
 
   try {
@@ -83,16 +101,17 @@ test("検索の表示種別と選択リスト優先表示が反映される", as
       .filter({ hasText: archivedListName });
     await archivedRow.getByTestId("list-menu-btn").click();
     await archivedRow.getByText("アーカイブ", { exact: true }).click();
-    await Promise.all([
+    const [archiveResponse] = await Promise.all([
+      page.waitForResponse((response) =>
+        response.url().includes("/api/trpc/lists.archive"),
+      ),
       page
         .getByRole("dialog")
         .last()
         .getByRole("button", { name: "アーカイブ", exact: true })
         .click(),
-      page.waitForResponse((response) =>
-        response.url().includes("/api/trpc/lists.archive"),
-      ),
     ]);
+    requireSuccessfulResponse(archiveResponse, "lists.archive");
     archivedList = true;
 
     await selectList(page, activeListName);
@@ -166,9 +185,14 @@ test("検索の表示種別と選択リスト優先表示が反映される", as
         .getByTestId("list-item")
         .filter({ hasText: archivedListName });
       await archivedRow.getByTestId("list-menu-btn").click();
-      await archivedRow.getByText("アーカイブ解除", { exact: true }).click();
+      const [unarchiveResponse] = await Promise.all([
+        page.waitForResponse((response) =>
+          response.url().includes("/api/trpc/lists.unarchive"),
+        ),
+        archivedRow.getByText("アーカイブ解除", { exact: true }).click(),
+      ]);
+      requireSuccessfulResponse(unarchiveResponse, "lists.unarchive");
     }
-    await cleanupTestList(browser, activeListName);
-    await cleanupTestList(browser, archivedListName);
+    await cleanupTestLists(browser, [activeListName, archivedListName]);
   }
 });

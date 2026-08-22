@@ -11,6 +11,7 @@ import {
   type Browser,
   type Locator,
   type Page,
+  type Response,
 } from "@playwright/test";
 import * as path from "node:path";
 
@@ -32,20 +33,54 @@ export const STORAGE_STATE_PATH = path.join(
 );
 
 /** タスク更新mutationの応答を待つ */
-export function waitForTaskUpdateResponse(page: Page) {
+export function waitForTaskUpdateResponse(page: Page): Promise<Response> {
   return page.waitForResponse((response) =>
     response.url().includes("/api/trpc/tasks.update"),
   );
 }
 
-/** タスク状態を1段階進め、更新完了後に返る */
+/** 楽観追加されたタスクが実IDへ置き換わるまで待つ */
+export async function waitForPersistedTask(taskRow: Locator): Promise<void> {
+  await expect
+    .poll(async () => Number(await taskRow.getAttribute("data-reorder-id")))
+    .toBeGreaterThan(0);
+}
+
+/** タスク状態を1段階進め、成功応答と画面状態の反映後に返る */
 export async function toggleTaskAndWaitForUpdate(
   page: Page,
   checkbox: Locator,
 ): Promise<void> {
-  const response = waitForTaskUpdateResponse(page);
+  const taskRow = checkbox.locator("..");
+  await waitForPersistedTask(taskRow);
+
+  const wasChecked = await checkbox.isChecked();
+  const wasRunning = await checkbox.evaluate(
+    (element: HTMLInputElement) => element.indeterminate,
+  );
+  const wasArchived = await taskRow.evaluate((element) =>
+    element.classList.contains("opacity-50"),
+  );
+  const responsePromise = waitForTaskUpdateResponse(page);
   await checkbox.dispatchEvent("click");
-  await response;
+  const response = await responsePromise;
+  if (!response.ok()) {
+    throw new Error(`tasks.updateがHTTP ${response.status()}で失敗した`);
+  }
+
+  const taskText = taskRow.getByTestId("task-text");
+  if (wasChecked) {
+    await expect(checkbox).not.toBeChecked();
+    await expect(checkbox).toHaveJSProperty("indeterminate", false);
+    await expect(taskText).not.toHaveClass(/line-through/);
+  } else if (wasRunning || wasArchived) {
+    await expect(checkbox).toBeChecked();
+    await expect(taskText).toHaveClass(/line-through/);
+  } else {
+    await expect(checkbox).not.toBeChecked();
+    await expect(checkbox).toHaveJSProperty("indeterminate", true);
+    await expect(taskText).not.toHaveClass(/line-through/);
+  }
 }
 
 /** テスト用リストを作成するための共通コンテキストオプション */
@@ -66,18 +101,32 @@ export async function setupTestList(
   browser: Browser,
   listName: string,
 ): Promise<void> {
+  await setupTestLists(browser, [listName]);
+}
+
+/** 1つのコンテキストで複数のテスト用リストを作成する */
+export async function setupTestLists(
+  browser: Browser,
+  listNames: readonly string[],
+): Promise<void> {
+  if (listNames.length === 0) return;
   const ctx = await browser.newContext(makeContextOptions());
-  const page = await ctx.newPage();
-  await Promise.all([
-    page.goto("/"),
-    page.waitForResponse((res) => res.url().includes("/api/trpc")),
-  ]);
-  await page.fill('aside input[placeholder="新しいリスト"]', listName);
-  await page.click('aside button[type="submit"]');
-  await page
-    .locator(`[data-testid="list-select-btn"]:has-text("${listName}")`)
-    .waitFor({ timeout: 15000 });
-  await ctx.close();
+  try {
+    const page = await ctx.newPage();
+    await Promise.all([
+      page.goto("/"),
+      page.waitForResponse((res) => res.url().includes("/api/trpc")),
+    ]);
+    for (const listName of listNames) {
+      await page.fill('aside input[placeholder="新しいリスト"]', listName);
+      await page.click('aside button[type="submit"]');
+      await page
+        .locator(`[data-testid="list-select-btn"]:has-text("${listName}")`)
+        .waitFor({ timeout: 15000 });
+    }
+  } finally {
+    await ctx.close();
+  }
 }
 
 /**
@@ -89,6 +138,15 @@ export async function cleanupTestList(
   browser: Browser,
   listName: string,
 ): Promise<void> {
+  await cleanupTestLists(browser, [listName]);
+}
+
+/** 1つのコンテキストで複数のテスト用リストを削除する */
+export async function cleanupTestLists(
+  browser: Browser,
+  listNames: readonly string[],
+): Promise<void> {
+  if (listNames.length === 0) return;
   const ctx = await browser.newContext(makeContextOptions());
   try {
     const page = await ctx.newPage();
@@ -96,15 +154,19 @@ export async function cleanupTestList(
       page.goto("/"),
       page.waitForResponse((res) => res.url().includes("/api/trpc")),
     ]);
-    const listRow = page.getByTestId("list-item").filter({ hasText: listName });
-    await listRow.getByTestId("list-menu-btn").click();
-    await page.getByTestId("list-delete-btn").click();
-    await page
-      .getByRole("dialog")
-      .last()
-      .getByRole("button", { name: "削除", exact: true })
-      .click();
-    await expect(listRow).toHaveCount(0);
+    for (const listName of listNames) {
+      const listRow = page
+        .getByTestId("list-item")
+        .filter({ hasText: listName });
+      await listRow.getByTestId("list-menu-btn").click();
+      await page.getByTestId("list-delete-btn").click();
+      await page
+        .getByRole("dialog")
+        .last()
+        .getByRole("button", { name: "削除", exact: true })
+        .click();
+      await expect(listRow).toHaveCount(0);
+    }
   } finally {
     await ctx.close();
   }

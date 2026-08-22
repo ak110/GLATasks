@@ -117,5 +117,8 @@ e2eテストでは共通ヘルパー（`app/tests/helpers/common.ts`）を利用
 
 - `BASE_URL`はテスト対象のベースURL（環境変数`BASE_URL`優先、既定値`https://localhost:38180`）
 - `STORAGE_STATE_PATH`は認証状態ファイルの絶対パス（`import.meta.dirname`基準）
+- `waitForPersistedTask(taskRow)`は楽観追加されたタスクが実IDへ置き換わるまで待つ
 - `setupTestList(browser, listName)`は`beforeAll`からテスト用リストを作成する
+- `setupTestLists(browser, listNames)`は1つのブラウザーコンテキストで複数のテスト用リストを作成する
 - `cleanupTestList(browser, listName)`は`afterAll`からテスト用リストを削除する
+- `cleanupTestLists(browser, listNames)`は1つのブラウザーコンテキストで複数のテスト用リストを削除する

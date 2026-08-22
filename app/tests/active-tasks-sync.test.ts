@@ -274,7 +274,10 @@ test.describe("activeTasks 差分sync・楽観的更新", () => {
       await expect(
         taskRow.locator('[data-testid="task-text"].line-through'),
       ).toBeVisible({ timeout: 500 });
-      await updateResponse;
+      const response = await updateResponse;
+      if (!response.ok()) {
+        throw new Error(`tasks.updateがHTTP ${response.status()}で失敗した`);
+      }
 
       // 遅延ルートを解除する
       await ctx.unroute("**/api/trpc/**");

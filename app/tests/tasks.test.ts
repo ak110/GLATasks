@@ -7,6 +7,7 @@ import {
   cleanupTestList,
   setupTestList,
   toggleTaskAndWaitForUpdate,
+  waitForPersistedTask,
 } from "./helpers/common";
 import {
   verifyAttachmentListKeepsTaskListAvailable,
@@ -564,6 +565,7 @@ test.describe("tasks", () => {
       .locator('[data-testid="task-item"]')
       .filter({ hasText: title });
     await taskRow.waitFor({ timeout: 15000 });
+    await waitForPersistedTask(taskRow);
     await taskRow
       .locator('[data-testid="task-edit-btn"]')
       .dispatchEvent("click");
@@ -668,7 +670,7 @@ test.describe("tasks", () => {
       .locator('[data-testid="task-item"]')
       .filter({ hasText: original });
     await taskRow.waitFor({ timeout: 15000 });
-    await page.waitForTimeout(500);
+    await waitForPersistedTask(taskRow);
     await taskRow
       .locator('[data-testid="task-edit-btn"]')
       .dispatchEvent("click");
