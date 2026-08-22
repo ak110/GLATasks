@@ -20,7 +20,6 @@
     import type { TaskStatus, TaskKind } from "$lib/schemas";
     import type {
         TagInfo,
-        SearchTaskResult,
         TaskListItem,
         GetActiveTasksResult,
         GetTasksResult,
@@ -32,6 +31,7 @@
         type ActiveTasksCache,
     } from "$lib/task-cache";
     import { splitTitle, splitNotes } from "$lib/text-split";
+    import { groupSearchResultsByList } from "$lib/search-grouping";
     import { compareTagName } from "$lib/tag-sort";
     import Header from "$lib/components/layout/Header.svelte";
     import ListSidebar from "$lib/components/lists/ListSidebar.svelte";
@@ -179,10 +179,11 @@
     // 全文検索クエリ
     const searchResultsQuery = createQuery<RouterOutputs["tasks"]["search"]>(
         () => ({
-            queryKey: ["search", debouncedQuery] as const,
+            queryKey: ["search", debouncedQuery, showType] as const,
             queryFn: () =>
                 trpc.tasks.search.query({
                     query: debouncedQuery,
+                    showType,
                 }),
             enabled: debouncedQuery.length > 0,
         }),
@@ -639,19 +640,7 @@
     const searchResults = $derived(searchResultsQuery.data ?? []);
     // 検索結果をリスト名でグループ化
     const searchResultsByList = $derived.by(() => {
-        const map = new SvelteMap<
-            number,
-            { title: string; tasks: SearchTaskResult[] }
-        >();
-        for (const task of searchResults) {
-            let group = map.get(task.listId);
-            if (!group) {
-                group = { title: task.listTitle, tasks: [] };
-                map.set(task.listId, group);
-            }
-            group.tasks.push(task);
-        }
-        return map;
+        return groupSearchResultsByList(searchResults, selectedListId);
     });
 
     // URLハッシュからリストIDを解析
@@ -804,11 +793,12 @@
         if (files.length > 0) handleAttachmentChange();
     }
 
-    async function toggleTask(taskId: number, checked: boolean) {
+    async function toggleTask(taskId: number, nextStatus: TaskStatus) {
         if (!selectedListId) return;
-        const taskData = checked
-            ? { status: "completed" as const }
-            : { status: "active" as const, completed: null };
+        const taskData =
+            nextStatus === "completed"
+                ? { status: "completed" as const }
+                : { status: nextStatus, completed: null };
         try {
             await updateTaskMutation.mutateAsync({
                 listId: selectedListId,

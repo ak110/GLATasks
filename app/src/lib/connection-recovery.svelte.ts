@@ -32,13 +32,7 @@
  */
 
 import { debugLog } from "./debug-log";
-
-// ポーリング周期（ms）。判定基盤の `/healthcheck` は認証もDBアクセスも持たず軽量で、
-// サーバー側 SSE heartbeat 周期30秒と同等の負荷に収まるため、同等の30秒間隔とする。
-const POLL_INTERVAL_MS = 30_000;
-
-// 能動チェックの応答待ちタイムアウト（ms）。キャプティブポータルの応答遅延で検出が止まらないようにする。
-const HEALTHCHECK_TIMEOUT_MS = 5_000;
+import { isHealthy, startConnectivityTriggers } from "./connectivity-check.js";
 
 const state = $state({
   pendingReload: false,
@@ -47,9 +41,7 @@ const state = $state({
 /** バナー側から購読するリアクティブ状態 */
 export const connectivityState = state;
 
-let pollTimer: ReturnType<typeof setInterval> | null = null;
-let visibilityHandler: (() => void) | null = null;
-let onlineHandler: (() => void) | null = null;
+let stopTriggers: (() => void) | null = null;
 let watching = false;
 // 複数トリガーがほぼ同時に発火しうるため、能動チェックの重複起動を防ぐ
 let checking = false;
@@ -58,30 +50,17 @@ let checking = false;
 export function startConnectivityWatch(): void {
   if (watching) return;
   watching = true;
-  visibilityHandler = handleVisibilityChange;
-  onlineHandler = () => {
+  stopTriggers = startConnectivityTriggers(() => {
     void checkConnectivity();
-  };
-  document.addEventListener("visibilitychange", visibilityHandler);
-  window.addEventListener("online", onlineHandler);
-  if (document.visibilityState !== "hidden") {
-    startPolling();
-  }
+  });
 }
 
 /** 能動検出監視を停止する（多重停止はno-op） */
 export function stopConnectivityWatch(): void {
   if (!watching) return;
   watching = false;
-  stopPolling();
-  if (visibilityHandler) {
-    document.removeEventListener("visibilitychange", visibilityHandler);
-    visibilityHandler = null;
-  }
-  if (onlineHandler) {
-    window.removeEventListener("online", onlineHandler);
-    onlineHandler = null;
-  }
+  stopTriggers?.();
+  stopTriggers = null;
 }
 
 /**
@@ -106,51 +85,6 @@ export async function checkConnectivity(
     }
   } finally {
     checking = false;
-  }
-}
-
-// 非表示中はポーリングを停止し、可視復帰時はポーリングを再開して即時チェックする（無駄な通信を抑える）
-function handleVisibilityChange(): void {
-  if (document.visibilityState === "hidden") {
-    stopPolling();
-  } else {
-    startPolling();
-    void checkConnectivity();
-  }
-}
-
-function startPolling(): void {
-  if (pollTimer) return;
-  pollTimer = setInterval(() => {
-    void checkConnectivity();
-  }, POLL_INTERVAL_MS);
-}
-
-function stopPolling(): void {
-  if (pollTimer) {
-    clearInterval(pollTimer);
-    pollTimer = null;
-  }
-}
-
-/**
- * `/healthcheck` の応答が健全条件を満たすか判定する。
- *
- * タイムアウト・ネットワークエラー・JSON解析失敗はすべて不健全とみなす。
- */
-async function isHealthy(fetchFn: typeof fetch): Promise<boolean> {
-  try {
-    const res = await fetchFn("/healthcheck", {
-      cache: "no-store",
-      signal: AbortSignal.timeout(HEALTHCHECK_TIMEOUT_MS),
-    });
-    if (res.status !== 200) return false;
-    const contentType = res.headers.get("Content-Type") ?? "";
-    if (!contentType.includes("application/json")) return false;
-    const body = (await res.json()) as { status?: unknown };
-    return body.status === "ok";
-  } catch {
-    return false;
   }
 }
 

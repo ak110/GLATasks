@@ -58,37 +58,15 @@ describe("connection-recovery", () => {
     document.body.innerHTML = "";
   });
 
-  // 同値分割: 3点判定の健全条件と各失敗条件。
-  // 非入力中のため、不健全なら即時 reload、健全なら何もしない。
+  // 接続判定の詳細な同値分割は connectivity-check.dom.test.ts が担う。
+  // ここでは接続回復誘導の健全・不健全分岐だけを検証する。
   it.each([
     {
       label: "健全（200・JSON・ok）",
       fetch: makeFetch({}),
       expectReload: false,
     },
-    {
-      label: "非200",
-      fetch: makeFetch({ status: 503 }),
-      expectReload: true,
-    },
-    {
-      label: "非JSON（キャプティブポータルのHTML応答）",
-      fetch: makeFetch({
-        contentType: "text/html",
-        body: "<html>login</html>",
-      }),
-      expectReload: true,
-    },
-    {
-      label: "status 値が非ok",
-      fetch: makeFetch({ body: '{"status":"error"}' }),
-      expectReload: true,
-    },
-    {
-      label: "fetch 例外（ネットワークエラー・タイムアウト相当）",
-      fetch: makeFetch({ reject: true }),
-      expectReload: true,
-    },
+    { label: "不健全", fetch: makeFetch({ status: 503 }), expectReload: true },
   ])(
     "非入力中 checkConnectivity: $label → reload=$expectReload",
     async ({ fetch, expectReload }) => {

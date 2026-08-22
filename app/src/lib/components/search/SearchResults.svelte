@@ -77,14 +77,17 @@
         {#each group.tasks as task (task.id)}
             <div
                 class="flex items-start gap-3 border-b border-gray-200 px-3 py-3 hover:bg-gray-50 sm:px-5 dark:border-gray-700 dark:hover:bg-gray-700"
+                class:opacity-50={task.status === "archived"}
             >
                 <div class="min-w-0 flex-1 wrap-break-word break-all">
                     {#if !task.title && task.notes}
                         <!-- タイトルなし: notes を主表示として折りたたみ -->
                         <button
-                            class="cursor-pointer text-left leading-tight hover:text-blue-600 dark:text-gray-100 dark:hover:text-blue-400"
+                            class="cursor-pointer text-left leading-tight {task.status ===
+                                'completed' || task.status === 'running'
+                                ? 'text-gray-400 dark:text-gray-500'
+                                : 'dark:text-gray-100'} hover:text-blue-600 dark:hover:text-blue-400"
                             class:line-through={task.status === "completed"}
-                            class:text-gray-400={task.status === "completed"}
                             class:line-clamp-5={!expandedNotes.has(task.id)}
                             onclick={() => onGoToResult(listId)}
                             use:clampDetector={makeClampCallback(task.id)}
@@ -94,9 +97,11 @@
                         </button>
                     {:else}
                         <button
-                            class="cursor-pointer text-left leading-tight hover:text-blue-600 dark:text-gray-100 dark:hover:text-blue-400"
+                            class="cursor-pointer text-left leading-tight {task.status ===
+                                'completed' || task.status === 'running'
+                                ? 'text-gray-400 dark:text-gray-500'
+                                : 'dark:text-gray-100'} hover:text-blue-600 dark:hover:text-blue-400"
                             class:line-through={task.status === "completed"}
-                            class:text-gray-400={task.status === "completed"}
                             onclick={() => onGoToResult(listId)}
                         >
                             <!-- eslint-disable-next-line svelte/no-at-html-tags -- linkify()が自前でHTMLエスケープ済み -->

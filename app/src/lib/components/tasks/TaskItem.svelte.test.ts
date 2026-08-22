@@ -5,7 +5,7 @@
  * 表示されることを確認する。
  */
 
-import { render, screen } from "@testing-library/svelte";
+import { fireEvent, render, screen } from "@testing-library/svelte";
 import { describe, expect, it, vi } from "vitest";
 
 import type { TaskListItem } from "$lib/types";
@@ -93,6 +93,37 @@ describe("TaskItem", () => {
     });
 
     expect(screen.getByRole("checkbox")).toBeChecked();
+  });
+
+  it("running 状態は indeterminate で灰色表示になる", () => {
+    render(TaskItem, {
+      props: {
+        task: makeTask({ status: "running" }),
+        onToggle: vi.fn(),
+        onEdit: vi.fn(),
+      },
+    });
+
+    const checkbox = screen.getByRole("checkbox");
+    expect(checkbox).toHaveProperty("indeterminate", true);
+    expect(checkbox).not.toBeChecked();
+    const taskText = screen.getByTestId("task-text");
+    expect(taskText).not.toHaveClass("line-through");
+    expect(screen.getByText("テストタスク")).toHaveClass("text-gray-400");
+  });
+
+  it("active 状態のチェック操作は running へ遷移させる", async () => {
+    const onToggle = vi.fn();
+    render(TaskItem, {
+      props: {
+        task: makeTask(),
+        onToggle,
+        onEdit: vi.fn(),
+      },
+    });
+
+    await fireEvent.click(screen.getByRole("checkbox"));
+    expect(onToggle).toHaveBeenCalledWith(1, "running");
   });
 
   it("編集ボタンが表示される", () => {

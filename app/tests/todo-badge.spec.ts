@@ -66,6 +66,7 @@ test.describe("todo-badge", () => {
       .locator('[data-testid="task-item"]')
       .filter({ hasText: title });
     await taskRow.locator('input[type="checkbox"]').dispatchEvent("click");
+    await taskRow.locator('input[type="checkbox"]').dispatchEvent("click");
     await expect(badgeLocator(page)).not.toBeVisible({ timeout: 15000 });
   });
 
@@ -77,6 +78,7 @@ test.describe("todo-badge", () => {
     const taskRow = page
       .locator('[data-testid="task-item"]')
       .filter({ hasText: title });
+    await taskRow.locator('input[type="checkbox"]').dispatchEvent("click");
     await taskRow.locator('input[type="checkbox"]').dispatchEvent("click");
     await expect(badgeLocator(page)).not.toBeVisible({ timeout: 15000 });
 

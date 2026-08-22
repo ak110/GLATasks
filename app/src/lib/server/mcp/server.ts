@@ -239,11 +239,16 @@ export function createMcpServer(): McpServer {
   server.registerTool(
     "tasks.search",
     {
-      description: "全タスクを全文検索する（query は1～255文字）",
+      description:
+        "全タスクを全文検索する（query は1～255文字、showType の既定値は active）",
       inputSchema: SearchTasksSchema,
     },
     async (input, { authInfo }) => {
-      const result = await api.searchTasks(getUserId(authInfo), input.query);
+      const result = await api.searchTasks(
+        getUserId(authInfo),
+        input.query,
+        input.showType,
+      );
       return jsonResult(result);
     },
   );

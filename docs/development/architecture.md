@@ -106,6 +106,11 @@ sequenceDiagram
   SSE不健全遷移・操作失敗を前倒しトリガーとする。
   不健全検知時は、非入力中なら即時リロードして認証画面への遷移を促し、
   入力中ならバナーで案内し回復検知時に自動解除する
+- 接続判定と検出トリガーの正本は`app/src/lib/connectivity-check.js`である。アプリ本体の
+  `connection-recovery.svelte.ts`とService Workerが返すオフライン画面
+  （`app/src/routes/offline.html/+server.ts`）が同じモジュールを使う。オフライン画面は、
+  オフライン時に追加のスクリプトを取得できずキャッシュ対象を増やせないため、Viteの`?raw`で
+  共有モジュールをインライン展開する
 
 ## タイマー時刻同期
 
@@ -215,6 +220,9 @@ const withApiErrors = t.middleware(async ({ next }) => {
 ## DB 設計方針
 
 テーブル定義は `app/src/lib/server/schema.ts` を参照。以下はコードから読み取りにくい設計判断:
+
+- `task.status`は`active`・`running`・`completed`・`archived`の4値を取り得る。
+  `running`は未完了としてTODOバッジへ計上し、`lists.clear`（完了済みタスクの非表示）の対象外とする
 
 - 日時カラムはすべてTIMESTAMP型でUTC保存。タイムゾーン変換はクライアント側で行い、
   サーバー・DB層ではタイムゾーンを意識しない設計。

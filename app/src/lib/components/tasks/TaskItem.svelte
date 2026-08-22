@@ -3,7 +3,9 @@
      * @fileoverview タスクアイテム（チェックボックス + テキスト表示 + 編集・コピーボタン）
      */
 
+    import type { TaskStatus } from "$lib/schemas";
     import type { TaskListItem } from "$lib/types";
+    import { nextTaskStatus } from "$lib/task-status";
     import { linkify } from "$lib/linkify";
     import { getTagColorClass } from "$lib/tag-palette";
     import { downloadAttachment } from "$lib/attachment-download";
@@ -15,7 +17,7 @@
 
     type Props = {
         task: TaskListItem;
-        onToggle: (taskId: number, checked: boolean) => void;
+        onToggle: (taskId: number, nextStatus: TaskStatus) => void;
         onEdit: (task: TaskListItem) => void;
         isDragging?: boolean;
         isRemoteUpdated?: boolean;
@@ -39,6 +41,22 @@
     let notesClamped = $state(false);
     let notesEl: HTMLParagraphElement | undefined = $state();
     let copyMenuEl: HTMLDivElement | undefined = $state();
+    const isCompleted = $derived(task.status === "completed");
+    const isRunning = $derived(task.status === "running");
+    const isDimmed = $derived(isCompleted || isRunning);
+    const titleColorClass = $derived(
+        isDimmed ? "text-gray-400 dark:text-gray-500" : "dark:text-gray-100",
+    );
+    const notesColorClass = $derived(
+        isDimmed
+            ? "text-gray-400 dark:text-gray-500"
+            : "text-gray-500 dark:text-gray-400",
+    );
+    const emptyTaskColorClass = $derived(
+        isDimmed
+            ? "text-gray-400 dark:text-gray-500"
+            : "text-gray-400 dark:text-gray-500",
+    );
 
     // notesが実際にクランプされているか検知
     $effect(() => {
@@ -88,6 +106,14 @@
         copyText(task.notes);
     }
 
+    function handleToggle(event: Event) {
+        const nextStatus = nextTaskStatus(task.status);
+        const checkbox = event.currentTarget as HTMLInputElement;
+        checkbox.checked = nextStatus === "completed";
+        checkbox.indeterminate = nextStatus === "running";
+        onToggle(task.id, nextStatus);
+    }
+
     async function handleDownloadClick(attachmentId: number) {
         try {
             await downloadAttachment(attachmentId);
@@ -130,13 +156,14 @@
 >
     <input
         type="checkbox"
-        checked={task.status === "completed"}
-        onchange={(e) => onToggle(task.id, e.currentTarget.checked)}
+        checked={isCompleted}
+        indeterminate={isRunning}
+        onchange={handleToggle}
         class="mt-1 size-4 cursor-pointer"
     />
     <div
         class="min-w-0 flex-1 wrap-break-word break-all"
-        class:line-through={task.status === "completed"}
+        class:line-through={isCompleted}
         data-testid="task-text"
     >
         {#if task.kind === "todo"}
@@ -148,11 +175,7 @@
             </span>
         {/if}
         {#if task.title}
-            <p
-                class="leading-tight {task.status === 'completed'
-                    ? 'text-gray-400 dark:text-gray-500'
-                    : 'dark:text-gray-100'}"
-            >
+            <p class="leading-tight {titleColorClass}">
                 <!-- eslint-disable-next-line svelte/no-at-html-tags -- linkify()が自前でHTMLエスケープ済み -->
                 {@html linkify(task.title)}
             </p>
@@ -160,9 +183,7 @@
         {#if task.notes}
             <p
                 bind:this={notesEl}
-                class="mt-0.5 whitespace-pre-wrap {task.status === 'completed'
-                    ? 'text-gray-400 dark:text-gray-500'
-                    : 'text-gray-500 dark:text-gray-400'}"
+                class="mt-0.5 whitespace-pre-wrap {notesColorClass}"
                 class:line-clamp-5={!notesExpanded}
             >
                 <!-- eslint-disable-next-line svelte/no-at-html-tags -- linkify()が自前でHTMLエスケープ済み -->
@@ -170,9 +191,7 @@
             </p>
         {/if}
         {#if !task.title && !task.notes}
-            <p class="leading-tight text-gray-400 dark:text-gray-500">
-                （空のタスク）
-            </p>
+            <p class="leading-tight {emptyTaskColorClass}">（空のタスク）</p>
         {/if}
         {#if task.attachments.length > 0 || task.tags.length > 0}
             <div class="mt-1 flex flex-wrap items-center gap-1">

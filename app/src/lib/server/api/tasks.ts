@@ -5,7 +5,7 @@
 import { and, asc, eq, gte, inArray, like, min, ne } from "drizzle-orm";
 import type { z } from "zod";
 
-import type { UpdateTaskSchema } from "$lib/schemas";
+import type { ShowType, UpdateTaskSchema } from "$lib/schemas";
 import type {
   TagInfo,
   TaskInfo,
@@ -207,7 +207,7 @@ export async function postTask(
  *
  * data のキーに応じて以下の更新パターンを処理する:
  * - text: テキスト変更 + keep_order=false なら先頭移動
- * - status: ステータス変更（active→completed 時に completed 日時を自動セット）
+ * - status: ステータス変更（未完了状態から completed への変更時に completed 日時を自動セット）
  * - completed: 完了日時の明示的な上書き（null でクリア）
  * - move_to: 別リストへの移動（移動先リストの先頭に配置）
  *
@@ -248,7 +248,7 @@ export async function patchTask(
     updates.updated = new Date();
   }
   if (data.status !== undefined) {
-    if (task.status === "active" && data.status === "completed") {
+    if (task.status !== "completed" && data.status === "completed") {
       updates.completed = new Date();
     }
     updates.status = data.status;
@@ -296,13 +296,18 @@ export async function patchTask(
 export async function searchTasks(
   userId: number,
   query: string,
+  showType: ShowType,
 ): Promise<SearchTaskResult[]> {
   const db = getDb();
-  // ユーザーの active リストを取得
+  // active 表示では active リストだけ、それ以外ではユーザーの全リストを対象にする
   const userLists = await db
     .select()
     .from(lists)
-    .where(and(eq(lists.user_id, userId), eq(lists.status, "active")));
+    .where(
+      showType === "active"
+        ? and(eq(lists.user_id, userId), eq(lists.status, "active"))
+        : eq(lists.user_id, userId),
+    );
   if (userLists.length === 0) return [];
 
   // LIKE 用にワイルドカードをエスケープ
@@ -318,7 +323,11 @@ export async function searchTasks(
 
   // listId → title のマップ
   const listMap = new Map(userLists.map((l) => [l.id, l.title]));
-  const matchedTasks = rows.filter((t) => t.status !== "archived");
+  const matchedTasks = rows.filter((t) => {
+    if (showType === "active") return t.status !== "archived";
+    if (showType === "archived") return t.status === "archived";
+    return true;
+  });
   const attachmentsByTask = await listAttachmentsForTasks(
     matchedTasks.map((t) => t.id),
   );

@@ -268,7 +268,8 @@ export async function verifyTagListsKeepTaskListAvailable(
   expect(taskListBox.height).toBeGreaterThan(0);
   if (includeMaximumAttachments) {
     const checkbox = taskList.getByRole("checkbox").first();
-    await checkbox.check();
+    await checkbox.dispatchEvent("click");
+    await checkbox.dispatchEvent("click");
     await expect(checkbox).toBeChecked();
   }
   await expect(tagInput).toBeVisible();

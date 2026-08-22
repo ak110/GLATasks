@@ -9,10 +9,12 @@ description: >-
   GLATasks に新しい tRPC procedure を追加するとき、
   または既存ドメインのスキーマへフィールドを追加するとき、
   もしくは既存 tRPC procedure を新規箇所（新規UIコンポーネント・新規ライブラリ関数など）から呼び出すときの定型チェックリスト。
+  画面状態（表示範囲・表示種別など）の意味論を変更するときも対象とする。
   Zod スキーマ → ルーター登録 → 難読化ミドルウェア → SSE 通知 → クライアント側 invalidate → テスト、
   および既存 procedure 呼び出し時の入力スキーマ引数キー整合の漏れを防ぐ。
   ユーザーが "tRPC procedure 追加" や "/add-trpc-procedure" を実行したとき、
-  もしくは新しい router エントリを書く前・既存スキーマを拡張する前・既存 procedure を新規箇所から呼び出す前に呼び出す。
+  もしくは新しい router エントリを書く前・既存スキーマを拡張する前・既存 procedure を新規箇所から呼び出す前・
+  画面状態（表示範囲・表示種別など）の意味論を変更する前に呼び出す。
 ---
 
 # tRPC Procedure 追加手順 (GLATasks)
@@ -28,6 +30,8 @@ description: >-
 - 数値パラメータは `z.coerce.number()` か、呼び出し側で `Number()` 変換するかの方針を明示する（文字列混入を防ぐため）
 - 市民時刻を扱う場合は `tz_offset_minutes: z.number()` を必ず含める（既存のタイマー系スキーマを参照）
 - 型推論用の型エクスポート (`export type FooInput = z.infer<typeof FooSchema>`) は必要な場合のみ追加する
+- 取得系procedureが画面状態（表示範囲・表示種別など）を入力に取る場合、同種データを返す既存の全取得経路（tRPC・MCP）へ
+  当該入力が伝播しているか確認する
 
 ### 2. DB 層の実装
 

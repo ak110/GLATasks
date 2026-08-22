@@ -6,10 +6,25 @@ import { describe, it, expect } from "vitest";
 import {
   CreateTaskSchema,
   CreateTimerSchema,
+  SearchTasksSchema,
   TagInfoSchema,
+  TaskStatusSchema,
   UpdateTaskSchema,
   UserPreferencesSchema,
 } from "./schemas";
+
+describe("TaskStatusSchema / SearchTasksSchema", () => {
+  it("running 状態を受け入れる", () => {
+    expect(TaskStatusSchema.parse("running")).toBe("running");
+  });
+
+  it("検索表示種別の既定値は active で、all も受け入れる", () => {
+    expect(SearchTasksSchema.parse({ query: "検索" }).showType).toBe("active");
+    expect(
+      SearchTasksSchema.parse({ query: "検索", showType: "all" }).showType,
+    ).toBe("all");
+  });
+});
 
 describe("CreateTimerSchema", () => {
   it("ephemeral は未指定だと false になる", () => {

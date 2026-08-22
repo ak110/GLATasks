@@ -138,6 +138,7 @@ test.describe("tasks", () => {
     await taskRow.waitFor({ timeout: 15000 });
     await page.waitForTimeout(500);
     await taskRow.locator('input[type="checkbox"]').dispatchEvent("click");
+    await taskRow.locator('input[type="checkbox"]').dispatchEvent("click");
     await expect(
       taskRow.locator('[data-testid="task-text"].line-through'),
     ).toBeVisible({
@@ -155,6 +156,7 @@ test.describe("tasks", () => {
     await taskRow.waitFor({ timeout: 15000 });
     await page.waitForTimeout(500);
     await taskRow.locator('input[type="checkbox"]').dispatchEvent("click");
+    await taskRow.locator('input[type="checkbox"]').dispatchEvent("click");
     await expect(
       taskRow.locator('[data-testid="task-text"].line-through'),
     ).toBeVisible({
@@ -167,6 +169,47 @@ test.describe("tasks", () => {
     ).not.toBeVisible({
       timeout: 15000,
     });
+  });
+
+  test("チェックボックスが実行中を経由して循環し、完了済み非表示の対象外になる", async ({
+    page,
+  }) => {
+    const taskTitle = `実行中テスト_${Date.now()}`;
+    await page.fill('textarea[placeholder*="タスクを追加"]', taskTitle);
+    await page.click('[data-testid="task-add-form"] button[type="submit"]');
+    const taskRow = page
+      .locator('[data-testid="task-item"]')
+      .filter({ hasText: taskTitle });
+    await taskRow.waitFor({ timeout: 15000 });
+    const checkbox = taskRow.locator('input[type="checkbox"]');
+
+    await checkbox.dispatchEvent("click");
+    await expect(checkbox).toHaveJSProperty("indeterminate", true);
+    await expect(checkbox).not.toBeChecked();
+    await expect(taskRow.locator('[data-testid="task-text"]')).not.toHaveClass(
+      /line-through/,
+    );
+
+    await Promise.all([
+      page.getByTitle("完了済みタスクを非表示にする").click(),
+      page.waitForResponse((response) =>
+        response.url().includes("/api/trpc/lists.clear"),
+      ),
+    ]);
+    await expect(taskRow).toBeVisible();
+
+    await checkbox.dispatchEvent("click");
+    await expect(checkbox).toBeChecked();
+    await expect(taskRow.locator('[data-testid="task-text"]')).toHaveClass(
+      /line-through/,
+    );
+
+    await checkbox.dispatchEvent("click");
+    await expect(checkbox).not.toBeChecked();
+    await expect(checkbox).toHaveJSProperty("indeterminate", false);
+    await expect(taskRow.locator('[data-testid="task-text"]')).not.toHaveClass(
+      /line-through/,
+    );
   });
 
   test("コピーメニューでタイトルのみをコピーできる", async ({ page }) => {
@@ -441,9 +484,20 @@ test.describe("tasks", () => {
     await prepareScrollableTaskList(page);
     const taskItems = page.getByTestId("task-item");
     const taskCount = await taskItems.count();
+    const taskIds = await taskItems.evaluateAll((elements) =>
+      elements.map((element) => element.getAttribute("data-reorder-id")),
+    );
     for (let index = 0; index < taskCount; index++) {
       const checkbox = taskItems.nth(index).getByRole("checkbox");
-      await checkbox.check();
+      if (await checkbox.isChecked()) continue;
+      const isRunning = await checkbox.evaluate(
+        (element: HTMLInputElement) => element.indeterminate,
+      );
+      if (!isRunning) {
+        await checkbox.dispatchEvent("click");
+        await expect(checkbox).toHaveJSProperty("indeterminate", true);
+      }
+      await checkbox.dispatchEvent("click");
       await expect(checkbox).toBeChecked();
     }
     await Promise.all([
@@ -455,7 +509,12 @@ test.describe("tasks", () => {
     await expect(taskItems).toHaveCount(0, { timeout: 15000 });
 
     await page.locator("header select").selectOption("archived");
-    await expect(taskItems).toHaveCount(taskCount, { timeout: 15000 });
+    for (const taskId of taskIds) {
+      if (taskId === null) throw new Error("task reorder ID is missing");
+      await expect(
+        page.locator(`[data-testid="task-item"][data-reorder-id="${taskId}"]`),
+      ).toBeVisible({ timeout: 15000 });
+    }
     await scrollTaskListDown(page);
 
     const title = `アーカイブ中追加_${Date.now()}`;

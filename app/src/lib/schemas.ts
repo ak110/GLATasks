@@ -25,7 +25,12 @@ export type TagColorKey = (typeof TAG_COLOR_KEYS)[number];
 
 // ── 共通スキーマ ──
 
-export const TaskStatusSchema = z.enum(["active", "completed", "archived"]);
+export const TaskStatusSchema = z.enum([
+  "active",
+  "running",
+  "completed",
+  "archived",
+]);
 export const ShowTypeSchema = z.enum(["active", "archived", "all"]);
 export const ListStatusSchema = z.enum(["active", "archived"]);
 
@@ -48,6 +53,7 @@ export const TagsSchema = z.array(TagInfoSchema).max(32);
 
 export const SearchTasksSchema = z.object({
   query: z.string().min(1).max(255),
+  showType: ShowTypeSchema.default("active"),
 });
 
 // ── タスク操作スキーマ ──

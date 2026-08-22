@@ -419,7 +419,7 @@ export const appRouter = t.router({
     search: encryptedProcedure
       .input(SearchTasksSchema)
       .query(async ({ ctx, input }) => {
-        return api.searchTasks(ctx.userId, input.query);
+        return api.searchTasks(ctx.userId, input.query, input.showType);
       }),
 
     reorder: encryptedProcedure.input(ReorderTasksSchema).mutation(

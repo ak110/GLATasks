@@ -248,6 +248,12 @@ test.describe("activeTasks 差分sync・楽観的更新", () => {
         .filter({ hasText: taskTitle });
       await taskRow.waitFor({ timeout: 15000 });
 
+      const checkbox = taskRow.locator('input[type="checkbox"]');
+
+      // 遅延のない状態で active → running へ遷移させる
+      await checkbox.dispatchEvent("click");
+      await expect(checkbox).toHaveJSProperty("indeterminate", true);
+
       // /api/trpc リクエストを2秒遅延させる
       // SSEの /api/events を巻き込まないよう除外する
       await ctx.route("**/api/trpc/**", async (route) => {
@@ -260,8 +266,8 @@ test.describe("activeTasks 差分sync・楽観的更新", () => {
         await route.continue();
       });
 
-      // チェックボックスをオンにして completed 状態へ変更する
-      await taskRow.locator('input[type="checkbox"]').dispatchEvent("click");
+      // 実行中から completed へ遷移させる
+      await checkbox.dispatchEvent("click");
 
       // mutation応答を待たずに、500ms以内に打ち消し線が表示されることを検証する（楽観的更新）
       await expect(

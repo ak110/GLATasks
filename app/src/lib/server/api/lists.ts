@@ -13,7 +13,7 @@ import { toUtcIso, touchListUpdated, getOwnedList } from "./common";
 export type { ListInfo };
 
 /**
- * ユーザーの全リストについて、未完了（status="active"）かつ kind="todo" の
+ * ユーザーの全リストについて、未完了（status="active"または"running"）かつ kind="todo" の
  * タスク件数を list_id ごとに集計する。
  *
  * `getLists` の既存クエリ（lists 単独取得 + JS側フィルタ）とは別クエリとして扱う。
@@ -31,7 +31,7 @@ async function countTodoTasksByList(
     .where(
       and(
         eq(lists.user_id, userId),
-        eq(tasks.status, "active"),
+        inArray(tasks.status, ["active", "running"]),
         eq(tasks.kind, "todo"),
       ),
     )
