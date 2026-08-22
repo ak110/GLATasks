@@ -92,6 +92,39 @@ function makeContextOptions() {
   };
 }
 
+async function deleteTestListFromPage(
+  page: Page,
+  listName: string,
+): Promise<void> {
+  const listRow = page.getByTestId("list-item").filter({ hasText: listName });
+  if ((await listRow.count()) === 0) return;
+  await listRow.getByTestId("list-menu-btn").click();
+  await page.getByTestId("list-delete-btn").click();
+  await page
+    .getByRole("dialog")
+    .last()
+    .getByRole("button", { name: "削除", exact: true })
+    .click();
+  await expect(listRow).toHaveCount(0);
+}
+
+async function deleteTestListsFromPage(
+  page: Page,
+  listNames: readonly string[],
+): Promise<void> {
+  const errors: unknown[] = [];
+  for (const listName of listNames) {
+    try {
+      await deleteTestListFromPage(page, listName);
+    } catch (error) {
+      errors.push(error);
+    }
+  }
+  if (errors.length > 0) {
+    throw new AggregateError(errors, "テスト用リストの削除に失敗した");
+  }
+}
+
 /**
  * テスト用リストを作成する
  *
@@ -111,6 +144,7 @@ export async function setupTestLists(
 ): Promise<void> {
   if (listNames.length === 0) return;
   const ctx = await browser.newContext(makeContextOptions());
+  const attemptedListNames: string[] = [];
   try {
     const page = await ctx.newPage();
     await Promise.all([
@@ -120,10 +154,23 @@ export async function setupTestLists(
     for (const listName of listNames) {
       await page.fill('aside input[placeholder="新しいリスト"]', listName);
       await page.click('aside button[type="submit"]');
+      attemptedListNames.push(listName);
       await page
         .locator(`[data-testid="list-select-btn"]:has-text("${listName}")`)
         .waitFor({ timeout: 15000 });
     }
+  } catch (setupError) {
+    try {
+      const page = ctx.pages()[0];
+      if (page) await deleteTestListsFromPage(page, attemptedListNames);
+    } catch (cleanupError) {
+      throw new AggregateError(
+        [setupError, cleanupError],
+        "テスト用リストの作成と途中作成分の削除に失敗した",
+        { cause: cleanupError },
+      );
+    }
+    throw setupError;
   } finally {
     await ctx.close();
   }
@@ -154,19 +201,7 @@ export async function cleanupTestLists(
       page.goto("/"),
       page.waitForResponse((res) => res.url().includes("/api/trpc")),
     ]);
-    for (const listName of listNames) {
-      const listRow = page
-        .getByTestId("list-item")
-        .filter({ hasText: listName });
-      await listRow.getByTestId("list-menu-btn").click();
-      await page.getByTestId("list-delete-btn").click();
-      await page
-        .getByRole("dialog")
-        .last()
-        .getByRole("button", { name: "削除", exact: true })
-        .click();
-      await expect(listRow).toHaveCount(0);
-    }
+    await deleteTestListsFromPage(page, listNames);
   } finally {
     await ctx.close();
   }

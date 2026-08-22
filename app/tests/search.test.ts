@@ -75,13 +75,14 @@ test("検索の表示種別と選択リスト優先表示が反映される", as
   const keyword = `検索分類_${STAMP}`;
   const activeTask = `${keyword}_A1`;
   const activeArchivedTask = `${keyword}_A2`;
+  const archivedOrderingTask = `検索順序調整_${STAMP}`;
   const archivedTask = `${keyword}_B1`;
   const archivedArchivedTask = `${keyword}_B2`;
 
-  await setupTestLists(browser, [activeListName, archivedListName]);
   let archivedList = false;
 
   try {
+    await setupTestLists(browser, [activeListName, archivedListName]);
     await Promise.all([
       page.goto("/"),
       page.waitForResponse((response) => response.url().includes("/api/trpc")),
@@ -92,6 +93,7 @@ test("検索の表示種別と選択リスト優先表示が反映される", as
     await archiveMatchingTasks(page, activeArchivedTask);
 
     await selectList(page, archivedListName);
+    await addTask(page, archivedOrderingTask);
     await addTask(page, archivedTask);
     await addTask(page, archivedArchivedTask);
     await archiveMatchingTasks(page, archivedArchivedTask);

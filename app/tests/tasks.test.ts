@@ -611,14 +611,22 @@ test.describe("tasks", () => {
       await textarea.click();
       await textarea.fill(t);
       await expect(submitBtn).toBeVisible({ timeout: 5000 });
-      await Promise.all([
-        submitBtn.click(),
-        page.waitForResponse((res) => res.url().includes("/api/trpc")),
-      ]);
+      const createResponsePromise = page.waitForResponse((response) =>
+        response.url().includes("/api/trpc/tasks.create"),
+      );
+      await submitBtn.click();
+      const createResponse = await createResponsePromise;
+      if (!createResponse.ok()) {
+        throw new Error(
+          `tasks.createがHTTP ${createResponse.status()}で失敗した`,
+        );
+      }
       // 追加結果が一覧に反映されるまで待ってから次の追加に進む
-      await expect(
-        page.locator('[data-testid="task-item"]').filter({ hasText: t }),
-      ).toBeVisible({ timeout: 15000 });
+      const taskRow = page
+        .locator('[data-testid="task-item"]')
+        .filter({ hasText: t });
+      await expect(taskRow).toBeVisible({ timeout: 15000 });
+      await waitForPersistedTask(taskRow);
     }
 
     const items = page.locator('[data-testid="task-item"]');
@@ -644,12 +652,17 @@ test.describe("tasks", () => {
     // ドラッグ閾値（既定 5px）を確実に超えるための明示的な中間移動
     await page.mouse.move(startX + 20, startY + 20);
     // 並び替え mutation の発射を mouse.up と同時に待機する
-    const reorderResponse = page.waitForResponse((res) =>
-      res.url().includes("/api/trpc"),
+    const reorderResponsePromise = page.waitForResponse((response) =>
+      response.url().includes("/api/trpc/tasks.reorder"),
     );
     await page.mouse.move(endX, endY, { steps: 10 });
     await page.mouse.up();
-    await reorderResponse;
+    const reorderResponse = await reorderResponsePromise;
+    if (!reorderResponse.ok()) {
+      throw new Error(
+        `tasks.reorderがHTTP ${reorderResponse.status()}で失敗した`,
+      );
+    }
 
     // 期待順序: B, A, C（C を末尾に移動）
     await expect(items.nth(0)).toContainText(`B_${stamp}`, { timeout: 10000 });

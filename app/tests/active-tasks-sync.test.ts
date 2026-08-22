@@ -9,6 +9,7 @@ import {
   setupTestList,
   cleanupTestList,
   toggleTaskAndWaitForUpdate,
+  waitForPersistedTask,
   waitForTaskUpdateResponse,
 } from "./helpers/common";
 
@@ -179,6 +180,9 @@ test.describe("activeTasks 差分sync・楽観的更新", () => {
 
       const taskTitle = `楽観タスク_${STAMP}`;
       await page.fill('textarea[placeholder*="タスクを追加"]', taskTitle);
+      const createResponsePromise = page.waitForResponse((response) =>
+        response.url().includes("/api/trpc/tasks.create"),
+      );
       await page
         .locator('[data-testid="task-add-form"] button[type="submit"]')
         .click();
@@ -190,16 +194,19 @@ test.describe("activeTasks 差分sync・楽観的更新", () => {
           .filter({ hasText: taskTitle }),
       ).toBeVisible({ timeout: 500 });
 
-      // 遅延ルートを解除してからmutation応答完了を待つ
-      await ctx.unroute("**/api/trpc/**");
+      const createResponse = await createResponsePromise;
+      if (!createResponse.ok()) {
+        throw new Error(
+          `tasks.createがHTTP ${createResponse.status()}で失敗した`,
+        );
+      }
+      await ctx.unrouteAll({ behavior: "wait" });
 
-      // mutation応答後（2秒後以降）も同タスクが残っていることを確認する
-      // 仮ID→実IDの置き換えでタスクが消えていないことを検証する
-      await expect(
-        page
-          .locator('[data-testid="task-item"]')
-          .filter({ hasText: taskTitle }),
-      ).toBeVisible({ timeout: 5000 });
+      const taskRow = page
+        .locator('[data-testid="task-item"]')
+        .filter({ hasText: taskTitle });
+      await waitForPersistedTask(taskRow);
+      await expect(taskRow).toBeVisible({ timeout: 5000 });
     } finally {
       await ctx.close();
       await cleanupTestList(browser, listName);
