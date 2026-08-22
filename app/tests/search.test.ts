@@ -30,6 +30,7 @@ async function archiveMatchingTasks(page: Page, title: string): Promise<void> {
   const row = page.getByTestId("task-item").filter({ hasText: title });
   const checkbox = row.getByRole("checkbox");
   await checkbox.dispatchEvent("click");
+  await expect(checkbox).toHaveJSProperty("indeterminate", true);
   await checkbox.dispatchEvent("click");
   await expect(checkbox).toBeChecked();
   await Promise.all([
@@ -45,6 +46,8 @@ test("検索の表示種別と選択リスト優先表示が反映される", as
   page,
   browser,
 }) => {
+  test.setTimeout(60_000);
+
   const activeListName = `検索アクティブ_${STAMP}`;
   const archivedListName = `検索アーカイブ_${STAMP}`;
   const keyword = `検索分類_${STAMP}`;

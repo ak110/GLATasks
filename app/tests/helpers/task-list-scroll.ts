@@ -269,6 +269,7 @@ export async function verifyTagListsKeepTaskListAvailable(
   if (includeMaximumAttachments) {
     const checkbox = taskList.getByRole("checkbox").first();
     await checkbox.dispatchEvent("click");
+    await expect(checkbox).toHaveJSProperty("indeterminate", true);
     await checkbox.dispatchEvent("click");
     await expect(checkbox).toBeChecked();
   }

@@ -137,8 +137,10 @@ test.describe("tasks", () => {
       .filter({ hasText: taskTitle });
     await taskRow.waitFor({ timeout: 15000 });
     await page.waitForTimeout(500);
-    await taskRow.locator('input[type="checkbox"]').dispatchEvent("click");
-    await taskRow.locator('input[type="checkbox"]').dispatchEvent("click");
+    const checkbox = taskRow.locator('input[type="checkbox"]');
+    await checkbox.dispatchEvent("click");
+    await expect(checkbox).toHaveJSProperty("indeterminate", true);
+    await checkbox.dispatchEvent("click");
     await expect(
       taskRow.locator('[data-testid="task-text"].line-through'),
     ).toBeVisible({
@@ -155,15 +157,17 @@ test.describe("tasks", () => {
       .filter({ hasText: taskTitle });
     await taskRow.waitFor({ timeout: 15000 });
     await page.waitForTimeout(500);
-    await taskRow.locator('input[type="checkbox"]').dispatchEvent("click");
-    await taskRow.locator('input[type="checkbox"]').dispatchEvent("click");
+    const checkbox = taskRow.locator('input[type="checkbox"]');
+    await checkbox.dispatchEvent("click");
+    await expect(checkbox).toHaveJSProperty("indeterminate", true);
+    await checkbox.dispatchEvent("click");
     await expect(
       taskRow.locator('[data-testid="task-text"].line-through'),
     ).toBeVisible({
       timeout: 15000,
     });
     await page.waitForTimeout(500);
-    await taskRow.locator('input[type="checkbox"]').dispatchEvent("click");
+    await checkbox.dispatchEvent("click");
     await expect(
       taskRow.locator('[data-testid="task-text"].line-through'),
     ).not.toBeVisible({

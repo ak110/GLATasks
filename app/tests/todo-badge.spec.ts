@@ -65,8 +65,10 @@ test.describe("todo-badge", () => {
     const taskRow = page
       .locator('[data-testid="task-item"]')
       .filter({ hasText: title });
-    await taskRow.locator('input[type="checkbox"]').dispatchEvent("click");
-    await taskRow.locator('input[type="checkbox"]').dispatchEvent("click");
+    const checkbox = taskRow.locator('input[type="checkbox"]');
+    await checkbox.dispatchEvent("click");
+    await expect(checkbox).toHaveJSProperty("indeterminate", true);
+    await checkbox.dispatchEvent("click");
     await expect(badgeLocator(page)).not.toBeVisible({ timeout: 15000 });
   });
 
@@ -78,11 +80,13 @@ test.describe("todo-badge", () => {
     const taskRow = page
       .locator('[data-testid="task-item"]')
       .filter({ hasText: title });
-    await taskRow.locator('input[type="checkbox"]').dispatchEvent("click");
-    await taskRow.locator('input[type="checkbox"]').dispatchEvent("click");
+    const checkbox = taskRow.locator('input[type="checkbox"]');
+    await checkbox.dispatchEvent("click");
+    await expect(checkbox).toHaveJSProperty("indeterminate", true);
+    await checkbox.dispatchEvent("click");
     await expect(badgeLocator(page)).not.toBeVisible({ timeout: 15000 });
 
-    await taskRow.locator('input[type="checkbox"]').dispatchEvent("click");
+    await checkbox.dispatchEvent("click");
     await expect(badgeLocator(page)).toHaveText("1", { timeout: 15000 });
   });
 
