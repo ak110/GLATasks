@@ -8,7 +8,11 @@
  */
 
 import { test, expect } from "@playwright/test";
-import { setupTestList, cleanupTestList } from "./helpers/common";
+import {
+  setupTestList,
+  cleanupTestList,
+  toggleTaskAndWaitForUpdate,
+} from "./helpers/common";
 
 test.describe("todo-badge", () => {
   let listName: string;
@@ -66,9 +70,8 @@ test.describe("todo-badge", () => {
       .locator('[data-testid="task-item"]')
       .filter({ hasText: title });
     const checkbox = taskRow.locator('input[type="checkbox"]');
-    await checkbox.dispatchEvent("click");
-    await expect(checkbox).toHaveJSProperty("indeterminate", true);
-    await checkbox.dispatchEvent("click");
+    await toggleTaskAndWaitForUpdate(page, checkbox);
+    await toggleTaskAndWaitForUpdate(page, checkbox);
     await expect(badgeLocator(page)).not.toBeVisible({ timeout: 15000 });
   });
 
@@ -81,12 +84,11 @@ test.describe("todo-badge", () => {
       .locator('[data-testid="task-item"]')
       .filter({ hasText: title });
     const checkbox = taskRow.locator('input[type="checkbox"]');
-    await checkbox.dispatchEvent("click");
-    await expect(checkbox).toHaveJSProperty("indeterminate", true);
-    await checkbox.dispatchEvent("click");
+    await toggleTaskAndWaitForUpdate(page, checkbox);
+    await toggleTaskAndWaitForUpdate(page, checkbox);
     await expect(badgeLocator(page)).not.toBeVisible({ timeout: 15000 });
 
-    await checkbox.dispatchEvent("click");
+    await toggleTaskAndWaitForUpdate(page, checkbox);
     await expect(badgeLocator(page)).toHaveText("1", { timeout: 15000 });
   });
 

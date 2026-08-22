@@ -6,7 +6,12 @@
  * 不統一なパス形式（絶対パスと相対パスの混在）を解消する。
  */
 
-import { expect, type Browser } from "@playwright/test";
+import {
+  expect,
+  type Browser,
+  type Locator,
+  type Page,
+} from "@playwright/test";
 import * as path from "node:path";
 
 /** テスト対象のベースURL */
@@ -25,6 +30,23 @@ export const STORAGE_STATE_PATH = path.join(
   ".auth",
   "user.json",
 );
+
+/** タスク更新mutationの応答を待つ */
+export function waitForTaskUpdateResponse(page: Page) {
+  return page.waitForResponse((response) =>
+    response.url().includes("/api/trpc/tasks.update"),
+  );
+}
+
+/** タスク状態を1段階進め、更新完了後に返る */
+export async function toggleTaskAndWaitForUpdate(
+  page: Page,
+  checkbox: Locator,
+): Promise<void> {
+  const response = waitForTaskUpdateResponse(page);
+  await checkbox.dispatchEvent("click");
+  await response;
+}
 
 /** テスト用リストを作成するための共通コンテキストオプション */
 function makeContextOptions() {

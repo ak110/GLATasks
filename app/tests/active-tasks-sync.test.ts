@@ -8,6 +8,8 @@ import {
   STORAGE_STATE_PATH,
   setupTestList,
   cleanupTestList,
+  toggleTaskAndWaitForUpdate,
+  waitForTaskUpdateResponse,
 } from "./helpers/common";
 
 const STAMP = Date.now();
@@ -251,14 +253,12 @@ test.describe("activeTasks 差分sync・楽観的更新", () => {
       const checkbox = taskRow.locator('input[type="checkbox"]');
 
       // 遅延のない状態で active → running へ遷移させる
-      await checkbox.dispatchEvent("click");
-      await expect(checkbox).toHaveJSProperty("indeterminate", true);
+      await toggleTaskAndWaitForUpdate(page, checkbox);
 
-      // /api/trpc リクエストを2秒遅延させる
-      // SSEの /api/events を巻き込まないよう除外する
+      // 2回目のtasks.updateだけを2秒遅延させる
       await ctx.route("**/api/trpc/**", async (route) => {
         const url = route.request().url();
-        if (url.includes("/api/events")) {
+        if (!url.includes("/api/trpc/tasks.update")) {
           await route.continue();
           return;
         }
@@ -267,12 +267,14 @@ test.describe("activeTasks 差分sync・楽観的更新", () => {
       });
 
       // 実行中から completed へ遷移させる
+      const updateResponse = waitForTaskUpdateResponse(page);
       await checkbox.dispatchEvent("click");
 
       // mutation応答を待たずに、500ms以内に打ち消し線が表示されることを検証する（楽観的更新）
       await expect(
         taskRow.locator('[data-testid="task-text"].line-through'),
       ).toBeVisible({ timeout: 500 });
+      await updateResponse;
 
       // 遅延ルートを解除する
       await ctx.unroute("**/api/trpc/**");

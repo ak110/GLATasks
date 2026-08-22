@@ -3,7 +3,11 @@
  */
 
 import { test, expect, type Page } from "@playwright/test";
-import { cleanupTestList, setupTestList } from "./helpers/common";
+import {
+  cleanupTestList,
+  setupTestList,
+  toggleTaskAndWaitForUpdate,
+} from "./helpers/common";
 import {
   verifyAttachmentListKeepsTaskListAvailable,
   prepareScrollableTaskList,
@@ -138,9 +142,8 @@ test.describe("tasks", () => {
     await taskRow.waitFor({ timeout: 15000 });
     await page.waitForTimeout(500);
     const checkbox = taskRow.locator('input[type="checkbox"]');
-    await checkbox.dispatchEvent("click");
-    await expect(checkbox).toHaveJSProperty("indeterminate", true);
-    await checkbox.dispatchEvent("click");
+    await toggleTaskAndWaitForUpdate(page, checkbox);
+    await toggleTaskAndWaitForUpdate(page, checkbox);
     await expect(
       taskRow.locator('[data-testid="task-text"].line-through'),
     ).toBeVisible({
@@ -158,16 +161,15 @@ test.describe("tasks", () => {
     await taskRow.waitFor({ timeout: 15000 });
     await page.waitForTimeout(500);
     const checkbox = taskRow.locator('input[type="checkbox"]');
-    await checkbox.dispatchEvent("click");
-    await expect(checkbox).toHaveJSProperty("indeterminate", true);
-    await checkbox.dispatchEvent("click");
+    await toggleTaskAndWaitForUpdate(page, checkbox);
+    await toggleTaskAndWaitForUpdate(page, checkbox);
     await expect(
       taskRow.locator('[data-testid="task-text"].line-through'),
     ).toBeVisible({
       timeout: 15000,
     });
     await page.waitForTimeout(500);
-    await checkbox.dispatchEvent("click");
+    await toggleTaskAndWaitForUpdate(page, checkbox);
     await expect(
       taskRow.locator('[data-testid="task-text"].line-through'),
     ).not.toBeVisible({
@@ -187,7 +189,7 @@ test.describe("tasks", () => {
     await taskRow.waitFor({ timeout: 15000 });
     const checkbox = taskRow.locator('input[type="checkbox"]');
 
-    await checkbox.dispatchEvent("click");
+    await toggleTaskAndWaitForUpdate(page, checkbox);
     await expect(checkbox).toHaveJSProperty("indeterminate", true);
     await expect(checkbox).not.toBeChecked();
     await expect(taskRow.locator('[data-testid="task-text"]')).not.toHaveClass(
@@ -202,13 +204,13 @@ test.describe("tasks", () => {
     ]);
     await expect(taskRow).toBeVisible();
 
-    await checkbox.dispatchEvent("click");
+    await toggleTaskAndWaitForUpdate(page, checkbox);
     await expect(checkbox).toBeChecked();
     await expect(taskRow.locator('[data-testid="task-text"]')).toHaveClass(
       /line-through/,
     );
 
-    await checkbox.dispatchEvent("click");
+    await toggleTaskAndWaitForUpdate(page, checkbox);
     await expect(checkbox).not.toBeChecked();
     await expect(checkbox).toHaveJSProperty("indeterminate", false);
     await expect(taskRow.locator('[data-testid="task-text"]')).not.toHaveClass(
@@ -498,10 +500,9 @@ test.describe("tasks", () => {
         (element: HTMLInputElement) => element.indeterminate,
       );
       if (!isRunning) {
-        await checkbox.dispatchEvent("click");
-        await expect(checkbox).toHaveJSProperty("indeterminate", true);
+        await toggleTaskAndWaitForUpdate(page, checkbox);
       }
-      await checkbox.dispatchEvent("click");
+      await toggleTaskAndWaitForUpdate(page, checkbox);
       await expect(checkbox).toBeChecked();
     }
     await Promise.all([

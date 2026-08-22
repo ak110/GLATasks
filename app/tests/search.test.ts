@@ -3,7 +3,11 @@
  */
 
 import { test, expect, type Page } from "@playwright/test";
-import { cleanupTestList, setupTestList } from "./helpers/common";
+import {
+  cleanupTestList,
+  setupTestList,
+  toggleTaskAndWaitForUpdate,
+} from "./helpers/common";
 
 const STAMP = Date.now();
 
@@ -29,9 +33,8 @@ async function addTask(page: Page, title: string): Promise<void> {
 async function archiveMatchingTasks(page: Page, title: string): Promise<void> {
   const row = page.getByTestId("task-item").filter({ hasText: title });
   const checkbox = row.getByRole("checkbox");
-  await checkbox.dispatchEvent("click");
-  await expect(checkbox).toHaveJSProperty("indeterminate", true);
-  await checkbox.dispatchEvent("click");
+  await toggleTaskAndWaitForUpdate(page, checkbox);
+  await toggleTaskAndWaitForUpdate(page, checkbox);
   await expect(checkbox).toBeChecked();
   await Promise.all([
     page.getByTitle("完了済みタスクを非表示にする").click(),

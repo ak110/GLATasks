@@ -4,6 +4,7 @@
 
 import { expect, type Locator, type Page } from "@playwright/test";
 import { MAX_ATTACHMENTS_PER_TASK } from "../../src/lib/schemas";
+import { toggleTaskAndWaitForUpdate } from "./common";
 
 const MINIMUM_TASK_ROWS = 18;
 const MAX_TAGS_PER_TASK = 32;
@@ -268,9 +269,8 @@ export async function verifyTagListsKeepTaskListAvailable(
   expect(taskListBox.height).toBeGreaterThan(0);
   if (includeMaximumAttachments) {
     const checkbox = taskList.getByRole("checkbox").first();
-    await checkbox.dispatchEvent("click");
-    await expect(checkbox).toHaveJSProperty("indeterminate", true);
-    await checkbox.dispatchEvent("click");
+    await toggleTaskAndWaitForUpdate(page, checkbox);
+    await toggleTaskAndWaitForUpdate(page, checkbox);
     await expect(checkbox).toBeChecked();
   }
   await expect(tagInput).toBeVisible();
