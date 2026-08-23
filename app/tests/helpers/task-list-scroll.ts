@@ -203,9 +203,11 @@ export async function verifyTagListsKeepTaskListAvailable(
     }),
   ).toHaveCount(MAX_TAGS_PER_TASK);
   await form.locator('button[type="submit"]').click();
-  await expect(
-    page.getByTestId("task-item").filter({ hasText: sourceTaskTitle }),
-  ).toBeVisible({ timeout: 15000 });
+  const sourceTask = page
+    .getByTestId("task-item")
+    .filter({ hasText: sourceTaskTitle });
+  await expect(sourceTask).toBeVisible({ timeout: 15000 });
+  await waitForPersistedTask(sourceTask);
 
   await form.locator("textarea").focus();
   await expect(

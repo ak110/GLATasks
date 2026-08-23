@@ -52,8 +52,10 @@ test.describe("timers", () => {
     await page.fill('[data-testid="timer-base-time-input"]', "00:05:00");
 
     // 送信
-    await page.click('[data-testid="timer-submit-btn"]');
-    await page.waitForResponse((res) => res.url().includes("/api/trpc"));
+    await Promise.all([
+      page.waitForResponse((res) => res.url().includes("/api/trpc")),
+      page.click('[data-testid="timer-submit-btn"]'),
+    ]);
 
     // タイマーカードが表示される
     const card = page
@@ -189,8 +191,10 @@ test.describe("timers", () => {
     await page.fill('[data-testid="timer-target-time-input"]', "23:59");
 
     // 送信
-    await page.click('[data-testid="timer-submit-btn"]');
-    await page.waitForResponse((res) => res.url().includes("/api/trpc"));
+    await Promise.all([
+      page.waitForResponse((res) => res.url().includes("/api/trpc")),
+      page.click('[data-testid="timer-submit-btn"]'),
+    ]);
 
     // タイマーカードが表示される
     const card = page
@@ -266,8 +270,10 @@ test.describe("timers", () => {
     await expect(card).toBeVisible({ timeout: 10000 });
 
     // リセットで停止＆再計算される
-    await card.locator('[data-testid="timer-reset-btn"]').click();
-    await page.waitForResponse((res) => res.url().includes("/api/trpc"));
+    await Promise.all([
+      page.waitForResponse((res) => res.url().includes("/api/trpc")),
+      card.locator('[data-testid="timer-reset-btn"]').click(),
+    ]);
 
     // 開始ボタンが表示される（停止状態）
     await expect(card.locator('[data-testid="timer-start-btn"]')).toBeVisible({
@@ -405,8 +411,10 @@ test.describe("timers", () => {
     // 2 秒タイマーとして送信
     await page.fill('[data-testid="timer-name-input"]', timerName);
     await page.fill('[data-testid="timer-base-time-input"]', "00:00:02");
-    await page.click('[data-testid="timer-submit-btn"]');
-    await page.waitForResponse((res) => res.url().includes("/api/trpc"));
+    await Promise.all([
+      page.waitForResponse((res) => res.url().includes("/api/trpc")),
+      page.click('[data-testid="timer-submit-btn"]'),
+    ]);
 
     const card = page
       .locator('[data-testid="timer-card"]')
@@ -437,8 +445,10 @@ test.describe("timers", () => {
     await page.locator('[data-testid="timer-name-input"]').waitFor();
     await ringInput.fill("3");
     await page.fill('[data-testid="timer-adjust-input"]', "10");
-    await page.click('[data-testid="timer-save-default-btn"]');
-    await page.waitForResponse((res) => res.url().includes("/api/trpc"));
+    await Promise.all([
+      page.waitForResponse((res) => res.url().includes("/api/trpc")),
+      page.click('[data-testid="timer-save-default-btn"]'),
+    ]);
     await page.keyboard.press("Escape");
 
     // リセット後の状態でダイアログを再度開く
@@ -451,14 +461,18 @@ test.describe("timers", () => {
     // 値を変更し、既定として保存
     await page.fill('[data-testid="timer-adjust-input"]', "7");
     await ringInput.fill("120");
-    await page.click('[data-testid="timer-save-default-btn"]');
-    await page.waitForResponse((res) => res.url().includes("/api/trpc"));
+    await Promise.all([
+      page.waitForResponse((res) => res.url().includes("/api/trpc")),
+      page.click('[data-testid="timer-save-default-btn"]'),
+    ]);
 
     // タイマーを作成
     await page.fill('[data-testid="timer-name-input"]', timerName);
     await page.fill('[data-testid="timer-base-time-input"]', "00:05:00");
-    await page.click('[data-testid="timer-submit-btn"]');
-    await page.waitForResponse((res) => res.url().includes("/api/trpc"));
+    await Promise.all([
+      page.waitForResponse((res) => res.url().includes("/api/trpc")),
+      page.click('[data-testid="timer-submit-btn"]'),
+    ]);
 
     const card = page
       .locator('[data-testid="timer-card"]')
@@ -484,8 +498,10 @@ test.describe("timers", () => {
     await page.locator('[data-testid="timer-name-input"]').waitFor();
     await ringInput.fill("3");
     await page.fill('[data-testid="timer-adjust-input"]', "10");
-    await page.click('[data-testid="timer-save-default-btn"]');
-    await page.waitForResponse((res) => res.url().includes("/api/trpc"));
+    await Promise.all([
+      page.waitForResponse((res) => res.url().includes("/api/trpc")),
+      page.click('[data-testid="timer-save-default-btn"]'),
+    ]);
     await page.keyboard.press("Escape");
   });
 
@@ -576,8 +592,10 @@ test.describe("timers", () => {
     await page.locator('[data-testid="timer-name-input"]').waitFor();
     await page.fill('[data-testid="timer-name-input"]', timerName);
     await page.fill('[data-testid="timer-base-time-input"]', "01:00:00");
-    await page.click('[data-testid="timer-submit-btn"]');
-    await page.waitForResponse((res) => res.url().includes("/api/trpc"));
+    await Promise.all([
+      page.waitForResponse((res) => res.url().includes("/api/trpc")),
+      page.click('[data-testid="timer-submit-btn"]'),
+    ]);
 
     const card = page
       .locator('[data-testid="timer-card"]')

@@ -334,14 +334,14 @@ test.describe("activeTasks 差分sync・楽観的更新", () => {
           .click(),
         pageA.waitForResponse((res) => res.url().includes("/api/trpc")),
       ]);
-      await expect(
-        pageA
-          .locator('[data-testid="task-item"]')
-          .filter({ hasText: taskByCtxA }),
-      ).toBeVisible({ timeout: 15000 });
+      const taskARow = pageA
+        .locator('[data-testid="task-item"]')
+        .filter({ hasText: taskByCtxA });
+      await expect(taskARow).toBeVisible({ timeout: 15000 });
+      await waitForPersistedTask(taskARow);
 
-      // コンテキストAのSSEをブロックする（SSE切断状態を再現する）
-      await ctxA.route("**/api/events", (route) => route.abort());
+      // コンテキストAをオフラインにして、SSE切断状態を再現する
+      await ctxA.setOffline(true);
 
       // --- コンテキストB: 同一storageStateで別ページを開いてタスクを追加する ---
       const pageB = await ctxB.newPage();
@@ -357,27 +357,24 @@ test.describe("activeTasks 差分sync・楽観的更新", () => {
         .waitFor({ timeout: 15000 });
       await pageB.fill('textarea[placeholder*="タスクを追加"]', taskByCtxB);
       await Promise.all([
+        pageB.waitForResponse((res) =>
+          res.url().includes("/api/trpc/tasks.create"),
+        ),
         pageB
           .locator('[data-testid="task-add-form"] button[type="submit"]')
           .click(),
-        pageB.waitForResponse((res) => res.url().includes("/api/trpc")),
       ]);
       // コンテキストBでタスクが追加されたことを確認する
-      await expect(
-        pageB
-          .locator('[data-testid="task-item"]')
-          .filter({ hasText: taskByCtxB }),
-      ).toBeVisible({ timeout: 15000 });
+      const taskBRow = pageB
+        .locator('[data-testid="task-item"]')
+        .filter({ hasText: taskByCtxB });
+      await expect(taskBRow).toBeVisible({ timeout: 15000 });
+      await waitForPersistedTask(taskBRow);
 
-      // コンテキストAのSSEブロックを解除する
-      // unroute で登録解除し、以降の /api/events 接続を通す
-      await ctxA.unroute("**/api/events");
-
-      // ページを再フォーカスして TanStack Query の focus 時 invalidate を起動する
-      await pageA.evaluate(() => window.dispatchEvent(new Event("focus")));
+      // オンライン復帰でSSEを再接続する
+      await ctxA.setOffline(false);
 
       // コンテキストAのタスク一覧にコンテキストBで追加したタスクが現れることを検証する
-      // SSEの自動再接続と差分sync完了を待つため、タイムアウトを15秒に設定する
       await expect(
         pageA
           .locator('[data-testid="task-item"]')
