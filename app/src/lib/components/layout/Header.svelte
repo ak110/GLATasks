@@ -1,6 +1,6 @@
 <script lang="ts">
     /**
-     * @fileoverview 共通ヘッダーコンポーネント（タスク・タイマー両ページで使用）
+     * @fileoverview 共通ヘッダーコンポーネント（タスク・タイマー・翻訳ページで使用）
      */
 
     import { getContext } from "svelte";
@@ -21,7 +21,7 @@
     );
 
     type Props = {
-        page: "tasks" | "timers";
+        page: "tasks" | "timers" | "translate";
         isLoading: boolean;
         showType?: "active" | "archived" | "all";
         onChangeShowType?: (type: "active" | "archived" | "all") => void;
@@ -37,6 +37,21 @@
         searchQuery,
         onSearchChange,
     }: Props = $props();
+
+    const navigationItems = [
+        {
+            key: "timers",
+            path: "/timers",
+            icon: "⏱",
+            label: "タイマー",
+        },
+        {
+            key: "translate",
+            path: "/translate",
+            icon: "🌐",
+            label: "翻訳",
+        },
+    ] as const;
 </script>
 
 <header
@@ -44,17 +59,21 @@
 >
     <a href={resolve("/")} class="font-bold hover:text-gray-300">GLATasks</a>
     <span class="hidden text-gray-400 sm:inline">|</span>
-    {#if page === "tasks"}
-        <a
-            href={resolve("/timers")}
-            class="cursor-pointer rounded text-sm text-gray-300 hover:bg-gray-700 hover:text-white"
-            >⏱<span class="hidden sm:inline">タイマー</span></a
-        >
-    {:else}
-        <span class="text-sm font-semibold text-gray-200"
-            >⏱<span class="hidden sm:inline">タイマー</span></span
-        >
-    {/if}
+    {#each navigationItems as item (item.key)}
+        {#if page === item.key}
+            <span class="text-sm font-semibold text-gray-200"
+                >{item.icon}<span class="hidden sm:inline">{item.label}</span
+                ></span
+            >
+        {:else}
+            <a
+                href={resolve(item.path)}
+                class="cursor-pointer rounded text-sm text-gray-300 hover:bg-gray-700 hover:text-white"
+                >{item.icon}<span class="hidden sm:inline">{item.label}</span
+                ></a
+            >
+        {/if}
+    {/each}
     {#if isLoading}
         <span class="text-sm text-gray-400">読み込み中...</span>
     {/if}

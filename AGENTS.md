@@ -60,6 +60,8 @@ Biomeへの移行は次の阻害要因により見送っている。
   プロファイル指定は`COMPOSE_PROFILES`環境変数へ一括export済みであり、
   個別ターゲットのドライラン出力にはプロファイル値が現れない
 - 特定のe2eテストだけを実行したい場合、`make test-e2e E2E_GREP="パターン"`で対象を限定できる
+- ブラウザ内蔵AI API（`Translator`・`LanguageDetector`・`LanguageModel`）はPlaywright同梱のChromiumに存在しない。
+  これらに依存する画面のe2eテストは`page.addInitScript`でグローバルをスタブしてから検証する
 - 新規依存を追加する`pnpm add`はプロジェクトルートから実行する。
   `app/package.json`はルート`package.json`へのシンボリックリンクであり、
   `app/`配下から実行すると`pnpm-lock.yaml`に不正な`app:` importerセクションが生成され
