@@ -398,11 +398,13 @@
                     <button
                         onclick={() => handleSubmit(false)}
                         class="cursor-pointer rounded bg-gray-100 px-6 py-2 text-gray-700 hover:bg-gray-200 focus:outline-none dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+                        data-testid="task-edit-save-btn"
                         title="Ctrl+S">保存</button
                     >
                     <button
                         onclick={() => handleSubmit(true)}
                         class="cursor-pointer rounded bg-blue-600 px-6 py-2 text-white hover:bg-blue-700 focus:outline-none"
+                        data-testid="task-edit-save-close-btn"
                         >保存して閉じる</button
                     >
                 </div>

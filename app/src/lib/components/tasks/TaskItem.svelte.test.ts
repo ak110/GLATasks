@@ -140,6 +140,56 @@ describe("TaskItem", () => {
     ).toBeInTheDocument();
   });
 
+  it("仮IDのタスクは更新と並び替えを抑止し、実IDで解除される", async () => {
+    const onDragStart = vi.fn();
+    const { unmount } = render(TaskItem, {
+      props: {
+        task: makeTask({ id: -1, _key: -1 }),
+        onToggle: vi.fn(),
+        onEdit: vi.fn(),
+        onDragStart,
+        isTempTask: true,
+      },
+    });
+
+    expect(screen.getByRole("checkbox")).toBeDisabled();
+    expect(screen.getByRole("button", { name: "タスクを編集" })).toBeDisabled();
+    expect(screen.getByTestId("task-drag-handle")).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
+    expect(screen.getByTestId("task-item")).not.toHaveAttribute(
+      "data-reorder-id",
+    );
+
+    await fireEvent.pointerDown(screen.getByTestId("task-drag-handle"));
+    expect(onDragStart).not.toHaveBeenCalled();
+
+    unmount();
+    const realOnDragStart = vi.fn();
+    render(TaskItem, {
+      props: {
+        task: makeTask({ id: 1 }),
+        onToggle: vi.fn(),
+        onEdit: vi.fn(),
+        onDragStart: realOnDragStart,
+      },
+    });
+
+    expect(screen.getByRole("checkbox")).toBeEnabled();
+    expect(screen.getByRole("button", { name: "タスクを編集" })).toBeEnabled();
+    expect(screen.getByTestId("task-item")).toHaveAttribute(
+      "data-reorder-id",
+      "1",
+    );
+    expect(screen.getByTestId("task-drag-handle")).not.toHaveAttribute(
+      "aria-disabled",
+    );
+
+    await fireEvent.pointerDown(screen.getByTestId("task-drag-handle"));
+    expect(realOnDragStart).toHaveBeenCalledOnce();
+  });
+
   it("title と notes が両方空のとき（空のタスク）が表示される", () => {
     render(TaskItem, {
       props: {

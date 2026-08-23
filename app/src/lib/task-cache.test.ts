@@ -2,12 +2,14 @@
  * @fileoverview task-cache ユーティリティのテスト
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { TaskListItem } from "./types";
 import {
+  createTempTaskId,
   mergeActiveTasks,
   sortByListAndOrder,
   filterByList,
+  isTempTaskId,
   type ActiveTasksCache,
 } from "./task-cache";
 
@@ -28,6 +30,22 @@ function makeTask(overrides: Partial<TaskListItem> = {}): TaskListItem {
     ...overrides,
   };
 }
+
+describe("仮ID", () => {
+  it("現在時刻の負値を仮IDとして採番する", () => {
+    const now = vi.spyOn(Date, "now").mockReturnValue(1700000000000);
+    expect(createTempTaskId()).toBe(-1700000000000);
+    now.mockRestore();
+  });
+
+  it.each([
+    [-1, true],
+    [0, true],
+    [1, false],
+  ])("ID %s の仮ID判定は %s になる", (id, expected) => {
+    expect(isTempTaskId(id)).toBe(expected);
+  });
+});
 
 describe("mergeActiveTasks", () => {
   it("prev が undefined の場合は応答タスクをそのまま採用する", () => {

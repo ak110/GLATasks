@@ -21,6 +21,7 @@
         onEdit: (task: TaskListItem) => void;
         isDragging?: boolean;
         isRemoteUpdated?: boolean;
+        isTempTask?: boolean;
         dropIndicator?: "before" | "after" | null;
         onDragStart?: (taskId: number, e: PointerEvent) => void;
     };
@@ -31,6 +32,7 @@
         onEdit,
         isDragging = false,
         isRemoteUpdated = false,
+        isTempTask = false,
         dropIndicator = null,
         onDragStart,
     }: Props = $props();
@@ -151,15 +153,17 @@
     class:border-b-2={dropIndicator === "after"}
     class:border-b-blue-500={dropIndicator === "after"}
     data-testid="task-item"
-    data-reorder-id={task.id}
+    data-reorder-id={isTempTask ? undefined : task.id}
     role="listitem"
 >
     <input
         type="checkbox"
         checked={isCompleted}
         indeterminate={isRunning}
-        onchange={handleToggle}
-        class="mt-1 size-4 cursor-pointer"
+        onclick={isTempTask ? (event) => event.preventDefault() : undefined}
+        onchange={isTempTask ? undefined : handleToggle}
+        class="mt-1 size-4 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+        disabled={isTempTask}
     />
     <div
         class="min-w-0 flex-1 wrap-break-word break-all"
@@ -251,10 +255,11 @@
     </div>
     <div class="flex shrink-0 flex-col gap-1">
         <button
-            onclick={() => onEdit(task)}
-            class="cursor-pointer rounded p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-600 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-300"
+            onclick={isTempTask ? undefined : () => onEdit(task)}
+            class="cursor-pointer rounded p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-600 disabled:cursor-not-allowed disabled:opacity-50 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-300"
             data-testid="task-edit-btn"
             aria-label="タスクを編集"
+            disabled={isTempTask}
             title="編集">✏️</button
         >
         <div class="relative" bind:this={copyMenuEl}>
@@ -318,14 +323,19 @@
         <div class="flex flex-col items-center gap-1">
             {#if onDragStart}
                 <span
-                    class="mt-0.5 cursor-grab touch-none text-gray-400 select-none dark:text-gray-500"
-                    class:cursor-grabbing={isDragging}
+                    class="mt-0.5 touch-none text-gray-400 select-none dark:text-gray-500"
+                    class:cursor-grab={!isTempTask}
+                    class:cursor-grabbing={!isTempTask && isDragging}
+                    class:cursor-not-allowed={isTempTask}
                     role="button"
                     tabindex="-1"
                     aria-label="ドラッグして並び替え"
                     data-testid="task-drag-handle"
+                    aria-disabled={isTempTask ? "true" : undefined}
                     title="ドラッグして並び替え"
-                    onpointerdown={(e) => onDragStart(task.id, e)}>⠿</span
+                    onpointerdown={isTempTask
+                        ? undefined
+                        : (e) => onDragStart(task.id, e)}>⠿</span
                 >
             {/if}
             {#if isRemoteUpdated}

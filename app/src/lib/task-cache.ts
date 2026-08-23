@@ -11,6 +11,24 @@ export type ActiveTasksCache = {
 };
 
 /**
+ * 楽観追加で使用する仮IDを採番する。
+ *
+ * サーバーが採番するIDは正値のため、負値を仮IDの符号規約とする。
+ */
+export function createTempTaskId(): number {
+  return -Date.now();
+}
+
+/**
+ * IDが楽観追加中の仮IDか判定する。
+ *
+ * 仮IDはサーバーが確定した実IDへ置き換わるまで、サーバー入力へ渡さない。
+ */
+export function isTempTaskId(id: number): boolean {
+  return id <= 0;
+}
+
+/**
  * サーバー応答をキャッシュにマージして新しいキャッシュを返す純関数。
  *
  * prev が undefined（初回取得時）は mode に関わらず応答タスクをそのまま採用する。

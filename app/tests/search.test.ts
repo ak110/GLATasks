@@ -50,7 +50,7 @@ async function archiveMatchingTasks(page: Page, title: string): Promise<void> {
   const updateResponsePromise = page.waitForResponse((response) =>
     response.url().includes("/api/trpc/tasks.update"),
   );
-  await dialog.getByRole("button", { name: "保存して閉じる" }).click();
+  await dialog.getByTestId("task-edit-save-close-btn").click();
   const updateResponse = await updateResponsePromise;
   requireSuccessfulResponse(updateResponse, "tasks.update");
   await expect(row.getByRole("checkbox")).toBeChecked();

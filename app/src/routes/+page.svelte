@@ -25,6 +25,8 @@
         GetTasksResult,
     } from "$lib/types";
     import {
+        createTempTaskId,
+        isTempTaskId,
         mergeActiveTasks,
         sortByListAndOrder,
         filterByList,
@@ -342,10 +344,7 @@
             kind?: TaskKind;
         }) => {
             await queryClient.cancelQueries({ queryKey: ["activeTasks"] });
-            const prev = queryClient.getQueryData<ActiveTasksCache>([
-                "activeTasks",
-            ]);
-            const tempId = -Date.now();
+            const tempId = createTempTaskId();
             queryClient.setQueryData<ActiveTasksCache>(
                 ["activeTasks"],
                 (old) => {
@@ -372,12 +371,22 @@
                     return { ...old, tasks: [...old.tasks, optimisticTask] };
                 },
             );
-            return { prev, tempId };
+            return { tempId };
         },
         onError: (_err, _vars, context) => {
-            if (context?.prev !== undefined) {
-                queryClient.setQueryData(["activeTasks"], context.prev);
-            }
+            const tempId = context?.tempId;
+            if (tempId === undefined) return;
+            // 失敗時は作成操作が追加した仮IDのタスクだけを取り消し、並行操作の結果を保持する。
+            queryClient.setQueryData<ActiveTasksCache>(
+                ["activeTasks"],
+                (old) =>
+                    old
+                        ? {
+                              ...old,
+                              tasks: old.tasks.filter((t) => t.id !== tempId),
+                          }
+                        : old,
+            );
         },
         onSuccess: (data, _vars, context) => {
             // 仮IDタスクを実IDで置き換える。DOMの連続性を保ちつつ正しいIDになる。
@@ -397,10 +406,6 @@
                               }
                             : old,
                 );
-                // 編集ダイアログが楽観タスクを参照していた場合、taskIdを実IDに更新する
-                if (editDialog.taskId === tempId) {
-                    editDialog.taskId = data.taskId;
-                }
             }
             queryClient.invalidateQueries({ queryKey: ["activeTasks"] });
             // TODO区分で作成された場合の通知バッジ反映のため、リスト一覧も再取得する
@@ -434,9 +439,9 @@
             kind?: TaskKind;
         }) => {
             await queryClient.cancelQueries({ queryKey: ["activeTasks"] });
-            const prev = queryClient.getQueryData<ActiveTasksCache>([
-                "activeTasks",
-            ]);
+            const previousUpdated = queryClient
+                .getQueryData<ActiveTasksCache>(["activeTasks"])
+                ?.tasks.find((t) => t.id === variables.taskId)?.updated;
             // text変更かつkeep_order=falseなら先頭移動（サーバーロジック踏襲）
             let optimisticSortOrder: number | undefined;
             if (variables.text !== undefined && variables.keep_order !== true) {
@@ -503,12 +508,20 @@
                     };
                 },
             );
-            return { prev };
+            return { previousUpdated };
         },
-        onError: (_err, _vars, context) => {
-            if (context?.prev !== undefined) {
-                queryClient.setQueryData(["activeTasks"], context.prev);
+        onError: (_error, _variables, context) => {
+            // 差分取得はサーバー側で updated が変わっていないタスクを応答へ含めない。
+            // 変更前の updated を起点に取り直し、失敗した楽観値を確定値で上書きする。
+            const previousUpdated = context?.previousUpdated;
+            if (previousUpdated !== undefined) {
+                queryClient.setQueryData<ActiveTasksCache>(
+                    ["activeTasks"],
+                    (old) =>
+                        old ? { ...old, serverTime: previousUpdated } : old,
+                );
             }
+            queryClient.invalidateQueries({ queryKey: ["activeTasks"] });
         },
         onSuccess: (_data, variables) => {
             queryClient.invalidateQueries({ queryKey: ["activeTasks"] });
@@ -990,11 +1003,15 @@
     /** タスクの並び替え（楽観的更新 + API呼出） */
     function handleReorderTasks(taskIds: number[]) {
         if (!selectedListId) return;
+        // 仮IDはサーバー入力の正整数制約に反するため、送信配列と楽観更新の双方から除く
+        const persistedTaskIds = taskIds.filter(
+            (taskId) => !isTempTaskId(taskId),
+        );
         // 楽観的更新: キャッシュ内の sort_order と updated をリスト内連番で上書きする
         const now = new Date().toISOString();
         queryClient.setQueryData<ActiveTasksCache>(["activeTasks"], (old) => {
             if (!old) return old;
-            const idxMap = new Map(taskIds.map((id, i) => [id, i]));
+            const idxMap = new Map(persistedTaskIds.map((id, i) => [id, i]));
             return {
                 ...old,
                 tasks: old.tasks.map((t) => {
@@ -1005,7 +1022,10 @@
                 }),
             };
         });
-        reorderTasksMutation.mutate({ listId: selectedListId, taskIds });
+        reorderTasksMutation.mutate({
+            listId: selectedListId,
+            taskIds: persistedTaskIds,
+        });
     }
 
     /** サイドバーのリストへのタスクD&D移動（楽観的更新 + 失敗時ロールバック） */

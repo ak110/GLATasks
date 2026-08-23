@@ -6,6 +6,7 @@
     import type { TaskStatus } from "$lib/schemas";
     import type { TaskListItem } from "$lib/types";
     import { createDragReorder } from "$lib/dnd-reorder.svelte";
+    import { isTempTaskId } from "$lib/task-cache";
     import TaskItem from "./TaskItem.svelte";
 
     type Props = {
@@ -54,6 +55,7 @@
                 {task}
                 {onToggle}
                 {onEdit}
+                isTempTask={isTempTaskId(task.id)}
                 isDragging={dnd.isActive && dnd.draggedId === task.id}
                 isRemoteUpdated={updatedTaskIds?.has(task.id) ?? false}
                 dropIndicator={dnd.isActive && dnd.dropTargetId === task.id
