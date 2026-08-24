@@ -439,7 +439,10 @@
         {/if}
     </div>
 
-    <div class="grid min-h-0 flex-1 gap-3 sm:grid-cols-2">
+    <div
+        class="grid min-h-0 flex-1 gap-3 sm:grid-cols-2"
+        data-testid="translate-editor-grid"
+    >
         <div class="flex min-h-64 min-w-0 flex-col gap-2 sm:min-h-0">
             <label
                 for="translate-source"

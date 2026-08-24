@@ -434,22 +434,7 @@ export async function runTranslation(
         availability,
       );
     }
-    await prepareEngine({
-      engine,
-      preparation: [
-        {
-          kind: "translator",
-          sourceText: text,
-          nativeLanguage: nativeTag,
-          foreignLanguage: foreignTag,
-          sourceLanguage: undefined,
-          targetLanguage: undefined,
-          availability,
-          requiresUserActivation: false,
-        },
-      ],
-      onProgress: () => undefined,
-    });
+    await createDetector(() => undefined);
   }
 
   if (!resources.detector) {
@@ -488,11 +473,11 @@ export async function runTranslation(
       availability,
     );
     if (availability !== "available") return preparation;
-    await prepareEngine({
-      engine,
-      preparation: preparation.preparation,
-      onProgress: () => undefined,
-    });
+    await createTranslator(
+      direction.sourceLanguage,
+      direction.targetLanguage,
+      () => undefined,
+    );
   }
 
   if (!resources.translator) {
