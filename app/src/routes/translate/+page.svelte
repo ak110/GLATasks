@@ -21,6 +21,7 @@
         destroyTranslationResources,
         prepareEngine,
         runTranslation,
+        type TranslationDirectionChoice,
         type TranslationPreparationTarget,
     } from "$lib/translate-client";
 
@@ -29,7 +30,13 @@
         nativeLanguage: string;
         foreignLanguage: string;
         engine: TranslateEngine;
+        direction?: TranslationDirectionChoice;
     };
+
+    type TranslatorPreparation = Extract<
+        TranslationPreparationTarget,
+        { kind: "translator" }
+    >;
 
     type PendingPreparation = {
         request: TranslationRequest;
@@ -50,10 +57,27 @@
     let preparationProgress = $state<number | undefined>(undefined);
     let pendingPreparation = $state<PendingPreparation | undefined>(undefined);
     let pendingPreparationStale = $state(false);
+    let directionPreparations = $state<readonly TranslatorPreparation[]>([]);
+    let selectedDirection = $state<
+        TranslatorPreparation["direction"] | undefined
+    >(undefined);
 
     const selectedPreparationTarget = $derived(
         pendingPreparation?.preparation[pendingPreparation.selectedIndex],
     );
+    const selectedDirectionIndex = $derived.by(() => {
+        const pendingTarget = selectedPreparationTarget;
+        const direction =
+            pendingTarget?.kind === "translator"
+                ? pendingTarget.direction
+                : selectedDirection;
+        const index = direction
+            ? directionPreparations.findIndex(
+                  (target) => target.direction === direction,
+              )
+            : 0;
+        return index >= 0 ? index : 0;
+    });
 
     let requestSequence = 0;
     let availabilitySequence = 0;
@@ -100,6 +124,8 @@
             nativeLanguage,
             foreignLanguage,
             engine: selectedEngine,
+            direction:
+                selectedEngine === "translator" ? selectedDirection : undefined,
         };
     }
 
@@ -108,7 +134,11 @@
             request.sourceText === sourceText &&
             request.nativeLanguage === nativeLanguage &&
             request.foreignLanguage === foreignLanguage &&
-            request.engine === selectedEngine
+            request.engine === selectedEngine &&
+            request.direction ===
+                (selectedEngine === "translator"
+                    ? selectedDirection
+                    : undefined)
         );
     }
 
@@ -126,6 +156,8 @@
 
     function handleNativeLanguageInput(event: Event): void {
         nativeLanguage = (event.currentTarget as HTMLInputElement).value;
+        selectedDirection = undefined;
+        directionPreparations = [];
         statusMessage = "";
         markPendingPreparationStale();
         saveSettings();
@@ -133,6 +165,8 @@
 
     function handleForeignLanguageInput(event: Event): void {
         foreignLanguage = (event.currentTarget as HTMLInputElement).value;
+        selectedDirection = undefined;
+        directionPreparations = [];
         statusMessage = "";
         markPendingPreparationStale();
         saveSettings();
@@ -141,6 +175,8 @@
     function handleEngineChange(event: Event): void {
         selectedEngine = (event.currentTarget as HTMLSelectElement)
             .value as TranslateEngine;
+        selectedDirection = undefined;
+        directionPreparations = [];
         statusMessage = "";
         markPendingPreparationStale();
         saveSettings();
@@ -154,19 +190,53 @@
     }
 
     function handlePreparationDirectionChange(event: Event): void {
-        if (!pendingPreparation) return;
         const selectedIndex = Number(
             (event.currentTarget as HTMLSelectElement).value,
         );
         if (
             !Number.isInteger(selectedIndex) ||
             selectedIndex < 0 ||
-            selectedIndex >= pendingPreparation.preparation.length
+            selectedIndex >= directionPreparations.length
         ) {
             return;
         }
-        pendingPreparation = { ...pendingPreparation, selectedIndex };
-        statusMessage = `準備対象: ${describePreparationDirection(pendingPreparation.preparation[selectedIndex])}`;
+        const selectedTarget = directionPreparations[selectedIndex];
+        if (!selectedTarget) return;
+
+        if (pendingPreparation) {
+            const pendingIndex = pendingPreparation.preparation.findIndex(
+                (target) =>
+                    target.kind === "translator" &&
+                    target.direction === selectedTarget.direction,
+            );
+            if (pendingIndex >= 0) {
+                pendingPreparation = {
+                    ...pendingPreparation,
+                    selectedIndex: pendingIndex,
+                };
+                statusMessage = `準備対象: ${describePreparationDirection(selectedTarget)}`;
+            }
+            return;
+        }
+
+        selectedDirection = selectedTarget.direction;
+        statusMessage = `翻訳方向を変更しました: ${describePreparationDirection(selectedTarget)}`;
+    }
+
+    function updateDirectionPreparations(
+        preparation: readonly TranslationPreparationTarget[],
+    ): void {
+        const next = [...directionPreparations];
+        for (const target of preparation) {
+            if (target.kind === "translator") {
+                const index = next.findIndex(
+                    (candidate) => candidate.direction === target.direction,
+                );
+                if (index >= 0) next[index] = target;
+                else next.push(target);
+            }
+        }
+        directionPreparations = next;
     }
 
     async function executeTranslation(
@@ -203,6 +273,7 @@
                         targetText = translatedText;
                     }
                 },
+                request.direction,
             );
 
             if (sequence !== requestSequence || controller.signal.aborted) {
@@ -210,10 +281,27 @@
             }
 
             if (result.status === "prepare") {
+                const translatorPreparations = result.preparation.filter(
+                    (target): target is TranslatorPreparation =>
+                        target.kind === "translator",
+                );
+                if (translatorPreparations.length > 0) {
+                    updateDirectionPreparations(translatorPreparations);
+                } else {
+                    directionPreparations = [];
+                    selectedDirection = undefined;
+                }
+                const selectedIndex = request.direction
+                    ? result.preparation.findIndex(
+                          (target) =>
+                              target.kind === "translator" &&
+                              target.direction === request.direction,
+                      )
+                    : 0;
                 pendingPreparation = {
                     request,
                     preparation: result.preparation,
-                    selectedIndex: 0,
+                    selectedIndex: selectedIndex >= 0 ? selectedIndex : 0,
                 };
                 pendingPreparationStale = false;
                 statusMessage = `準備が必要です: ${result.preparation.map(describePreparationDirection).join("、")}`;
@@ -247,6 +335,14 @@
         const selectedTarget =
             pendingPreparation.preparation[pendingPreparation.selectedIndex];
         if (!selectedTarget) return;
+
+        if (selectedTarget.kind === "translator") {
+            selectedDirection = selectedTarget.direction;
+            updateDirectionPreparations(pendingPreparation.preparation);
+        } else {
+            selectedDirection = undefined;
+            directionPreparations = [];
+        }
 
         if (
             selectedTarget.requiresUserActivation &&
@@ -515,36 +611,45 @@
         >
             {displayedStatus}
         </p>
+        {#if !sourceDisabled && directionPreparations.length > 1}
+            <label
+                class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300"
+                data-testid="translate-direction-field"
+            >
+                <span>翻訳方向</span>
+                <select
+                    value={selectedDirectionIndex}
+                    onchange={handlePreparationDirectionChange}
+                    disabled={isPreparing || pendingPreparationStale}
+                    class="cursor-pointer rounded border border-gray-300 bg-white px-2 py-1 text-gray-700 focus:border-blue-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+                    data-testid="translate-direction-select"
+                >
+                    {#each directionPreparations as target, index (target.direction)}
+                        <option value={index}
+                            >{describePreparationDirection(target)}</option
+                        >
+                    {/each}
+                </select>
+            </label>
+        {/if}
+        {#if selectedPreparationTarget}
+            <span
+                class="text-sm text-gray-600 dark:text-gray-300"
+                data-testid="translate-direction-status"
+            >
+                {describePreparationDirection(selectedPreparationTarget)}
+            </span>
+        {:else if selectedDirection && directionPreparations[selectedDirectionIndex]}
+            <span
+                class="text-sm text-gray-600 dark:text-gray-300"
+                data-testid="translate-direction-status"
+            >
+                {describePreparationDirection(
+                    directionPreparations[selectedDirectionIndex],
+                )}
+            </span>
+        {/if}
         {#if pendingPreparation && !sourceDisabled}
-            {#if pendingPreparation.preparation.length > 1}
-                <label
-                    class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300"
-                    data-testid="translate-direction-field"
-                >
-                    <span>翻訳方向</span>
-                    <select
-                        value={pendingPreparation.selectedIndex}
-                        onchange={handlePreparationDirectionChange}
-                        disabled={isPreparing || pendingPreparationStale}
-                        class="cursor-pointer rounded border border-gray-300 bg-white px-2 py-1 text-gray-700 focus:border-blue-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
-                        data-testid="translate-direction-select"
-                    >
-                        {#each pendingPreparation.preparation as target, index (target.kind === "translator" ? target.direction : target.kind)}
-                            <option value={index}
-                                >{describePreparationDirection(target)}</option
-                            >
-                        {/each}
-                    </select>
-                </label>
-            {/if}
-            {#if selectedPreparationTarget}
-                <span
-                    class="text-sm text-gray-600 dark:text-gray-300"
-                    data-testid="translate-direction-status"
-                >
-                    {describePreparationDirection(selectedPreparationTarget)}
-                </span>
-            {/if}
             <button
                 type="button"
                 onclick={handlePrepare}

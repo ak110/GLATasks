@@ -541,6 +541,7 @@ export async function runTranslation(
   engine: TranslateEngine,
   signal: AbortSignal,
   onChunk: (chunk: string) => void,
+  directionChoice?: TranslationDirectionChoice,
 ): Promise<TranslationResult> {
   const generation = resourceGeneration;
   ensurePreparationActive(generation, signal);
@@ -626,22 +627,60 @@ export async function runTranslation(
       message: "このブラウザはTranslator APIに対応していません",
     };
   }
-  const explicitTranslator = resources.translator;
-  if (explicitTranslator?.mode === "explicit") {
-    const isNativeToForeign =
-      explicitTranslator.key === makePairKey(nativeTag, foreignTag);
-    const isForeignToNative =
-      explicitTranslator.key === makePairKey(foreignTag, nativeTag);
-    if (isNativeToForeign || isForeignToNative) {
+  if (directionChoice) {
+    const direction =
+      directionChoice === "native-to-foreign"
+        ? { sourceLanguage: nativeTag, targetLanguage: foreignTag }
+        : { sourceLanguage: foreignTag, targetLanguage: nativeTag };
+    const pairKey = makePairKey(
+      direction.sourceLanguage,
+      direction.targetLanguage,
+    );
+
+    if (resources.translator?.key !== pairKey) {
+      const availability = await globalThis.Translator.availability(direction);
       ensurePreparationActive(generation, signal);
-      await consumeStream(
-        await explicitTranslator.instance.translateStreaming(text, {
-          signal,
-        }),
-        onChunk,
+      if (availability === "unavailable") {
+        return {
+          status: "unavailable",
+          message: `この言語ペア（${direction.sourceLanguage}→${direction.targetLanguage}）は翻訳できません`,
+        };
+      }
+      if (availability === "downloadable") {
+        return makeTranslatorPreparation(
+          text,
+          nativeLanguage,
+          foreignLanguage,
+          direction.sourceLanguage,
+          direction.targetLanguage,
+          directionChoice,
+          availability,
+        );
+      }
+      await createTranslator(
+        direction.sourceLanguage,
+        direction.targetLanguage,
+        () => undefined,
+        "explicit",
+        generation,
+        signal,
       );
-      return { status: "translated" };
     }
+
+    ensurePreparationActive(generation, signal);
+    if (!resources.translator || resources.translator.key !== pairKey) {
+      return {
+        status: "unavailable",
+        message: "Translator APIを利用できません",
+      };
+    }
+    await consumeStream(
+      await resources.translator.instance.translateStreaming(text, {
+        signal,
+      }),
+      onChunk,
+    );
+    return { status: "translated" };
   }
 
   if (!resources.detector) {

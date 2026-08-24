@@ -208,12 +208,11 @@ export async function installAiStubs(
         );
         state.translatorCreateActivationIds.push(activeActivationId);
         if (
-          (getTranslatorAvailability(
+          getTranslatorAvailability(
             options.sourceLanguage,
             options.targetLanguage,
           ) === "downloadable" &&
-            activeActivationId === 0) ||
-          !navigator.userActivation.isActive
+          (activeActivationId === 0 || !navigator.userActivation.isActive)
         ) {
           throw new Error("missing transient activation");
         }
@@ -252,9 +251,8 @@ export async function installAiStubs(
         state.detectorCreateCount += 1;
         state.detectorCreateActivationIds.push(activeActivationId);
         if (
-          (detectorAvailability === "downloadable" &&
-            activeActivationId === 0) ||
-          !navigator.userActivation.isActive
+          detectorAvailability === "downloadable" &&
+          (activeActivationId === 0 || !navigator.userActivation.isActive)
         ) {
           throw new Error("missing transient activation");
         }

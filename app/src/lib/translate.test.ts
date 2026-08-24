@@ -453,6 +453,89 @@ describe("translate client availability", () => {
     await expect(pending).resolves.toBeUndefined();
   });
 
+  it("準備済みの翻訳方向を保持し、方向変更で対象Translatorだけを作成する", async () => {
+    const detectorCreate = vi.fn();
+    const translatorCreate = vi.fn(
+      ({ sourceLanguage, targetLanguage }: TranslatorCreateOptions) =>
+        Promise.resolve({
+          sourceLanguage,
+          targetLanguage,
+          translate: vi.fn(),
+          translateStreaming: vi.fn(
+            () =>
+              new ReadableStream<string>({
+                start(controller) {
+                  controller.enqueue(`[${sourceLanguage}>${targetLanguage}]`);
+                  controller.close();
+                },
+              }),
+          ),
+          destroy: vi.fn(),
+        } as Translator),
+    );
+    vi.stubGlobal("LanguageDetector", {
+      availability: vi.fn().mockResolvedValue("downloadable"),
+      create: detectorCreate,
+    });
+    vi.stubGlobal("Translator", {
+      availability: vi.fn().mockResolvedValue("available"),
+      create: translatorCreate,
+    });
+
+    const first = await runTranslation(
+      "こんにちは",
+      "ja",
+      "en",
+      "translator",
+      new AbortController().signal,
+      () => undefined,
+    );
+    expect(first.status).toBe("prepare");
+    if (first.status !== "prepare") return;
+    const firstTarget = first.preparation[0];
+    if (!firstTarget) return;
+    await prepareEngine({
+      engine: "translator",
+      preparation: [firstTarget],
+      onProgress: () => undefined,
+    });
+
+    const nativeChunks: string[] = [];
+    await expect(
+      runTranslation(
+        "こんにちは",
+        "ja",
+        "en",
+        "translator",
+        new AbortController().signal,
+        (chunk) => nativeChunks.push(chunk),
+        "native-to-foreign",
+      ),
+    ).resolves.toEqual({ status: "translated" });
+    expect(nativeChunks).toEqual(["[ja>en]"]);
+
+    const foreignChunks: string[] = [];
+    await expect(
+      runTranslation(
+        "hello",
+        "ja",
+        "en",
+        "translator",
+        new AbortController().signal,
+        (chunk) => foreignChunks.push(chunk),
+        "foreign-to-native",
+      ),
+    ).resolves.toEqual({ status: "translated" });
+    expect(foreignChunks).toEqual(["[en>ja]"]);
+    expect(detectorCreate).not.toHaveBeenCalled();
+    expect(translatorCreate).toHaveBeenCalledTimes(2);
+    expect(
+      translatorCreate.mock.calls.map(
+        ([options]) => `${options.sourceLanguage}>${options.targetLanguage}`,
+      ),
+    ).toEqual(["ja>en", "en>ja"]);
+  });
+
   it("downloadableのPrompt準備は呼び出しスタック内でcreateを開始する", async () => {
     let resolvePrompt: ((model: LanguageModel) => void) | undefined;
     const prompt = {

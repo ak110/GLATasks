@@ -65,6 +65,25 @@ test.describe("translate", () => {
       expect(state.translatorCreateCount).toBe(1);
       expect(state.translatorCreatePairs).toEqual(["en>ja"]);
       expect(state.translatorCreateActivationIds[0]).toBeGreaterThan(0);
+      await expect(
+        page.getByTestId("translate-direction-status"),
+      ).toContainText("相手言語 → 母語");
+
+      await expect(directionSelect).toBeVisible();
+      await directionSelect.selectOption("0");
+      await expect(page.getByTestId("translate-prepare-btn")).toBeVisible();
+      await page.getByTestId("translate-prepare-btn").click();
+      await expect(page.getByTestId("translate-target-output")).toHaveValue(
+        "[ja>en] こんにちは",
+        { timeout: 5000 },
+      );
+      await expect(
+        page.getByTestId("translate-direction-status"),
+      ).toContainText("母語 → 相手言語");
+      const switchedState = await getState(page);
+      expect(switchedState.detectorCreateCount).toBe(0);
+      expect(switchedState.translatorCreateCount).toBe(2);
+      expect(switchedState.translatorCreatePairs).toEqual(["en>ja", "ja>en"]);
     });
 
     test("downloadingのTranslator APIは自動経路で翻訳する", async ({
