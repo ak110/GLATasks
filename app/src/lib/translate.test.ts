@@ -151,13 +151,14 @@ describe("translate client availability", () => {
       destroy: vi.fn(),
     };
     const translator = {
-      translateStreaming: vi.fn().mockReturnValue(
-        new ReadableStream<string>({
-          start(controller) {
-            controller.enqueue("translated");
-            controller.close();
-          },
-        }),
+      translateStreaming: vi.fn().mockImplementation(
+        () =>
+          new ReadableStream<string>({
+            start(controller) {
+              controller.enqueue("translated");
+              controller.close();
+            },
+          }),
       ),
       destroy: vi.fn(),
     };
@@ -186,6 +187,67 @@ describe("translate client availability", () => {
     expect(detectorCreate).toHaveBeenCalledTimes(1);
     expect(translatorCreate).toHaveBeenCalledTimes(1);
     expect(chunks).toEqual(["translated"]);
+  });
+
+  it("準備中の原文変更で検出器を重複作成しない", async () => {
+    let resolveDetector: ((detector: LanguageDetector) => void) | undefined;
+    const detector = {
+      detect: vi
+        .fn()
+        .mockResolvedValue([{ detectedLanguage: "ja", confidence: 1 }]),
+      destroy: vi.fn(),
+    };
+    const detectorCreate = vi.fn(
+      () =>
+        new Promise<LanguageDetector>((resolve) => {
+          resolveDetector = resolve;
+        }),
+    );
+    const translator = {
+      translateStreaming: vi.fn().mockImplementation(
+        () =>
+          new ReadableStream<string>({
+            start(controller) {
+              controller.enqueue("translated");
+              controller.close();
+            },
+          }),
+      ),
+      destroy: vi.fn(),
+    };
+    vi.stubGlobal("LanguageDetector", {
+      availability: vi.fn().mockResolvedValue("available"),
+      create: detectorCreate,
+    });
+    vi.stubGlobal("Translator", {
+      availability: vi.fn().mockResolvedValue("available"),
+      create: vi.fn().mockResolvedValue(translator),
+    });
+
+    const first = runTranslation(
+      "最初",
+      "ja",
+      "en",
+      "translator",
+      new AbortController().signal,
+      () => undefined,
+    );
+    await vi.waitFor(() => expect(detectorCreate).toHaveBeenCalledTimes(1));
+    const second = runTranslation(
+      "変更後",
+      "ja",
+      "en",
+      "translator",
+      new AbortController().signal,
+      () => undefined,
+    );
+    expect(detectorCreate).toHaveBeenCalledTimes(1);
+    resolveDetector?.(detector);
+    await expect(Promise.all([first, second])).resolves.toEqual([
+      { status: "translated" },
+      { status: "translated" },
+    ]);
+    expect(detectorCreate).toHaveBeenCalledTimes(1);
   });
 
   it("downloadableのTranslator APIはactivationが必要な準備対象を返す", async () => {

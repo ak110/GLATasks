@@ -63,6 +63,11 @@ const resources: TranslationResources = {
   prompt: undefined,
 };
 
+let resourceGeneration = 0;
+let detectorCreation: Promise<LanguageDetector> | undefined;
+let translatorCreationQueue = Promise.resolve();
+let promptCreationQueue = Promise.resolve();
+
 function makePairKey(sourceLanguage: string, targetLanguage: string): string {
   return `${sourceLanguage}\u0000${targetLanguage}`;
 }
@@ -158,11 +163,27 @@ async function createDetector(
   monitor: CreateMonitorCallback,
 ): Promise<LanguageDetector> {
   if (resources.detector) return resources.detector;
+  if (detectorCreation) return detectorCreation;
   if (typeof globalThis.LanguageDetector === "undefined") {
     throw new Error("Language Detector APIを利用できません");
   }
-  resources.detector = await globalThis.LanguageDetector.create({ monitor });
-  return resources.detector;
+  const generation = resourceGeneration;
+  const creation = globalThis.LanguageDetector.create({ monitor }).then(
+    (instance) => {
+      if (generation !== resourceGeneration) {
+        instance.destroy();
+        throw new DOMException("翻訳準備が中断されました", "AbortError");
+      }
+      resources.detector = instance;
+      return instance;
+    },
+  );
+  detectorCreation = creation;
+  try {
+    return await creation;
+  } finally {
+    if (detectorCreation === creation) detectorCreation = undefined;
+  }
 }
 
 async function createTranslator(
@@ -172,18 +193,31 @@ async function createTranslator(
 ): Promise<Translator> {
   const key = makePairKey(sourceLanguage, targetLanguage);
   if (resources.translator?.key === key) return resources.translator.instance;
-  resources.translator?.instance.destroy();
-  resources.translator = undefined;
   if (typeof globalThis.Translator === "undefined") {
     throw new Error("Translator APIを利用できません");
   }
-  const instance = await globalThis.Translator.create({
-    sourceLanguage,
-    targetLanguage,
-    monitor,
+  const generation = resourceGeneration;
+  const creation = translatorCreationQueue.then(async () => {
+    if (resources.translator?.key === key) return resources.translator.instance;
+    resources.translator?.instance.destroy();
+    resources.translator = undefined;
+    const instance = await globalThis.Translator.create({
+      sourceLanguage,
+      targetLanguage,
+      monitor,
+    });
+    if (generation !== resourceGeneration) {
+      instance.destroy();
+      throw new DOMException("翻訳準備が中断されました", "AbortError");
+    }
+    resources.translator = { key, instance };
+    return instance;
   });
-  resources.translator = { key, instance };
-  return instance;
+  translatorCreationQueue = creation.then(
+    () => undefined,
+    () => undefined,
+  );
+  return creation;
 }
 
 async function createPrompt(
@@ -192,18 +226,31 @@ async function createPrompt(
 ): Promise<LanguageModel> {
   const key = makePromptKey(target.nativeLanguage, target.foreignLanguage);
   if (resources.prompt?.key === key) return resources.prompt.instance;
-  resources.prompt?.instance.destroy();
-  resources.prompt = undefined;
   if (typeof globalThis.LanguageModel === "undefined") {
     throw new Error("Prompt APIを利用できません");
   }
-  const instance = await globalThis.LanguageModel.create({
-    ...target.options,
-    initialPrompts: [{ role: "system", content: target.initialPrompt }],
-    monitor,
+  const generation = resourceGeneration;
+  const creation = promptCreationQueue.then(async () => {
+    if (resources.prompt?.key === key) return resources.prompt.instance;
+    resources.prompt?.instance.destroy();
+    resources.prompt = undefined;
+    const instance = await globalThis.LanguageModel.create({
+      ...target.options,
+      initialPrompts: [{ role: "system", content: target.initialPrompt }],
+      monitor,
+    });
+    if (generation !== resourceGeneration) {
+      instance.destroy();
+      throw new DOMException("翻訳準備が中断されました", "AbortError");
+    }
+    resources.prompt = { key, instance };
+    return instance;
   });
-  resources.prompt = { key, instance };
-  return instance;
+  promptCreationQueue = creation.then(
+    () => undefined,
+    () => undefined,
+  );
+  return creation;
 }
 
 async function prepareTranslator(
@@ -503,6 +550,7 @@ export async function runTranslation(
 
 /** 保持中の検出器、翻訳器、Promptセッションを解放する */
 export function destroyTranslationResources(): void {
+  resourceGeneration += 1;
   resources.detector?.destroy();
   resources.translator?.instance.destroy();
   resources.prompt?.instance.destroy();
