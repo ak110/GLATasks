@@ -34,23 +34,54 @@ test.describe("translate", () => {
       const state = await getState(page);
       expect(state.detectorCreateCount).toBe(1);
       expect(state.translatorCreateCount).toBe(1);
+      expect(state.detectorCreateActivationIds).toEqual([0]);
+      expect(state.translatorCreateActivationIds).toEqual([0]);
     });
 
-    test("downloadable・downloadingのTranslator APIは準備ボタン1回で翻訳する", async ({
+    test("detector downloadable時は方向を選択した1クリックで翻訳する", async ({
       page,
     }) => {
-      for (const availability of ["downloadable", "downloading"] as const) {
-        await installAiStubs(page, {
-          detectorAvailability: availability,
-          translatorAvailability: availability,
-        });
-        await page.reload();
-        await expectStubbedPageReady(page);
-        await prepareTranslator(page, "こんにちは", "[ja>en] こんにちは");
-        const state = await getState(page);
-        expect(state.detectorCreateCount).toBe(1);
-        expect(state.translatorCreateCount).toBe(1);
-      }
+      await installAiStubs(page, {
+        detectorAvailability: "downloadable",
+        translatorAvailability: "downloadable",
+      });
+      await page.reload();
+      await expectStubbedPageReady(page);
+      await page.getByTestId("translate-source-input").fill("こんにちは");
+      const directionSelect = page.getByTestId("translate-direction-select");
+      await expect(directionSelect).toBeVisible({ timeout: 5000 });
+      await expect(directionSelect.locator("option")).toHaveCount(2);
+      await directionSelect.selectOption("1");
+      await expect(
+        page.getByTestId("translate-direction-status"),
+      ).toContainText("相手言語 → 母語");
+      await page.getByTestId("translate-prepare-btn").click();
+      await expect(page.getByTestId("translate-target-output")).toHaveValue(
+        "[en>ja] こんにちは",
+        { timeout: 5000 },
+      );
+      const state = await getState(page);
+      expect(state.detectorCreateCount).toBe(0);
+      expect(state.translatorCreateCount).toBe(1);
+      expect(state.translatorCreatePairs).toEqual(["en>ja"]);
+      expect(state.translatorCreateActivationIds[0]).toBeGreaterThan(0);
+    });
+
+    test("downloadingのTranslator APIは自動経路で翻訳する", async ({
+      page,
+    }) => {
+      await installAiStubs(page, {
+        detectorAvailability: "downloading",
+        translatorAvailability: "downloading",
+      });
+      await page.reload();
+      await expectStubbedPageReady(page);
+      await translateAutomatically(page, "こんにちは", "[ja>en] こんにちは");
+      const state = await getState(page);
+      expect(state.detectorCreateCount).toBe(1);
+      expect(state.translatorCreateCount).toBe(1);
+      expect(state.detectorCreateActivationIds).toEqual([0]);
+      expect(state.translatorCreateActivationIds).toEqual([0]);
     });
 
     test("母語以外の文章を母語へ自動翻訳する", async ({ page }) => {
@@ -111,7 +142,7 @@ test.describe("translate", () => {
       await expectStubbedPageReady(page);
       await page.getByTestId("translate-source-input").fill("こんにちは");
       const prepareButton = page.getByTestId("translate-prepare-btn");
-      await expect(prepareButton).toContainText("翻訳モデル");
+      await expect(prepareButton).toContainText("母語 → 相手言語");
       await page.getByTestId("translate-foreign-input").fill("フランス語");
       await expect(prepareButton).toBeEnabled({ timeout: 5000 });
       await prepareButton.click();
@@ -158,6 +189,7 @@ test.describe("translate", () => {
       await prepareTranslator(page, "hello", "[prompt] hello");
       const state = await getState(page);
       expect(state.promptCreateCount).toBe(1);
+      expect(state.promptCreateActivationIds[0]).toBeGreaterThan(0);
     });
 
     test("Promptセッションを実行ごとに分離する", async ({ page }) => {

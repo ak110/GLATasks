@@ -17,6 +17,7 @@ import {
 import {
   detectEngineAvailability,
   destroyTranslationResources,
+  prepareEngine,
   runTranslation,
 } from "./translate-client";
 
@@ -354,36 +355,146 @@ describe("translate client availability", () => {
     expect(detectorCreate).not.toHaveBeenCalled();
   });
 
-  it("downloadableのTranslator APIはactivationが必要な準備対象を返す", async () => {
+  it("検出器downloadable時は方向別のTranslator準備対象を返す", async () => {
+    const detectorCreate = vi.fn();
+    const translatorAvailability = vi.fn(
+      async ({
+        sourceLanguage,
+        targetLanguage,
+      }: {
+        sourceLanguage: string;
+        targetLanguage: string;
+      }) =>
+        sourceLanguage === "ja" && targetLanguage === "en"
+          ? "downloadable"
+          : "available",
+    );
     vi.stubGlobal("LanguageDetector", {
       availability: vi.fn().mockResolvedValue("downloadable"),
-      create: vi.fn(),
+      create: detectorCreate,
     });
     vi.stubGlobal("Translator", {
-      availability: vi.fn(),
+      availability: translatorAvailability,
       create: vi.fn(),
     });
 
-    await expect(
-      runTranslation(
-        "こんにちは",
-        "ja",
-        "en",
-        "translator",
-        new AbortController().signal,
-        () => undefined,
-      ),
-    ).resolves.toMatchObject({
+    const result = await runTranslation(
+      "こんにちは",
+      "ja",
+      "en",
+      "translator",
+      new AbortController().signal,
+      () => undefined,
+    );
+    expect(result).toMatchObject({
       status: "prepare",
       preparation: [
         {
           kind: "translator",
           availability: "downloadable",
+          direction: "native-to-foreign",
           requiresUserActivation: true,
-          sourceLanguage: undefined,
-          targetLanguage: undefined,
+          sourceLanguage: "ja",
+          targetLanguage: "en",
+        },
+        {
+          kind: "translator",
+          availability: "available",
+          direction: "foreign-to-native",
+          requiresUserActivation: true,
+          sourceLanguage: "en",
+          targetLanguage: "ja",
         },
       ],
     });
+    expect(detectorCreate).not.toHaveBeenCalled();
+    expect(translatorAvailability).toHaveBeenCalledTimes(2);
+  });
+
+  it("downloadableのTranslator準備は呼び出しスタック内でcreateを開始する", async () => {
+    let resolveTranslator: ((translator: Translator) => void) | undefined;
+    const translator = {
+      sourceLanguage: "ja",
+      targetLanguage: "en",
+      translate: vi.fn(),
+      translateStreaming: vi.fn(),
+      destroy: vi.fn(),
+    };
+    const translatorCreate = vi.fn(
+      () =>
+        new Promise<Translator>((resolve) => {
+          resolveTranslator = resolve;
+        }),
+    );
+    vi.stubGlobal("Translator", {
+      availability: vi.fn().mockResolvedValue("downloadable"),
+      create: translatorCreate,
+    });
+
+    const preparation = {
+      kind: "translator" as const,
+      sourceText: "こんにちは",
+      nativeLanguage: "ja",
+      foreignLanguage: "en",
+      sourceLanguage: "ja",
+      targetLanguage: "en",
+      direction: "native-to-foreign" as const,
+      availability: "downloadable" as const,
+      requiresUserActivation: true,
+    };
+    const pending = prepareEngine({
+      engine: "translator",
+      preparation: [preparation],
+      onProgress: () => undefined,
+    });
+
+    expect(translatorCreate).toHaveBeenCalledTimes(1);
+    resolveTranslator?.(translator);
+    await expect(pending).resolves.toBeUndefined();
+  });
+
+  it("downloadableのPrompt準備は呼び出しスタック内でcreateを開始する", async () => {
+    let resolvePrompt: ((model: LanguageModel) => void) | undefined;
+    const prompt = {
+      clone: vi.fn(),
+      prompt: vi.fn(),
+      promptStreaming: vi.fn(),
+      destroy: vi.fn(),
+    };
+    const promptCreate = vi.fn(
+      () =>
+        new Promise<LanguageModel>((resolve) => {
+          resolvePrompt = resolve;
+        }),
+    );
+    vi.stubGlobal("LanguageModel", {
+      availability: vi.fn().mockResolvedValue("downloadable"),
+      create: promptCreate,
+    });
+
+    const pending = prepareEngine({
+      engine: "prompt",
+      preparation: [
+        {
+          kind: "prompt" as const,
+          nativeLanguage: "ja",
+          foreignLanguage: "en",
+          options: {
+            expectedInputs: [{ type: "text" as const, languages: ["en"] }],
+            expectedOutputs: [
+              { type: "text" as const, languages: ["ja", "en"] },
+            ],
+          },
+          initialPrompt: "翻訳する",
+          availability: "downloadable" as const,
+          requiresUserActivation: true,
+        },
+      ],
+      onProgress: () => undefined,
+    });
+
+    expect(promptCreate).toHaveBeenCalledTimes(1);
+    resolvePrompt?.(prompt);
+    await expect(pending).resolves.toBeUndefined();
   });
 });

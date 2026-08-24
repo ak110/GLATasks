@@ -7,6 +7,10 @@ export type StubOptions = {
   detectorLanguage?: string;
   detectorAvailability?: Availability;
   translatorAvailability?: Availability;
+  translatorAvailabilityByDirection?: {
+    nativeToForeign?: Availability;
+    foreignToNative?: Availability;
+  };
   promptAvailability?: Availability;
   includeTranslator?: boolean;
   includePrompt?: boolean;
@@ -19,8 +23,12 @@ export type StubOptions = {
 
 export type TranslateTestState = {
   detectorCreateCount: number;
+  detectorCreateActivationIds: number[];
   translatorCreateCount: number;
+  translatorCreatePairs: string[];
+  translatorCreateActivationIds: number[];
   promptCreateCount: number;
+  promptCreateActivationIds: number[];
   promptCloneCount: number;
   promptDestroyCount: number;
   translationInputs: string[];
@@ -63,6 +71,7 @@ export async function installAiStubs(
       detectorLanguage,
       detectorAvailability,
       translatorAvailability,
+      translatorAvailabilityByDirection,
       promptAvailability,
       includeTranslator,
       includePrompt,
@@ -73,10 +82,27 @@ export async function installAiStubs(
       blockDetectorCreate,
     } = options;
     let releaseDetectorCreate: (() => void) | undefined;
+    let activationSequence = 0;
+    let activeActivationId = 0;
+    document.addEventListener(
+      "click",
+      () => {
+        activeActivationId = ++activationSequence;
+        const activationId = activeActivationId;
+        setTimeout(() => {
+          if (activeActivationId === activationId) activeActivationId = 0;
+        }, 0);
+      },
+      true,
+    );
     const state: TranslateTestState = {
       detectorCreateCount: 0,
+      detectorCreateActivationIds: [],
       translatorCreateCount: 0,
+      translatorCreatePairs: [],
+      translatorCreateActivationIds: [],
       promptCreateCount: 0,
+      promptCreateActivationIds: [],
       promptCloneCount: 0,
       promptDestroyCount: 0,
       translationInputs: [],
@@ -133,6 +159,25 @@ export async function installAiStubs(
       });
     }
 
+    function getTranslatorAvailability(
+      sourceLanguage: string,
+      targetLanguage: string,
+    ): Availability {
+      if (sourceLanguage === "ja" && targetLanguage === "en") {
+        return (
+          translatorAvailabilityByDirection?.nativeToForeign ??
+          translatorAvailability
+        );
+      }
+      if (sourceLanguage === "en" && targetLanguage === "ja") {
+        return (
+          translatorAvailabilityByDirection?.foreignToNative ??
+          translatorAvailability
+        );
+      }
+      return translatorAvailability;
+    }
+
     class TestTranslator {
       readonly sourceLanguage: string;
       readonly targetLanguage: string;
@@ -142,8 +187,14 @@ export async function installAiStubs(
         this.targetLanguage = targetLanguage;
       }
 
-      static async availability() {
-        return translatorAvailability;
+      static async availability(options: {
+        sourceLanguage: string;
+        targetLanguage: string;
+      }) {
+        return getTranslatorAvailability(
+          options.sourceLanguage,
+          options.targetLanguage,
+        );
       }
 
       static async create(options: {
@@ -152,6 +203,20 @@ export async function installAiStubs(
         monitor?: (monitor: unknown) => void;
       }) {
         state.translatorCreateCount += 1;
+        state.translatorCreatePairs.push(
+          `${options.sourceLanguage}>${options.targetLanguage}`,
+        );
+        state.translatorCreateActivationIds.push(activeActivationId);
+        if (
+          (getTranslatorAvailability(
+            options.sourceLanguage,
+            options.targetLanguage,
+          ) === "downloadable" &&
+            activeActivationId === 0) ||
+          !navigator.userActivation.isActive
+        ) {
+          throw new Error("missing transient activation");
+        }
         if (translatorCreateError) throw new Error(translatorCreateError);
         notifyProgress(options.monitor as never);
         return new TestTranslator(
@@ -185,6 +250,14 @@ export async function installAiStubs(
 
       static async create(options: { monitor?: unknown }) {
         state.detectorCreateCount += 1;
+        state.detectorCreateActivationIds.push(activeActivationId);
+        if (
+          (detectorAvailability === "downloadable" &&
+            activeActivationId === 0) ||
+          !navigator.userActivation.isActive
+        ) {
+          throw new Error("missing transient activation");
+        }
         if (detectorCreateError) throw new Error(detectorCreateError);
         if (blockDetectorCreate && state.detectorCreateCount === 1) {
           state.detectorCreateBlocked = true;
@@ -238,6 +311,13 @@ export async function installAiStubs(
         monitor?: unknown;
       }) {
         state.promptCreateCount += 1;
+        state.promptCreateActivationIds.push(activeActivationId);
+        if (
+          promptAvailability === "downloadable" &&
+          (activeActivationId === 0 || !navigator.userActivation.isActive)
+        ) {
+          throw new Error("missing transient activation");
+        }
         if (promptCreateError) throw new Error(promptCreateError);
         state.promptExpectedInputs.push(
           options.expectedInputs?.[0]?.languages ?? [],
@@ -308,8 +388,12 @@ export async function getState(page: Page): Promise<TranslateTestState> {
       .__translateTestState;
     return {
       detectorCreateCount: state.detectorCreateCount,
+      detectorCreateActivationIds: [...state.detectorCreateActivationIds],
       translatorCreateCount: state.translatorCreateCount,
+      translatorCreatePairs: [...state.translatorCreatePairs],
+      translatorCreateActivationIds: [...state.translatorCreateActivationIds],
       promptCreateCount: state.promptCreateCount,
+      promptCreateActivationIds: [...state.promptCreateActivationIds],
       promptCloneCount: state.promptCloneCount,
       promptDestroyCount: state.promptDestroyCount,
       translationInputs: [...state.translationInputs],
