@@ -5,6 +5,7 @@ export type Availability =
 
 export type StubOptions = {
   detectorLanguage?: string;
+  detectorLanguages?: string[];
   detectorAvailability?: Availability;
   translatorAvailability?: Availability;
   translatorAvailabilityByDirection?: {
@@ -69,6 +70,7 @@ export async function installAiStubs(
   await page.addInitScript((options) => {
     const {
       detectorLanguage,
+      detectorLanguages,
       detectorAvailability,
       translatorAvailability,
       translatorAvailabilityByDirection,
@@ -82,6 +84,7 @@ export async function installAiStubs(
       blockDetectorCreate,
     } = options;
     let releaseDetectorCreate: (() => void) | undefined;
+    let detectorDetectionCount = 0;
     let activationSequence = 0;
     let activeActivationId = 0;
     document.addEventListener(
@@ -269,9 +272,13 @@ export async function installAiStubs(
       }
 
       async detect(_input: string, _options: { signal?: AbortSignal } = {}) {
+        const detectedLanguage =
+          detectorLanguages?.[detectorDetectionCount++] ??
+          detectorLanguage ??
+          "ja";
         return [
           {
-            detectedLanguage: detectorLanguage ?? "ja",
+            detectedLanguage,
             confidence: 1,
           },
         ];

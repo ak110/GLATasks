@@ -285,8 +285,12 @@
                     (target): target is TranslatorPreparation =>
                         target.kind === "translator",
                 );
-                if (translatorPreparations.length > 0) {
-                    updateDirectionPreparations(translatorPreparations);
+                const directionChoicePreparations =
+                    translatorPreparations.filter(
+                        (target) => target.requiresDirectionChoice,
+                    );
+                if (directionChoicePreparations.length > 0) {
+                    updateDirectionPreparations(directionChoicePreparations);
                 } else {
                     directionPreparations = [];
                     selectedDirection = undefined;
@@ -336,7 +340,10 @@
             pendingPreparation.preparation[pendingPreparation.selectedIndex];
         if (!selectedTarget) return;
 
-        if (selectedTarget.kind === "translator") {
+        if (
+            selectedTarget.kind === "translator" &&
+            selectedTarget.requiresDirectionChoice
+        ) {
             selectedDirection = selectedTarget.direction;
             updateDirectionPreparations(pendingPreparation.preparation);
         } else {

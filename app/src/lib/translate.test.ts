@@ -394,6 +394,7 @@ describe("translate client availability", () => {
           availability: "downloadable",
           direction: "native-to-foreign",
           requiresUserActivation: true,
+          requiresDirectionChoice: true,
           sourceLanguage: "ja",
           targetLanguage: "en",
         },
@@ -402,6 +403,7 @@ describe("translate client availability", () => {
           availability: "available",
           direction: "foreign-to-native",
           requiresUserActivation: true,
+          requiresDirectionChoice: true,
           sourceLanguage: "en",
           targetLanguage: "ja",
         },
@@ -440,6 +442,7 @@ describe("translate client availability", () => {
       targetLanguage: "en",
       direction: "native-to-foreign" as const,
       availability: "downloadable" as const,
+      requiresDirectionChoice: true,
       requiresUserActivation: true,
     };
     const pending = prepareEngine({
@@ -451,6 +454,131 @@ describe("translate client availability", () => {
     expect(translatorCreate).toHaveBeenCalledTimes(1);
     resolveTranslator?.(translator);
     await expect(pending).resolves.toBeUndefined();
+  });
+
+  it("中断済み要求のAbortSignalで共有Translator作成Promiseを失敗させない", async () => {
+    let resolveTranslator: ((translator: Translator) => void) | undefined;
+    const translator = {
+      sourceLanguage: "ja",
+      targetLanguage: "en",
+      translate: vi.fn(),
+      translateStreaming: vi.fn(),
+      destroy: vi.fn(),
+    };
+    const translatorCreate = vi.fn(
+      () =>
+        new Promise<Translator>((resolve) => {
+          resolveTranslator = resolve;
+        }),
+    );
+    vi.stubGlobal("Translator", {
+      availability: vi.fn().mockResolvedValue("downloadable"),
+      create: translatorCreate,
+    });
+    const preparation = {
+      kind: "translator" as const,
+      sourceText: "こんにちは",
+      nativeLanguage: "ja",
+      foreignLanguage: "en",
+      sourceLanguage: "ja",
+      targetLanguage: "en",
+      direction: "native-to-foreign" as const,
+      availability: "downloadable" as const,
+      requiresDirectionChoice: true,
+      requiresUserActivation: true,
+    };
+    const firstController = new AbortController();
+    const first = prepareEngine({
+      engine: "translator",
+      preparation: [preparation],
+      onProgress: () => undefined,
+      signal: firstController.signal,
+    });
+    await vi.waitFor(() => expect(translatorCreate).toHaveBeenCalledTimes(1));
+    firstController.abort();
+
+    const second = prepareEngine({
+      engine: "translator",
+      preparation: [preparation],
+      onProgress: () => undefined,
+    });
+    expect(translatorCreate).toHaveBeenCalledTimes(1);
+    resolveTranslator?.(translator);
+
+    await expect(first).rejects.toMatchObject({ name: "AbortError" });
+    await expect(second).resolves.toBeUndefined();
+  });
+
+  it("検出器の自動経路ではTranslator準備後も入力ごとに方向を再判定する", async () => {
+    const detector = {
+      detect: vi
+        .fn()
+        .mockResolvedValueOnce([{ detectedLanguage: "ja", confidence: 1 }])
+        .mockResolvedValueOnce([{ detectedLanguage: "en", confidence: 1 }]),
+      destroy: vi.fn(),
+    };
+    const translatorCreate = vi.fn(
+      ({ sourceLanguage, targetLanguage }: TranslatorCreateOptions) =>
+        Promise.resolve({
+          sourceLanguage,
+          targetLanguage,
+          translate: vi.fn(),
+          translateStreaming: vi.fn(),
+          destroy: vi.fn(),
+        } as Translator),
+    );
+    vi.stubGlobal("LanguageDetector", {
+      availability: vi.fn().mockResolvedValue("available"),
+      create: vi.fn().mockResolvedValue(detector),
+    });
+    vi.stubGlobal("Translator", {
+      availability: vi.fn().mockResolvedValue("downloadable"),
+      create: translatorCreate,
+    });
+
+    const first = await runTranslation(
+      "こんにちは",
+      "ja",
+      "en",
+      "translator",
+      new AbortController().signal,
+      () => undefined,
+    );
+    expect(first).toMatchObject({
+      status: "prepare",
+      preparation: [
+        {
+          direction: "native-to-foreign",
+          requiresDirectionChoice: false,
+        },
+      ],
+    });
+    if (first.status !== "prepare") return;
+    await prepareEngine({
+      engine: "translator",
+      preparation: first.preparation,
+      onProgress: () => undefined,
+    });
+
+    const second = await runTranslation(
+      "hello",
+      "ja",
+      "en",
+      "translator",
+      new AbortController().signal,
+      () => undefined,
+    );
+    expect(second).toMatchObject({
+      status: "prepare",
+      preparation: [
+        {
+          direction: "foreign-to-native",
+          requiresDirectionChoice: false,
+        },
+      ],
+    });
+    expect(detector.detect).toHaveBeenCalledTimes(2);
+    expect(translatorCreate).toHaveBeenCalledTimes(1);
   });
 
   it("準備済みの翻訳方向を保持し、方向変更で対象Translatorだけを作成する", async () => {
@@ -579,5 +707,57 @@ describe("translate client availability", () => {
     expect(promptCreate).toHaveBeenCalledTimes(1);
     resolvePrompt?.(prompt);
     await expect(pending).resolves.toBeUndefined();
+  });
+
+  it("中断済み要求のAbortSignalで共有Prompt作成Promiseを失敗させない", async () => {
+    let resolvePrompt: ((model: LanguageModel) => void) | undefined;
+    const prompt = {
+      clone: vi.fn(),
+      prompt: vi.fn(),
+      promptStreaming: vi.fn(),
+      destroy: vi.fn(),
+    } as LanguageModel;
+    const promptCreate = vi.fn(
+      () =>
+        new Promise<LanguageModel>((resolve) => {
+          resolvePrompt = resolve;
+        }),
+    );
+    vi.stubGlobal("LanguageModel", {
+      availability: vi.fn().mockResolvedValue("downloadable"),
+      create: promptCreate,
+    });
+    const preparation = {
+      kind: "prompt" as const,
+      nativeLanguage: "ja",
+      foreignLanguage: "en",
+      options: {
+        expectedInputs: [{ type: "text" as const, languages: ["en"] }],
+        expectedOutputs: [{ type: "text" as const, languages: ["ja", "en"] }],
+      },
+      initialPrompt: "翻訳する",
+      availability: "downloadable" as const,
+      requiresUserActivation: true,
+    };
+    const firstController = new AbortController();
+    const first = prepareEngine({
+      engine: "prompt",
+      preparation: [preparation],
+      onProgress: () => undefined,
+      signal: firstController.signal,
+    });
+    await vi.waitFor(() => expect(promptCreate).toHaveBeenCalledTimes(1));
+    firstController.abort();
+
+    const second = prepareEngine({
+      engine: "prompt",
+      preparation: [preparation],
+      onProgress: () => undefined,
+    });
+    expect(promptCreate).toHaveBeenCalledTimes(1);
+    resolvePrompt?.(prompt);
+
+    await expect(first).rejects.toMatchObject({ name: "AbortError" });
+    await expect(second).resolves.toBeUndefined();
   });
 });

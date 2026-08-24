@@ -25,6 +25,7 @@ export type TranslationPreparationTarget =
       direction: TranslationDirectionChoice;
       availability: Availability;
       requiresUserActivation: boolean;
+      requiresDirectionChoice: boolean;
     }
   | {
       kind: "prompt";
@@ -260,7 +261,6 @@ async function createTranslator(
         sourceLanguage,
         targetLanguage,
         monitor,
-        ...(signal ? { signal } : {}),
       }),
     ).then((instance) => {
       if (
@@ -318,7 +318,6 @@ async function createPrompt(
         ...target.options,
         initialPrompts: [{ role: "system", content: target.initialPrompt }],
         monitor,
-        ...(signal ? { signal } : {}),
       }),
     ).then((instance) => {
       if (
@@ -373,6 +372,7 @@ async function prepareTranslator(
     generation,
     signal,
   );
+  ensurePreparationActive(generation, signal);
 }
 
 async function preparePrompt(
@@ -389,6 +389,7 @@ async function preparePrompt(
     throw new Error("Prompt APIを利用できません");
   }
   await createPrompt(target, monitor, generation, signal);
+  ensurePreparationActive(generation, signal);
 }
 
 function getDetectedLanguage(
@@ -409,6 +410,7 @@ function makeTranslatorPreparation(
   targetLanguage: string,
   direction: TranslationDirectionChoice,
   availability: Availability,
+  requiresDirectionChoice = false,
   requiresUserActivation = true,
 ): TranslationPreparationResult {
   return {
@@ -423,6 +425,7 @@ function makeTranslatorPreparation(
         targetLanguage,
         direction,
         availability,
+        requiresDirectionChoice,
         requiresUserActivation,
       },
     ],
@@ -481,6 +484,7 @@ async function makeDirectionPreparations(
         availability,
         // Detector未準備の方向選択は、available/downloadingでも1回の明示操作で確定する。
         requiresUserActivation: true,
+        requiresDirectionChoice: true,
       };
     }),
   );
@@ -530,9 +534,10 @@ async function consumeStream(
 
 /**
  * 作成済みの内蔵AIインスタンスで翻訳し、必要な準備があればその対象を返す。
- * 実行ごとのAbortSignalは検出・翻訳・Prompt実行へ渡し、準備対象の
- * create()へも渡す。利用者操作起点のcreate()自体は、この関数から呼び出す
- * 準備処理の呼び出しスタック内で開始する。
+ * 実行ごとのAbortSignalは検出・翻訳・Prompt実行へ渡す。モデル作成は
+ * resourceGenerationで共有所有し、個別要求の中断で共有作成Promiseを壊さない。
+ * 利用者操作起点のcreate()自体は、この関数から呼び出す準備処理の呼び出し
+ * スタック内で開始する。
  */
 export async function runTranslation(
   text: string,
@@ -655,6 +660,7 @@ export async function runTranslation(
           direction.targetLanguage,
           directionChoice,
           availability,
+          true,
         );
       }
       await createTranslator(
