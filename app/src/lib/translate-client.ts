@@ -126,8 +126,14 @@ export async function detectEngineAvailability(
 
 /**
  * 準備対象の内蔵AIインスタンスを作成する。
- * `availability()`がモデルのダウンロードを示す対象は、利用者操作から呼び出す。
+ * `availability() === "available"`の資源は自動経路で作成し、モデルの
+ * ダウンロードを示す資源は利用者操作から検出器・翻訳器を連続して作成する。
+ * 同一activation内で複数の`create()`を試行するため、実機での受理結果を
+ * 継続して確認する。
+ * 仕様: https://developer.chrome.com/docs/ai/get-started
+ * https://developer.chrome.com/docs/ai/translator-api
  * https://developer.mozilla.org/en-US/docs/Web/API/Prompt_API/Using
+ * https://learn.microsoft.com/en-us/microsoft-edge/web-platform/prompt-api
  */
 export async function prepareEngine({
   engine,
