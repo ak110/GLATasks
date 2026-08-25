@@ -15,6 +15,9 @@
         onToggle: (taskId: number, nextStatus: TaskStatus) => void;
         onEdit: (task: TaskListItem) => void;
         onReorder?: (taskIds: number[]) => void;
+        onTaskDragOver?: (listId: number | null) => void;
+        onTaskDrop?: (taskId: number, targetListId: number) => void;
+        onDragStateChange?: (isDragging: boolean) => void;
         updatedTaskIds?: Set<number>;
     };
 
@@ -24,6 +27,9 @@
         onToggle,
         onEdit,
         onReorder,
+        onTaskDragOver,
+        onTaskDrop,
+        onDragStateChange,
         updatedTaskIds,
     }: Props = $props();
 
@@ -33,10 +39,18 @@
         if (scrollElement) scrollElement.scrollTop = 0;
     }
 
-    // D&D 状態管理（onReorder が渡された場合のみ有効化）
+    // D&D 状態管理（並び替えまたは別リストへの移動が渡された場合のみ有効化）
     const dnd = createDragReorder(
         () => tasks,
         (ids) => onReorder?.(ids),
+        {
+            externalDropTargetSelector: "[data-task-drop-list-id]",
+            externalDropTargetIdAttribute: "taskDropListId",
+            onExternalDropTargetChange: (listId) => onTaskDragOver?.(listId),
+            onExternalDrop: (taskId, targetListId) =>
+                onTaskDrop?.(taskId, targetListId),
+            onDragStateChange: (isDragging) => onDragStateChange?.(isDragging),
+        },
     );
 </script>
 
@@ -61,7 +75,9 @@
                 dropIndicator={dnd.isActive && dnd.dropTargetId === task.id
                     ? dnd.dropPosition
                     : null}
-                onDragStart={onReorder ? dnd.handleDragStart : undefined}
+                onDragStart={onReorder || onTaskDrop
+                    ? dnd.handleDragStart
+                    : undefined}
             />
         {/each}
     {/if}

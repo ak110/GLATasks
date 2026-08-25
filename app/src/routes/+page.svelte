@@ -15,7 +15,6 @@
     import { showErrorToast } from "$lib/toast-store.svelte";
     import { extractErrorMessage } from "$lib/extract-error-message";
     import { uploadAttachment } from "$lib/attachment-utils";
-    import { onMount } from "svelte";
     import { SvelteSet, SvelteMap } from "svelte/reactivity";
     import type { TaskStatus, TaskKind } from "$lib/schemas";
     import type {
@@ -55,6 +54,7 @@
     let addTaskText = $state("");
     let openMenuId = $state<number | null>(null);
     let dragOverListId = $state<number | null>(null);
+    let isTaskDragging = $state(false);
     let hasHash = $state(false);
     let searchQuery = $state("");
     let debouncedQuery = $state("");
@@ -301,15 +301,6 @@
             fallback: syncSchedules,
         },
     });
-    // ドラッグ終了時にサイドバーのハイライトをリセット
-    onMount(() => {
-        const clearDragOver = () => (dragOverListId = null);
-        document.addEventListener("dragend", clearDragOver);
-        return () => {
-            document.removeEventListener("dragend", clearDragOver);
-        };
-    });
-
     // リスト作成
     const createListMutation = createMutation(() => ({
         mutationFn: (title: string) => trpc.lists.create.mutate({ title }),
@@ -1115,6 +1106,7 @@
         {mobileView}
         {openMenuId}
         {dragOverListId}
+        {isTaskDragging}
         bind:addListTitle
         onSelect={selectList}
         onToggleMenu={(listId) => {
@@ -1127,15 +1119,13 @@
         onDelete={deleteList}
         onOpenSchedules={(listId) => (schedulesDialogListId = listId)}
         onAddList={addList}
-        onTaskDragOver={(listId) => (dragOverListId = listId)}
-        onTaskDrop={handleTaskDropToList}
     />
 
     <!-- メインコンテンツ: 選択リストのタスク or 検索結果 -->
     <main
         class="flex-1 flex-col bg-white sm:flex dark:bg-gray-800"
-        class:flex={mobileView === "tasks"}
-        class:hidden={mobileView !== "tasks"}
+        class:flex={mobileView === "tasks" && !isTaskDragging}
+        class:hidden={mobileView !== "tasks" || isTaskDragging}
         class:min-h-0={!isSearching}
         class:overflow-hidden={!isSearching}
         class:overflow-y-auto={isSearching}
@@ -1170,6 +1160,10 @@
                 onToggle={toggleTask}
                 onEdit={openEditDialog}
                 onReorder={handleReorderTasks}
+                onTaskDragOver={(listId) => (dragOverListId = listId)}
+                onTaskDrop={handleTaskDropToList}
+                onDragStateChange={(isDragging) =>
+                    (isTaskDragging = isDragging)}
                 {updatedTaskIds}
             />
         {:else}

@@ -18,8 +18,6 @@
         onMerge: (listId: number) => void;
         onDelete: (listId: number) => void;
         onOpenSchedules: (listId: number) => void;
-        onTaskDragOver?: () => void;
-        onTaskDrop?: (taskId: number) => void;
     };
 
     let {
@@ -35,8 +33,6 @@
         onMerge,
         onDelete,
         onOpenSchedules,
-        onTaskDragOver,
-        onTaskDrop,
     }: Props = $props();
 </script>
 
@@ -47,19 +43,8 @@
         ? 'bg-blue-50 ring-2 ring-blue-400 ring-inset dark:bg-blue-900/30 dark:ring-blue-500'
         : ''}"
     data-testid="list-item"
+    data-task-drop-list-id={isSelected ? undefined : list.id}
     role="listitem"
-    ondragover={(e) => {
-        if (e.dataTransfer?.types.includes("application/x-task-id")) {
-            e.preventDefault();
-            e.dataTransfer.dropEffect = "move";
-            onTaskDragOver?.();
-        }
-    }}
-    ondrop={(e) => {
-        e.preventDefault();
-        const taskId = Number(e.dataTransfer?.getData("application/x-task-id"));
-        if (taskId) onTaskDrop?.(taskId);
-    }}
 >
     <button
         class="flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 truncate px-4 py-2.5 text-left"

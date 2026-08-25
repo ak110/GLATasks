@@ -14,6 +14,7 @@
         openMenuId: number | null;
         addListTitle: string;
         dragOverListId?: number | null;
+        isTaskDragging?: boolean;
         onSelect: (listId: number) => void;
         onToggleMenu: (listId: number) => void;
         onRename: (listId: number, currentTitle: string) => void;
@@ -23,8 +24,6 @@
         onDelete: (listId: number) => void;
         onOpenSchedules: (listId: number) => void;
         onAddList: (title: string) => void;
-        onTaskDragOver?: (listId: number) => void;
-        onTaskDrop?: (taskId: number, targetListId: number) => void;
     };
 
     let {
@@ -35,6 +34,7 @@
         openMenuId,
         addListTitle = $bindable(),
         dragOverListId = null,
+        isTaskDragging = false,
         onSelect,
         onToggleMenu,
         onRename,
@@ -44,8 +44,6 @@
         onDelete,
         onOpenSchedules,
         onAddList,
-        onTaskDragOver,
-        onTaskDrop,
     }: Props = $props();
 
     function handleAddList(e: Event) {
@@ -59,9 +57,9 @@
 
 <aside
     class="flex-col border-r border-gray-200 bg-white sm:flex sm:w-56 sm:shrink-0 dark:border-gray-700 dark:bg-gray-800"
-    class:flex={mobileView === "lists"}
-    class:w-full={mobileView === "lists"}
-    class:hidden={mobileView !== "lists"}
+    class:flex={mobileView === "lists" || isTaskDragging}
+    class:w-full={mobileView === "lists" || isTaskDragging}
+    class:hidden={mobileView !== "lists" && !isTaskDragging}
 >
     <div class="flex-1 overflow-y-auto">
         {#each lists as list (list.id)}
@@ -78,8 +76,6 @@
                 {onMerge}
                 {onDelete}
                 {onOpenSchedules}
-                onTaskDragOver={() => onTaskDragOver?.(list.id)}
-                onTaskDrop={(taskId) => onTaskDrop?.(taskId, list.id)}
             />
         {/each}
         {#if lists.length === 0 && !isLoading}

@@ -1269,6 +1269,69 @@ test.describe("tasks", () => {
     await cleanupTestList(page.context().browser()!, reorderListName);
   });
 
+  test("ドラッグハンドルでタスクを別リストへ移動できる", async ({
+    page,
+    browser,
+  }) => {
+    const targetListName = `移動先_${Date.now()}`;
+    const taskTitle = `別リスト移動_${Date.now()}`;
+    await createListFromPage(page, targetListName);
+    try {
+      await page
+        .getByTestId("list-select-btn")
+        .filter({ hasText: LIST_NAME })
+        .click();
+      await expect(
+        page.getByRole("heading", { name: LIST_NAME, exact: true }),
+      ).toBeVisible({ timeout: 15000 });
+
+      await addTaskAndWaitForPersist(page, taskTitle);
+      const sourceTask = page
+        .getByTestId("task-item")
+        .filter({ hasText: taskTitle });
+      const handleBox = await sourceTask
+        .getByTestId("task-drag-handle")
+        .boundingBox();
+      const targetList = page
+        .getByTestId("list-item")
+        .filter({ hasText: targetListName });
+      await expect(targetList).toHaveAttribute("data-task-drop-list-id", /\d+/);
+      await targetList.scrollIntoViewIfNeeded();
+      const targetBox = await targetList.boundingBox();
+      if (!handleBox || !targetBox) {
+        throw new Error("タスク移動対象の境界ボックスを取得できない");
+      }
+
+      const startX = handleBox.x + handleBox.width / 2;
+      const startY = handleBox.y + handleBox.height / 2;
+      const targetX = targetBox.x + targetBox.width / 2;
+      const targetY = targetBox.y + targetBox.height / 2;
+      await page.mouse.move(startX, startY);
+      await page.mouse.down();
+      await page.mouse.move(startX + 20, startY + 20);
+      const updateResponsePromise = page.waitForResponse((response) =>
+        isTaskUpdateUrl(response.url()),
+      );
+      await page.mouse.move(targetX, targetY, { steps: 10 });
+      await expect(targetList).toHaveClass(/ring-blue-400/, {
+        timeout: 5000,
+      });
+      await page.mouse.up();
+      const updateResponse = await updateResponsePromise;
+      expect(updateResponse.ok()).toBe(true);
+
+      await expect(sourceTask).toHaveCount(0, { timeout: 15000 });
+
+      await targetList.getByTestId("list-select-btn").click();
+      await expect(page.getByTestId("task-item").first()).toContainText(
+        taskTitle,
+        { timeout: 15000 },
+      );
+    } finally {
+      await cleanupTestList(browser, targetListName);
+    }
+  });
+
   test("編集ダイアログでテキストを変更できる", async ({ page }) => {
     const original = `編集前_${Date.now()}`;
     const edited = `編集後_${Date.now()}`;

@@ -38,17 +38,6 @@ function makeRowElement(id: number, rect = { top: 100, height: 100 }) {
   return el;
 }
 
-/** 必要な最小フィールドを持つ PointerEvent 風オブジェクトを生成する（DragOver レガシー API 用） */
-function makeOverEvent(
-  currentTarget: HTMLElement,
-  clientY: number,
-): PointerEvent {
-  return {
-    currentTarget,
-    clientY,
-  } as unknown as PointerEvent;
-}
-
 /** ハンドル要素に対する pointerdown を模した PointerEvent 風オブジェクトを生成する */
 function makeStartEvent(
   handle: Element,
@@ -62,6 +51,13 @@ function makeStartEvent(
     clientX,
     clientY,
   } as unknown as PointerEvent;
+}
+
+/** `data-task-drop-list-id` を持つ外部ドロップ先要素を生成する */
+function makeExternalDropTarget(listId: number) {
+  const el = document.createElement("div");
+  el.setAttribute("data-task-drop-list-id", String(listId));
+  return el;
 }
 
 /** window へ pointermove を発火する */
@@ -98,27 +94,29 @@ describe("createDragReorder", () => {
     dnd.resetDragState();
   });
 
-  it("handleDragOver を呼ぶと dropTargetId / dropPosition が設定される（before）", () => {
+  it("pointermove で dropTargetId / dropPosition が設定される（before）", () => {
     const dnd = createDragReorder(() => makeItems([1, 2, 3]), vi.fn());
     const handle = document.createElement("span");
     dnd.handleDragStart(1, makeStartEvent(handle, 0, 0));
 
     const row = makeRowElement(2);
+    vi.spyOn(document, "elementFromPoint").mockReturnValue(row);
     // midY=150 より上 → before
-    dnd.handleDragOver(2, makeOverEvent(row, 110));
+    dispatchPointerMove(20, 110);
     expect(dnd.dropTargetId).toBe(2);
     expect(dnd.dropPosition).toBe("before");
     dnd.resetDragState();
   });
 
-  it("handleDragOver を呼ぶと dropTargetId / dropPosition が設定される（after）", () => {
+  it("pointermove で dropTargetId / dropPosition が設定される（after）", () => {
     const dnd = createDragReorder(() => makeItems([1, 2, 3]), vi.fn());
     const handle = document.createElement("span");
     dnd.handleDragStart(1, makeStartEvent(handle, 0, 0));
 
     const row = makeRowElement(2);
+    vi.spyOn(document, "elementFromPoint").mockReturnValue(row);
     // midY=150 より下 → after
-    dnd.handleDragOver(2, makeOverEvent(row, 160));
+    dispatchPointerMove(20, 160);
     expect(dnd.dropTargetId).toBe(2);
     expect(dnd.dropPosition).toBe("after");
     dnd.resetDragState();
@@ -130,48 +128,52 @@ describe("createDragReorder", () => {
     dnd.handleDragStart(1, makeStartEvent(handle, 0, 0));
 
     const row = makeRowElement(1);
-    dnd.handleDragOver(1, makeOverEvent(row, 110));
+    vi.spyOn(document, "elementFromPoint").mockReturnValue(row);
+    dispatchPointerMove(20, 110);
     expect(dnd.dropTargetId).toBeNull();
     expect(dnd.dropPosition).toBeNull();
     dnd.resetDragState();
   });
 
-  it("handleDrop を呼ぶと onReorder が新しい順序で呼ばれる（before）", () => {
+  it("pointerup で onReorder が新しい順序で呼ばれる（before）", () => {
     const onReorder = vi.fn();
     const dnd = createDragReorder(() => makeItems([1, 2, 3]), onReorder);
 
     const handle = document.createElement("span");
     dnd.handleDragStart(3, makeStartEvent(handle, 0, 0));
     const row = makeRowElement(2);
-    dnd.handleDragOver(2, makeOverEvent(row, 110));
-    dnd.handleDrop();
+    vi.spyOn(document, "elementFromPoint").mockReturnValue(row);
+    dispatchPointerMove(20, 110);
+    dispatchPointerUp();
 
     // アイテム 3 をアイテム 2 の前へ移動
     expect(onReorder).toHaveBeenCalledWith([1, 3, 2]);
   });
 
-  it("handleDrop を呼ぶと onReorder が新しい順序で呼ばれる（after）", () => {
+  it("pointerup で onReorder が新しい順序で呼ばれる（after）", () => {
     const onReorder = vi.fn();
     const dnd = createDragReorder(() => makeItems([1, 2, 3]), onReorder);
 
     const handle = document.createElement("span");
     dnd.handleDragStart(1, makeStartEvent(handle, 0, 0));
     const row = makeRowElement(2);
-    dnd.handleDragOver(2, makeOverEvent(row, 160));
-    dnd.handleDrop();
+    vi.spyOn(document, "elementFromPoint").mockReturnValue(row);
+    dispatchPointerMove(20, 160);
+    dispatchPointerUp();
 
     // アイテム 1 をアイテム 2 の後ろへ移動
     expect(onReorder).toHaveBeenCalledWith([2, 1, 3]);
   });
 
-  it("handleDrop 後は状態がリセットされる", () => {
+  it("pointerup 後は状態がリセットされる", () => {
     const dnd = createDragReorder(() => makeItems([1, 2, 3]), vi.fn());
 
     const handle = document.createElement("span");
     dnd.handleDragStart(1, makeStartEvent(handle, 0, 0));
     const row = makeRowElement(2);
-    dnd.handleDragOver(2, makeOverEvent(row, 160));
-    dnd.handleDrop();
+    vi.spyOn(document, "elementFromPoint").mockReturnValue(row);
+    dispatchPointerMove(20, 160);
+    dispatchPointerUp();
 
     expect(dnd.draggedId).toBeNull();
     expect(dnd.isActive).toBe(false);
@@ -192,22 +194,25 @@ describe("createDragReorder", () => {
     expect(dnd.dropPosition).toBeNull();
   });
 
-  it("draggedId が null のとき handleDrop は onReorder を呼ばない", () => {
+  it("ドラッグ開始前の pointerup は onReorder を呼ばない", () => {
     const onReorder = vi.fn();
-    const dnd = createDragReorder(() => makeItems([1, 2, 3]), onReorder);
+    createDragReorder(() => makeItems([1, 2, 3]), onReorder);
 
-    // handleDragStart を呼ばずにドロップ → draggedId が null
-    dnd.handleDrop();
+    dispatchPointerUp();
     expect(onReorder).not.toHaveBeenCalled();
   });
 
-  it("dropTargetId が null のとき handleDrop は onReorder を呼ばない", () => {
+  it("dropTargetId が null のとき pointerup は onReorder を呼ばない", () => {
     const onReorder = vi.fn();
     const dnd = createDragReorder(() => makeItems([1, 2, 3]), onReorder);
 
     const handle = document.createElement("span");
     dnd.handleDragStart(1, makeStartEvent(handle, 0, 0));
-    dnd.handleDrop();
+    vi.spyOn(document, "elementFromPoint").mockReturnValue(
+      document.createElement("div"),
+    );
+    dispatchPointerMove(20, 110);
+    dispatchPointerUp();
     expect(onReorder).not.toHaveBeenCalled();
   });
 
@@ -270,6 +275,74 @@ describe("createDragReorder", () => {
     dnd.resetDragState();
   });
 
+  it("外部ドロップ候補と並び替え候補を排他的に切り替え、pointerup で外部ドロップを確定する", () => {
+    const onReorder = vi.fn();
+    const onExternalDrop = vi.fn();
+    const onExternalDropTargetChange = vi.fn();
+    const onDragStateChange = vi.fn();
+    const dnd = createDragReorder(() => makeItems([1, 2, 3]), onReorder, {
+      externalDropTargetSelector: "[data-task-drop-list-id]",
+      externalDropTargetIdAttribute: "taskDropListId",
+      onExternalDropTargetChange,
+      onExternalDrop,
+      onDragStateChange,
+    });
+
+    const row = makeRowElement(2);
+    const externalTarget = makeExternalDropTarget(10);
+    vi.spyOn(document, "elementFromPoint").mockImplementation((x) => {
+      if (x < 30) return externalTarget;
+      if (x < 60) return row;
+      return document.createElement("div");
+    });
+
+    const handle = document.createElement("span");
+    dnd.handleDragStart(1, makeStartEvent(handle, 0, 0));
+
+    dispatchPointerMove(20, 110);
+    expect(dnd.isActive).toBe(true);
+    expect(dnd.dropTargetId).toBeNull();
+    expect(dnd.dropPosition).toBeNull();
+    expect(onExternalDropTargetChange).toHaveBeenLastCalledWith(10);
+
+    dispatchPointerMove(40, 110);
+    expect(dnd.dropTargetId).toBe(2);
+    expect(dnd.dropPosition).toBe("before");
+    expect(onExternalDropTargetChange).toHaveBeenLastCalledWith(null);
+
+    dispatchPointerMove(80, 110);
+    expect(dnd.dropTargetId).toBeNull();
+    expect(dnd.dropPosition).toBeNull();
+    expect(onExternalDropTargetChange).toHaveBeenLastCalledWith(null);
+
+    dispatchPointerMove(20, 110);
+    dispatchPointerUp();
+    expect(onExternalDrop).toHaveBeenCalledWith(1, 10);
+    expect(onReorder).not.toHaveBeenCalled();
+    expect(dnd.draggedId).toBeNull();
+    expect(dnd.isActive).toBe(false);
+    expect(onDragStateChange).toHaveBeenNthCalledWith(1, true);
+    expect(onDragStateChange).toHaveBeenLastCalledWith(false);
+    expect(onExternalDropTargetChange).toHaveBeenLastCalledWith(null);
+  });
+
+  it("別の pointerId のイベントを無視する", () => {
+    const dnd = createDragReorder(() => makeItems([1, 2, 3]), vi.fn());
+    const row = makeRowElement(2);
+    vi.spyOn(document, "elementFromPoint").mockReturnValue(row);
+
+    const handle = document.createElement("span");
+    dnd.handleDragStart(1, makeStartEvent(handle, 0, 0, 1));
+    dispatchPointerMove(20, 110, 2);
+    dispatchPointerUp(2);
+    expect(dnd.draggedId).toBe(1);
+    expect(dnd.isActive).toBe(false);
+
+    dispatchPointerMove(20, 110, 1);
+    expect(dnd.isActive).toBe(true);
+    dispatchPointerUp(1);
+  });
+
   it("pointercancel でドラッグ状態がリセットされる", () => {
     const onReorder = vi.fn();
     const dnd = createDragReorder(() => makeItems([1, 2, 3]), onReorder);
@@ -284,6 +357,30 @@ describe("createDragReorder", () => {
     expect(onReorder).not.toHaveBeenCalled();
   });
 
+  it("外部ドロップ候補がある状態でも pointercancel で候補が消える", () => {
+    const onExternalDropTargetChange = vi.fn();
+    const onExternalDrop = vi.fn();
+    const dnd = createDragReorder(() => makeItems([1, 2, 3]), vi.fn(), {
+      externalDropTargetSelector: "[data-task-drop-list-id]",
+      externalDropTargetIdAttribute: "taskDropListId",
+      onExternalDropTargetChange,
+      onExternalDrop,
+    });
+    const externalTarget = makeExternalDropTarget(10);
+    vi.spyOn(document, "elementFromPoint").mockReturnValue(externalTarget);
+
+    const handle = document.createElement("span");
+    dnd.handleDragStart(1, makeStartEvent(handle, 0, 0));
+    dispatchPointerMove(20, 110);
+    expect(onExternalDropTargetChange).toHaveBeenLastCalledWith(10);
+
+    window.dispatchEvent(new PointerEvent("pointercancel", { pointerId: 1 }));
+    expect(dnd.draggedId).toBeNull();
+    expect(dnd.isActive).toBe(false);
+    expect(onExternalDropTargetChange).toHaveBeenLastCalledWith(null);
+    expect(onExternalDrop).not.toHaveBeenCalled();
+  });
+
   it("lostpointercapture でドラッグ状態がリセットされる", () => {
     const onReorder = vi.fn();
     const dnd = createDragReorder(() => makeItems([1, 2, 3]), onReorder);
@@ -296,5 +393,26 @@ describe("createDragReorder", () => {
     expect(dnd.draggedId).toBeNull();
     expect(dnd.isActive).toBe(false);
     expect(onReorder).not.toHaveBeenCalled();
+  });
+
+  it("外部ドロップ候補がある状態でも lostpointercapture で候補が消える", () => {
+    const onExternalDropTargetChange = vi.fn();
+    const dnd = createDragReorder(() => makeItems([1, 2, 3]), vi.fn(), {
+      externalDropTargetSelector: "[data-task-drop-list-id]",
+      externalDropTargetIdAttribute: "taskDropListId",
+      onExternalDropTargetChange,
+    });
+    const externalTarget = makeExternalDropTarget(10);
+    vi.spyOn(document, "elementFromPoint").mockReturnValue(externalTarget);
+
+    const handle = document.createElement("span");
+    dnd.handleDragStart(1, makeStartEvent(handle, 0, 0));
+    dispatchPointerMove(20, 110);
+    expect(onExternalDropTargetChange).toHaveBeenLastCalledWith(10);
+
+    handle.dispatchEvent(new Event("lostpointercapture"));
+    expect(dnd.draggedId).toBeNull();
+    expect(dnd.isActive).toBe(false);
+    expect(onExternalDropTargetChange).toHaveBeenLastCalledWith(null);
   });
 });

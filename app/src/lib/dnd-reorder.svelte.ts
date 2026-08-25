@@ -37,6 +37,19 @@ export interface DragReorderOptions {
    * 既定は `reorderId`（=`data-reorder-id`）。
    */
   itemIdAttribute?: string;
+  /**
+   * 並び替え対象とは別のドロップ先を解決する CSS セレクタ。
+   * 指定した場合は Pointer Events の同じ状態遷移で外部ドロップを扱う。
+   */
+  externalDropTargetSelector?: string;
+  /** 外部ドロップ先の id を読み取る `dataset` キー。 */
+  externalDropTargetIdAttribute?: string;
+  /** 外部ドロップ先候補が変化したときに呼ぶコールバック。 */
+  onExternalDropTargetChange?: (targetId: number | null) => void;
+  /** 外部ドロップを確定したときに呼ぶコールバック。 */
+  onExternalDrop?: (draggedId: number, targetId: number) => void;
+  /** 閾値超過後の実ドラッグ状態が変化したときに呼ぶコールバック。 */
+  onDragStateChange?: (isActive: boolean) => void;
 }
 
 /**
@@ -56,12 +69,16 @@ export function createDragReorder<T extends Orderable>(
   const threshold = options?.threshold ?? 5;
   const itemSelector = options?.itemSelector ?? "[data-reorder-id]";
   const itemIdAttribute = options?.itemIdAttribute ?? "reorderId";
+  const externalDropTargetSelector = options?.externalDropTargetSelector;
+  const externalDropTargetIdAttribute =
+    options?.externalDropTargetIdAttribute ?? "dropTargetId";
 
   // D&D 状態（Svelte 5 $state rune）
   let draggedId = $state<number | null>(null);
   let isActive = $state(false);
   let dropTargetId = $state<number | null>(null);
   let dropPosition = $state<"before" | "after" | null>(null);
+  let externalDropTargetId = $state<number | null>(null);
 
   // 内部状態（reactivity 不要のため通常変数）
   let startX = 0;
@@ -76,9 +93,10 @@ export function createDragReorder<T extends Orderable>(
    */
   function handleDragStart(itemId: number, event: PointerEvent) {
     draggedId = itemId;
-    isActive = false;
+    updateDragState(false);
     dropTargetId = null;
     dropPosition = null;
+    updateExternalDropTarget(null);
     startX = event.clientX;
     startY = event.clientY;
     activePointerId = event.pointerId;
@@ -113,15 +131,28 @@ export function createDragReorder<T extends Orderable>(
       const dx = event.clientX - startX;
       const dy = event.clientY - startY;
       if (dx * dx + dy * dy < threshold * threshold) return;
-      isActive = true;
+      updateDragState(true);
+    }
+
+    if (!Number.isFinite(event.clientX) || !Number.isFinite(event.clientY)) {
+      clearDropCandidates();
+      return;
+    }
+
+    const externalTarget = findExternalDropTarget(event.clientX, event.clientY);
+    if (externalTarget !== null) {
+      dropTargetId = null;
+      dropPosition = null;
+      updateExternalDropTarget(externalTarget.id);
+      return;
     }
 
     const target = findReorderTarget(event.clientX, event.clientY);
     if (target === null || target.id === draggedId) {
-      dropTargetId = null;
-      dropPosition = null;
+      clearDropCandidates();
       return;
     }
+    updateExternalDropTarget(null);
     const rect = target.element.getBoundingClientRect();
     const midY = rect.top + rect.height / 2;
     dropTargetId = target.id;
@@ -148,6 +179,23 @@ export function createDragReorder<T extends Orderable>(
     return { id, element: row };
   }
 
+  /** 座標から外部ドロップ先を解決する。 */
+  function findExternalDropTarget(
+    x: number,
+    y: number,
+  ): { id: number; element: HTMLElement } | null {
+    if (externalDropTargetSelector === undefined) return null;
+    const hit = document.elementFromPoint(x, y);
+    if (!(hit instanceof Element)) return null;
+    const row = hit.closest<HTMLElement>(externalDropTargetSelector);
+    if (!row) return null;
+    const idStr = row.dataset[externalDropTargetIdAttribute];
+    if (idStr === undefined) return null;
+    const id = Number(idStr);
+    if (!Number.isFinite(id)) return null;
+    return { id, element: row };
+  }
+
   /**
    * pointerup ハンドラ。
    * 閾値を超えていればドロップを確定し、超えていなければ状態のみリセットする。
@@ -155,11 +203,19 @@ export function createDragReorder<T extends Orderable>(
   function handlePointerUp(event: PointerEvent) {
     if (activePointerId !== null && event.pointerId !== activePointerId) return;
     cleanupPointerListeners();
-    if (isActive) {
-      handleDrop();
-    } else {
+    if (!isActive) {
       resetDragState();
+      return;
     }
+
+    const dragged = draggedId;
+    const externalTarget = externalDropTargetId;
+    if (dragged !== null && externalTarget !== null) {
+      resetDragState();
+      options?.onExternalDrop?.(dragged, externalTarget);
+      return;
+    }
+    completeReorderDrop();
   }
 
   /** pointercancel ハンドラ。状態をリセットして終了する。 */
@@ -191,11 +247,8 @@ export function createDragReorder<T extends Orderable>(
     activePointerId = null;
   }
 
-  /**
-   * ドロップ確定時に呼ぶ。新しい id 順を構成して `onReorder` に渡す。
-   * `pointerup` 時に内部から呼ばれるが、テスト互換のため公開する。
-   */
-  function handleDrop() {
+  /** ドラッグ中に並び替え候補を確定し、新しい id 順を `onReorder` に渡す。 */
+  function completeReorderDrop() {
     if (draggedId === null || dropTargetId === null) {
       resetDragState();
       return;
@@ -211,30 +264,36 @@ export function createDragReorder<T extends Orderable>(
     const insertIndex =
       dropPosition === "after" ? targetIndex + 1 : targetIndex;
     ids.splice(insertIndex, 0, draggedId);
-    onReorder(ids);
     resetDragState();
+    onReorder(ids);
   }
 
-  /**
-   * `currentTarget` の境界矩形を基準に before/after を判定するレガシー API。
-   * 新コードでは Pointer Events 経由の hit-testing で代替されるが、
-   * 既存ユニットテストの互換性維持と、特定要素を対象に直接判定したいケースのために残す。
-   */
-  function handleDragOver(itemId: number, event: PointerEvent) {
-    if (draggedId === null || itemId === draggedId) return;
-    isActive = true;
-    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-    const midY = rect.top + rect.height / 2;
-    dropTargetId = itemId;
-    dropPosition = event.clientY < midY ? "before" : "after";
+  /** 候補を排他的に消去する。 */
+  function clearDropCandidates() {
+    dropTargetId = null;
+    dropPosition = null;
+    updateExternalDropTarget(null);
+  }
+
+  /** 実ドラッグ状態を更新し、表示側へ通知する。 */
+  function updateDragState(nextIsActive: boolean) {
+    if (isActive === nextIsActive) return;
+    isActive = nextIsActive;
+    options?.onDragStateChange?.(nextIsActive);
+  }
+
+  /** 外部ドロップ先候補を更新し、表示側へ通知する。 */
+  function updateExternalDropTarget(targetId: number | null) {
+    if (externalDropTargetId === targetId) return;
+    externalDropTargetId = targetId;
+    options?.onExternalDropTargetChange?.(targetId);
   }
 
   /** ドラッグ終了・キャンセル時の状態リセット。 */
   function resetDragState() {
     draggedId = null;
-    isActive = false;
-    dropTargetId = null;
-    dropPosition = null;
+    updateDragState(false);
+    clearDropCandidates();
   }
 
   return {
@@ -255,8 +314,6 @@ export function createDragReorder<T extends Orderable>(
       return dropPosition;
     },
     handleDragStart,
-    handleDragOver,
-    handleDrop,
     resetDragState,
   };
 }
