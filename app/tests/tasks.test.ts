@@ -90,32 +90,6 @@ async function holdTaskCreate(
   return { intercepted, release };
 }
 
-async function holdTaskReorder(page: Page): Promise<{
-  intercepted: Promise<void>;
-  release: () => void;
-}> {
-  let notifyIntercepted!: () => void;
-  let release!: () => void;
-  const intercepted = new Promise<void>((resolve) => {
-    notifyIntercepted = resolve;
-  });
-  const released = new Promise<void>((resolve) => {
-    release = resolve;
-  });
-
-  await page.route("**/api/trpc/**", async (route) => {
-    if (!isTaskReorderUrl(route.request().url())) {
-      await route.continue();
-      return;
-    }
-    notifyIntercepted();
-    await released;
-    await route.fulfill({ status: 500 });
-  });
-
-  return { intercepted, release };
-}
-
 async function addTaskAndWaitForPersist(
   page: Page,
   title: string,
@@ -139,19 +113,6 @@ async function dragTaskAfter(
   sourceTitle: string,
   targetTitle: string,
 ): Promise<void> {
-  const reorderResponsePromise = page.waitForResponse((response) =>
-    isTaskReorderUrl(response.url()),
-  );
-  await performTaskDragAfter(page, sourceTitle, targetTitle);
-  const reorderResponse = await reorderResponsePromise;
-  expect(reorderResponse.ok()).toBe(true);
-}
-
-async function performTaskDragAfter(
-  page: Page,
-  sourceTitle: string,
-  targetTitle: string,
-): Promise<void> {
   const source = page.getByTestId("task-item").filter({ hasText: sourceTitle });
   const target = page.getByTestId("task-item").filter({ hasText: targetTitle });
   const handleBox = await source.getByTestId("task-drag-handle").boundingBox();
@@ -167,8 +128,13 @@ async function performTaskDragAfter(
   await page.mouse.move(startX, startY);
   await page.mouse.down();
   await page.mouse.move(startX + 20, startY + 20);
+  const reorderResponsePromise = page.waitForResponse((response) =>
+    isTaskReorderUrl(response.url()),
+  );
   await page.mouse.move(endX, endY, { steps: 10 });
   await page.mouse.up();
+  const reorderResponse = await reorderResponsePromise;
+  expect(reorderResponse.ok()).toBe(true);
 }
 
 test.describe("tasks", () => {
@@ -1307,46 +1273,6 @@ test.describe("tasks", () => {
 
     // 後片付け: 並び替え用リストを削除
     await cleanupTestList(page.context().browser()!, reorderListName);
-  });
-
-  test("並び替え失敗後に元の順へ戻る", async ({ page, browser }) => {
-    const reorderListName = `並び替え失敗_${Date.now()}`;
-    const stamp = Date.now();
-    const titles = [`失敗A_${stamp}`, `失敗B_${stamp}`, `失敗C_${stamp}`];
-    await createListFromPage(page, reorderListName);
-    const gate = await holdTaskReorder(page);
-
-    try {
-      for (const title of titles) {
-        await addTaskAndWaitForPersist(page, title);
-      }
-      const items = page.getByTestId("task-item");
-      await expect(items.nth(0)).toContainText(titles[2]!);
-      await expect(items.nth(1)).toContainText(titles[1]!);
-      await expect(items.nth(2)).toContainText(titles[0]!);
-
-      const reorderResponsePromise = page.waitForResponse((response) =>
-        isTaskReorderUrl(response.url()),
-      );
-      await performTaskDragAfter(page, titles[2]!, titles[0]!);
-      await gate.intercepted;
-      await expect(items.nth(0)).toContainText(titles[1]!);
-      await expect(items.nth(1)).toContainText(titles[0]!);
-      await expect(items.nth(2)).toContainText(titles[2]!);
-
-      gate.release();
-      const reorderResponse = await reorderResponsePromise;
-      expect(reorderResponse.status()).toBe(500);
-      await expect(items.nth(0)).toContainText(titles[2]!, {
-        timeout: 15000,
-      });
-      await expect(items.nth(1)).toContainText(titles[1]!);
-      await expect(items.nth(2)).toContainText(titles[0]!);
-    } finally {
-      gate.release();
-      await page.unroute("**/api/trpc/**");
-      await cleanupTestList(browser, reorderListName);
-    }
   });
 
   test("ドラッグハンドルでタスクを別リストへ移動できる", async ({

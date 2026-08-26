@@ -72,11 +72,6 @@ function dispatchPointerUp(pointerId = 1) {
   window.dispatchEvent(new PointerEvent("pointerup", { pointerId }));
 }
 
-/** window へ pointercancel を発火する */
-function dispatchPointerCancel(pointerId = 1) {
-  window.dispatchEvent(new PointerEvent("pointercancel", { pointerId }));
-}
-
 describe("createDragReorder", () => {
   afterEach(() => {
     vi.restoreAllMocks();
@@ -96,7 +91,7 @@ describe("createDragReorder", () => {
     dnd.handleDragStart(1, makeStartEvent(handle, 0, 0));
     expect(dnd.draggedId).toBe(1);
     expect(dnd.isActive).toBe(false);
-    dispatchPointerCancel();
+    dnd.resetDragState();
   });
 
   it("pointermove で dropTargetId / dropPosition が設定される（before）", () => {
@@ -110,7 +105,7 @@ describe("createDragReorder", () => {
     dispatchPointerMove(20, 110);
     expect(dnd.dropTargetId).toBe(2);
     expect(dnd.dropPosition).toBe("before");
-    dispatchPointerCancel();
+    dnd.resetDragState();
   });
 
   it("pointermove で dropTargetId / dropPosition が設定される（after）", () => {
@@ -124,7 +119,7 @@ describe("createDragReorder", () => {
     dispatchPointerMove(20, 160);
     expect(dnd.dropTargetId).toBe(2);
     expect(dnd.dropPosition).toBe("after");
-    dispatchPointerCancel();
+    dnd.resetDragState();
   });
 
   it("自分自身へのドラッグオーバーは無視される", () => {
@@ -137,7 +132,7 @@ describe("createDragReorder", () => {
     dispatchPointerMove(20, 110);
     expect(dnd.dropTargetId).toBeNull();
     expect(dnd.dropPosition).toBeNull();
-    dispatchPointerCancel();
+    dnd.resetDragState();
   });
 
   it("pointerup で onReorder が新しい順序で呼ばれる（before）", () => {
@@ -186,12 +181,12 @@ describe("createDragReorder", () => {
     expect(dnd.dropPosition).toBeNull();
   });
 
-  it("pointercancel を受領すると状態がリセットされる（ドラッグ中断）", () => {
+  it("resetDragState を呼ぶと状態がリセットされる（ドラッグ中断）", () => {
     const dnd = createDragReorder(() => makeItems([1, 2, 3]), vi.fn());
 
     const handle = document.createElement("span");
     dnd.handleDragStart(2, makeStartEvent(handle, 0, 0));
-    dispatchPointerCancel();
+    dnd.resetDragState();
 
     expect(dnd.draggedId).toBeNull();
     expect(dnd.isActive).toBe(false);
@@ -277,7 +272,7 @@ describe("createDragReorder", () => {
     expect(dnd.isActive).toBe(true);
     expect(dnd.dropTargetId).toBeNull();
     expect(dnd.dropPosition).toBeNull();
-    dispatchPointerCancel();
+    dnd.resetDragState();
   });
 
   it("外部ドロップ候補と並び替え候補を排他的に切り替え、pointerup で外部ドロップを確定する", () => {
@@ -356,7 +351,7 @@ describe("createDragReorder", () => {
     dnd.handleDragStart(1, makeStartEvent(handle, 0, 0));
     expect(dnd.draggedId).toBe(1);
 
-    dispatchPointerCancel();
+    window.dispatchEvent(new PointerEvent("pointercancel", { pointerId: 1 }));
     expect(dnd.draggedId).toBeNull();
     expect(dnd.isActive).toBe(false);
     expect(onReorder).not.toHaveBeenCalled();
@@ -379,7 +374,7 @@ describe("createDragReorder", () => {
     dispatchPointerMove(20, 110);
     expect(onExternalDropTargetChange).toHaveBeenLastCalledWith(10);
 
-    dispatchPointerCancel();
+    window.dispatchEvent(new PointerEvent("pointercancel", { pointerId: 1 }));
     expect(dnd.draggedId).toBeNull();
     expect(dnd.isActive).toBe(false);
     expect(onExternalDropTargetChange).toHaveBeenLastCalledWith(null);

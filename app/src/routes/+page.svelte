@@ -167,14 +167,6 @@
         staleTime: Infinity,
     }));
 
-    /** アクティブタスクキャッシュを初期状態へ戻して全件再取得する。 */
-    async function resetActiveTasks(): Promise<void> {
-        await queryClient.resetQueries({
-            queryKey: ["activeTasks"],
-            exact: true,
-        });
-    }
-
     // アーカイブタスク取得（showType="archived" のときのみ起動）
     const archivedTasksQuery = createQuery<GetTasksResult>(() => ({
         queryKey: ["tasks", selectedListId, "archived"] as const,
@@ -222,7 +214,15 @@
         );
         if (prevKey !== newKey) {
             debugLog("sync", "lists-reset-cache");
-            await resetActiveTasks();
+            // 物理削除追従のためアクティブタスクキャッシュをundefined化し、
+            // 次のfetchで since 未指定の fullモードリクエストを実行する。
+            queryClient.setQueryData<ActiveTasksCache | undefined>(
+                ["activeTasks"],
+                () => undefined,
+            );
+            await queryClient.invalidateQueries({
+                queryKey: ["activeTasks"],
+            });
             // 注: 本ハンドラは async で動作するため、tasksUpdated と並走した場合
             // updatedTaskIds の差分検知が空キャッシュを参照する可能性がある。
             // その場合 updatedTaskIds が一時的に空になるが、後続のSSE/操作で復元されるので許容。
@@ -577,7 +577,12 @@
         onSuccess: async () => {
             queryClient.invalidateQueries({ queryKey: ["lists"] });
             queryClient.invalidateQueries({ queryKey: ["schedules"] });
-            await resetActiveTasks();
+            // リスト統合は物理削除を伴うためキャッシュをundefined化してフル再取得する
+            queryClient.setQueryData<ActiveTasksCache | undefined>(
+                ["activeTasks"],
+                () => undefined,
+            );
+            await queryClient.invalidateQueries({ queryKey: ["activeTasks"] });
         },
     }));
 
@@ -585,48 +590,8 @@
     const reorderTasksMutation = createMutation(() => ({
         mutationFn: (input: { listId: number; taskIds: number[] }) =>
             trpc.tasks.reorder.mutate(input),
-        onMutate: async (input: { listId: number; taskIds: number[] }) => {
-            await queryClient.cancelQueries({ queryKey: ["activeTasks"] });
-            const previousUpdated: string[] = [];
-            const now = new Date().toISOString();
-            const idxMap = new Map(input.taskIds.map((id, i) => [id, i]));
-            queryClient.setQueryData<ActiveTasksCache>(
-                ["activeTasks"],
-                (old) => {
-                    if (!old) return old;
-                    return {
-                        ...old,
-                        tasks: old.tasks.map((task) => {
-                            const newOrder = idxMap.get(task.id);
-                            if (newOrder === undefined) return task;
-                            previousUpdated.push(task.updated);
-                            return {
-                                ...task,
-                                sort_order: newOrder,
-                                updated: now,
-                            };
-                        }),
-                    };
-                },
-            );
-            return { previousUpdated };
-        },
-        onError: (_error, _input, context) => {
-            const oldestUpdated = context?.previousUpdated.reduce<
-                string | undefined
-            >(
-                (oldest, updated) =>
-                    oldest === undefined || updated < oldest ? updated : oldest,
-                undefined,
-            );
-            if (oldestUpdated === undefined) return;
-            queryClient.setQueryData<ActiveTasksCache>(
-                ["activeTasks"],
-                (old) => (old ? { ...old, serverTime: oldestUpdated } : old),
-            );
-        },
-        onSettled: async () => {
-            await queryClient.invalidateQueries({ queryKey: ["activeTasks"] });
+        onSettled: () => {
+            queryClient.invalidateQueries({ queryKey: ["activeTasks"] });
         },
     }));
 
@@ -1033,6 +998,21 @@
         const persistedTaskIds = taskIds.filter(
             (taskId) => !isTempTaskId(taskId),
         );
+        // 楽観的更新: キャッシュ内の sort_order と updated をリスト内連番で上書きする
+        const now = new Date().toISOString();
+        queryClient.setQueryData<ActiveTasksCache>(["activeTasks"], (old) => {
+            if (!old) return old;
+            const idxMap = new Map(persistedTaskIds.map((id, i) => [id, i]));
+            return {
+                ...old,
+                tasks: old.tasks.map((t) => {
+                    const newOrder = idxMap.get(t.id);
+                    return newOrder !== undefined
+                        ? { ...t, sort_order: newOrder, updated: now }
+                        : t;
+                }),
+            };
+        });
         reorderTasksMutation.mutate({
             listId: selectedListId,
             taskIds: persistedTaskIds,

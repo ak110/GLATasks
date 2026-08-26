@@ -2,7 +2,6 @@ import { expect, test } from "@playwright/test";
 import {
   classifyMutationObservation,
   MUTATION_DIAGNOSTIC_PREFIX,
-  selectMutationDiagnosticObservation,
   serializeMutationDiagnostic,
   type MutationObservation,
 } from "./mutation-observation";
@@ -43,39 +42,6 @@ function parseDiagnostic(serialized: string): Record<string, unknown> {
 }
 
 test.describe("mutation診断分類", () => {
-  test("複数観測では先行成功より後続エラーを優先する", () => {
-    const success: MutationObservation = {
-      ...baseObservation,
-      responseAt: 1100,
-      httpStatus: 200,
-      trpcOutcome: "ok",
-    };
-    const failure: MutationObservation = {
-      ...baseObservation,
-      responseAt: 1200,
-      httpStatus: 413,
-      trpcOutcome: "error",
-    };
-
-    expect(selectMutationDiagnosticObservation([success, failure])).toBe(
-      failure,
-    );
-  });
-
-  test("エラー観測が無い場合は未応答観測を優先する", () => {
-    const success: MutationObservation = {
-      ...baseObservation,
-      responseAt: 1100,
-      httpStatus: 200,
-      trpcOutcome: "ok",
-    };
-    const pending: MutationObservation = { ...baseObservation };
-
-    expect(selectMutationDiagnosticObservation([success, pending])).toBe(
-      pending,
-    );
-  });
-
   test("応答がUI期限までに完了しない場合を分類する", () => {
     const serialized = serializeMutationDiagnostic(baseObservation);
     const payload = parseDiagnostic(serialized);

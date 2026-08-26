@@ -70,20 +70,6 @@ export function serializeMutationDiagnostic(
   })}`;
 }
 
-/** 複数ファイル処理の失敗を最もよく表す観測を選ぶ */
-export function selectMutationDiagnosticObservation(
-  observations: readonly MutationObservation[],
-): MutationObservation | undefined {
-  return (
-    observations.find((observation) => observation.trpcOutcome === "error") ??
-    observations.find(
-      (observation) =>
-        observation.responseAt === null || observation.trpcOutcome === null,
-    ) ??
-    observations[0]
-  );
-}
-
 export type MutationObservationTracker = {
   observations: MutationObservation[];
   responses: Promise<Response>[];
