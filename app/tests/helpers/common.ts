@@ -117,6 +117,7 @@ function makeContextOptions() {
     baseURL: BASE_URL,
     storageState: STORAGE_STATE_PATH,
     ignoreHTTPSErrors: true,
+    viewport: { width: 1280, height: 720 },
   };
 }
 
