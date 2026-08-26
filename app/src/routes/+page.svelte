@@ -590,8 +590,48 @@
     const reorderTasksMutation = createMutation(() => ({
         mutationFn: (input: { listId: number; taskIds: number[] }) =>
             trpc.tasks.reorder.mutate(input),
-        onSettled: () => {
-            queryClient.invalidateQueries({ queryKey: ["activeTasks"] });
+        onMutate: async (input: { listId: number; taskIds: number[] }) => {
+            await queryClient.cancelQueries({ queryKey: ["activeTasks"] });
+            const previousUpdated: string[] = [];
+            const now = new Date().toISOString();
+            const idxMap = new Map(input.taskIds.map((id, i) => [id, i]));
+            queryClient.setQueryData<ActiveTasksCache>(
+                ["activeTasks"],
+                (old) => {
+                    if (!old) return old;
+                    return {
+                        ...old,
+                        tasks: old.tasks.map((task) => {
+                            const newOrder = idxMap.get(task.id);
+                            if (newOrder === undefined) return task;
+                            previousUpdated.push(task.updated);
+                            return {
+                                ...task,
+                                sort_order: newOrder,
+                                updated: now,
+                            };
+                        }),
+                    };
+                },
+            );
+            return { previousUpdated };
+        },
+        onError: (_error, _input, context) => {
+            const oldestUpdated = context?.previousUpdated.reduce<
+                string | undefined
+            >(
+                (oldest, updated) =>
+                    oldest === undefined || updated < oldest ? updated : oldest,
+                undefined,
+            );
+            if (oldestUpdated === undefined) return;
+            queryClient.setQueryData<ActiveTasksCache>(
+                ["activeTasks"],
+                (old) => (old ? { ...old, serverTime: oldestUpdated } : old),
+            );
+        },
+        onSettled: async () => {
+            await queryClient.invalidateQueries({ queryKey: ["activeTasks"] });
         },
     }));
 
@@ -998,21 +1038,6 @@
         const persistedTaskIds = taskIds.filter(
             (taskId) => !isTempTaskId(taskId),
         );
-        // 楽観的更新: キャッシュ内の sort_order と updated をリスト内連番で上書きする
-        const now = new Date().toISOString();
-        queryClient.setQueryData<ActiveTasksCache>(["activeTasks"], (old) => {
-            if (!old) return old;
-            const idxMap = new Map(persistedTaskIds.map((id, i) => [id, i]));
-            return {
-                ...old,
-                tasks: old.tasks.map((t) => {
-                    const newOrder = idxMap.get(t.id);
-                    return newOrder !== undefined
-                        ? { ...t, sort_order: newOrder, updated: now }
-                        : t;
-                }),
-            };
-        });
         reorderTasksMutation.mutate({
             listId: selectedListId,
             taskIds: persistedTaskIds,
