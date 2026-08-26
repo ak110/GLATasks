@@ -314,6 +314,5 @@ export function createDragReorder<T extends Orderable>(
       return dropPosition;
     },
     handleDragStart,
-    resetDragState,
   };
 }

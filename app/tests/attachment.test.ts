@@ -12,6 +12,8 @@ import {
 import {
   MUTATION_UI_DEADLINE_MS,
   observeMutationResponses,
+  selectMutationDiagnosticObservation,
+  serializeMutationDiagnostic,
   type MutationObservationTracker,
 } from "./helpers/mutation-observation";
 import { MAX_ATTACHMENT_BYTES } from "../src/lib/schemas";
@@ -38,10 +40,12 @@ async function expectAttachmentUiResult(
       expect(observation.trpcOutcome).toBe(expectedOutcome);
     }
   } catch (error) {
-    const observation = tracker.observations[0];
+    const observation = selectMutationDiagnosticObservation(
+      tracker.observations,
+    );
     if (!observation || observation.uiObservedAt !== null) throw error;
     const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`${tracker.serializeDiagnostic()}\n${message}`, {
+    throw new Error(`${serializeMutationDiagnostic(observation)}\n${message}`, {
       cause: error,
     });
   } finally {
