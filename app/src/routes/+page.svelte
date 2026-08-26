@@ -167,6 +167,14 @@
         staleTime: Infinity,
     }));
 
+    /** アクティブタスクキャッシュを初期状態へ戻して全件再取得する。 */
+    async function resetActiveTasks(): Promise<void> {
+        await queryClient.resetQueries({
+            queryKey: ["activeTasks"],
+            exact: true,
+        });
+    }
+
     // アーカイブタスク取得（showType="archived" のときのみ起動）
     const archivedTasksQuery = createQuery<GetTasksResult>(() => ({
         queryKey: ["tasks", selectedListId, "archived"] as const,
@@ -214,15 +222,7 @@
         );
         if (prevKey !== newKey) {
             debugLog("sync", "lists-reset-cache");
-            // 物理削除追従のためアクティブタスクキャッシュをundefined化し、
-            // 次のfetchで since 未指定の fullモードリクエストを実行する。
-            queryClient.setQueryData<ActiveTasksCache | undefined>(
-                ["activeTasks"],
-                () => undefined,
-            );
-            await queryClient.invalidateQueries({
-                queryKey: ["activeTasks"],
-            });
+            await resetActiveTasks();
             // 注: 本ハンドラは async で動作するため、tasksUpdated と並走した場合
             // updatedTaskIds の差分検知が空キャッシュを参照する可能性がある。
             // その場合 updatedTaskIds が一時的に空になるが、後続のSSE/操作で復元されるので許容。
@@ -577,12 +577,7 @@
         onSuccess: async () => {
             queryClient.invalidateQueries({ queryKey: ["lists"] });
             queryClient.invalidateQueries({ queryKey: ["schedules"] });
-            // リスト統合は物理削除を伴うためキャッシュをundefined化してフル再取得する
-            queryClient.setQueryData<ActiveTasksCache | undefined>(
-                ["activeTasks"],
-                () => undefined,
-            );
-            await queryClient.invalidateQueries({ queryKey: ["activeTasks"] });
+            await resetActiveTasks();
         },
     }));
 
