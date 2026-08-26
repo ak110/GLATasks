@@ -25,18 +25,46 @@ export const BASE_URL = process.env.BASE_URL ?? "https://localhost:38180";
  * playwright.config.ts の storageState 設定はリポジトリルート基準の相対パスを使うが、
  * テストコード内では絶対パスを使うことで一貫性を保つ。
  */
-export const STORAGE_STATE_PATH = path.join(
-  import.meta.dirname,
-  "..",
-  ".auth",
-  "user.json",
-);
+export const STORAGE_STATE_PATH = process.env.E2E_STORAGE_STATE
+  ? path.resolve(process.env.E2E_STORAGE_STATE)
+  : path.join(import.meta.dirname, "..", ".auth", "user.json");
+
+/** 指定したprocedureを含むtRPC応答かどうかを判定する */
+export function isMutationResponse(
+  response: Response,
+  procedure: string,
+): boolean {
+  const pathname = new URL(response.url()).pathname;
+  const prefix = "/api/trpc/";
+  if (!pathname.startsWith(prefix)) return false;
+  return pathname.slice(prefix.length).split(",").includes(procedure);
+}
+
+/** 操作前に登録した指定procedureのmutation応答を待つ */
+export function waitForMutationResponse(
+  page: Page,
+  procedure: string,
+): Promise<Response> {
+  return page.waitForResponse((response) =>
+    isMutationResponse(response, procedure),
+  );
+}
+
+/** 指定procedureのmutationがHTTP成功で完了するまで待つ */
+export async function waitForSuccessfulMutationResponse(
+  page: Page,
+  procedure: string,
+): Promise<Response> {
+  const response = await waitForMutationResponse(page, procedure);
+  if (!response.ok()) {
+    throw new Error(`${procedure}がHTTP ${response.status()}で失敗した`);
+  }
+  return response;
+}
 
 /** タスク更新mutationの応答を待つ */
 export function waitForTaskUpdateResponse(page: Page): Promise<Response> {
-  return page.waitForResponse((response) =>
-    response.url().includes("/api/trpc/tasks.update"),
-  );
+  return waitForMutationResponse(page, "tasks.update");
 }
 
 /** 楽観追加されたタスクが実IDへ置き換わるまで待つ */
@@ -61,12 +89,12 @@ export async function toggleTaskAndWaitForUpdate(
   const wasArchived = await taskRow.evaluate((element) =>
     element.classList.contains("opacity-50"),
   );
-  const responsePromise = waitForTaskUpdateResponse(page);
+  const responsePromise = waitForSuccessfulMutationResponse(
+    page,
+    "tasks.update",
+  );
   await checkbox.dispatchEvent("click");
-  const response = await responsePromise;
-  if (!response.ok()) {
-    throw new Error(`tasks.updateがHTTP ${response.status()}で失敗した`);
-  }
+  await responsePromise;
 
   const taskText = taskRow.getByTestId("task-text");
   if (wasChecked) {

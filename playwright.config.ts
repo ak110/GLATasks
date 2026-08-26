@@ -1,8 +1,12 @@
 import { defineConfig, devices } from "@playwright/test";
 
+const storageState =
+  process.env.E2E_STORAGE_STATE || "app/tests/.auth/user.json";
+
 export default defineConfig({
   testDir: "./app/tests",
   testIgnore: /global-setup\.ts/,
+  outputDir: process.env.E2E_OUTPUT_DIR || "test-results",
   fullyParallel: false,
   retries: process.env.CI ? 2 : 0,
   workers: 1,
@@ -22,7 +26,7 @@ export default defineConfig({
       testIgnore: /\.mobile\.test\.ts$/,
       use: {
         ...devices["Desktop Chrome"],
-        storageState: "app/tests/.auth/user.json",
+        storageState,
       },
     },
     {
@@ -38,7 +42,7 @@ export default defineConfig({
       use: {
         ...devices["Desktop Chrome"],
         viewport: { width: 393, height: 851 },
-        storageState: "app/tests/.auth/user.json",
+        storageState,
       },
     },
   ],

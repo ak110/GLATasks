@@ -9,6 +9,11 @@ import {
   cleanupTestList,
   waitForPersistedTask,
 } from "./helpers/common";
+import {
+  MUTATION_UI_DEADLINE_MS,
+  observeMutationResponses,
+  type MutationObservationTracker,
+} from "./helpers/mutation-observation";
 import { MAX_ATTACHMENT_BYTES } from "../src/lib/schemas";
 
 const LIST_NAME = `添付テスト_${Date.now()}`;
@@ -16,6 +21,33 @@ const LIST_NAME = `添付テスト_${Date.now()}`;
 // 1x1 透過PNGの最小バイナリ（添付テストのサンプル画像として使用）
 const TINY_PNG_BASE64 =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
+
+type ExpectedAttachmentOutcome = "ok" | "error";
+
+/** 添付UIの失敗時に、同じ操作のmutation境界を診断情報として返す */
+async function expectAttachmentUiResult(
+  tracker: MutationObservationTracker,
+  assertUi: () => Promise<void>,
+  expectedOutcome: ExpectedAttachmentOutcome,
+): Promise<void> {
+  try {
+    await assertUi();
+    tracker.markUiObserved();
+    await Promise.all(tracker.responses);
+    for (const observation of tracker.observations) {
+      expect(observation.trpcOutcome).toBe(expectedOutcome);
+    }
+  } catch (error) {
+    const observation = tracker.observations[0];
+    if (!observation || observation.uiObservedAt !== null) throw error;
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`${tracker.serializeDiagnostic()}\n${message}`, {
+      cause: error,
+    });
+  } finally {
+    tracker.stop();
+  }
+}
 
 /** タスクを追加し、編集ダイアログを開いた状態にして、タスク行のlocatorを返す */
 async function addTaskAndOpenEditDialog(
@@ -64,6 +96,11 @@ test.describe("attachments", () => {
     const title = `添付_${Date.now()}`;
     const taskRow = await addTaskAndOpenEditDialog(page, title);
 
+    const attachmentObservation = observeMutationResponses(
+      page,
+      "attachments.create",
+      2,
+    );
     await page.locator('[role="dialog"] input[type="file"]').setInputFiles([
       {
         name: "memo.txt",
@@ -76,18 +113,24 @@ test.describe("attachments", () => {
         buffer: Buffer.from(TINY_PNG_BASE64, "base64"),
       },
     ]);
-    await page
-      .locator('[role="dialog"] li')
-      .filter({ hasText: "icon.png" })
-      .waitFor({ timeout: 15000 });
-    await page.keyboard.press("Escape");
+    await expectAttachmentUiResult(
+      attachmentObservation,
+      async () => {
+        await page
+          .locator('[role="dialog"] li')
+          .filter({ hasText: "icon.png" })
+          .waitFor({ timeout: MUTATION_UI_DEADLINE_MS });
+        await page.keyboard.press("Escape");
 
-    await expect(
-      taskRow.locator('[data-testid="task-attachment-icon"]'),
-    ).toHaveCount(1, { timeout: 15000 });
-    await expect(
-      taskRow.locator('[data-testid="task-attachment-thumbnail"]'),
-    ).toHaveCount(1, { timeout: 15000 });
+        await expect(
+          taskRow.locator('[data-testid="task-attachment-icon"]'),
+        ).toHaveCount(1, { timeout: MUTATION_UI_DEADLINE_MS });
+        await expect(
+          taskRow.locator('[data-testid="task-attachment-thumbnail"]'),
+        ).toHaveCount(1, { timeout: MUTATION_UI_DEADLINE_MS });
+      },
+      "ok",
+    );
   });
 
   test("添付アイコンのtitle属性でファイル名を確認できる", async ({ page }) => {
@@ -95,20 +138,32 @@ test.describe("attachments", () => {
     const filename = `title確認_${Date.now()}.txt`;
     const taskRow = await addTaskAndOpenEditDialog(page, title);
 
+    const attachmentObservation = observeMutationResponses(
+      page,
+      "attachments.create",
+    );
     await page.locator('[role="dialog"] input[type="file"]').setInputFiles({
       name: filename,
       mimeType: "text/plain",
       buffer: Buffer.from("title確認用の内容"),
     });
-    await page
-      .locator('[role="dialog"] li')
-      .filter({ hasText: filename })
-      .waitFor({ timeout: 15000 });
-    await page.keyboard.press("Escape");
+    await expectAttachmentUiResult(
+      attachmentObservation,
+      async () => {
+        await page
+          .locator('[role="dialog"] li')
+          .filter({ hasText: filename })
+          .waitFor({ timeout: MUTATION_UI_DEADLINE_MS });
+        await page.keyboard.press("Escape");
 
-    await expect(
-      taskRow.locator('[data-testid="task-attachment-icon"]'),
-    ).toHaveAttribute("title", filename, { timeout: 15000 });
+        await expect(
+          taskRow.locator('[data-testid="task-attachment-icon"]'),
+        ).toHaveAttribute("title", filename, {
+          timeout: MUTATION_UI_DEADLINE_MS,
+        });
+      },
+      "ok",
+    );
   });
 
   test("添付アイコンをクリックするとダウンロードが発火し内容が復元される", async ({
@@ -119,19 +174,33 @@ test.describe("attachments", () => {
     const content = `ダウンロード内容_${Date.now()}`;
     const taskRow = await addTaskAndOpenEditDialog(page, title);
 
+    const attachmentObservation = observeMutationResponses(
+      page,
+      "attachments.create",
+    );
     await page.locator('[role="dialog"] input[type="file"]').setInputFiles({
       name: filename,
       mimeType: "text/plain",
       buffer: Buffer.from(content),
     });
-    await page
-      .locator('[role="dialog"] li')
-      .filter({ hasText: filename })
-      .waitFor({ timeout: 15000 });
-    await page.keyboard.press("Escape");
+    await expectAttachmentUiResult(
+      attachmentObservation,
+      async () => {
+        await page
+          .locator('[role="dialog"] li')
+          .filter({ hasText: filename })
+          .waitFor({ timeout: MUTATION_UI_DEADLINE_MS });
+        await page.keyboard.press("Escape");
+
+        await expect(
+          taskRow.locator('[data-testid="task-attachment-icon"]'),
+        ).toHaveCount(1, { timeout: MUTATION_UI_DEADLINE_MS });
+      },
+      "ok",
+    );
 
     const icon = taskRow.locator('[data-testid="task-attachment-icon"]');
-    await icon.waitFor({ timeout: 15000 });
+    await icon.waitFor({ timeout: MUTATION_UI_DEADLINE_MS });
     const [download] = await Promise.all([
       page.waitForEvent("download"),
       icon.click(),
@@ -148,20 +217,32 @@ test.describe("attachments", () => {
     const taskRow = await addTaskAndOpenEditDialog(page, title);
 
     const oversized = Buffer.alloc(10 * 1024 * 1024 + 1, 0x41);
+    const attachmentObservation = observeMutationResponses(
+      page,
+      "attachments.create",
+    );
     await page.locator('[role="dialog"] input[type="file"]').setInputFiles({
       name: "oversized.bin",
       mimeType: "application/octet-stream",
       buffer: oversized,
     });
 
-    await expect(page.locator('[data-testid="toast-error"]')).toContainText(
-      "ファイルサイズが上限を超えています",
-      { timeout: 15000 },
+    await expectAttachmentUiResult(
+      attachmentObservation,
+      async () => {
+        await expect(page.locator('[data-testid="toast-error"]')).toContainText(
+          "ファイルサイズが上限を超えています",
+          {
+            timeout: MUTATION_UI_DEADLINE_MS,
+          },
+        );
+        await page.keyboard.press("Escape");
+        await expect(
+          taskRow.locator('[data-testid="task-attachment-icon"]'),
+        ).toHaveCount(0);
+      },
+      "error",
     );
-    await page.keyboard.press("Escape");
-    await expect(
-      taskRow.locator('[data-testid="task-attachment-icon"]'),
-    ).toHaveCount(0);
   });
 
   test("既存添付を削除するとリロード後も削除が保たれる", async ({ page }) => {
@@ -169,6 +250,10 @@ test.describe("attachments", () => {
     const filename = `delete_${Date.now()}.txt`;
     const taskRow = await addTaskAndOpenEditDialog(page, title);
 
+    const attachmentObservation = observeMutationResponses(
+      page,
+      "attachments.create",
+    );
     await page.locator('[role="dialog"] input[type="file"]').setInputFiles({
       name: filename,
       mimeType: "text/plain",
@@ -177,7 +262,11 @@ test.describe("attachments", () => {
     const attachmentItem = page
       .locator('[role="dialog"] li')
       .filter({ hasText: filename });
-    await attachmentItem.waitFor({ timeout: 15000 });
+    await expectAttachmentUiResult(
+      attachmentObservation,
+      async () => attachmentItem.waitFor({ timeout: MUTATION_UI_DEADLINE_MS }),
+      "ok",
+    );
 
     await attachmentItem
       .locator(`button[aria-label="${filename}を削除"]`)
@@ -333,6 +422,10 @@ test.describe("attachments", () => {
   }) => {
     await addTaskAndOpenEditDialog(page, `編集ダイアログ貼付_${Date.now()}`);
     await page.locator('[role="dialog"] textarea#edit-text').focus();
+    const attachmentObservation = observeMutationResponses(
+      page,
+      "attachments.create",
+    );
     await page.evaluate((base64) => {
       const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
       const file = new File([bytes], "", { type: "image/png" });
@@ -348,11 +441,16 @@ test.describe("attachments", () => {
       );
       el?.dispatchEvent(event);
     }, TINY_PNG_BASE64);
-    await expect(
-      page
-        .locator('[role="dialog"]')
-        .locator('[data-testid="task-attachment-thumbnail"]'),
-    ).toBeVisible();
+    await expectAttachmentUiResult(
+      attachmentObservation,
+      async () =>
+        expect(
+          page
+            .locator('[role="dialog"]')
+            .locator('[data-testid="task-attachment-thumbnail"]'),
+        ).toBeVisible({ timeout: MUTATION_UI_DEADLINE_MS }),
+      "ok",
+    );
   });
 
   test("画像添付は一覧でサムネイル表示され、クリックで原寸ポップアップが開く", async ({
@@ -360,16 +458,25 @@ test.describe("attachments", () => {
   }) => {
     const title = `画像プレビュー_${Date.now()}`;
     await addTaskAndOpenEditDialog(page, title);
+    const attachmentObservation = observeMutationResponses(
+      page,
+      "attachments.create",
+    );
     await page.locator('[role="dialog"] input[type="file"]').setInputFiles({
       name: "sample.png",
       mimeType: "image/png",
       buffer: Buffer.from(TINY_PNG_BASE64, "base64"),
     });
-    await expect(
-      page
-        .locator('[role="dialog"]')
-        .locator('[data-testid="task-attachment-thumbnail"]'),
-    ).toBeVisible();
+    await expectAttachmentUiResult(
+      attachmentObservation,
+      async () =>
+        expect(
+          page
+            .locator('[role="dialog"]')
+            .locator('[data-testid="task-attachment-thumbnail"]'),
+        ).toBeVisible({ timeout: MUTATION_UI_DEADLINE_MS }),
+      "ok",
+    );
     await page.keyboard.press("Escape");
     const listThumbnail = page
       .locator('[data-testid="task-attachment-thumbnail"]')
@@ -395,16 +502,26 @@ test.describe("attachments", () => {
       return dt;
     });
     const dialogBody = page.locator('[role="dialog"] > div').first();
+    const attachmentObservation = observeMutationResponses(
+      page,
+      "attachments.create",
+    );
     await dialogBody.dispatchEvent("dragover", { dataTransfer });
     await dialogBody.dispatchEvent("drop", { dataTransfer });
-    await page
-      .locator('[role="dialog"] li')
-      .filter({ hasText: "dnd-edit.txt" })
-      .waitFor({ timeout: 15000 });
-    await page.keyboard.press("Escape");
+    await expectAttachmentUiResult(
+      attachmentObservation,
+      async () => {
+        await page
+          .locator('[role="dialog"] li')
+          .filter({ hasText: "dnd-edit.txt" })
+          .waitFor({ timeout: MUTATION_UI_DEADLINE_MS });
+        await page.keyboard.press("Escape");
 
-    await expect(
-      taskRow.locator('[data-testid="task-attachment-icon"]'),
-    ).toHaveCount(1, { timeout: 15000 });
+        await expect(
+          taskRow.locator('[data-testid="task-attachment-icon"]'),
+        ).toHaveCount(1, { timeout: MUTATION_UI_DEADLINE_MS });
+      },
+      "ok",
+    );
   });
 });

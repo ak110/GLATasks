@@ -16,7 +16,7 @@
 import { chromium, type Page, type FullConfig } from "@playwright/test";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { BASE_URL } from "./helpers/common";
+import { BASE_URL, STORAGE_STATE_PATH } from "./helpers/common";
 const TEST_USER = "e2etest";
 const TEST_PASSWORD = "e2etestpass123";
 const MAX_ATTEMPTS = 3;
@@ -62,7 +62,7 @@ async function isAuthenticated(page: Page, authPath: string): Promise<boolean> {
 }
 
 async function globalSetup(_config: FullConfig) {
-  const authDir = path.join(import.meta.dirname, ".auth");
+  const authDir = path.dirname(STORAGE_STATE_PATH);
   fs.mkdirSync(authDir, { recursive: true });
 
   const browser = await chromium.launch();
@@ -128,7 +128,7 @@ async function globalSetup(_config: FullConfig) {
     );
   }
 
-  await context.storageState({ path: path.join(authDir, "user.json") });
+  await context.storageState({ path: STORAGE_STATE_PATH });
   await browser.close();
 }
 

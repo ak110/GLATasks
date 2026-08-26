@@ -189,13 +189,19 @@ test-e2e:  # E2Eテスト（E2E_GREP=... 指定で対象限定実行）
 	docker compose run --rm \
 		--env=BASE_URL=https://web \
 		--env=COREPACK_ENABLE_DOWNLOAD_PROMPT=0 \
+		--env=E2E_STORAGE_STATE=$(E2E_STORAGE_STATE) \
+		--env=E2E_OUTPUT_DIR=$(E2E_OUTPUT_DIR) \
+		--env=E2E_SKIP_INSTALL=$(E2E_SKIP_INSTALL) \
 		playwright \
 		bash -xc '\
-			mkdir -p ${PWD}/.cache/playwright/bin &&\
-			corepack enable --install-directory=${PWD}/.cache/playwright/bin &&\
 			export PATH=${PWD}/.cache/playwright/bin:${PWD}/node_modules/.bin:$$PATH &&\
-			corepack prepare pnpm@$(PNPM_VERSION) --activate &&\
-			pnpm install --frozen-lockfile && pnpm run test:e2e $(if $(E2E_GREP),-g "$(E2E_GREP)")\
+			if [ "$$E2E_SKIP_INSTALL" != "1" ]; then\
+				mkdir -p ${PWD}/.cache/playwright/bin &&\
+				corepack enable --install-directory=${PWD}/.cache/playwright/bin &&\
+				corepack prepare pnpm@$(PNPM_VERSION) --activate &&\
+				pnpm install --frozen-lockfile;\
+			fi &&\
+			pnpm run test:e2e $(if $(E2E_GREP),-g "$(E2E_GREP)")\
 		'
 
 .PHONY: help setup sync backup deploy build start stop restart-app logs ps healthcheck shell node-shell update update-actions format test test-unit test-backup test-e2e start-app logs-app migrate db-studio sql docs

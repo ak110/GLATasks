@@ -13,6 +13,7 @@ import {
   cleanupTestList,
   setupTestList,
   toggleTaskAndWaitForUpdate,
+  waitForSuccessfulMutationResponse,
   waitForPersistedTask,
 } from "./helpers/common";
 import {
@@ -1172,7 +1173,12 @@ test.describe("tasks", () => {
     await page
       .locator('[role="dialog"] [data-testid="tag-editor-add"]')
       .click();
+    const updateResponsePromise = waitForSuccessfulMutationResponse(
+      page,
+      "tasks.update",
+    );
     await page.getByTestId("task-edit-save-btn").click();
+    await updateResponsePromise;
 
     await expect(
       taskRow.locator('[data-testid="task-tags"]').filter({ hasText: tagName }),
@@ -1348,7 +1354,12 @@ test.describe("tasks", () => {
       .dispatchEvent("click");
     await page.locator("#edit-text").waitFor({ timeout: 15000 });
     await page.locator("#edit-text").fill(edited);
+    const updateResponsePromise = waitForSuccessfulMutationResponse(
+      page,
+      "tasks.update",
+    );
     await page.getByTestId("task-edit-save-btn").click();
+    await updateResponsePromise;
     await expect(
       page.locator('[data-testid="task-item"]').filter({ hasText: edited }),
     ).toBeVisible({
