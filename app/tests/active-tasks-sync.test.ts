@@ -7,13 +7,33 @@ import {
   BASE_URL,
   STORAGE_STATE_PATH,
   setupTestList,
+  setupTestLists,
   cleanupTestList,
+  cleanupTestLists,
   toggleTaskAndWaitForUpdate,
   waitForPersistedTask,
+  waitForSuccessfulMutationResponse,
   waitForTaskUpdateResponse,
 } from "./helpers/common";
 
 const STAMP = Date.now();
+
+async function addTaskToSelectedList(
+  page: import("@playwright/test").Page,
+  title: string,
+): Promise<void> {
+  const form = page.getByTestId("task-add-form");
+  await form.locator("textarea").fill(title);
+  const responsePromise = waitForSuccessfulMutationResponse(
+    page,
+    "tasks.create",
+  );
+  await form.locator('button[type="submit"]').click();
+  await responsePromise;
+  const taskRow = page.getByTestId("task-item").filter({ hasText: title });
+  await expect(taskRow).toBeVisible({ timeout: 15000 });
+  await waitForPersistedTask(taskRow);
+}
 
 test.describe("activeTasks 差分sync・楽観的更新", () => {
   // ---------------------------------------------------------------------------
@@ -385,6 +405,92 @@ test.describe("activeTasks 差分sync・楽観的更新", () => {
       await ctxB.close();
       await ctxA.close();
       await cleanupTestList(browser, listName);
+    }
+  });
+
+  test("別コンテキストのリスト統合を全件同期する", async ({ browser }) => {
+    const stamp = Date.now();
+    const sourceListName = `SSE統合元_${stamp}`;
+    const targetListName = `SSE統合先_${stamp}`;
+    const sourceTaskTitle = `SSE統合元タスク_${stamp}`;
+    const targetTaskTitle = `SSE統合先タスク_${stamp}`;
+    await setupTestLists(browser, [sourceListName, targetListName]);
+
+    const ctxOptions = {
+      baseURL: BASE_URL,
+      storageState: STORAGE_STATE_PATH,
+      ignoreHTTPSErrors: true,
+    };
+    const ctxA = await browser.newContext(ctxOptions);
+    const ctxB = await browser.newContext(ctxOptions);
+
+    try {
+      const pageA = await ctxA.newPage();
+      await Promise.all([
+        pageA.goto("/"),
+        pageA.waitForResponse((response) =>
+          response.url().includes("/api/trpc"),
+        ),
+      ]);
+      const sourceListA = pageA
+        .getByTestId("list-item")
+        .filter({ hasText: sourceListName });
+      const targetListA = pageA
+        .getByTestId("list-item")
+        .filter({ hasText: targetListName });
+      await sourceListA.getByTestId("list-select-btn").click();
+      await addTaskToSelectedList(pageA, sourceTaskTitle);
+      await targetListA.getByTestId("list-select-btn").click();
+      await addTaskToSelectedList(pageA, targetTaskTitle);
+
+      const activeTaskRequestInputs: string[] = [];
+      pageA.on("request", (request) => {
+        if (!request.url().includes("/api/trpc/tasks.listActive")) return;
+        const urlInput = new URL(request.url()).searchParams.get("input");
+        activeTaskRequestInputs.push(urlInput ?? request.postData() ?? "");
+      });
+
+      const pageB = await ctxB.newPage();
+      await Promise.all([
+        pageB.goto("/"),
+        pageB.waitForResponse((response) =>
+          response.url().includes("/api/trpc"),
+        ),
+      ]);
+      const sourceListB = pageB
+        .getByTestId("list-item")
+        .filter({ hasText: sourceListName });
+      await sourceListB.getByTestId("list-menu-btn").click();
+      await pageB.getByRole("button", { name: "他のリストに統合" }).click();
+      const mergeDialog = pageB.getByRole("dialog", {
+        name: "リストの統合",
+      });
+      await mergeDialog.getByLabel("統合先リスト").selectOption({
+        label: targetListName,
+      });
+      const mergeResponsePromise = waitForSuccessfulMutationResponse(
+        pageB,
+        "lists.merge",
+      );
+      await mergeDialog.getByRole("button", { name: "統合" }).click();
+      await mergeResponsePromise;
+
+      await expect(sourceListA).toHaveCount(0, { timeout: 15000 });
+      await targetListA.getByTestId("list-select-btn").click();
+      await expect(
+        pageA.getByTestId("task-item").filter({ hasText: sourceTaskTitle }),
+      ).toBeVisible({ timeout: 15000 });
+      await expect(
+        pageA.getByTestId("task-item").filter({ hasText: targetTaskTitle }),
+      ).toBeVisible({ timeout: 15000 });
+      expect(activeTaskRequestInputs.length).toBeGreaterThan(0);
+      expect(
+        activeTaskRequestInputs.some((input) => !input.includes('"since"')),
+      ).toBe(true);
+    } finally {
+      await ctxB.close();
+      await ctxA.close();
+      await cleanupTestLists(browser, [sourceListName, targetListName]);
     }
   });
 });
