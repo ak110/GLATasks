@@ -40,8 +40,11 @@
 
     type PendingPreparation = {
         request: TranslationRequest;
+        translationUnits: readonly string[];
         preparation: readonly TranslationPreparationTarget[];
         selectedIndex: number;
+        translationIndex: number;
+        translatedText: string;
     };
 
     let nativeLanguage = $state<string>(TRANSLATE_DEFAULTS.nativeLanguage);
@@ -239,9 +242,21 @@
         directionPreparations = next;
     }
 
+    function splitTranslationUnits(text: string): string[] {
+        return text
+            .replace(/\r\n?/g, "\n")
+            .split(/\n[ \t]*(?:\n[ \t]*)+/)
+            .map((unit) => unit.trim())
+            .filter((unit) => unit.length > 0);
+    }
+
     async function executeTranslation(
         request: TranslationRequest,
         sequence: number,
+        resume?: Pick<
+            PendingPreparation,
+            "translationUnits" | "translationIndex" | "translatedText"
+        >,
     ): Promise<void> {
         if (
             sequence !== requestSequence ||
@@ -253,67 +268,96 @@
 
         const controller = new AbortController();
         activeController = controller;
-        targetText = "";
+        pendingPreparation = undefined;
+        pendingPreparationStale = false;
+        const translationUnits =
+            resume?.translationUnits ??
+            splitTranslationUnits(request.sourceText);
+        const startIndex = resume?.translationIndex ?? 0;
+        let translatedText = resume?.translatedText ?? "";
+        targetText = translatedText;
         statusMessage = "翻訳中...";
-        let translatedText = "";
 
         try {
-            const result = await runTranslation(
-                request.sourceText,
-                request.nativeLanguage,
-                request.foreignLanguage,
-                request.engine,
-                controller.signal,
-                (chunk) => {
-                    if (
-                        sequence === requestSequence &&
-                        !controller.signal.aborted
-                    ) {
-                        translatedText += chunk;
-                        targetText = translatedText;
-                    }
-                },
-                request.direction,
-            );
-
-            if (sequence !== requestSequence || controller.signal.aborted) {
-                return;
-            }
-
-            if (result.status === "prepare") {
-                const translatorPreparations = result.preparation.filter(
-                    (target): target is TranslatorPreparation =>
-                        target.kind === "translator",
-                );
-                const directionChoicePreparations =
-                    translatorPreparations.filter(
-                        (target) => target.requiresDirectionChoice,
-                    );
-                if (directionChoicePreparations.length > 0) {
-                    updateDirectionPreparations(directionChoicePreparations);
-                } else {
-                    directionPreparations = [];
-                    selectedDirection = undefined;
+            for (
+                let index = startIndex;
+                index < translationUnits.length;
+                index++
+            ) {
+                if (sequence !== requestSequence || controller.signal.aborted) {
+                    return;
                 }
-                const selectedIndex = request.direction
-                    ? result.preparation.findIndex(
-                          (target) =>
-                              target.kind === "translator" &&
-                              target.direction === request.direction,
-                      )
-                    : 0;
-                pendingPreparation = {
-                    request,
-                    preparation: result.preparation,
-                    selectedIndex: selectedIndex >= 0 ? selectedIndex : 0,
-                };
-                pendingPreparationStale = false;
-                statusMessage = `準備が必要です: ${result.preparation.map(describePreparationDirection).join("、")}`;
-            } else if (result.status === "unavailable") {
-                statusMessage = result.message;
-            } else {
-                statusMessage = "";
+                const translationUnit = translationUnits[index];
+                if (translationUnit === undefined) continue;
+                let receivedChunk = false;
+                const result = await runTranslation(
+                    translationUnit,
+                    request.nativeLanguage,
+                    request.foreignLanguage,
+                    request.engine,
+                    controller.signal,
+                    (chunk) => {
+                        if (
+                            sequence === requestSequence &&
+                            !controller.signal.aborted
+                        ) {
+                            if (!receivedChunk && translatedText) {
+                                translatedText += "\n\n";
+                            }
+                            receivedChunk = true;
+                            translatedText += chunk;
+                            targetText = translatedText;
+                        }
+                    },
+                    request.direction,
+                );
+
+                if (sequence !== requestSequence || controller.signal.aborted) {
+                    return;
+                }
+
+                if (result.status === "prepare") {
+                    const translatorPreparations = result.preparation.filter(
+                        (target): target is TranslatorPreparation =>
+                            target.kind === "translator",
+                    );
+                    const directionChoicePreparations =
+                        translatorPreparations.filter(
+                            (target) => target.requiresDirectionChoice,
+                        );
+                    if (directionChoicePreparations.length > 0) {
+                        updateDirectionPreparations(
+                            directionChoicePreparations,
+                        );
+                    } else {
+                        directionPreparations = [];
+                        selectedDirection = undefined;
+                    }
+                    const selectedIndex = request.direction
+                        ? result.preparation.findIndex(
+                              (target) =>
+                                  target.kind === "translator" &&
+                                  target.direction === request.direction,
+                          )
+                        : 0;
+                    pendingPreparation = {
+                        request,
+                        translationUnits,
+                        preparation: result.preparation,
+                        selectedIndex: selectedIndex >= 0 ? selectedIndex : 0,
+                        translationIndex: index,
+                        translatedText,
+                    };
+                    pendingPreparationStale = false;
+                    statusMessage = `準備が必要です: ${result.preparation.map(describePreparationDirection).join("、")}`;
+                    return;
+                }
+                if (result.status === "unavailable") {
+                    statusMessage = result.message;
+                    return;
+                }
             }
+            statusMessage = "";
         } catch (error) {
             if (sequence === requestSequence && !controller.signal.aborted) {
                 statusMessage = extractErrorMessage(error);
@@ -396,7 +440,11 @@
             pendingPreparationStale = false;
             statusMessage = "";
             const nextSequence = ++requestSequence;
-            void executeTranslation(request, nextSequence);
+            void executeTranslation(request, nextSequence, {
+                translationUnits: preparationRequest.translationUnits,
+                translationIndex: preparationRequest.translationIndex,
+                translatedText: preparationRequest.translatedText,
+            });
         } catch (error) {
             if (isCurrentRequest(request)) {
                 statusMessage = extractErrorMessage(error);

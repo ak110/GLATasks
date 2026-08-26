@@ -127,6 +127,155 @@ test.describe("translate", () => {
       expect(state.translatorCreatePairs).toEqual(["ja>en", "en>ja"]);
     });
 
+    test("段落を空行で分割し単一改行と訳文間の空行を保持する", async ({
+      page,
+    }) => {
+      await page
+        .getByTestId("translate-source-input")
+        .fill(
+          "  一つ目の行\r\n二つ目の行\r\n \r\n\t\r\n  二つ目の段落  \n\n\n  三つ目の行\r\n最後の行  ",
+        );
+      await expect(page.getByTestId("translate-target-output")).toHaveValue(
+        "[ja>en] 一つ目の行\n二つ目の行\n\n[ja>en] 二つ目の段落\n\n[ja>en] 三つ目の行\n最後の行",
+        { timeout: 5000 },
+      );
+      const state = await getState(page);
+      expect(state.translationInputs).toEqual([
+        "一つ目の行\n二つ目の行",
+        "二つ目の段落",
+        "三つ目の行\n最後の行",
+      ]);
+    });
+
+    test("段落途中の準備後に後続方向から再開する", async ({ page }) => {
+      await installAiStubs(page, {
+        detectorAvailability: "available",
+        detectorLanguages: ["ja", "en", "en", "en"],
+        translatorAvailabilityByDirection: {
+          nativeToForeign: "available",
+          foreignToNative: "downloadable",
+        },
+        includePrompt: false,
+      });
+      await page.reload();
+      await expectStubbedPageReady(page, { includePrompt: false });
+
+      await page
+        .getByTestId("translate-source-input")
+        .fill("最初の段落\n\n後続の段落\n\n最後の段落");
+      const prepareButton = page.getByTestId("translate-prepare-btn");
+      await expect(prepareButton).toBeVisible({ timeout: 5000 });
+      await expect(page.getByTestId("translate-target-output")).toHaveValue(
+        "[ja>en] 最初の段落",
+      );
+      await prepareButton.click();
+      await expect(page.getByTestId("translate-target-output")).toHaveValue(
+        "[ja>en] 最初の段落\n\n[en>ja] 後続の段落\n\n[en>ja] 最後の段落",
+        { timeout: 5000 },
+      );
+      await expect(prepareButton).toHaveCount(0);
+      const state = await getState(page);
+      expect(state.translationInputs).toEqual([
+        "最初の段落",
+        "後続の段落",
+        "最後の段落",
+      ]);
+      expect(state.translatorCreatePairs).toEqual(["ja>en", "en>ja"]);
+    });
+
+    test("段落途中の利用不可で完了済み訳文を保持する", async ({ page }) => {
+      await installAiStubs(page, {
+        detectorAvailability: "available",
+        detectorLanguages: ["ja", "en", "en"],
+        translatorAvailabilityByDirection: {
+          nativeToForeign: "available",
+          foreignToNative: "unavailable",
+        },
+        includePrompt: false,
+      });
+      await page.reload();
+      await expectStubbedPageReady(page, { includePrompt: false });
+
+      await page
+        .getByTestId("translate-source-input")
+        .fill("最初の段落\n\n利用できない段落\n\n未開始の段落");
+      await expect(page.getByTestId("translate-target-output")).toHaveValue(
+        "[ja>en] 最初の段落",
+        { timeout: 5000 },
+      );
+      await expect(page.getByTestId("translate-status")).toContainText(
+        "この言語ペア",
+      );
+      const state = await getState(page);
+      expect(state.translationInputs).toEqual(["最初の段落"]);
+    });
+
+    test("段落途中の例外で受信済み訳文を保持する", async ({ page }) => {
+      await installAiStubs(page, {
+        detectorAvailability: "available",
+        detectorLanguages: ["ja", "en", "en"],
+        translatorAvailabilityByDirection: {
+          nativeToForeign: "available",
+          foreignToNative: "available",
+        },
+        includePrompt: false,
+      });
+      await page.reload();
+      await expectStubbedPageReady(page, { includePrompt: false });
+      await page.evaluate(() => {
+        type TranslatorPrototype = {
+          prototype: {
+            translateStreaming: (
+              this: { sourceLanguage: string; targetLanguage: string },
+              input: string,
+              options?: { signal?: AbortSignal },
+            ) => ReadableStream<string>;
+          };
+        };
+        const translator =
+          globalThis.Translator as unknown as TranslatorPrototype;
+        const originalTranslateStreaming =
+          translator.prototype.translateStreaming;
+        const state = (
+          globalThis as typeof globalThis & {
+            __translateTestState: { translationInputs: string[] };
+          }
+        ).__translateTestState;
+        translator.prototype.translateStreaming = function (
+          this: { sourceLanguage: string; targetLanguage: string },
+          input: string,
+          options?: { signal?: AbortSignal },
+        ) {
+          if (input !== "途中で失敗") {
+            return originalTranslateStreaming.call(this, input, options);
+          }
+          state.translationInputs.push(input);
+          const prefix = `[${this.sourceLanguage}>${this.targetLanguage}] `;
+          return new ReadableStream<string>({
+            async start(controller) {
+              controller.enqueue(prefix);
+              controller.enqueue("途中まで");
+              await Promise.resolve();
+              controller.error(new Error("段落翻訳失敗"));
+            },
+          });
+        };
+      });
+
+      await page
+        .getByTestId("translate-source-input")
+        .fill("最初の段落\n\n途中で失敗\n\n未開始の段落");
+      await expect(page.getByTestId("translate-target-output")).toHaveValue(
+        "[ja>en] 最初の段落\n\n[en>ja] 途中まで",
+        { timeout: 5000 },
+      );
+      await expect(page.getByTestId("translate-status")).toContainText(
+        "段落翻訳失敗",
+      );
+      const state = await getState(page);
+      expect(state.translationInputs).toEqual(["最初の段落", "途中で失敗"]);
+    });
+
     test("downloadingのTranslator APIは自動経路で翻訳する", async ({
       page,
     }) => {
