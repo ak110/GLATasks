@@ -19,7 +19,7 @@
     "@sveltejs/adapter-node": "^5.5.7",
     "@sveltejs/kit": "^2.70.3",
     "@tailwindcss/vite": "^4.3.3",
-    "@tanstack/svelte-query": "^6.1.43",
+    "@tanstack/svelte-query": "^6.1.39",
     "@trpc/client": "^11.18.0",
     "@trpc/server": "^11.18.0",
     "bcryptjs": "^3.0.3",
