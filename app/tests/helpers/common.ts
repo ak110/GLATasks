@@ -134,11 +134,77 @@ type FixtureOperation =
   | { kind: "create"; listNames: readonly string[] }
   | { kind: "delete"; listNames: readonly string[] };
 
-/** 軽量ページで初期化済みの暗号化tRPCクライアントを使ってfixtureを操作する */
+async function deleteTestListFromPage(
+  page: Page,
+  listName: string,
+): Promise<void> {
+  const listRow = page.getByTestId("list-item").filter({ hasText: listName });
+  if ((await listRow.count()) === 0) return;
+  await listRow.getByTestId("list-menu-btn").click();
+  await page.getByTestId("list-delete-btn").click();
+  const responsePromise = waitForSuccessfulMutationResponse(
+    page,
+    "lists.delete",
+  );
+  await page
+    .getByRole("dialog")
+    .last()
+    .getByRole("button", { name: "削除", exact: true })
+    .click();
+  await responsePromise;
+  await expect(listRow).toHaveCount(0);
+}
+
+async function mutateTestListFixturesFromPage(
+  page: Page,
+  operation: FixtureOperation,
+): Promise<void> {
+  await Promise.all([
+    page.goto("/"),
+    page.waitForResponse((response) => response.url().includes("/api/trpc")),
+  ]);
+
+  if (operation.kind === "create") {
+    for (const listName of operation.listNames) {
+      await page.fill('aside input[placeholder="新しいリスト"]', listName);
+      const responsePromise = waitForSuccessfulMutationResponse(
+        page,
+        "lists.create",
+      );
+      await page.click('aside button[type="submit"]');
+      await responsePromise;
+      await page
+        .getByTestId("list-select-btn")
+        .filter({ hasText: listName })
+        .waitFor({ timeout: 15000 });
+    }
+    return;
+  }
+
+  const errors: unknown[] = [];
+  for (const listName of operation.listNames) {
+    try {
+      await deleteTestListFromPage(page, listName);
+    } catch (error) {
+      errors.push(error);
+    }
+  }
+  if (errors.length > 0) {
+    throw new AggregateError(errors, "テスト用リストの削除に失敗した");
+  }
+}
+
+/** 開発時は暗号化tRPCクライアント、ビルド済み画面では公開UIを使ってfixtureを操作する */
 async function mutateTestListFixtures(
   page: Page,
   operation: FixtureOperation,
 ): Promise<void> {
+  if (process.env.CI) {
+    await mutateTestListFixturesFromPage(page, operation);
+    await page.goto("about:blank");
+    return;
+  }
+
   const mounted = page.waitForRequest(
     (request) => new URL(request.url()).pathname === "/api/events",
   );
