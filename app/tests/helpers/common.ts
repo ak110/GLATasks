@@ -120,37 +120,76 @@ function makeContextOptions() {
   };
 }
 
-async function deleteTestListFromPage(
-  page: Page,
-  listName: string,
-): Promise<void> {
-  const listRow = page.getByTestId("list-item").filter({ hasText: listName });
-  if ((await listRow.count()) === 0) return;
-  await listRow.getByTestId("list-menu-btn").click();
-  await page.getByTestId("list-delete-btn").click();
-  await page
-    .getByRole("dialog")
-    .last()
-    .getByRole("button", { name: "削除", exact: true })
-    .click();
-  await expect(listRow).toHaveCount(0);
-}
+type FixtureList = { id: number; title: string };
 
-async function deleteTestListsFromPage(
+type FixtureTrpcClient = {
+  lists: {
+    create: { mutate: (input: { title: string }) => Promise<unknown> };
+    list: { query: (showType: "all") => Promise<unknown> };
+    delete: { mutate: (input: { listId: number }) => Promise<unknown> };
+  };
+};
+
+type FixtureOperation =
+  | { kind: "create"; listNames: readonly string[] }
+  | { kind: "delete"; listNames: readonly string[] };
+
+/** 軽量ページで初期化済みの暗号化tRPCクライアントを使ってfixtureを操作する */
+async function mutateTestListFixtures(
   page: Page,
-  listNames: readonly string[],
+  operation: FixtureOperation,
 ): Promise<void> {
-  const errors: unknown[] = [];
-  for (const listName of listNames) {
-    try {
-      await deleteTestListFromPage(page, listName);
-    } catch (error) {
-      errors.push(error);
-    }
-  }
-  if (errors.length > 0) {
-    throw new AggregateError(errors, "テスト用リストの削除に失敗した");
-  }
+  const mounted = page.waitForRequest(
+    (request) => new URL(request.url()).pathname === "/api/events",
+  );
+  await page.goto("/translate");
+  await mounted;
+  await page.evaluate(
+    async ({ moduleUrl, operation }) => {
+      await new Promise<void>((resolve) =>
+        requestAnimationFrame(() => resolve()),
+      );
+      const module = (await import(
+        /* @vite-ignore */ moduleUrl
+      )) as unknown as { trpc: FixtureTrpcClient };
+      const { trpc } = module;
+
+      if (operation.kind === "create") {
+        await Promise.all(
+          operation.listNames.map((title) =>
+            trpc.lists.create.mutate({ title }),
+          ),
+        );
+        return;
+      }
+
+      const rawLists = await trpc.lists.list.query("all");
+      if (!Array.isArray(rawLists)) {
+        throw new Error("テスト用リスト一覧が配列ではありません");
+      }
+      const targetNames = new Set(operation.listNames);
+      const targetLists: FixtureList[] = rawLists.map((list) => {
+        if (
+          typeof list !== "object" ||
+          list === null ||
+          !("id" in list) ||
+          typeof list.id !== "number" ||
+          !("title" in list) ||
+          typeof list.title !== "string"
+        ) {
+          throw new Error("テスト用リスト一覧の項目が不正です");
+        }
+        return { id: list.id, title: list.title };
+      });
+      await Promise.all(
+        targetLists
+          .filter((list) => targetNames.has(list.title))
+          .map((list) => trpc.lists.delete.mutate({ listId: list.id })),
+      );
+    },
+    { moduleUrl: "/src/lib/trpc.ts", operation },
+  );
+  await page.goto("about:blank");
 }
 
 /**
@@ -175,22 +214,17 @@ export async function setupTestLists(
   const attemptedListNames: string[] = [];
   try {
     const page = await ctx.newPage();
-    await Promise.all([
-      page.goto("/"),
-      page.waitForResponse((res) => res.url().includes("/api/trpc")),
-    ]);
-    for (const listName of listNames) {
-      await page.fill('aside input[placeholder="新しいリスト"]', listName);
-      await page.click('aside button[type="submit"]');
-      attemptedListNames.push(listName);
-      await page
-        .locator(`[data-testid="list-select-btn"]:has-text("${listName}")`)
-        .waitFor({ timeout: 15000 });
-    }
+    attemptedListNames.push(...listNames);
+    await mutateTestListFixtures(page, { kind: "create", listNames });
   } catch (setupError) {
     try {
       const page = ctx.pages()[0];
-      if (page) await deleteTestListsFromPage(page, attemptedListNames);
+      if (page) {
+        await mutateTestListFixtures(page, {
+          kind: "delete",
+          listNames: attemptedListNames,
+        });
+      }
     } catch (cleanupError) {
       throw new AggregateError(
         [setupError, cleanupError],
@@ -225,11 +259,7 @@ export async function cleanupTestLists(
   const ctx = await browser.newContext(makeContextOptions());
   try {
     const page = await ctx.newPage();
-    await Promise.all([
-      page.goto("/"),
-      page.waitForResponse((res) => res.url().includes("/api/trpc")),
-    ]);
-    await deleteTestListsFromPage(page, listNames);
+    await mutateTestListFixtures(page, { kind: "delete", listNames });
   } finally {
     await ctx.close();
   }
