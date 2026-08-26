@@ -251,11 +251,19 @@ test.describe("translate", () => {
           }
           state.translationInputs.push(input);
           const prefix = `[${this.sourceLanguage}>${this.targetLanguage}] `;
+          let pullCount = 0;
           return new ReadableStream<string>({
-            async start(controller) {
-              controller.enqueue(prefix);
-              controller.enqueue("途中まで");
-              await Promise.resolve();
+            pull(controller) {
+              if (pullCount === 0) {
+                pullCount += 1;
+                controller.enqueue(prefix);
+                return;
+              }
+              if (pullCount === 1) {
+                pullCount += 1;
+                controller.enqueue("途中まで");
+                return;
+              }
               controller.error(new Error("段落翻訳失敗"));
             },
           });
