@@ -20,6 +20,7 @@ export type StubOptions = {
   promptCreateError?: string;
   blockFirstTranslation?: boolean;
   blockDetectorCreate?: boolean;
+  blockTranslatorCreate?: boolean;
 };
 
 export type TranslateTestState = {
@@ -43,6 +44,7 @@ export type TranslateTestState = {
 type TranslateTestWindow = Window & {
   __translateTestState: TranslateTestState;
   __translateTestReleaseDetectorCreate: () => void;
+  __translateTestReleaseTranslatorCreate: () => void;
 };
 
 const defaultStubOptions: Required<
@@ -82,8 +84,10 @@ export async function installAiStubs(
       promptCreateError,
       blockFirstTranslation,
       blockDetectorCreate,
+      blockTranslatorCreate,
     } = options;
     let releaseDetectorCreate: (() => void) | undefined;
+    let releaseTranslatorCreate: (() => void) | undefined;
     let detectorDetectionCount = 0;
     let activationSequence = 0;
     let activeActivationId = 0;
@@ -120,6 +124,10 @@ export async function installAiStubs(
       __translateTestReleaseDetectorCreate: () => {
         releaseDetectorCreate?.();
         releaseDetectorCreate = undefined;
+      },
+      __translateTestReleaseTranslatorCreate: () => {
+        releaseTranslatorCreate?.();
+        releaseTranslatorCreate = undefined;
       },
     });
 
@@ -204,6 +212,7 @@ export async function installAiStubs(
         sourceLanguage: string;
         targetLanguage: string;
         monitor?: (monitor: unknown) => void;
+        signal?: AbortSignal;
       }) {
         state.translatorCreateCount += 1;
         state.translatorCreatePairs.push(
@@ -221,6 +230,22 @@ export async function installAiStubs(
         }
         if (translatorCreateError) throw new Error(translatorCreateError);
         notifyProgress(options.monitor as never);
+        if (blockTranslatorCreate && state.translatorCreateCount === 1) {
+          // 進捗が100%に達した後もcreate()が解決しない無応答を再現する。
+          // 中断と明示解放のどちらか先に起きた方だけでPromiseが決着する。
+          try {
+            await new Promise<void>((resolve, reject) => {
+              releaseTranslatorCreate = resolve;
+              options.signal?.addEventListener(
+                "abort",
+                () => reject(options.signal?.reason),
+                { once: true },
+              );
+            });
+          } finally {
+            releaseTranslatorCreate = undefined;
+          }
+        }
         return new TestTranslator(
           options.sourceLanguage,
           options.targetLanguage,
@@ -418,6 +443,15 @@ export async function releaseDetectorCreate(page: Page): Promise<void> {
     (
       window as unknown as TranslateTestWindow
     ).__translateTestReleaseDetectorCreate();
+  });
+}
+
+/** 保留した初回のTranslator作成を解放して正常完了させる */
+export async function releaseTranslatorCreate(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    (
+      window as unknown as TranslateTestWindow
+    ).__translateTestReleaseTranslatorCreate();
   });
 }
 

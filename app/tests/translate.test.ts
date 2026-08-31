@@ -10,6 +10,7 @@ import {
   openStubbedPage,
   openUnsupportedPage,
   prepareTranslator,
+  releaseTranslatorCreate,
   translateAutomatically,
 } from "./helpers/translate-page";
 
@@ -481,6 +482,70 @@ test.describe("translate", () => {
       await expect(page.getByTestId("translate-status")).toContainText(
         "translator creation failed",
       );
+    });
+
+    test("準備が完了しない場合は翻訳先の変更で中断し再操作で翻訳する", async ({
+      page,
+    }) => {
+      await installAiStubs(page, {
+        detectorAvailability: "available",
+        translatorAvailability: "downloadable",
+        blockTranslatorCreate: true,
+      });
+      await page.reload();
+      await expectStubbedPageReady(page);
+      await page.getByTestId("translate-source-input").fill("こんにちは");
+      const prepareButton = page.getByTestId("translate-prepare-btn");
+      await expect(prepareButton).toBeVisible({ timeout: 5000 });
+      await prepareButton.click();
+      await expect
+        .poll(async () => (await getState(page)).translatorCreateCount)
+        .toBe(1);
+
+      await page.getByTestId("translate-foreign-input").fill("フランス語");
+      await expect(prepareButton).toBeEnabled({ timeout: 5000 });
+      await prepareButton.click();
+      await expect(page.getByTestId("translate-target-output")).toHaveValue(
+        "[ja>fr] こんにちは",
+        { timeout: 5000 },
+      );
+      const state = await getState(page);
+      expect(state.translatorCreateCount).toBe(2);
+      expect(state.translatorCreatePairs).toEqual(["ja>en", "ja>fr"]);
+    });
+
+    test("準備中の原文変更では同じモデル作成を継続する", async ({ page }) => {
+      await installAiStubs(page, {
+        detectorAvailability: "available",
+        translatorAvailability: "downloadable",
+        blockTranslatorCreate: true,
+      });
+      await page.reload();
+      await expectStubbedPageReady(page);
+      await page.getByTestId("translate-source-input").fill("こんにちは");
+      const prepareButton = page.getByTestId("translate-prepare-btn");
+      await expect(prepareButton).toBeVisible({ timeout: 5000 });
+      await prepareButton.click();
+      await expect
+        .poll(async () => (await getState(page)).translatorCreateCount)
+        .toBe(1);
+
+      await page.getByTestId("translate-source-input").fill("こんにちは、世界");
+      await expect(page.getByTestId("translate-status")).toContainText(
+        "準備が必要です",
+        { timeout: 5000 },
+      );
+      await expect(prepareButton).toBeDisabled();
+      expect((await getState(page)).translatorCreateCount).toBe(1);
+
+      await releaseTranslatorCreate(page);
+      await expect(prepareButton).toBeEnabled({ timeout: 5000 });
+      await prepareButton.click();
+      await expect(page.getByTestId("translate-target-output")).toHaveValue(
+        "[ja>en] こんにちは、世界",
+        { timeout: 5000 },
+      );
+      expect((await getState(page)).translatorCreateCount).toBe(1);
     });
 
     test("Prompt APIへ設定外の対応言語を入力言語として宣言する", async ({

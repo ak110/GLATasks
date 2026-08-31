@@ -55,6 +55,14 @@ export type PrepareEngineOptions = {
   preparation: readonly TranslationPreparationTarget[];
   onProgress: (progress: number) => void;
   signal?: AbortSignal;
+  /**
+   * 準備を所有する呼び出し元が共有の作成処理そのものを中断するための信号。
+   *
+   * `signal`は個別の翻訳要求の中断に使い、共有の作成Promiseを壊さない。
+   * 利用者操作で開始した準備は中断の所有者が呼び出し元にあるため、この信号を
+   * `create()`へ渡して作成自体を失敗させ、共有キャッシュの登録を解放する。
+   */
+  creationSignal?: AbortSignal;
 };
 
 type TranslationResources = {
@@ -175,12 +183,15 @@ export async function detectEngineAvailability(
  * https://webmachinelearning.github.io/translation-api/#dom-translator-create
  * https://developer.mozilla.org/en-US/docs/Web/API/Prompt_API/Using
  * https://learn.microsoft.com/en-us/microsoft-edge/web-platform/prompt-api
+ * 進捗は0〜1の割合で通知する。仕様上、割合が1に達した後もモデルの初期化工程が続き、
+ * その間は進捗を通知しない。
  */
 export async function prepareEngine({
   engine,
   preparation,
   onProgress,
   signal,
+  creationSignal,
 }: PrepareEngineOptions): Promise<void> {
   if (preparation.length === 0) return;
   const generation = resourceGeneration;
@@ -191,10 +202,16 @@ export async function prepareEngine({
   for (const target of preparation) {
     ensurePreparationActive(generation, signal);
     if (engine === "translator" && target.kind === "translator") {
-      await prepareTranslator(target, monitor, generation, signal);
+      await prepareTranslator(
+        target,
+        monitor,
+        generation,
+        signal,
+        creationSignal,
+      );
     }
     if (engine === "prompt" && target.kind === "prompt") {
-      await preparePrompt(target, monitor, generation, signal);
+      await preparePrompt(target, monitor, generation, signal, creationSignal);
     }
   }
 }
@@ -237,6 +254,7 @@ async function createTranslator(
   mode: "detected" | "explicit",
   generation = resourceGeneration,
   signal?: AbortSignal,
+  creationSignal?: AbortSignal,
 ): Promise<Translator> {
   const key = makePairKey(sourceLanguage, targetLanguage);
   ensurePreparationActive(generation, signal);
@@ -261,6 +279,7 @@ async function createTranslator(
         sourceLanguage,
         targetLanguage,
         monitor,
+        signal: creationSignal,
       }),
     ).then((instance) => {
       if (
@@ -297,6 +316,7 @@ async function createPrompt(
   monitor: CreateMonitorCallback,
   generation = resourceGeneration,
   signal?: AbortSignal,
+  creationSignal?: AbortSignal,
 ): Promise<LanguageModel> {
   const key = makePromptKey(target.nativeLanguage, target.foreignLanguage);
   ensurePreparationActive(generation, signal);
@@ -318,6 +338,7 @@ async function createPrompt(
         ...target.options,
         initialPrompts: [{ role: "system", content: target.initialPrompt }],
         monitor,
+        signal: creationSignal,
       }),
     ).then((instance) => {
       if (
@@ -354,6 +375,7 @@ async function prepareTranslator(
   monitor: CreateMonitorCallback,
   generation: number,
   signal?: AbortSignal,
+  creationSignal?: AbortSignal,
 ): Promise<void> {
   ensurePreparationActive(generation, signal);
   if (typeof globalThis.Translator === "undefined") {
@@ -371,6 +393,7 @@ async function prepareTranslator(
     "explicit",
     generation,
     signal,
+    creationSignal,
   );
   ensurePreparationActive(generation, signal);
 }
@@ -380,6 +403,7 @@ async function preparePrompt(
   monitor: CreateMonitorCallback,
   generation: number,
   signal?: AbortSignal,
+  creationSignal?: AbortSignal,
 ): Promise<void> {
   ensurePreparationActive(generation, signal);
   if (typeof globalThis.LanguageModel === "undefined") {
@@ -388,7 +412,7 @@ async function preparePrompt(
   if (target.availability === "unavailable") {
     throw new Error("Prompt APIを利用できません");
   }
-  await createPrompt(target, monitor, generation, signal);
+  await createPrompt(target, monitor, generation, signal, creationSignal);
   ensurePreparationActive(generation, signal);
 }
 

@@ -509,6 +509,61 @@ describe("translate client availability", () => {
     await expect(second).resolves.toBeUndefined();
   });
 
+  it("準備の中断信号で共有Translator作成Promiseを失敗させ再作成する", async () => {
+    const translator = {
+      sourceLanguage: "ja",
+      targetLanguage: "en",
+      translate: vi.fn(),
+      translateStreaming: vi.fn(),
+      destroy: vi.fn(),
+    } as unknown as Translator;
+    const translatorResolvers: Array<(translator: Translator) => void> = [];
+    const translatorCreate = vi.fn(
+      (options: TranslatorCreateOptions) =>
+        new Promise<Translator>((resolve, reject) => {
+          translatorResolvers.push(resolve);
+          options.signal?.addEventListener("abort", () => {
+            reject(options.signal?.reason);
+          });
+        }),
+    );
+    vi.stubGlobal("Translator", {
+      availability: vi.fn().mockResolvedValue("downloadable"),
+      create: translatorCreate,
+    });
+    const preparation = {
+      kind: "translator" as const,
+      sourceText: "こんにちは",
+      nativeLanguage: "ja",
+      foreignLanguage: "en",
+      sourceLanguage: "ja",
+      targetLanguage: "en",
+      direction: "native-to-foreign" as const,
+      availability: "downloadable" as const,
+      requiresDirectionChoice: true,
+      requiresUserActivation: true,
+    };
+    const controller = new AbortController();
+    const first = prepareEngine({
+      engine: "translator",
+      preparation: [preparation],
+      onProgress: () => undefined,
+      creationSignal: controller.signal,
+    });
+    await vi.waitFor(() => expect(translatorCreate).toHaveBeenCalledTimes(1));
+    controller.abort();
+    await expect(first).rejects.toMatchObject({ name: "AbortError" });
+
+    const second = prepareEngine({
+      engine: "translator",
+      preparation: [preparation],
+      onProgress: () => undefined,
+    });
+    await vi.waitFor(() => expect(translatorCreate).toHaveBeenCalledTimes(2));
+    translatorResolvers[1]?.(translator);
+    await expect(second).resolves.toBeUndefined();
+  });
+
   it("検出器の自動経路ではTranslator準備後も入力ごとに方向を再判定する", async () => {
     const detector = {
       detect: vi
@@ -707,6 +762,60 @@ describe("translate client availability", () => {
     expect(promptCreate).toHaveBeenCalledTimes(1);
     resolvePrompt?.(prompt);
     await expect(pending).resolves.toBeUndefined();
+  });
+
+  it("準備の中断信号で共有Prompt作成Promiseを失敗させ再作成する", async () => {
+    const prompt = {
+      clone: vi.fn(),
+      prompt: vi.fn(),
+      promptStreaming: vi.fn(),
+      destroy: vi.fn(),
+    } as unknown as LanguageModel;
+    const promptResolvers: Array<(model: LanguageModel) => void> = [];
+    const promptCreate = vi.fn(
+      (options: LanguageModelCreateOptions) =>
+        new Promise<LanguageModel>((resolve, reject) => {
+          promptResolvers.push(resolve);
+          options.signal?.addEventListener("abort", () => {
+            reject(options.signal?.reason);
+          });
+        }),
+    );
+    vi.stubGlobal("LanguageModel", {
+      availability: vi.fn().mockResolvedValue("downloadable"),
+      create: promptCreate,
+    });
+    const preparation = {
+      kind: "prompt" as const,
+      nativeLanguage: "ja",
+      foreignLanguage: "en",
+      options: {
+        expectedInputs: [{ type: "text" as const, languages: ["en"] }],
+        expectedOutputs: [{ type: "text" as const, languages: ["ja", "en"] }],
+      },
+      initialPrompt: "翻訳する",
+      availability: "downloadable" as const,
+      requiresUserActivation: true,
+    };
+    const controller = new AbortController();
+    const first = prepareEngine({
+      engine: "prompt",
+      preparation: [preparation],
+      onProgress: () => undefined,
+      creationSignal: controller.signal,
+    });
+    await vi.waitFor(() => expect(promptCreate).toHaveBeenCalledTimes(1));
+    controller.abort();
+    await expect(first).rejects.toMatchObject({ name: "AbortError" });
+
+    const second = prepareEngine({
+      engine: "prompt",
+      preparation: [preparation],
+      onProgress: () => undefined,
+    });
+    await vi.waitFor(() => expect(promptCreate).toHaveBeenCalledTimes(2));
+    promptResolvers[1]?.(prompt);
+    await expect(second).resolves.toBeUndefined();
   });
 
   it("中断済み要求のAbortSignalで共有Prompt作成Promiseを失敗させない", async () => {
