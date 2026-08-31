@@ -82,3 +82,11 @@ Biomeへの移行は次の阻害要因により見送っている。
   対話端末を持たない実行では当該プロンプトの表示時点で例外終了するため、
   `script -qec "pnpm run db:generate" /dev/null`のように疑似端末を割り当てたうえで
   列の追加か改名かの問いに応答し、生成されたマイグレーションファイルの内容を確認して手直しする
+- Docker Compose環境と`make`ターゲットは主作業ツリー（`git worktree list`の先頭に表示される作業ツリー）で実行する。
+  git worktreeからは実行しない。worktreeにはgit管理外の`.env`が無いため`make`が
+  `COMPOSE_PROFILE が定義されていません`で即座に終了し、`.env`を複製した場合も
+  Composeのプロジェクト名がworktreeのディレクトリ名になるため、`web`の公開ポート38180と
+  `${DATA_DIR}`配下のMariaDBデータディレクトリが主作業ツリーで稼働中の環境と衝突する
+  （プロジェクト名は`docker compose config --format=json`の`name`で確認できる）。
+  worktree内では`pnpm install --frozen-lockfile`のうえ`uvx pyfltr run <path>`までを実行し、
+  E2Eとバックアップテストは主作業ツリーへ統合してから実行する
