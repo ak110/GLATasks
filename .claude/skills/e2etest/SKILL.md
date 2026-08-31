@@ -122,3 +122,7 @@ e2eテストでは共通ヘルパー（`app/tests/helpers/common.ts`）を利用
 - `setupTestLists(browser, listNames)`は1つのブラウザーコンテキストで複数のテスト用リストを作成する
 - `cleanupTestList(browser, listName)`は`afterAll`からテスト用リストを削除する
 - `cleanupTestLists(browser, listNames)`は1つのブラウザーコンテキストで複数のテスト用リストを削除する
+
+テスト用リストの作成・削除は公開UI（サイドバーのリスト追加と削除ダイアログ）を操作する。
+開発サーバーだけに存在するViteのソースモジュールへは依存させない。
+開発環境とCI（ビルド済み環境）で経路を分けると、ローカル検証の合否がCIと一致しなくなるためである。

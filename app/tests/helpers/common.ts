@@ -121,16 +121,6 @@ function makeContextOptions() {
   };
 }
 
-type FixtureList = { id: number; title: string };
-
-type FixtureTrpcClient = {
-  lists: {
-    create: { mutate: (input: { title: string }) => Promise<unknown> };
-    list: { query: (showType: "all") => Promise<unknown> };
-    delete: { mutate: (input: { listId: number }) => Promise<unknown> };
-  };
-};
-
 type FixtureOperation =
   | { kind: "create"; listNames: readonly string[] }
   | { kind: "delete"; listNames: readonly string[] };
@@ -156,7 +146,13 @@ async function deleteTestListFromPage(
   await expect(listRow).toHaveCount(0);
 }
 
-async function mutateTestListFixturesFromPage(
+/**
+ * 公開UIを操作してテスト用リストを作成・削除する
+ *
+ * 開発サーバーとビルド済み環境の双方で成立する経路へ統一するため、
+ * Viteのソースモジュール（`/src/lib/trpc.ts`）へは依存しない。
+ */
+async function mutateTestListFixtures(
   page: Page,
   operation: FixtureOperation,
 ): Promise<void> {
@@ -179,83 +175,20 @@ async function mutateTestListFixturesFromPage(
         .filter({ hasText: listName })
         .waitFor({ timeout: 15000 });
     }
-    return;
-  }
-
-  const errors: unknown[] = [];
-  for (const listName of operation.listNames) {
-    try {
-      await deleteTestListFromPage(page, listName);
-    } catch (error) {
-      errors.push(error);
+  } else {
+    const errors: unknown[] = [];
+    for (const listName of operation.listNames) {
+      try {
+        await deleteTestListFromPage(page, listName);
+      } catch (error) {
+        errors.push(error);
+      }
+    }
+    if (errors.length > 0) {
+      throw new AggregateError(errors, "テスト用リストの削除に失敗した");
     }
   }
-  if (errors.length > 0) {
-    throw new AggregateError(errors, "テスト用リストの削除に失敗した");
-  }
-}
 
-/** 開発時は暗号化tRPCクライアント、ビルド済み画面では公開UIを使ってfixtureを操作する */
-async function mutateTestListFixtures(
-  page: Page,
-  operation: FixtureOperation,
-): Promise<void> {
-  if (process.env.CI) {
-    await mutateTestListFixturesFromPage(page, operation);
-    await page.goto("about:blank");
-    return;
-  }
-
-  const mounted = page.waitForRequest(
-    (request) => new URL(request.url()).pathname === "/api/events",
-  );
-  await page.goto("/translate");
-  await mounted;
-  await page.evaluate(
-    async ({ moduleUrl, operation }) => {
-      await new Promise<void>((resolve) =>
-        requestAnimationFrame(() => resolve()),
-      );
-      const module = (await import(
-        /* @vite-ignore */ moduleUrl
-      )) as unknown as { trpc: FixtureTrpcClient };
-      const { trpc } = module;
-
-      if (operation.kind === "create") {
-        await Promise.all(
-          operation.listNames.map((title) =>
-            trpc.lists.create.mutate({ title }),
-          ),
-        );
-        return;
-      }
-
-      const rawLists = await trpc.lists.list.query("all");
-      if (!Array.isArray(rawLists)) {
-        throw new Error("テスト用リスト一覧が配列ではありません");
-      }
-      const targetNames = new Set(operation.listNames);
-      const targetLists: FixtureList[] = rawLists.map((list) => {
-        if (
-          typeof list !== "object" ||
-          list === null ||
-          !("id" in list) ||
-          typeof list.id !== "number" ||
-          !("title" in list) ||
-          typeof list.title !== "string"
-        ) {
-          throw new Error("テスト用リスト一覧の項目が不正です");
-        }
-        return { id: list.id, title: list.title };
-      });
-      await Promise.all(
-        targetLists
-          .filter((list) => targetNames.has(list.title))
-          .map((list) => trpc.lists.delete.mutate({ listId: list.id })),
-      );
-    },
-    { moduleUrl: "/src/lib/trpc.ts", operation },
-  );
   await page.goto("about:blank");
 }
 
