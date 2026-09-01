@@ -123,7 +123,7 @@
             id="calorie-record-datetime"
             bind:value={consumedAt}
             required
-            pattern="\d{4}/\d{2}/\d{2} \d{2}:\d{2}"
+            pattern={"[0-9]{4}/[0-9]{2}/[0-9]{2} [0-9]{2}:[0-9]{2}"}
             placeholder="yyyy/MM/dd HH:mm"
             class="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-800 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
         />
