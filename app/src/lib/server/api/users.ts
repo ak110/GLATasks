@@ -33,14 +33,33 @@ export async function getUserPreferences(
   }
 }
 
-/** 利用者の既定値を保存する（既存値は完全に置き換える） */
+/** 利用者の既定値を部分更新し、指定されていない項目を保持する。 */
 export async function updateUserPreferences(
   userId: number,
   preferences: UserPreferences,
 ): Promise<void> {
   const db = getDb();
-  await db
-    .update(users)
-    .set({ preferences: JSON.stringify(preferences) })
-    .where(eq(users.id, userId));
+  await db.transaction(async (tx) => {
+    const rows = await tx
+      .select({ preferences: users.preferences })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1)
+      .for("update");
+    if (rows.length === 0) return;
+
+    let current: UserPreferences = {};
+    try {
+      const parsed: unknown = JSON.parse(rows[0].preferences);
+      const result = UserPreferencesSchema.safeParse(parsed);
+      if (result.success) current = result.data;
+    } catch {
+      current = {};
+    }
+
+    await tx
+      .update(users)
+      .set({ preferences: JSON.stringify({ ...current, ...preferences }) })
+      .where(eq(users.id, userId));
+  });
 }

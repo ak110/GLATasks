@@ -1,6 +1,6 @@
 <script lang="ts">
     /**
-     * @fileoverview 共通ヘッダーコンポーネント（タスク・タイマー・翻訳ページで使用）
+     * @fileoverview 共通ヘッダーコンポーネント
      */
 
     import { getContext } from "svelte";
@@ -21,7 +21,7 @@
     );
 
     type Props = {
-        page: "tasks" | "timers" | "translate";
+        page: "tasks" | "timers" | "translate" | "calories";
         isLoading: boolean;
         showType?: "active" | "archived" | "all";
         onChangeShowType?: (type: "active" | "archived" | "all") => void;
@@ -50,6 +50,12 @@
             path: "/translate",
             icon: "🌐",
             label: "翻訳",
+        },
+        {
+            key: "calories",
+            path: "/calories",
+            icon: "🍴",
+            label: "カロリー",
         },
     ] as const;
 </script>

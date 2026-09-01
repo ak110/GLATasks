@@ -4,6 +4,8 @@
 
 import { describe, it, expect } from "vitest";
 import {
+  CalorieItemInputSchema,
+  CalorieRecordInputSchema,
   CreateTaskSchema,
   CreateTimerSchema,
   SearchTasksSchema,
@@ -130,11 +132,13 @@ describe("UserPreferencesSchema", () => {
       base_seconds: 600,
       adjust_minutes: 5,
       mode: "alarm",
+      calorie_goal_kcal: 1615.5,
     });
     expect(parsed.ring_seconds).toBe(1800);
     expect(parsed.base_seconds).toBe(600);
     expect(parsed.adjust_minutes).toBe(5);
     expect(parsed.mode).toBe("alarm");
+    expect(parsed.calorie_goal_kcal).toBe(1615.5);
   });
 
   it("不正な mode を拒否する", () => {
@@ -151,6 +155,56 @@ describe("UserPreferencesSchema", () => {
   it("ring_seconds の範囲外を拒否する", () => {
     expect(() => UserPreferencesSchema.parse({ ring_seconds: 0 })).toThrow();
     expect(() => UserPreferencesSchema.parse({ ring_seconds: 3601 })).toThrow();
+  });
+
+  it("calorie_goal_kcal は正の有限数だけを受け入れる", () => {
+    expect(UserPreferencesSchema.parse({ calorie_goal_kcal: 1.5 })).toEqual({
+      calorie_goal_kcal: 1.5,
+    });
+    for (const value of [0, -1, Number.POSITIVE_INFINITY, Number.NaN]) {
+      expect(() =>
+        UserPreferencesSchema.parse({ calorie_goal_kcal: value }),
+      ).toThrow();
+    }
+  });
+});
+
+describe("簡易カロリー計算スキーマ", () => {
+  it("品目の正の小数kcalを受け入れ、非正数と非有限値を拒否する", () => {
+    expect(
+      CalorieItemInputSchema.parse({ name: "食品", kcal: 12.5, note: "" }),
+    ).toEqual({ name: "食品", kcal: 12.5, note: "" });
+    for (const kcal of [0, -1, Number.POSITIVE_INFINITY, Number.NaN]) {
+      expect(() =>
+        CalorieItemInputSchema.parse({ name: "食品", kcal, note: "" }),
+      ).toThrow();
+    }
+  });
+
+  it("分単位の実在日時とUTCオフセットを検証する", () => {
+    expect(
+      CalorieRecordInputSchema.parse({
+        consumed_at: "2026/09/01 12:34",
+        item_id: 1,
+        quantity: 0.5,
+        tz_offset_minutes: 540,
+      }).consumed_at,
+    ).toBe("2026/09/01 12:34");
+    for (const consumed_at of [
+      "2026-09-01 12:34",
+      "2026/02/30 12:34",
+      "2026/09/01 24:00",
+      "2026/09/01 12:34:56",
+    ]) {
+      expect(() =>
+        CalorieRecordInputSchema.parse({
+          consumed_at,
+          item_id: 1,
+          quantity: 1,
+          tz_offset_minutes: 540,
+        }),
+      ).toThrow();
+    }
   });
 });
 

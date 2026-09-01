@@ -83,8 +83,10 @@ sequenceDiagram
 - エンドポイント: `GET /api/events`（Cookie認証）
 - データは含めずイベント種別のみ送信
  （`lists:updated` / `tasks:updated` / `timers:updated` / `schedules:updated` /
-  `users:preferences:updated` / `reset`）
+  `users:preferences:updated` / `calories:updated` / `reset`）
 - クライアントはイベント受信時にTanStack Queryの `invalidateQueries` で該当データを再取得
+- 品目又は記録を変更した場合は`calories:updated`を通知し、受信側は品目、記録及び期間集計を再取得する。
+  目標値を変更した場合は既存の`users:preferences:updated`を通知し、カロリーページは目標値と期間集計を再取得する
 - 接続の健全性はクライアント側で監視する。`EventSource`の自動再接続に加え、
   受信ウォッチドッグ（30秒周期で判定、最終受信から75秒経過で強制再接続）・
   `error`イベント発火時の`readyState=CLOSED`即時再接続・
@@ -237,6 +239,9 @@ const withApiErrors = t.middleware(async ({ next }) => {
 - タイマーの `ephemeral` カラムは1回限り使用するタイマーを識別するフラグ。
   作成時のみ設定でき、`adjust` / `reset` / `setTime` などの操作で変更されない。
   クライアント側では満了到達時に削除ボタンを強調し、確認ダイアログを省略して削除できる体験に用いる
+- 簡易カロリー計算では、品目を利用者内で一意に保持し、記録は品目IDを参照する。
+  品目名又はkcalを変更すると、既存記録の表示と期間集計へ反映される。
+  利用者ごとの1日当たり目標値は`users.preferences.calorie_goal_kcal`へ保持する
 
 ### バイナリ保存と `max_allowed_packet`
 

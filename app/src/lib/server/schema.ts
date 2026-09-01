@@ -10,6 +10,8 @@ import {
   timestamp,
   tinyint,
   index,
+  uniqueIndex,
+  decimal,
   customType,
 } from "drizzle-orm/mysql-core";
 import {
@@ -29,6 +31,52 @@ export const users = mysqlTable("user", {
   // 値の構造は zod の UserPreferencesSchema 側で保証する。
   preferences: mediumtext("preferences").notNull().default("{}"),
 });
+
+/** 簡易カロリー計算の品目テーブル */
+export const calorieItems = mysqlTable(
+  "calorie_item",
+  {
+    id: int("id").primaryKey().autoincrement(),
+    user_id: int("user_id").notNull(),
+    name: varchar("name", { length: 255 }).notNull(),
+    kcal: decimal("kcal", { precision: 12, scale: 4 }).notNull(),
+    note: mediumtext("note").notNull().default(""),
+    created: timestamp("created").notNull(),
+    updated: timestamp("updated").notNull(),
+  },
+  (t) => ({
+    user_name_unique: uniqueIndex("calorie_item_user_name_unique").on(
+      t.user_id,
+      t.name,
+    ),
+  }),
+);
+
+/** 簡易カロリー計算の摂取記録テーブル */
+export const calorieRecords = mysqlTable(
+  "calorie_record",
+  {
+    id: int("id").primaryKey().autoincrement(),
+    user_id: int("user_id").notNull(),
+    item_id: int("item_id")
+      .notNull()
+      .references(() => calorieItems.id, {
+        onDelete: "restrict",
+        onUpdate: "cascade",
+      }),
+    consumed_at: timestamp("consumed_at").notNull(),
+    quantity: decimal("quantity", { precision: 12, scale: 4 }).notNull(),
+    created: timestamp("created").notNull(),
+    updated: timestamp("updated").notNull(),
+  },
+  (t) => ({
+    user_consumed_id_idx: index("calorie_record_user_consumed_id_idx").on(
+      t.user_id,
+      t.consumed_at,
+      t.id,
+    ),
+  }),
+);
 
 /** list テーブル */
 export const lists = mysqlTable("list", {

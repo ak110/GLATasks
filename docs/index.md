@@ -21,4 +21,6 @@ features:
     details: SSEによる複数端末・タブ間のリアルタイム同期。
   - title: マルチプラットフォーム
     details: PWA対応、Chrome拡張・Android共有からのタスク追加。
+  - title: 簡易カロリー計算
+    details: 品目別カロリーの記録と直近24時間・7日間・28日間の合計を目標値と比較。
 ---

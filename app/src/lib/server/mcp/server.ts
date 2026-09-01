@@ -427,7 +427,7 @@ export function createMcpServer(): McpServer {
   server.registerTool(
     "users.getPreferences",
     {
-      description: "利用者の新規タイマーデフォルト値を取得する",
+      description: "利用者の新規タイマーデフォルト値とカロリー目標値を取得する",
       inputSchema: z.object({}),
     },
     async (_input, { authInfo }) => {
@@ -439,7 +439,8 @@ export function createMcpServer(): McpServer {
   server.registerTool(
     "users.updatePreferences",
     {
-      description: "利用者の新規タイマーデフォルト値を更新する",
+      description:
+        "利用者の新規タイマーデフォルト値とカロリー目標値のうち、指定した項目だけを更新する",
       inputSchema: UserPreferencesSchema,
     },
     async (input, { authInfo }) => {

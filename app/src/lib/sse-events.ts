@@ -13,6 +13,7 @@ export const SSE_EVENTS = {
   timersUpdated: "timers:updated",
   usersPreferencesUpdated: "users:preferences:updated",
   schedulesUpdated: "schedules:updated",
+  caloriesUpdated: "calories:updated",
   /**
    * バッファ外れまたはサーバー再起動などで差分catchupが成立しない場合に送出する。
    * クライアントは受信時に全クエリーを invalidate して整合性を回復する。

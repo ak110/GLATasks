@@ -135,8 +135,90 @@ export const UserPreferencesSchema = z.object({
   base_seconds: z.number().int().min(0).max(359999).optional(),
   adjust_minutes: z.number().int().min(1).max(999).optional(),
   mode: TimerModeSchema.optional(),
+  calorie_goal_kcal: z.number().finite().positive().max(1_000_000).optional(),
 });
 export type UserPreferences = z.infer<typeof UserPreferencesSchema>;
+
+// ── 簡易カロリー計算スキーマ ──
+
+export const DEFAULT_CALORIE_GOAL_KCAL = 1615;
+export const MAX_CALORIE_CSV_ROWS = 10_000;
+
+const PositiveCalorieNumberSchema = z
+  .number()
+  .finite()
+  .positive()
+  .max(1_000_000);
+const LocalMinuteSchema = z
+  .string()
+  .regex(
+    /^\d{4}\/\d{2}\/\d{2} \d{2}:\d{2}$/,
+    "日時はyyyy/MM/dd HH:mm形式で入力してください",
+  )
+  .refine((value) => {
+    const [datePart, timePart] = value.split(" ");
+    const [year, month, day] = datePart.split("/").map(Number);
+    const [hour, minute] = timePart.split(":").map(Number);
+    const date = new Date(Date.UTC(year, month - 1, day, hour, minute));
+    return (
+      date.getUTCFullYear() === year &&
+      date.getUTCMonth() === month - 1 &&
+      date.getUTCDate() === day &&
+      date.getUTCHours() === hour &&
+      date.getUTCMinutes() === minute
+    );
+  }, "実在する日時を入力してください");
+const TimezoneOffsetSchema = z.number().int().min(-720).max(840);
+
+export const CalorieItemInputSchema = z.object({
+  name: z.string().trim().min(1, "品目名は必須です").max(255),
+  kcal: PositiveCalorieNumberSchema,
+  note: z.string().max(10_000).default(""),
+});
+
+export const UpdateCalorieItemSchema = CalorieItemInputSchema.extend({
+  itemId: z.number().int().positive(),
+});
+
+export const CalorieRecordInputSchema = z.object({
+  consumed_at: LocalMinuteSchema,
+  item_id: z.number().int().positive(),
+  quantity: PositiveCalorieNumberSchema,
+  tz_offset_minutes: TimezoneOffsetSchema,
+});
+
+export const UpdateCalorieRecordSchema = CalorieRecordInputSchema.extend({
+  recordId: z.number().int().positive(),
+});
+
+export const CalorieRecordIdSchema = z.object({
+  recordId: z.number().int().positive(),
+});
+
+export const ListCalorieRecordsSchema = z.object({
+  window_offset: z.number().int().min(0).max(120).default(0),
+  tz_offset_minutes: TimezoneOffsetSchema,
+});
+
+export const CalorieItemCsvRowSchema = z.object({
+  name: z.string().min(1, "品目名は必須です").max(255),
+  kcal: PositiveCalorieNumberSchema,
+  note: z.string().max(10_000).default(""),
+});
+export const CalorieRecordCsvRowSchema = z.object({
+  consumed_at: LocalMinuteSchema,
+  item_name: z.string().min(1).max(255),
+  quantity: PositiveCalorieNumberSchema,
+});
+
+export const ImportCalorieItemsSchema = z.object({
+  rows: z.array(CalorieItemCsvRowSchema).max(MAX_CALORIE_CSV_ROWS),
+});
+
+export const ImportCalorieRecordsSchema = z.object({
+  rows: z.array(CalorieRecordCsvRowSchema).max(MAX_CALORIE_CSV_ROWS),
+  tz_offset_minutes: TimezoneOffsetSchema,
+});
 
 // ── タイマー操作スキーマ ──
 
@@ -325,3 +407,12 @@ export type DeleteAttachmentInput = z.infer<typeof DeleteAttachmentSchema>;
 export type DownloadAttachmentInput = z.infer<
   typeof DownloadAttachmentInputSchema
 >;
+export type CalorieItemInput = z.infer<typeof CalorieItemInputSchema>;
+export type UpdateCalorieItemInput = z.infer<typeof UpdateCalorieItemSchema>;
+export type CalorieRecordInput = z.infer<typeof CalorieRecordInputSchema>;
+export type UpdateCalorieRecordInput = z.infer<
+  typeof UpdateCalorieRecordSchema
+>;
+export type ListCalorieRecordsInput = z.infer<typeof ListCalorieRecordsSchema>;
+export type CalorieItemCsvRow = z.infer<typeof CalorieItemCsvRowSchema>;
+export type CalorieRecordCsvRow = z.infer<typeof CalorieRecordCsvRowSchema>;

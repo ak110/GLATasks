@@ -16,6 +16,15 @@ vi.mock("$lib/server/api", async (importOriginal) => {
     ...actual,
     createAttachment: vi.fn().mockResolvedValue({ attachmentId: 1 }),
     deleteAttachment: vi.fn().mockResolvedValue(undefined),
+    getCalorieItems: vi.fn().mockResolvedValue([]),
+    createCalorieItem: vi.fn().mockResolvedValue(undefined),
+    getCalorieRecords: vi
+      .fn()
+      .mockResolvedValue({ records: [], window_offset: 0 }),
+    getCalorieSummary: vi.fn().mockResolvedValue({
+      goal_kcal: 1615,
+      periods: [],
+    }),
   };
 });
 
@@ -36,6 +45,8 @@ vi.mock("$lib/server/crypto", () => ({
 
 const { appRouter } = await import("./trpc");
 const { createAttachment, deleteAttachment } = await import("$lib/server/api");
+const { createCalorieItem, getCalorieRecords } =
+  await import("$lib/server/api");
 const { sendEvent } = await import("$lib/server/sse");
 
 /** 認証済み利用者を模したtRPCコンテキストを組み立てる */
@@ -110,5 +121,56 @@ describe("withApiErrorsのエラーマッピング", () => {
 
     await expect(result).rejects.toThrow("ファイルサイズが上限を超えています");
     await expect(result).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
+});
+
+describe("caloriesルーター", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("30日窓入力をAPIへ渡し、caloriesUpdatedを送出する", async () => {
+    const caller = appRouter.createCaller(makeCtx(42, "tab-calorie"));
+
+    await caller.calories.records({
+      window_offset: 2,
+      tz_offset_minutes: 540,
+    });
+    await caller.calories.createItem({
+      name: "食品",
+      kcal: 100,
+      note: "備考",
+    });
+
+    expect(getCalorieRecords).toHaveBeenCalledWith(42, {
+      window_offset: 2,
+      tz_offset_minutes: 540,
+    });
+    expect(createCalorieItem).toHaveBeenCalledWith(42, {
+      name: "食品",
+      kcal: 100,
+      note: "備考",
+    });
+    expect(sendEvent).toHaveBeenCalledWith(
+      42,
+      SSE_EVENTS.caloriesUpdated,
+      "tab-calorie",
+    );
+  });
+
+  it("品目名衝突をBAD_REQUESTへ変換する", async () => {
+    vi.mocked(createCalorieItem).mockRejectedValueOnce(
+      new Error("calorie_item_name_conflict"),
+    );
+    const caller = appRouter.createCaller(makeCtx(42, null));
+
+    const result = caller.calories.createItem({
+      name: "食品",
+      kcal: 100,
+      note: "",
+    });
+
+    await expect(result).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    await expect(result).rejects.toThrow("同じ名前の品目が既にあります");
   });
 });

@@ -30,6 +30,14 @@ import {
   ReorderTasksSchema,
   ReorderTimersSchema,
   UserPreferencesSchema,
+  CalorieItemInputSchema,
+  UpdateCalorieItemSchema,
+  CalorieRecordInputSchema,
+  UpdateCalorieRecordSchema,
+  CalorieRecordIdSchema,
+  ListCalorieRecordsSchema,
+  ImportCalorieItemsSchema,
+  ImportCalorieRecordsSchema,
 } from "$lib/schemas";
 import {
   CreateScheduleSchema,
@@ -166,6 +174,26 @@ const API_ERRORS: Record<
     code: "BAD_REQUEST",
     message: "カウントダウンモードではベース時間が必須です",
   },
+  calorie_item_not_found: {
+    code: "NOT_FOUND",
+    message: "品目が見つかりません",
+  },
+  calorie_record_not_found: {
+    code: "NOT_FOUND",
+    message: "記録が見つかりません",
+  },
+  calorie_item_name_conflict: {
+    code: "BAD_REQUEST",
+    message: "同じ名前の品目が既にあります",
+  },
+  calorie_csv_duplicate_item: {
+    code: "BAD_REQUEST",
+    message: "品目CSVに重複した品目名があります",
+  },
+  calorie_csv_unknown_item: {
+    code: "BAD_REQUEST",
+    message: "記録CSVに未登録の品目があります。品目CSVを先に取り込んでください",
+  },
 };
 
 /**
@@ -271,6 +299,92 @@ export const appRouter = t.router({
         },
       ),
     ),
+  }),
+
+  // ── 簡易カロリー計算 ──
+  calories: t.router({
+    items: encryptedProcedure.query(async ({ ctx }) => {
+      return api.getCalorieItems(ctx.userId);
+    }),
+
+    createItem: encryptedProcedure.input(CalorieItemInputSchema).mutation(
+      eventMutationHandler(
+        SSE_EVENTS.caloriesUpdated,
+        async ({ ctx, input }) => {
+          await api.createCalorieItem(ctx.userId, input);
+        },
+      ),
+    ),
+
+    updateItem: encryptedProcedure.input(UpdateCalorieItemSchema).mutation(
+      eventMutationHandler(
+        SSE_EVENTS.caloriesUpdated,
+        async ({ ctx, input }) => {
+          await api.updateCalorieItem(ctx.userId, input);
+        },
+      ),
+    ),
+
+    records: encryptedProcedure
+      .input(ListCalorieRecordsSchema)
+      .query(async ({ ctx, input }) => {
+        return api.getCalorieRecords(ctx.userId, input);
+      }),
+
+    allRecords: encryptedProcedure.query(async ({ ctx }) => {
+      return api.getAllCalorieRecords(ctx.userId);
+    }),
+
+    createRecord: encryptedProcedure.input(CalorieRecordInputSchema).mutation(
+      eventMutationHandler(
+        SSE_EVENTS.caloriesUpdated,
+        async ({ ctx, input }) => {
+          await api.createCalorieRecord(ctx.userId, input);
+        },
+      ),
+    ),
+
+    updateRecord: encryptedProcedure.input(UpdateCalorieRecordSchema).mutation(
+      eventMutationHandler(
+        SSE_EVENTS.caloriesUpdated,
+        async ({ ctx, input }) => {
+          await api.updateCalorieRecord(ctx.userId, input);
+        },
+      ),
+    ),
+
+    deleteRecord: encryptedProcedure.input(CalorieRecordIdSchema).mutation(
+      eventMutationHandler(
+        SSE_EVENTS.caloriesUpdated,
+        async ({ ctx, input }) => {
+          await api.deleteCalorieRecord(ctx.userId, input.recordId);
+        },
+      ),
+    ),
+
+    summary: encryptedProcedure.query(async ({ ctx }) => {
+      return api.getCalorieSummary(ctx.userId);
+    }),
+
+    importItems: encryptedProcedure
+      .input(ImportCalorieItemsSchema)
+      .mutation(async ({ ctx, input }) => {
+        const result = await api.importCalorieItems(ctx.userId, input.rows);
+        sendEvent(ctx.userId, SSE_EVENTS.caloriesUpdated, ctx.tabId);
+        return result;
+      }),
+
+    importRecords: encryptedProcedure
+      .input(ImportCalorieRecordsSchema)
+      .mutation(async ({ ctx, input }) => {
+        const result = await api.importCalorieRecords(
+          ctx.userId,
+          input.rows,
+          input.tz_offset_minutes,
+        );
+        sendEvent(ctx.userId, SSE_EVENTS.caloriesUpdated, ctx.tabId);
+        return result;
+      }),
   }),
 
   // ── 認証 ──

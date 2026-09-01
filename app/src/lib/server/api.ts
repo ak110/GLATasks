@@ -66,3 +66,18 @@ export {
 } from "./api/timers";
 
 export { getUserPreferences, updateUserPreferences } from "./api/users";
+
+export type { CalorieItem, CalorieRecord } from "./api/calories";
+export {
+  getCalorieItems,
+  createCalorieItem,
+  updateCalorieItem,
+  getCalorieRecords,
+  getAllCalorieRecords,
+  createCalorieRecord,
+  updateCalorieRecord,
+  deleteCalorieRecord,
+  getCalorieSummary,
+  importCalorieItems,
+  importCalorieRecords,
+} from "./api/calories";
