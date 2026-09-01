@@ -514,6 +514,75 @@ test.describe("translate", () => {
       expect(state.translatorCreatePairs).toEqual(["ja>en", "ja>fr"]);
     });
 
+    test("検出器の準備が完了しない場合は母語の変更で復帰する", async ({
+      page,
+    }) => {
+      await installAiStubs(page, {
+        blockDetectorCreate: true,
+        detectorLanguage: "fr",
+      });
+      await page.reload();
+      await expectStubbedPageReady(page);
+      await page.getByTestId("translate-source-input").fill("bonjour");
+      await expect
+        .poll(async () => (await getState(page)).detectorCreateBlocked)
+        .toBe(true);
+
+      await page.getByTestId("translate-native-input").fill("フランス語");
+      await expect(page.getByTestId("translate-target-output")).toHaveValue(
+        "[fr>en] bonjour",
+        { timeout: 5000 },
+      );
+      expect((await getState(page)).detectorCreateCount).toBe(2);
+      await expect(page.getByTestId("translate-status")).not.toContainText(
+        "翻訳準備が中断されました",
+      );
+    });
+
+    test("検出器の準備が完了しない場合は相手言語の変更で復帰する", async ({
+      page,
+    }) => {
+      await installAiStubs(page, { blockDetectorCreate: true });
+      await page.reload();
+      await expectStubbedPageReady(page);
+      await page.getByTestId("translate-source-input").fill("こんにちは");
+      await expect
+        .poll(async () => (await getState(page)).detectorCreateBlocked)
+        .toBe(true);
+
+      await page.getByTestId("translate-foreign-input").fill("フランス語");
+      await expect(page.getByTestId("translate-target-output")).toHaveValue(
+        "[ja>fr] こんにちは",
+        { timeout: 5000 },
+      );
+      expect((await getState(page)).detectorCreateCount).toBe(2);
+      await expect(page.getByTestId("translate-status")).not.toContainText(
+        "翻訳準備が中断されました",
+      );
+    });
+
+    test("検出器の準備が完了しない場合はエンジンの変更で復帰する", async ({
+      page,
+    }) => {
+      await installAiStubs(page, { blockDetectorCreate: true });
+      await page.reload();
+      await expectStubbedPageReady(page);
+      await page.getByTestId("translate-source-input").fill("こんにちは");
+      await expect
+        .poll(async () => (await getState(page)).detectorCreateBlocked)
+        .toBe(true);
+
+      await page.getByTestId("translate-engine-select").selectOption("prompt");
+      await expect(page.getByTestId("translate-target-output")).toHaveValue(
+        "[prompt] こんにちは",
+        { timeout: 5000 },
+      );
+      expect((await getState(page)).promptCreateCount).toBe(1);
+      await expect(page.getByTestId("translate-status")).not.toContainText(
+        "翻訳準備が中断されました",
+      );
+    });
+
     test("準備中の原文変更では同じモデル作成を継続する", async ({ page }) => {
       await installAiStubs(page, {
         detectorAvailability: "available",

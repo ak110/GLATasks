@@ -55,14 +55,13 @@ export type PrepareEngineOptions = {
   preparation: readonly TranslationPreparationTarget[];
   onProgress: (progress: number) => void;
   signal?: AbortSignal;
-  /**
-   * 準備を所有する呼び出し元が共有の作成処理そのものを中断するための信号。
-   *
-   * `signal`は個別の翻訳要求の中断に使い、共有の作成Promiseを壊さない。
-   * 利用者操作で開始した準備は中断の所有者が呼び出し元にあるため、この信号を
-   * `create()`へ渡して作成自体を失敗させ、共有キャッシュの登録を解放する。
-   */
-  creationSignal?: AbortSignal;
+};
+
+type SharedCreation<T> = {
+  generation: number;
+  controller: AbortController;
+  promise: Promise<T>;
+  reject: (reason: DOMException) => void;
 };
 
 type TranslationResources = {
@@ -84,26 +83,90 @@ const resources: TranslationResources = {
 };
 
 let resourceGeneration = 0;
-let detectorCreation:
-  { generation: number; promise: Promise<LanguageDetector> } | undefined;
-const translatorCreations = new Map<
-  string,
-  { generation: number; promise: Promise<Translator> }
->();
-const promptCreations = new Map<
-  string,
-  { generation: number; promise: Promise<LanguageModel> }
->();
+const detectorCreations = new Map<string, SharedCreation<LanguageDetector>>();
+const translatorCreations = new Map<string, SharedCreation<Translator>>();
+const promptCreations = new Map<string, SharedCreation<LanguageModel>>();
 let translatorCreationSequence = 0;
 let promptCreationSequence = 0;
+
+function makePreparationAbortError(): DOMException {
+  return new DOMException("翻訳準備が中断されました", "AbortError");
+}
 
 function ensurePreparationActive(
   generation: number,
   signal?: AbortSignal,
 ): void {
   if (generation !== resourceGeneration || signal?.aborted) {
-    throw new DOMException("翻訳準備が中断されました", "AbortError");
+    throw makePreparationAbortError();
   }
+}
+
+/**
+ * 外部APIの中断信号受理に依存せず、共有作成の待機と登録を所有する。
+ * 放棄後に外部作成が完了した場合は、採用せず作成物を解放する。
+ */
+function getOrCreateShared<T extends { destroy(): void }>(
+  creations: Map<string, SharedCreation<T>>,
+  key: string,
+  generation: number,
+  create: (signal: AbortSignal) => PromiseLike<T> | T,
+  adopt: (instance: T) => boolean,
+): Promise<T> {
+  const existing = creations.get(key);
+  if (existing?.generation === generation) return existing.promise;
+
+  const controller = new AbortController();
+  let resolveCreation!: (instance: T) => void;
+  let rejectCreation!: (reason: unknown) => void;
+  const promise = new Promise<T>((resolve, reject) => {
+    resolveCreation = resolve;
+    rejectCreation = reject;
+  });
+  const creation: SharedCreation<T> = {
+    generation,
+    controller,
+    promise,
+    reject: rejectCreation,
+  };
+  creations.set(key, creation);
+
+  try {
+    const externalCreation = create(controller.signal);
+    void Promise.resolve(externalCreation).then(
+      (instance) => {
+        if (creations.get(key) !== creation || !adopt(instance)) {
+          instance.destroy();
+          rejectCreation(makePreparationAbortError());
+          return;
+        }
+        resolveCreation(instance);
+      },
+      (error: unknown) => rejectCreation(error),
+    );
+  } catch (error) {
+    rejectCreation(error);
+  }
+  void promise.then(
+    () => {
+      if (creations.get(key) === creation) creations.delete(key);
+    },
+    () => {
+      if (creations.get(key) === creation) creations.delete(key);
+    },
+  );
+  return promise;
+}
+
+function abandonSharedCreations<T>(
+  creations: Map<string, SharedCreation<T>>,
+  reason: DOMException,
+): void {
+  for (const creation of creations.values()) {
+    creation.reject(reason);
+    creation.controller.abort(reason);
+  }
+  creations.clear();
 }
 
 function makePairKey(sourceLanguage: string, targetLanguage: string): string {
@@ -191,7 +254,6 @@ export async function prepareEngine({
   preparation,
   onProgress,
   signal,
-  creationSignal,
 }: PrepareEngineOptions): Promise<void> {
   if (preparation.length === 0) return;
   const generation = resourceGeneration;
@@ -202,16 +264,10 @@ export async function prepareEngine({
   for (const target of preparation) {
     ensurePreparationActive(generation, signal);
     if (engine === "translator" && target.kind === "translator") {
-      await prepareTranslator(
-        target,
-        monitor,
-        generation,
-        signal,
-        creationSignal,
-      );
+      await prepareTranslator(target, monitor, generation, signal);
     }
     if (engine === "prompt" && target.kind === "prompt") {
-      await preparePrompt(target, monitor, generation, signal, creationSignal);
+      await preparePrompt(target, monitor, generation, signal);
     }
   }
 }
@@ -223,28 +279,23 @@ async function createDetector(
 ): Promise<LanguageDetector> {
   ensurePreparationActive(generation, signal);
   if (resources.detector) return resources.detector;
-  if (detectorCreation?.generation === generation) {
-    return detectorCreation.promise;
-  }
   if (typeof globalThis.LanguageDetector === "undefined") {
     throw new Error("Language Detector APIを利用できません");
   }
-  const creation = globalThis.LanguageDetector.create({ monitor }).then(
+  return getOrCreateShared(
+    detectorCreations,
+    "detector",
+    generation,
+    (sharedSignal) =>
+      globalThis.LanguageDetector!.create({
+        monitor,
+        signal: sharedSignal,
+      }),
     (instance) => {
-      if (generation !== resourceGeneration) {
-        instance.destroy();
-        throw new DOMException("翻訳準備が中断されました", "AbortError");
-      }
       resources.detector = instance;
-      return instance;
+      return true;
     },
   );
-  detectorCreation = { generation, promise: creation };
-  try {
-    return await creation;
-  } finally {
-    if (detectorCreation?.promise === creation) detectorCreation = undefined;
-  }
 }
 
 async function createTranslator(
@@ -254,7 +305,6 @@ async function createTranslator(
   mode: "detected" | "explicit",
   generation = resourceGeneration,
   signal?: AbortSignal,
-  creationSignal?: AbortSignal,
 ): Promise<Translator> {
   const key = makePairKey(sourceLanguage, targetLanguage);
   ensurePreparationActive(generation, signal);
@@ -267,48 +317,29 @@ async function createTranslator(
   }
   const existing = translatorCreations.get(key);
   if (existing?.generation === generation) return existing.promise;
-
-  resources.translator?.instance.destroy();
-  resources.translator = undefined;
   const creationSequence = ++translatorCreationSequence;
-  let creation: Promise<Translator>;
-  try {
-    // create()は利用者操作の呼び出しスタック内で開始し、Promiseキューで遅延させない。
-    creation = Promise.resolve(
+  return getOrCreateShared(
+    translatorCreations,
+    key,
+    generation,
+    (sharedSignal) =>
+      // create()は利用者操作の呼び出しスタック内で開始し、Promiseキューで遅延させない。
       globalThis.Translator.create({
         sourceLanguage,
         targetLanguage,
         monitor,
-        signal: creationSignal,
+        signal: sharedSignal,
       }),
-    ).then((instance) => {
-      if (
-        generation !== resourceGeneration ||
-        creationSequence !== translatorCreationSequence
-      ) {
-        instance.destroy();
-        throw new DOMException("翻訳準備が中断されました", "AbortError");
+    (instance) => {
+      if (creationSequence !== translatorCreationSequence) {
+        return false;
       }
+      const previous = resources.translator?.instance;
       resources.translator = { key, instance, mode };
-      return instance;
-    });
-  } catch (error) {
-    creation = Promise.reject(error);
-  }
-  translatorCreations.set(key, { generation, promise: creation });
-  void creation.then(
-    () => {
-      if (translatorCreations.get(key)?.promise === creation) {
-        translatorCreations.delete(key);
-      }
-    },
-    () => {
-      if (translatorCreations.get(key)?.promise === creation) {
-        translatorCreations.delete(key);
-      }
+      if (previous !== instance) previous?.destroy();
+      return true;
     },
   );
-  return creation;
 }
 
 async function createPrompt(
@@ -316,7 +347,6 @@ async function createPrompt(
   monitor: CreateMonitorCallback,
   generation = resourceGeneration,
   signal?: AbortSignal,
-  creationSignal?: AbortSignal,
 ): Promise<LanguageModel> {
   const key = makePromptKey(target.nativeLanguage, target.foreignLanguage);
   ensurePreparationActive(generation, signal);
@@ -326,48 +356,29 @@ async function createPrompt(
   }
   const existing = promptCreations.get(key);
   if (existing?.generation === generation) return existing.promise;
-
-  resources.prompt?.instance.destroy();
-  resources.prompt = undefined;
   const creationSequence = ++promptCreationSequence;
-  let creation: Promise<LanguageModel>;
-  try {
-    // downloadableのPromptもクリックイベントの呼び出しスタック内でcreate()を開始する。
-    creation = Promise.resolve(
+  return getOrCreateShared(
+    promptCreations,
+    key,
+    generation,
+    (sharedSignal) =>
+      // downloadableのPromptもクリックイベントの呼び出しスタック内でcreate()を開始する。
       globalThis.LanguageModel.create({
         ...target.options,
         initialPrompts: [{ role: "system", content: target.initialPrompt }],
         monitor,
-        signal: creationSignal,
+        signal: sharedSignal,
       }),
-    ).then((instance) => {
-      if (
-        generation !== resourceGeneration ||
-        creationSequence !== promptCreationSequence
-      ) {
-        instance.destroy();
-        throw new DOMException("翻訳準備が中断されました", "AbortError");
+    (instance) => {
+      if (creationSequence !== promptCreationSequence) {
+        return false;
       }
+      const previous = resources.prompt?.instance;
       resources.prompt = { key, instance };
-      return instance;
-    });
-  } catch (error) {
-    creation = Promise.reject(error);
-  }
-  promptCreations.set(key, { generation, promise: creation });
-  void creation.then(
-    () => {
-      if (promptCreations.get(key)?.promise === creation) {
-        promptCreations.delete(key);
-      }
-    },
-    () => {
-      if (promptCreations.get(key)?.promise === creation) {
-        promptCreations.delete(key);
-      }
+      if (previous !== instance) previous?.destroy();
+      return true;
     },
   );
-  return creation;
 }
 
 async function prepareTranslator(
@@ -375,7 +386,6 @@ async function prepareTranslator(
   monitor: CreateMonitorCallback,
   generation: number,
   signal?: AbortSignal,
-  creationSignal?: AbortSignal,
 ): Promise<void> {
   ensurePreparationActive(generation, signal);
   if (typeof globalThis.Translator === "undefined") {
@@ -393,7 +403,6 @@ async function prepareTranslator(
     "explicit",
     generation,
     signal,
-    creationSignal,
   );
   ensurePreparationActive(generation, signal);
 }
@@ -403,7 +412,6 @@ async function preparePrompt(
   monitor: CreateMonitorCallback,
   generation: number,
   signal?: AbortSignal,
-  creationSignal?: AbortSignal,
 ): Promise<void> {
   ensurePreparationActive(generation, signal);
   if (typeof globalThis.LanguageModel === "undefined") {
@@ -412,7 +420,7 @@ async function preparePrompt(
   if (target.availability === "unavailable") {
     throw new Error("Prompt APIを利用できません");
   }
-  await createPrompt(target, monitor, generation, signal, creationSignal);
+  await createPrompt(target, monitor, generation, signal);
   ensurePreparationActive(generation, signal);
 }
 
@@ -807,14 +815,24 @@ export async function runTranslation(
   return { status: "translated" };
 }
 
-/** 保持中の検出器、翻訳器、Promptセッションを解放する */
-export function destroyTranslationResources(): void {
+/**
+ * 進行中の共有作成を同期的に放棄し、待機側を中断する。
+ * 外部APIが中断信号を受理しなくても、以降の要求は新しい作成を開始できる。
+ * 作成済みの資源は保持し、準備対象を変えない原文変更では呼び出さない。
+ */
+export function abandonEngineCreations(): void {
   resourceGeneration += 1;
   translatorCreationSequence += 1;
   promptCreationSequence += 1;
-  detectorCreation = undefined;
-  translatorCreations.clear();
-  promptCreations.clear();
+  const reason = makePreparationAbortError();
+  abandonSharedCreations(detectorCreations, reason);
+  abandonSharedCreations(translatorCreations, reason);
+  abandonSharedCreations(promptCreations, reason);
+}
+
+/** 保持中の検出器、翻訳器、Promptセッションを解放する */
+export function destroyTranslationResources(): void {
+  abandonEngineCreations();
   resources.detector?.destroy();
   resources.translator?.instance.destroy();
   resources.prompt?.instance.destroy();

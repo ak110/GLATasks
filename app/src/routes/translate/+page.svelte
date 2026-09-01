@@ -16,6 +16,7 @@
         type TranslateEngine,
     } from "$lib/translate";
     import {
+        abandonEngineCreations,
         describePreparationDirection,
         detectEngineAvailability,
         destroyTranslationResources,
@@ -85,7 +86,6 @@
     let requestSequence = 0;
     let availabilitySequence = 0;
     let activeController: AbortController | undefined;
-    let preparationController: AbortController | undefined;
     let scheduledTranslationTimer: ReturnType<typeof setTimeout> | undefined;
 
     const nativeTag = $derived(resolveLanguageTag(nativeLanguage));
@@ -160,18 +160,15 @@
     }
 
     /**
-     * 準備対象を陳腐化としてマークし、進行中の準備を中断する
+     * 準備対象を陳腐化としてマークし、進行中の要求と共有作成を中断する
      *
      * 言語・エンジンの変更は準備対象を変えるため、以前の対象の作成を継続しない。
-     * 中断理由には`app/src/lib/translate-client.ts`の`ensurePreparationActive`が使う既存の
-     * 中断文言と同じ値を渡す。この値は共有の作成Promiseを拒否する理由であり、状態表示へは到達しない。
-     * 中断後の表示は、`pendingPreparationStale`が既存の`displayedStatus`へ与える文言のまま変わらない。
+     * 要求を先に中断することで、共有作成の放棄が状態表示へ到達しないようにする。
      */
     function invalidatePendingPreparation(): void {
         markPendingPreparationStale();
-        preparationController?.abort(
-            new DOMException("翻訳準備が中断されました", "AbortError"),
-        );
+        activeController?.abort();
+        abandonEngineCreations();
     }
 
     function handleNativeLanguageInput(event: Event): void {
@@ -436,8 +433,6 @@
         const preparationRequest = pendingPreparation;
         const request = makeCurrentRequest();
         const sequence = ++requestSequence;
-        const controller = new AbortController();
-        preparationController = controller;
         isPreparing = true;
         preparationProgress = 0;
         statusMessage = "準備中...";
@@ -451,7 +446,6 @@
                         preparationProgress = Math.round(progress * 100);
                     }
                 },
-                creationSignal: controller.signal,
             });
 
             if (!isCurrentRequest(request) || sequence !== requestSequence) {
@@ -476,9 +470,6 @@
                 statusMessage = extractErrorMessage(error);
             }
         } finally {
-            if (preparationController === controller) {
-                preparationController = undefined;
-            }
             isPreparing = false;
             preparationProgress = undefined;
         }
@@ -568,7 +559,6 @@
 
     onDestroy(() => {
         activeController?.abort();
-        preparationController?.abort();
         if (scheduledTranslationTimer) clearTimeout(scheduledTranslationTimer);
         destroyTranslationResources();
     });

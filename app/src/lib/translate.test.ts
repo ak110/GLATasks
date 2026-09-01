@@ -15,6 +15,7 @@ import {
   TRANSLATE_DEFAULTS,
 } from "./translate";
 import {
+  abandonEngineCreations,
   detectEngineAvailability,
   destroyTranslationResources,
   prepareEngine,
@@ -34,6 +35,66 @@ beforeEach(() => {
   vi.stubGlobal("localStorage", localStorageMock);
   destroyTranslationResources();
 });
+
+function makeTranslatorPreparation(
+  sourceLanguage = "ja",
+  targetLanguage = "en",
+) {
+  return {
+    kind: "translator" as const,
+    sourceText: "翻訳する",
+    nativeLanguage: sourceLanguage,
+    foreignLanguage: targetLanguage,
+    sourceLanguage,
+    targetLanguage,
+    direction: "native-to-foreign" as const,
+    availability: "downloadable" as const,
+    requiresDirectionChoice: true,
+    requiresUserActivation: true,
+  };
+}
+
+function makePromptPreparation(nativeLanguage = "ja", foreignLanguage = "en") {
+  return {
+    kind: "prompt" as const,
+    nativeLanguage,
+    foreignLanguage,
+    options: {
+      expectedInputs: [{ type: "text" as const, languages: ["en"] }],
+      expectedOutputs: [
+        {
+          type: "text" as const,
+          languages: [nativeLanguage, foreignLanguage],
+        },
+      ],
+    },
+    initialPrompt: "翻訳する",
+    availability: "downloadable" as const,
+    requiresUserActivation: true,
+  };
+}
+
+function makeTranslatorInstance(
+  sourceLanguage = "ja",
+  targetLanguage = "en",
+): Translator {
+  return {
+    sourceLanguage,
+    targetLanguage,
+    translate: vi.fn(),
+    translateStreaming: vi.fn(),
+    destroy: vi.fn(),
+  } as unknown as Translator;
+}
+
+function makePromptInstance(): LanguageModel {
+  return {
+    clone: vi.fn(),
+    prompt: vi.fn(),
+    promptStreaming: vi.fn(),
+    destroy: vi.fn(),
+  } as unknown as LanguageModel;
+}
 
 describe("resolveLanguageTag", () => {
   it.each([
@@ -298,6 +359,9 @@ describe("translate client availability", () => {
       () => undefined,
     );
     await vi.waitFor(() => expect(detectorCreate).toHaveBeenCalledTimes(1));
+    const firstAborted = expect(first).rejects.toMatchObject({
+      name: "AbortError",
+    });
 
     destroyTranslationResources();
 
@@ -314,10 +378,78 @@ describe("translate client availability", () => {
     const staleDetector = makeDetector();
     const currentDetector = makeDetector();
     detectorResolvers[0]?.(staleDetector);
-    await expect(first).rejects.toMatchObject({ name: "AbortError" });
+    await firstAborted;
     detectorResolvers[1]?.(currentDetector);
     await expect(second).resolves.toEqual({ status: "translated" });
     expect(staleDetector.destroy).toHaveBeenCalledTimes(1);
+    expect(currentDetector.destroy).not.toHaveBeenCalled();
+  });
+
+  it("共有検出器作成を放棄して新しい作成を開始する", async () => {
+    const detectorResolvers: Array<(detector: LanguageDetector) => void> = [];
+    const detectorCreate = vi.fn(
+      () =>
+        new Promise<LanguageDetector>((resolve) => {
+          detectorResolvers.push(resolve);
+        }),
+    );
+    const makeDetector = () => ({
+      detect: vi
+        .fn()
+        .mockResolvedValue([{ detectedLanguage: "ja", confidence: 1 }]),
+      destroy: vi.fn(),
+    });
+    const translator = {
+      translateStreaming: vi.fn().mockImplementation(
+        () =>
+          new ReadableStream<string>({
+            start(controller) {
+              controller.enqueue("translated");
+              controller.close();
+            },
+          }),
+      ),
+      destroy: vi.fn(),
+    };
+    vi.stubGlobal("LanguageDetector", {
+      availability: vi.fn().mockResolvedValue("available"),
+      create: detectorCreate,
+    });
+    vi.stubGlobal("Translator", {
+      availability: vi.fn().mockResolvedValue("available"),
+      create: vi.fn().mockResolvedValue(translator),
+    });
+
+    const first = runTranslation(
+      "最初",
+      "ja",
+      "en",
+      "translator",
+      new AbortController().signal,
+      () => undefined,
+    );
+    await vi.waitFor(() => expect(detectorCreate).toHaveBeenCalledTimes(1));
+    abandonEngineCreations();
+    await expect(first).rejects.toMatchObject({ name: "AbortError" });
+
+    const second = runTranslation(
+      "再試行",
+      "ja",
+      "en",
+      "translator",
+      new AbortController().signal,
+      () => undefined,
+    );
+    await vi.waitFor(() => expect(detectorCreate).toHaveBeenCalledTimes(2));
+    const currentDetector = makeDetector();
+    detectorResolvers[1]?.(currentDetector);
+    await expect(second).resolves.toEqual({ status: "translated" });
+
+    const staleDetector = makeDetector();
+    detectorResolvers[0]?.(staleDetector);
+    await vi.waitFor(() =>
+      expect(staleDetector.destroy).toHaveBeenCalledTimes(1),
+    );
     expect(currentDetector.destroy).not.toHaveBeenCalled();
   });
 
@@ -509,49 +641,27 @@ describe("translate client availability", () => {
     await expect(second).resolves.toBeUndefined();
   });
 
-  it("準備の中断信号で共有Translator作成Promiseを失敗させ再作成する", async () => {
-    const translator = {
-      sourceLanguage: "ja",
-      targetLanguage: "en",
-      translate: vi.fn(),
-      translateStreaming: vi.fn(),
-      destroy: vi.fn(),
-    } as unknown as Translator;
+  it("共有Translator作成を放棄して新しい作成を開始する", async () => {
+    const translator = makeTranslatorInstance();
     const translatorResolvers: Array<(translator: Translator) => void> = [];
     const translatorCreate = vi.fn(
-      (options: TranslatorCreateOptions) =>
-        new Promise<Translator>((resolve, reject) => {
+      () =>
+        new Promise<Translator>((resolve) => {
           translatorResolvers.push(resolve);
-          options.signal?.addEventListener("abort", () => {
-            reject(options.signal?.reason);
-          });
         }),
     );
     vi.stubGlobal("Translator", {
       availability: vi.fn().mockResolvedValue("downloadable"),
       create: translatorCreate,
     });
-    const preparation = {
-      kind: "translator" as const,
-      sourceText: "こんにちは",
-      nativeLanguage: "ja",
-      foreignLanguage: "en",
-      sourceLanguage: "ja",
-      targetLanguage: "en",
-      direction: "native-to-foreign" as const,
-      availability: "downloadable" as const,
-      requiresDirectionChoice: true,
-      requiresUserActivation: true,
-    };
-    const controller = new AbortController();
+    const preparation = makeTranslatorPreparation();
     const first = prepareEngine({
       engine: "translator",
       preparation: [preparation],
       onProgress: () => undefined,
-      creationSignal: controller.signal,
     });
     await vi.waitFor(() => expect(translatorCreate).toHaveBeenCalledTimes(1));
-    controller.abort();
+    abandonEngineCreations();
     await expect(first).rejects.toMatchObject({ name: "AbortError" });
 
     const second = prepareEngine({
@@ -562,6 +672,113 @@ describe("translate client availability", () => {
     await vi.waitFor(() => expect(translatorCreate).toHaveBeenCalledTimes(2));
     translatorResolvers[1]?.(translator);
     await expect(second).resolves.toBeUndefined();
+  });
+
+  it("Translator置換作成の放棄時は既存資源を保持する", async () => {
+    const current = makeTranslatorInstance("ja", "en");
+    const replacement = makeTranslatorInstance("en", "fr");
+    let resolveReplacement: ((translator: Translator) => void) | undefined;
+    const translatorCreate = vi
+      .fn()
+      .mockResolvedValueOnce(current)
+      .mockImplementationOnce(
+        () =>
+          new Promise<Translator>((resolve) => {
+            resolveReplacement = resolve;
+          }),
+      );
+    vi.stubGlobal("Translator", {
+      availability: vi.fn().mockResolvedValue("downloadable"),
+      create: translatorCreate,
+    });
+    const currentPreparation = makeTranslatorPreparation("ja", "en");
+    const replacementPreparation = makeTranslatorPreparation("en", "fr");
+    await prepareEngine({
+      engine: "translator",
+      preparation: [currentPreparation],
+      onProgress: () => undefined,
+    });
+
+    const pending = prepareEngine({
+      engine: "translator",
+      preparation: [replacementPreparation],
+      onProgress: () => undefined,
+    });
+    await vi.waitFor(() => expect(translatorCreate).toHaveBeenCalledTimes(2));
+    abandonEngineCreations();
+    await expect(pending).rejects.toMatchObject({ name: "AbortError" });
+    expect(current.destroy).not.toHaveBeenCalled();
+
+    resolveReplacement?.(replacement);
+    await vi.waitFor(() =>
+      expect(replacement.destroy).toHaveBeenCalledTimes(1),
+    );
+    await prepareEngine({
+      engine: "translator",
+      preparation: [currentPreparation],
+      onProgress: () => undefined,
+    });
+    expect(translatorCreate).toHaveBeenCalledTimes(2);
+    expect(current.destroy).not.toHaveBeenCalled();
+  });
+
+  it("Translator置換作成の通常失敗時は既存資源を保持する", async () => {
+    const current = makeTranslatorInstance("ja", "en");
+    const translatorCreate = vi
+      .fn()
+      .mockResolvedValueOnce(current)
+      .mockRejectedValueOnce(new Error("replacement failed"));
+    vi.stubGlobal("Translator", {
+      availability: vi.fn().mockResolvedValue("downloadable"),
+      create: translatorCreate,
+    });
+    const currentPreparation = makeTranslatorPreparation("ja", "en");
+    await prepareEngine({
+      engine: "translator",
+      preparation: [currentPreparation],
+      onProgress: () => undefined,
+    });
+
+    await expect(
+      prepareEngine({
+        engine: "translator",
+        preparation: [makeTranslatorPreparation("en", "fr")],
+        onProgress: () => undefined,
+      }),
+    ).rejects.toThrow("replacement failed");
+    await prepareEngine({
+      engine: "translator",
+      preparation: [currentPreparation],
+      onProgress: () => undefined,
+    });
+    expect(translatorCreate).toHaveBeenCalledTimes(2);
+    expect(current.destroy).not.toHaveBeenCalled();
+  });
+
+  it("Translator置換作成の成功時は既存資源を一度だけ破棄する", async () => {
+    const current = makeTranslatorInstance("ja", "en");
+    const replacement = makeTranslatorInstance("en", "fr");
+    const translatorCreate = vi
+      .fn()
+      .mockResolvedValueOnce(current)
+      .mockResolvedValueOnce(replacement);
+    vi.stubGlobal("Translator", {
+      availability: vi.fn().mockResolvedValue("downloadable"),
+      create: translatorCreate,
+    });
+    await prepareEngine({
+      engine: "translator",
+      preparation: [makeTranslatorPreparation("ja", "en")],
+      onProgress: () => undefined,
+    });
+    await prepareEngine({
+      engine: "translator",
+      preparation: [makeTranslatorPreparation("en", "fr")],
+      onProgress: () => undefined,
+    });
+
+    expect(current.destroy).toHaveBeenCalledTimes(1);
+    expect(replacement.destroy).not.toHaveBeenCalled();
   });
 
   it("検出器の自動経路ではTranslator準備後も入力ごとに方向を再判定する", async () => {
@@ -764,48 +981,27 @@ describe("translate client availability", () => {
     await expect(pending).resolves.toBeUndefined();
   });
 
-  it("準備の中断信号で共有Prompt作成Promiseを失敗させ再作成する", async () => {
-    const prompt = {
-      clone: vi.fn(),
-      prompt: vi.fn(),
-      promptStreaming: vi.fn(),
-      destroy: vi.fn(),
-    } as unknown as LanguageModel;
+  it("共有Prompt作成を放棄して新しい作成を開始する", async () => {
+    const prompt = makePromptInstance();
     const promptResolvers: Array<(model: LanguageModel) => void> = [];
     const promptCreate = vi.fn(
-      (options: LanguageModelCreateOptions) =>
-        new Promise<LanguageModel>((resolve, reject) => {
+      () =>
+        new Promise<LanguageModel>((resolve) => {
           promptResolvers.push(resolve);
-          options.signal?.addEventListener("abort", () => {
-            reject(options.signal?.reason);
-          });
         }),
     );
     vi.stubGlobal("LanguageModel", {
       availability: vi.fn().mockResolvedValue("downloadable"),
       create: promptCreate,
     });
-    const preparation = {
-      kind: "prompt" as const,
-      nativeLanguage: "ja",
-      foreignLanguage: "en",
-      options: {
-        expectedInputs: [{ type: "text" as const, languages: ["en"] }],
-        expectedOutputs: [{ type: "text" as const, languages: ["ja", "en"] }],
-      },
-      initialPrompt: "翻訳する",
-      availability: "downloadable" as const,
-      requiresUserActivation: true,
-    };
-    const controller = new AbortController();
+    const preparation = makePromptPreparation();
     const first = prepareEngine({
       engine: "prompt",
       preparation: [preparation],
       onProgress: () => undefined,
-      creationSignal: controller.signal,
     });
     await vi.waitFor(() => expect(promptCreate).toHaveBeenCalledTimes(1));
-    controller.abort();
+    abandonEngineCreations();
     await expect(first).rejects.toMatchObject({ name: "AbortError" });
 
     const second = prepareEngine({
@@ -816,6 +1012,112 @@ describe("translate client availability", () => {
     await vi.waitFor(() => expect(promptCreate).toHaveBeenCalledTimes(2));
     promptResolvers[1]?.(prompt);
     await expect(second).resolves.toBeUndefined();
+  });
+
+  it("Prompt置換作成の放棄時は既存資源を保持する", async () => {
+    const current = makePromptInstance();
+    const replacement = makePromptInstance();
+    let resolveReplacement: ((model: LanguageModel) => void) | undefined;
+    const promptCreate = vi
+      .fn()
+      .mockResolvedValueOnce(current)
+      .mockImplementationOnce(
+        () =>
+          new Promise<LanguageModel>((resolve) => {
+            resolveReplacement = resolve;
+          }),
+      );
+    vi.stubGlobal("LanguageModel", {
+      availability: vi.fn().mockResolvedValue("downloadable"),
+      create: promptCreate,
+    });
+    const currentPreparation = makePromptPreparation("ja", "en");
+    await prepareEngine({
+      engine: "prompt",
+      preparation: [currentPreparation],
+      onProgress: () => undefined,
+    });
+
+    const pending = prepareEngine({
+      engine: "prompt",
+      preparation: [makePromptPreparation("en", "fr")],
+      onProgress: () => undefined,
+    });
+    await vi.waitFor(() => expect(promptCreate).toHaveBeenCalledTimes(2));
+    abandonEngineCreations();
+    await expect(pending).rejects.toMatchObject({ name: "AbortError" });
+    expect(current.destroy).not.toHaveBeenCalled();
+
+    resolveReplacement?.(replacement);
+    await vi.waitFor(() =>
+      expect(replacement.destroy).toHaveBeenCalledTimes(1),
+    );
+    await prepareEngine({
+      engine: "prompt",
+      preparation: [currentPreparation],
+      onProgress: () => undefined,
+    });
+    expect(promptCreate).toHaveBeenCalledTimes(2);
+    expect(current.destroy).not.toHaveBeenCalled();
+  });
+
+  it("Prompt置換作成の通常失敗時は既存資源を保持する", async () => {
+    const current = makePromptInstance();
+    const promptCreate = vi
+      .fn()
+      .mockResolvedValueOnce(current)
+      .mockRejectedValueOnce(new Error("replacement failed"));
+    vi.stubGlobal("LanguageModel", {
+      availability: vi.fn().mockResolvedValue("downloadable"),
+      create: promptCreate,
+    });
+    const currentPreparation = makePromptPreparation("ja", "en");
+    await prepareEngine({
+      engine: "prompt",
+      preparation: [currentPreparation],
+      onProgress: () => undefined,
+    });
+
+    await expect(
+      prepareEngine({
+        engine: "prompt",
+        preparation: [makePromptPreparation("en", "fr")],
+        onProgress: () => undefined,
+      }),
+    ).rejects.toThrow("replacement failed");
+    await prepareEngine({
+      engine: "prompt",
+      preparation: [currentPreparation],
+      onProgress: () => undefined,
+    });
+    expect(promptCreate).toHaveBeenCalledTimes(2);
+    expect(current.destroy).not.toHaveBeenCalled();
+  });
+
+  it("Prompt置換作成の成功時は既存資源を一度だけ破棄する", async () => {
+    const current = makePromptInstance();
+    const replacement = makePromptInstance();
+    const promptCreate = vi
+      .fn()
+      .mockResolvedValueOnce(current)
+      .mockResolvedValueOnce(replacement);
+    vi.stubGlobal("LanguageModel", {
+      availability: vi.fn().mockResolvedValue("downloadable"),
+      create: promptCreate,
+    });
+    await prepareEngine({
+      engine: "prompt",
+      preparation: [makePromptPreparation("ja", "en")],
+      onProgress: () => undefined,
+    });
+    await prepareEngine({
+      engine: "prompt",
+      preparation: [makePromptPreparation("en", "fr")],
+      onProgress: () => undefined,
+    });
+
+    expect(current.destroy).toHaveBeenCalledTimes(1);
+    expect(replacement.destroy).not.toHaveBeenCalled();
   });
 
   it("中断済み要求のAbortSignalで共有Prompt作成Promiseを失敗させない", async () => {

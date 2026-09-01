@@ -20,6 +20,7 @@ export type StubOptions = {
   promptCreateError?: string;
   blockFirstTranslation?: boolean;
   blockDetectorCreate?: boolean;
+  abortBlockedDetectorCreate?: boolean;
   blockTranslatorCreate?: boolean;
 };
 
@@ -84,6 +85,7 @@ export async function installAiStubs(
       promptCreateError,
       blockFirstTranslation,
       blockDetectorCreate,
+      abortBlockedDetectorCreate,
       blockTranslatorCreate,
     } = options;
     let releaseDetectorCreate: (() => void) | undefined;
@@ -275,7 +277,10 @@ export async function installAiStubs(
         return detectorAvailability;
       }
 
-      static async create(options: { monitor?: unknown }) {
+      static async create(options: {
+        monitor?: unknown;
+        signal?: AbortSignal;
+      }) {
         state.detectorCreateCount += 1;
         state.detectorCreateActivationIds.push(activeActivationId);
         if (
@@ -287,10 +292,21 @@ export async function installAiStubs(
         if (detectorCreateError) throw new Error(detectorCreateError);
         if (blockDetectorCreate && state.detectorCreateCount === 1) {
           state.detectorCreateBlocked = true;
-          await new Promise<void>((resolve) => {
-            releaseDetectorCreate = resolve;
-          });
-          state.detectorCreateBlocked = false;
+          try {
+            await new Promise<void>((resolve, reject) => {
+              releaseDetectorCreate = resolve;
+              if (abortBlockedDetectorCreate) {
+                options.signal?.addEventListener(
+                  "abort",
+                  () => reject(options.signal?.reason),
+                  { once: true },
+                );
+              }
+            });
+          } finally {
+            releaseDetectorCreate = undefined;
+            state.detectorCreateBlocked = false;
+          }
         }
         notifyProgress(options.monitor as never);
         return new TestDetector();
