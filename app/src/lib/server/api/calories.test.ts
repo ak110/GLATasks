@@ -20,7 +20,7 @@ import {
 
 const describeDb = process.env.DATABASE_URL ? describe : describe.skip;
 
-it("合計を丸める前に目標割合を算出する", async () => {
+it("合計を小数第1位に四捨五入する前に目標割合を算出する", async () => {
   vi.resetModules();
   vi.doMock("../db", () => ({
     getDb: () => ({
