@@ -2,7 +2,7 @@
  * @fileoverview カロリー集計カードの表示値と色境界テスト
  */
 
-import { render } from "@testing-library/svelte";
+import { fireEvent, render } from "@testing-library/svelte";
 import { describe, expect, it, vi } from "vitest";
 
 import CalorieSummary from "./CalorieSummary.svelte";
@@ -34,5 +34,20 @@ describe("CalorieSummary", () => {
     expect(getByTestId("calorie-summary-1")).toHaveTextContent("1,615");
     expect(getByTestId("calorie-summary-1")).toHaveTextContent("100.0%");
     expect(queryByText(/上回|下回/)).not.toBeInTheDocument();
+  });
+
+  it("既定の整数目標値を妥当な値として保存できる", async () => {
+    const onSaveGoal = vi.fn();
+    const { getByLabelText, getByRole } = render(CalorieSummary, {
+      periods: [],
+      goalKcal: 1615,
+      onSaveGoal,
+    });
+    const goalInput = getByLabelText("1日目標") as HTMLInputElement;
+
+    expect(goalInput.validity.stepMismatch).toBe(false);
+    expect(goalInput.checkValidity()).toBe(true);
+    await fireEvent.click(getByRole("button", { name: "保存" }));
+    expect(onSaveGoal).toHaveBeenCalledWith(1615);
   });
 });
