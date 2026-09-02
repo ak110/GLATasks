@@ -564,10 +564,6 @@
     });
 </script>
 
-<svelte:head>
-    <title>翻訳 - GLATasks</title>
-</svelte:head>
-
 <Header page="translate" isLoading={false} />
 
 <div
