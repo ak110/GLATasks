@@ -53,7 +53,7 @@
         品目
     </h2>
     <form
-        class="mb-4 grid gap-2 sm:grid-cols-[minmax(0,1fr)_7rem_minmax(0,1fr)_auto]"
+        class="mb-4 grid gap-2 sm:grid-cols-[minmax(0,1fr)_4rem_5rem_auto]"
         onsubmit={submit}
     >
         <label class="sr-only" for="calorie-item-name">品目名</label>
@@ -104,11 +104,11 @@
     </form>
 
     <div class="overflow-x-auto">
-        <table class="w-full max-w-98 table-fixed text-left text-sm">
+        <table class="w-full table-fixed text-left text-sm">
             <colgroup
-                ><col class="w-40" /><col class="w-20" /><col
-                    class="w-24"
-                /><col class="w-14" /></colgroup
+                ><col /><col class="w-16" /><col class="w-20" /><col
+                    class="w-14"
+                /></colgroup
             >
             <thead
                 class="border-b border-gray-200 text-gray-600 dark:border-gray-700 dark:text-gray-300"

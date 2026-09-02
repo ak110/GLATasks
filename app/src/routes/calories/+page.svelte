@@ -177,7 +177,7 @@
             onSaveGoal={(goal) => updateGoalMutation.mutateAsync(goal)}
         />
     {/if}
-    <div class="mt-5 grid gap-5 lg:grid-cols-2">
+    <div class="mt-5 grid gap-5 lg:grid-cols-[1.4fr_1fr]">
         <CalorieRecordTable
             {items}
             {records}
