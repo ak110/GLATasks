@@ -11,7 +11,6 @@ import {
   tinyint,
   index,
   uniqueIndex,
-  decimal,
   customType,
 } from "drizzle-orm/mysql-core";
 import {
@@ -39,7 +38,7 @@ export const calorieItems = mysqlTable(
     id: int("id").primaryKey().autoincrement(),
     user_id: int("user_id").notNull(),
     name: varchar("name", { length: 255 }).notNull(),
-    kcal: decimal("kcal", { precision: 12, scale: 4 }).notNull(),
+    kcal: int("kcal").notNull(),
     note: mediumtext("note").notNull().default(""),
     created: timestamp("created").notNull(),
     updated: timestamp("updated").notNull(),
@@ -65,7 +64,7 @@ export const calorieRecords = mysqlTable(
         onUpdate: "cascade",
       }),
     consumed_at: timestamp("consumed_at").notNull(),
-    quantity: decimal("quantity", { precision: 12, scale: 4 }).notNull(),
+    quantity: int("quantity").notNull(),
     created: timestamp("created").notNull(),
     updated: timestamp("updated").notNull(),
   },

@@ -18,21 +18,22 @@ describe("CalorieSummary", () => {
   ] as const)("丸め後の割合 %s に対応する色を使う", (raw, color) => {
     const percentage = Math.round(raw * 10) / 10;
     const { getByTestId } = render(CalorieSummary, {
-      periods: [{ days: 1, total_kcal: 100, percentage }],
+      periods: [{ days: 1, daily_kcal: 100, percentage }],
       goalKcal: 1615,
       onSaveGoal: vi.fn(),
     });
     expect(getByTestId("calorie-summary-1")).toHaveClass(color);
   });
 
-  it("合計と割合だけを表示し、上下判定の状態文言を追加しない", () => {
+  it("1日当たりkcalと割合を1行へまとめ、上下判定の状態文言を追加しない", () => {
     const { getByTestId, queryByText } = render(CalorieSummary, {
-      periods: [{ days: 1, total_kcal: 1615, percentage: 100 }],
+      periods: [{ days: 7, daily_kcal: 969, percentage: 60 }],
       goalKcal: 1615,
       onSaveGoal: vi.fn(),
     });
-    expect(getByTestId("calorie-summary-1")).toHaveTextContent("1,615");
-    expect(getByTestId("calorie-summary-1")).toHaveTextContent("100.0%");
+    const card = getByTestId("calorie-summary-7");
+    expect(card).toHaveTextContent("直近7日間平均");
+    expect(card.querySelector("p")).toHaveTextContent("969 kcal (60.0%)");
     expect(queryByText(/上回|下回/)).not.toBeInTheDocument();
   });
 

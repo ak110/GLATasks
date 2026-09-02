@@ -20,7 +20,7 @@ import {
 
 const describeDb = process.env.DATABASE_URL ? describe : describe.skip;
 
-it("合計を小数第1位に四捨五入する前に目標割合を算出する", async () => {
+it("期間別に1日当たり平均を四捨五入し、目標割合は期間合計から算出する", async () => {
   vi.resetModules();
   vi.doMock("../db", () => ({
     getDb: () => ({
@@ -31,8 +31,8 @@ it("合計を小数第1位に四捨五入する前に目標割合を算出する
               Promise.resolve([
                 {
                   consumed_at: new Date("2026-09-01T12:00:00.000Z"),
-                  quantity: "1.0000",
-                  kcal: "0.9504",
+                  quantity: 1,
+                  kcal: 969,
                 },
               ]),
           }),
@@ -41,18 +41,18 @@ it("合計を小数第1位に四捨五入する前に目標割合を算出する
     }),
   }));
   vi.doMock("./users", () => ({
-    getUserPreferences: () => Promise.resolve({ calorie_goal_kcal: 1 }),
+    getUserPreferences: () => Promise.resolve({ calorie_goal_kcal: 1615 }),
   }));
 
   try {
     const { getCalorieSummary: getSummary } = await import("./calories");
     const summary = await getSummary(1, new Date("2026-09-01T12:00:00.000Z"));
 
-    expect(summary.periods[0]).toEqual({
-      days: 1,
-      total_kcal: 1,
-      percentage: 95,
-    });
+    expect(summary.periods).toEqual([
+      { days: 1, daily_kcal: 969, percentage: 60 },
+      { days: 7, daily_kcal: 138, percentage: 8.6 },
+      { days: 28, daily_kcal: 35, percentage: 2.1 },
+    ]);
   } finally {
     vi.doUnmock("../db");
     vi.doUnmock("./users");
@@ -171,8 +171,8 @@ describeDb("簡易カロリー計算API", () => {
       new Date("2026-09-01T12:00:00.000Z"),
     );
     expect(summary.goal_kcal).toBe(1615);
-    expect(summary.periods.map((period) => period.total_kcal)).toEqual([
-      100, 200, 300,
+    expect(summary.periods.map((period) => period.daily_kcal)).toEqual([
+      100, 29, 11,
     ]);
   });
 

@@ -78,6 +78,13 @@ Biomeへの移行は次の阻害要因により見送っている。
     `app/src/lib/server/`配下のserver専用ファイルへスキーマを分離する
     （既存パターンとその制約詳細は`app/src/lib/server/schedule-schemas.ts`冒頭コメントを参照）
   - 併せて`app/vite.config.ts`に`ssr.noExternal: ["該当パッケージ"]`を追加する
+- 利用者設定（`user.preferences`）はJSON文字列を単一カラムへ保持し、
+  `UserPreferencesSchema`の`safeParse`が失敗すると設定全体を空として扱う
+  （`app/src/lib/server/api/users.ts`）。
+  既存値が不正になる方向へスキーマを狭める場合は、同じマイグレーションで既存値を新しい制約へ適合させる。
+  移行しないと当該利用者の全設定が既定値へ戻る。
+  JSON内の数値は`JSON_SET(preferences, '$.key', CEILING(JSON_VALUE(preferences, '$.key')))`で更新できる
+  （MariaDB 12.3.2で動作を確認した）
 - DBスキーマを変更する`pnpm run db:generate`（`drizzle-kit generate`）は、列の新規追加か既存列の改名かを判別できない場合に対話プロンプトを表示する。
   対話端末を持たない実行では当該プロンプトの表示時点で例外終了するため、
   `script -qec "pnpm run db:generate" /dev/null`のように疑似端末を割り当てたうえで

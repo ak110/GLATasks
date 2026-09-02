@@ -1,7 +1,7 @@
 <script lang="ts">
     type Period = {
         days: 1 | 7 | 28;
-        total_kcal: number;
+        daily_kcal: number;
         percentage: number;
     };
 
@@ -15,8 +15,8 @@
 
     const periodLabels = {
         1: "直近24時間",
-        7: "直近7日間",
-        28: "直近28日間",
+        7: "直近7日間平均",
+        28: "直近28日間平均",
     } as const;
 
     function colorClass(percentage: number): string {
@@ -36,7 +36,7 @@
         event.preventDefault();
         const form = event.currentTarget as HTMLFormElement;
         const value = Number(new FormData(form).get("goalKcal"));
-        if (Number.isFinite(value) && value > 0) void onSaveGoal(value);
+        if (Number.isInteger(value) && value > 0) void onSaveGoal(value);
     }
 </script>
 
@@ -46,7 +46,7 @@
             id="calorie-summary-title"
             class="text-lg font-bold text-gray-800 dark:text-gray-100"
         >
-            カロリー合計
+            カロリー
         </h2>
         <form class="flex items-center gap-2" onsubmit={handleGoalSubmit}>
             <label
@@ -59,8 +59,8 @@
                 id="calorie-goal"
                 name="goalKcal"
                 type="number"
-                min="0.0001"
-                step="any"
+                min="1"
+                step="1"
                 value={goalKcal}
                 class="w-28 rounded border border-gray-300 bg-white px-2 py-1 text-right text-sm text-gray-800 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
             />
@@ -83,13 +83,10 @@
                     {periodLabels[period.days]}
                 </h3>
                 <p class="mt-2 text-3xl font-bold">
-                    {period.total_kcal.toLocaleString("ja-JP", {
-                        maximumFractionDigits: 1,
-                    })}
-                    <span class="text-base font-normal">kcal</span>
-                </p>
-                <p class="mt-1 text-2xl font-semibold">
-                    {period.percentage.toFixed(1)}%
+                    {period.daily_kcal.toLocaleString("ja-JP")}
+                    <span class="text-base font-normal"
+                        >kcal ({period.percentage.toFixed(1)}%)</span
+                    >
                 </p>
             </article>
         {/each}

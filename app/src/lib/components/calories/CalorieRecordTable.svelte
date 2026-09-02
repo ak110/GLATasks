@@ -72,7 +72,7 @@
         event.preventDefault();
         const item = items.find((candidate) => candidate.name === itemName);
         const numericQuantity = Number(quantity);
-        if (!item || !Number.isFinite(numericQuantity) || numericQuantity <= 0)
+        if (!item || !Number.isInteger(numericQuantity) || numericQuantity <= 0)
             return;
         const input = {
             consumed_at: consumedAt,
@@ -115,7 +115,7 @@
     </div>
 
     <form
-        class="mb-4 grid gap-2 sm:grid-cols-[10.5rem_minmax(0,1fr)_6rem_auto]"
+        class="mb-4 grid gap-2 sm:grid-cols-[9rem_minmax(0,1fr)_3rem_auto]"
         onsubmit={submit}
     >
         <label class="sr-only" for="calorie-record-datetime">日時</label>
@@ -147,8 +147,8 @@
             bind:value={quantity}
             required
             type="number"
-            min="0.0001"
-            step="0.0001"
+            min="1"
+            step="1"
             placeholder="数量"
             class="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-800 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
         />
@@ -158,12 +158,12 @@
                 class="cursor-pointer rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700"
                 >{editingId === undefined ? "追加" : "変更"}</button
             >
-            {#if editingId !== undefined}<button
-                    type="button"
-                    onclick={resetForm}
-                    class="cursor-pointer rounded bg-gray-100 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
-                    >取消</button
-                >{/if}
+            <button
+                type="button"
+                onclick={resetForm}
+                class="cursor-pointer rounded bg-gray-100 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                >取消</button
+            >
         </div>
     </form>
 

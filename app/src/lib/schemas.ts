@@ -135,7 +135,7 @@ export const UserPreferencesSchema = z.object({
   base_seconds: z.number().int().min(0).max(359999).optional(),
   adjust_minutes: z.number().int().min(1).max(999).optional(),
   mode: TimerModeSchema.optional(),
-  calorie_goal_kcal: z.number().finite().positive().max(1_000_000).optional(),
+  calorie_goal_kcal: z.number().int().positive().max(1_000_000).optional(),
 });
 export type UserPreferences = z.infer<typeof UserPreferencesSchema>;
 
@@ -144,11 +144,7 @@ export type UserPreferences = z.infer<typeof UserPreferencesSchema>;
 export const DEFAULT_CALORIE_GOAL_KCAL = 1615;
 export const MAX_CALORIE_CSV_ROWS = 10_000;
 
-const PositiveCalorieNumberSchema = z
-  .number()
-  .finite()
-  .positive()
-  .max(1_000_000);
+const PositiveCalorieIntegerSchema = z.number().int().positive().max(1_000_000);
 const LocalMinuteSchema = z
   .string()
   .regex(
@@ -172,7 +168,7 @@ const TimezoneOffsetSchema = z.number().int().min(-720).max(840);
 
 export const CalorieItemInputSchema = z.object({
   name: z.string().trim().min(1, "品目名は必須です").max(255),
-  kcal: PositiveCalorieNumberSchema,
+  kcal: PositiveCalorieIntegerSchema,
   note: z.string().max(10_000).default(""),
 });
 
@@ -183,7 +179,7 @@ export const UpdateCalorieItemSchema = CalorieItemInputSchema.extend({
 export const CalorieRecordInputSchema = z.object({
   consumed_at: LocalMinuteSchema,
   item_id: z.number().int().positive(),
-  quantity: PositiveCalorieNumberSchema,
+  quantity: PositiveCalorieIntegerSchema,
   tz_offset_minutes: TimezoneOffsetSchema,
 });
 
@@ -202,13 +198,13 @@ export const ListCalorieRecordsSchema = z.object({
 
 export const CalorieItemCsvRowSchema = z.object({
   name: z.string().min(1, "品目名は必須です").max(255),
-  kcal: PositiveCalorieNumberSchema,
+  kcal: PositiveCalorieIntegerSchema,
   note: z.string().max(10_000).default(""),
 });
 export const CalorieRecordCsvRowSchema = z.object({
   consumed_at: LocalMinuteSchema,
   item_name: z.string().min(1).max(255),
-  quantity: PositiveCalorieNumberSchema,
+  quantity: PositiveCalorieIntegerSchema,
 });
 
 export const ImportCalorieItemsSchema = z.object({

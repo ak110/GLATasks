@@ -95,7 +95,7 @@ export async function getCalorieItems(userId: number): Promise<CalorieItem[]> {
     .from(calorieItems)
     .where(eq(calorieItems.user_id, userId))
     .orderBy(calorieItems.name);
-  return rows.map((row) => ({ ...row, kcal: Number(row.kcal) }));
+  return rows;
 }
 
 export async function createCalorieItem(
@@ -104,16 +104,14 @@ export async function createCalorieItem(
 ): Promise<void> {
   const now = new Date();
   try {
-    await getDb()
-      .insert(calorieItems)
-      .values({
-        user_id: userId,
-        name: input.name,
-        kcal: String(input.kcal),
-        note: input.note,
-        created: now,
-        updated: now,
-      });
+    await getDb().insert(calorieItems).values({
+      user_id: userId,
+      name: input.name,
+      kcal: input.kcal,
+      note: input.note,
+      created: now,
+      updated: now,
+    });
   } catch (error) {
     if (isDuplicateEntry(error)) {
       throw new Error("calorie_item_name_conflict", { cause: error });
@@ -132,7 +130,7 @@ export async function updateCalorieItem(
       .update(calorieItems)
       .set({
         name: input.name,
-        kcal: String(input.kcal),
+        kcal: input.kcal,
         note: input.note,
         updated: new Date(),
       })
@@ -179,17 +177,11 @@ async function selectRecords(
     )
     .where(and(eq(calorieRecords.user_id, userId), rangeCondition))
     .orderBy(desc(calorieRecords.consumed_at), desc(calorieRecords.id));
-  return rows.map((row) => {
-    const itemKcal = Number(row.item_kcal);
-    const quantity = Number(row.quantity);
-    return {
-      ...row,
-      item_kcal: itemKcal,
-      consumed_at: row.consumed_at.toISOString(),
-      quantity,
-      total_kcal: Math.round(itemKcal * quantity * 10) / 10,
-    };
-  });
+  return rows.map((row) => ({
+    ...row,
+    consumed_at: row.consumed_at.toISOString(),
+    total_kcal: row.item_kcal * row.quantity,
+  }));
 }
 
 export async function getCalorieRecords(
@@ -226,7 +218,7 @@ export async function createCalorieRecord(
       user_id: userId,
       item_id: input.item_id,
       consumed_at: localMinuteToUtc(input.consumed_at, input.tz_offset_minutes),
-      quantity: String(input.quantity),
+      quantity: input.quantity,
       created: now,
       updated: now,
     });
@@ -253,7 +245,7 @@ export async function updateCalorieRecord(
     .set({
       item_id: input.item_id,
       consumed_at: localMinuteToUtc(input.consumed_at, input.tz_offset_minutes),
-      quantity: String(input.quantity),
+      quantity: input.quantity,
       updated: new Date(),
     })
     .where(
@@ -288,7 +280,7 @@ export async function getCalorieSummary(
   now = new Date(),
 ): Promise<{
   goal_kcal: number;
-  periods: Array<{ days: 1 | 7 | 28; total_kcal: number; percentage: number }>;
+  periods: Array<{ days: 1 | 7 | 28; daily_kcal: number; percentage: number }>;
 }> {
   const start = new Date(now.getTime() - 28 * DAY_MS);
   const rows = await getDb()
@@ -313,11 +305,10 @@ export async function getCalorieSummary(
     const periodStart = now.getTime() - days * DAY_MS;
     const total = rows
       .filter((row) => row.consumed_at.getTime() >= periodStart)
-      .reduce((sum, row) => sum + Number(row.kcal) * Number(row.quantity), 0);
-    const totalKcal = Math.round(total * 10) / 10;
+      .reduce((sum, row) => sum + row.kcal * row.quantity, 0);
     return {
       days,
-      total_kcal: totalKcal,
+      daily_kcal: Math.round(total / days),
       percentage: Math.round((total / (goal * days)) * 1000) / 10,
     };
   });
@@ -342,7 +333,7 @@ export async function importCalorieItems(
       if (item) {
         await tx
           .update(calorieItems)
-          .set({ kcal: String(row.kcal), note: row.note, updated: now })
+          .set({ kcal: row.kcal, note: row.note, updated: now })
           .where(
             and(eq(calorieItems.id, item.id), eq(calorieItems.user_id, userId)),
           );
@@ -351,7 +342,7 @@ export async function importCalorieItems(
         await tx.insert(calorieItems).values({
           user_id: userId,
           name: row.name,
-          kcal: String(row.kcal),
+          kcal: row.kcal,
           note: row.note,
           created: now,
           updated: now,
@@ -378,7 +369,7 @@ export async function importCalorieRecords(
       user_id: userId,
       item_id: itemId,
       consumed_at: localMinuteToUtc(row.consumed_at, offsetMinutes),
-      quantity: String(row.quantity),
+      quantity: row.quantity,
       created: now,
       updated: now,
     };

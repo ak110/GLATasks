@@ -28,14 +28,14 @@ const PRESERVED_VALUES = [
 describe("品目CSV", () => {
   it("BOMとCRLFを付け、引用符を含む値も往復する", () => {
     const csv = exportCalorieItemsCsv([
-      { name: "食品,一", kcal: 12.5, note: '改行\nと"引用符"' },
+      { name: "食品,一", kcal: 13, note: '改行\nと"引用符"' },
       { name: "=食品", kcal: 3, note: "'+備考" },
     ]);
 
     expect(csv.startsWith("\uFEFF")).toBe(true);
     expect(csv).toContain("\r\n");
     expect(parseCalorieItemsCsv(csv)).toEqual([
-      { name: "食品,一", kcal: 12.5, note: '改行\nと"引用符"' },
+      { name: "食品,一", kcal: 13, note: '改行\nと"引用符"' },
       { name: "=食品", kcal: 3, note: "'+備考" },
     ]);
   });
@@ -56,6 +56,12 @@ describe("品目CSV", () => {
       rawRows.data.slice(1).map(([name, , note]) => ({ name, note })),
     ).toEqual(rows.map(({ name, note }) => ({ name, note })));
     expect(parseCalorieItemsCsv(csv)).toEqual(rows);
+  });
+
+  it("小数のkcalを拒否する", () => {
+    expect(() =>
+      parseCalorieItemsCsv("品目,kcal,備考\r\n食品,12.5,\r\n"),
+    ).toThrow("2行目");
   });
 
   it("固定ヘッダー違いと重複品目を拒否する", () => {
@@ -89,14 +95,14 @@ describe("記録CSV", () => {
       {
         consumed_at: "2026/09/01 12:34",
         item_name: "+食品",
-        quantity: 1.5,
+        quantity: 2,
       },
     ]);
     expect(parseCalorieRecordsCsv(csv)).toEqual([
       {
         consumed_at: "2026/09/01 12:34",
         item_name: "+食品",
-        quantity: 1.5,
+        quantity: 2,
       },
     ]);
   });
@@ -119,12 +125,15 @@ describe("記録CSV", () => {
     expect(parseCalorieRecordsCsv(csv)).toEqual(rows);
   });
 
-  it("不正日時と非正数を拒否する", () => {
+  it("不正日時と非正数と小数を拒否する", () => {
     expect(() =>
       parseCalorieRecordsCsv("日時,品目,数量\r\n2026/02/30 12:00,食品,1\r\n"),
     ).toThrow("2行目");
     expect(() =>
       parseCalorieRecordsCsv("日時,品目,数量\r\n2026/02/28 12:00,食品,0\r\n"),
+    ).toThrow("2行目");
+    expect(() =>
+      parseCalorieRecordsCsv("日時,品目,数量\r\n2026/02/28 12:00,食品,1.5\r\n"),
     ).toThrow("2行目");
   });
 });

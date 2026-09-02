@@ -32,7 +32,7 @@
         const input = { name, kcal: Number(kcal), note };
         if (
             !input.name.trim() ||
-            !Number.isFinite(input.kcal) ||
+            !Number.isInteger(input.kcal) ||
             input.kcal <= 0
         )
             return;
@@ -71,8 +71,8 @@
             bind:value={kcal}
             required
             type="number"
-            min="0.0001"
-            step="0.0001"
+            min="1"
+            step="1"
             placeholder="kcal"
             class="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-800 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
         />
@@ -104,7 +104,12 @@
     </form>
 
     <div class="overflow-x-auto">
-        <table class="w-full text-left text-sm">
+        <table class="w-full table-fixed text-left text-sm">
+            <colgroup
+                ><col /><col class="w-20" /><col class="w-1/2" /><col
+                    class="w-16"
+                /></colgroup
+            >
             <thead
                 class="border-b border-gray-200 text-gray-600 dark:border-gray-700 dark:text-gray-300"
             >
@@ -125,7 +130,7 @@
                         <td class="p-2 text-gray-600 dark:text-gray-300"
                             >{item.note}</td
                         >
-                        <td class="p-2 text-right">
+                        <td class="p-2 text-right whitespace-nowrap">
                             <button
                                 type="button"
                                 onclick={() => edit(item)}

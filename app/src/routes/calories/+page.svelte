@@ -166,7 +166,7 @@
 
 <Header page="calories" {isLoading} />
 
-<main class="mx-auto max-w-7xl px-3 py-4 sm:px-4 sm:py-6">
+<main class="mx-auto px-3 py-4 sm:px-4 sm:py-6 xl:max-w-285">
     <h1 class="mb-5 text-2xl font-bold text-gray-800 dark:text-gray-100">
         簡易カロリー計算
     </h1>
