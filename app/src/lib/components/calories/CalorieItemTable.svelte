@@ -104,11 +104,11 @@
     </form>
 
     <div class="overflow-x-auto">
-        <table class="w-full table-fixed text-left text-sm">
+        <table class="w-full max-w-98 table-fixed text-left text-sm">
             <colgroup
-                ><col /><col class="w-20" /><col class="w-1/2" /><col
-                    class="w-16"
-                /></colgroup
+                ><col class="w-40" /><col class="w-20" /><col
+                    class="w-24"
+                /><col class="w-14" /></colgroup
             >
             <thead
                 class="border-b border-gray-200 text-gray-600 dark:border-gray-700 dark:text-gray-300"
@@ -125,10 +125,13 @@
                         class="border-b border-gray-200 text-gray-800 last:border-0 dark:border-gray-700 dark:text-gray-100"
                         data-testid="calorie-item-row"
                     >
-                        <td class="p-2">{item.name}</td>
+                        <td class="truncate p-2" title={item.name}
+                            >{item.name}</td
+                        >
                         <td class="p-2 text-right">{item.kcal}</td>
-                        <td class="p-2 text-gray-600 dark:text-gray-300"
-                            >{item.note}</td
+                        <td
+                            class="truncate p-2 text-gray-600 dark:text-gray-300"
+                            title={item.note}>{item.note}</td
                         >
                         <td class="p-2 text-right whitespace-nowrap">
                             <button

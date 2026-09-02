@@ -31,7 +31,7 @@ export const users = mysqlTable("user", {
   preferences: mediumtext("preferences").notNull().default("{}"),
 });
 
-/** 簡易カロリー計算の品目テーブル */
+/** カロリー計算の品目テーブル */
 export const calorieItems = mysqlTable(
   "calorie_item",
   {
@@ -51,7 +51,7 @@ export const calorieItems = mysqlTable(
   }),
 );
 
-/** 簡易カロリー計算の摂取記録テーブル */
+/** カロリー計算の摂取記録テーブル */
 export const calorieRecords = mysqlTable(
   "calorie_record",
   {

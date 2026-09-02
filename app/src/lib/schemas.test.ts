@@ -171,7 +171,7 @@ describe("UserPreferencesSchema", () => {
   });
 });
 
-describe("簡易カロリー計算スキーマ", () => {
+describe("カロリー計算スキーマ", () => {
   it("品目の正の整数kcalを受け入れ、小数と非正数と非有限値を拒否する", () => {
     expect(
       CalorieItemInputSchema.parse({ name: "食品", kcal: 13, note: "" }),

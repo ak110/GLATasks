@@ -1,5 +1,5 @@
 /**
- * @fileoverview 簡易カロリー計算CSVの契約テスト
+ * @fileoverview カロリー計算CSVの契約テスト
  */
 
 import Papa from "papaparse";

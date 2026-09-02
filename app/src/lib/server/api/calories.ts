@@ -1,5 +1,5 @@
 /**
- * @fileoverview 簡易カロリー計算API
+ * @fileoverview カロリー計算API
  */
 
 import { and, desc, eq, gte, lt, lte } from "drizzle-orm";

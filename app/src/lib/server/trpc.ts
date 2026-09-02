@@ -301,7 +301,7 @@ export const appRouter = t.router({
     ),
   }),
 
-  // ── 簡易カロリー計算 ──
+  // ── カロリー計算 ──
   calories: t.router({
     items: encryptedProcedure.query(async ({ ctx }) => {
       return api.getCalorieItems(ctx.userId);

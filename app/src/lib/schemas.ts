@@ -139,7 +139,7 @@ export const UserPreferencesSchema = z.object({
 });
 export type UserPreferences = z.infer<typeof UserPreferencesSchema>;
 
-// ── 簡易カロリー計算スキーマ ──
+// ── カロリー計算スキーマ ──
 
 export const DEFAULT_CALORIE_GOAL_KCAL = 1615;
 export const MAX_CALORIE_CSV_ROWS = 10_000;

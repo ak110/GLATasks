@@ -1,5 +1,5 @@
 /**
- * @fileoverview 簡易カロリー計算APIの統合テスト
+ * @fileoverview カロリー計算APIの統合テスト
  */
 
 import { eq, inArray } from "drizzle-orm";
@@ -72,7 +72,7 @@ async function createFixtureUser(): Promise<number> {
   return id;
 }
 
-describeDb("簡易カロリー計算API", () => {
+describeDb("カロリー計算API", () => {
   const userIds: number[] = [];
 
   afterAll(async () => {

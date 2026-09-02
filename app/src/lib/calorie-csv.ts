@@ -1,5 +1,5 @@
 /**
- * @fileoverview 簡易カロリー計算のCSV入出力
+ * @fileoverview カロリー計算のCSV入出力
  */
 
 import Papa from "papaparse";

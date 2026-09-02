@@ -1,6 +1,6 @@
 <script lang="ts">
     /**
-     * @fileoverview 簡易カロリー計算ページ
+     * @fileoverview カロリー計算ページ
      */
 
     import { onMount } from "svelte";
@@ -168,7 +168,7 @@
 
 <main class="mx-auto px-3 py-4 sm:px-4 sm:py-6 xl:max-w-285">
     <h1 class="mb-5 text-2xl font-bold text-gray-800 dark:text-gray-100">
-        簡易カロリー計算
+        カロリー計算
     </h1>
     {#if summaryQuery.data}
         <CalorieSummary
@@ -177,7 +177,7 @@
             onSaveGoal={(goal) => updateGoalMutation.mutateAsync(goal)}
         />
     {/if}
-    <div class="mt-5 grid gap-5 xl:grid-cols-2">
+    <div class="mt-5 grid gap-5 lg:grid-cols-2">
         <CalorieRecordTable
             {items}
             {records}

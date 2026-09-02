@@ -1,8 +1,14 @@
 /**
- * @fileoverview 簡易カロリー計算のエンドユーザー操作テスト
+ * @fileoverview カロリー計算のエンドユーザー操作テスト
  */
 
-import { expect, test, type Browser, type Page } from "@playwright/test";
+import {
+  expect,
+  test,
+  type Browser,
+  type Locator,
+  type Page,
+} from "@playwright/test";
 
 import {
   BASE_URL,
@@ -16,7 +22,7 @@ async function openCalories(page: Page): Promise<void> {
     page.waitForResponse((response) => response.url().includes("/api/trpc")),
   ]);
   await expect(
-    page.getByRole("heading", { name: "簡易カロリー計算" }),
+    page.getByRole("heading", { name: "カロリー計算" }),
   ).toBeVisible();
 }
 
@@ -35,6 +41,11 @@ async function addItem(page: Page, name: string, kcal = "100"): Promise<void> {
   ).toBeVisible();
 }
 
+async function openRecordMenu(row: Locator): Promise<void> {
+  await row.getByTestId("calorie-record-menu-btn").click();
+  await expect(row.getByTestId("calorie-record-menu")).toBeVisible();
+}
+
 async function createContext(browser: Browser) {
   return browser.newContext({
     baseURL: BASE_URL,
@@ -48,12 +59,12 @@ test.describe("calories", () => {
     await openCalories(page);
   });
 
-  test("ヘッダーから簡易カロリー計算へ移動できる", async ({ page }) => {
+  test("ヘッダーからカロリー計算へ移動できる", async ({ page }) => {
     await page.goto("/");
     await page.getByRole("link", { name: /カロリー/ }).click();
     await expect(page).toHaveURL(/\/calories$/);
     await expect(
-      page.getByRole("heading", { name: "簡易カロリー計算" }),
+      page.getByRole("heading", { name: "カロリー計算" }),
     ).toBeVisible();
   });
 
@@ -79,7 +90,8 @@ test.describe("calories", () => {
       .filter({ hasText: itemName });
     await expect(recordRow).toContainText("240");
 
-    await recordRow.getByRole("button", { name: "編集" }).click();
+    await openRecordMenu(recordRow);
+    await recordRow.getByRole("menuitem", { name: "編集" }).click();
     await page.locator("#calorie-record-quantity").fill("3");
     const updateRecordResponse = waitForSuccessfulMutationResponse(
       page,
@@ -114,7 +126,8 @@ test.describe("calories", () => {
       page,
       "calories.deleteRecord",
     );
-    await recordRow.getByRole("button", { name: "削除" }).click();
+    await openRecordMenu(recordRow);
+    await recordRow.getByRole("menuitem", { name: "削除" }).click();
     await page
       .getByRole("dialog")
       .last()
@@ -146,11 +159,11 @@ test.describe("calories", () => {
     await expect(
       page.getByTestId("calorie-record-row").filter({ hasText: itemName }),
     ).toBeVisible();
-    await page
+    const copiedRow = page
       .getByTestId("calorie-record-row")
-      .filter({ hasText: itemName })
-      .getByTestId("calorie-record-copy")
-      .click();
+      .filter({ hasText: itemName });
+    await openRecordMenu(copiedRow);
+    await copiedRow.getByTestId("calorie-record-copy").click();
     await expect(page.locator("#calorie-record-item")).toHaveValue(itemName);
     await expect(page.locator("#calorie-record-datetime")).not.toHaveValue(
       "2026/08/01 01:00",

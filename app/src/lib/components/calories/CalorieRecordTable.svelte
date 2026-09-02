@@ -35,9 +35,28 @@
         onDelete,
     }: Props = $props();
     let editingId = $state<number | undefined>();
+    let openMenuId = $state<number | undefined>();
     let consumedAt = $state(formatLocalMinute(new Date()));
     let itemName = $state("");
     let quantity = $state("1");
+
+    // 操作メニュー外クリック/Escapeで閉じる
+    $effect(() => {
+        if (openMenuId === undefined) return;
+        const onClick = (event: MouseEvent) => {
+            const target = event.target as HTMLElement | null;
+            if (!target?.closest("[data-record-menu]")) openMenuId = undefined;
+        };
+        const onKey = (event: KeyboardEvent) => {
+            if (event.key === "Escape") openMenuId = undefined;
+        };
+        document.addEventListener("mousedown", onClick);
+        document.addEventListener("keydown", onKey);
+        return () => {
+            document.removeEventListener("mousedown", onClick);
+            document.removeEventListener("keydown", onKey);
+        };
+    });
 
     function pad(value: number): string {
         return String(value).padStart(2, "0");
@@ -55,6 +74,7 @@
     }
 
     function edit(record: RecordRow) {
+        openMenuId = undefined;
         editingId = record.id;
         consumedAt = formatLocalMinute(new Date(record.consumed_at));
         itemName = record.item_name;
@@ -62,10 +82,16 @@
     }
 
     function copy(record: RecordRow) {
+        openMenuId = undefined;
         editingId = undefined;
         consumedAt = formatLocalMinute(new Date());
         itemName = record.item_name;
         quantity = String(record.quantity);
+    }
+
+    function remove(record: RecordRow) {
+        openMenuId = undefined;
+        onDelete(record);
     }
 
     async function submit(event: SubmitEvent) {
@@ -115,7 +141,7 @@
     </div>
 
     <form
-        class="mb-4 grid gap-2 sm:grid-cols-[9rem_minmax(0,1fr)_3rem_auto]"
+        class="mb-4 grid gap-2 sm:grid-cols-[9rem_minmax(0,1fr)_4rem_auto]"
         onsubmit={submit}
     >
         <label class="sr-only" for="calorie-record-datetime">日時</label>
@@ -167,62 +193,91 @@
         </div>
     </form>
 
-    <div class="overflow-x-auto">
-        <table class="w-full text-left text-sm">
-            <thead
-                class="border-b border-gray-200 text-gray-600 dark:border-gray-700 dark:text-gray-300"
-                ><tr
-                    ><th class="p-2">日時</th><th class="p-2">品目</th><th
-                        class="p-2 text-right">数量</th
-                    ><th class="p-2 text-right">kcal</th><th class="p-2"
-                    ></th></tr
-                ></thead
-            >
-            <tbody>
-                {#each records as record (record.id)}
-                    <tr
-                        class="border-b border-gray-200 text-gray-800 last:border-0 dark:border-gray-700 dark:text-gray-100"
-                        data-testid="calorie-record-row"
+    <table class="w-full table-fixed text-left text-sm">
+        <colgroup
+            ><col class="w-36" /><col /><col class="w-16" /><col
+                class="w-16"
+            /><col class="w-10" /></colgroup
+        >
+        <thead
+            class="border-b border-gray-200 text-gray-600 dark:border-gray-700 dark:text-gray-300"
+            ><tr
+                ><th class="p-2 whitespace-nowrap">日時</th><th
+                    class="p-2 whitespace-nowrap">品目</th
+                ><th class="p-2 text-right whitespace-nowrap">数量</th><th
+                    class="p-2 text-right whitespace-nowrap">kcal</th
+                ><th class="p-2"></th></tr
+            ></thead
+        >
+        <tbody>
+            {#each records as record (record.id)}
+                <tr
+                    class="border-b border-gray-200 text-gray-800 last:border-0 dark:border-gray-700 dark:text-gray-100"
+                    data-testid="calorie-record-row"
+                >
+                    <td class="p-2 whitespace-nowrap"
+                        >{formatLocalMinute(new Date(record.consumed_at))}</td
                     >
-                        <td class="p-2 whitespace-nowrap"
-                            >{formatLocalMinute(
-                                new Date(record.consumed_at),
-                            )}</td
-                        >
-                        <td class="p-2">{record.item_name}</td>
-                        <td class="p-2 text-right">{record.quantity}</td>
-                        <td class="p-2 text-right">{record.total_kcal}</td>
-                        <td class="p-2 text-right whitespace-nowrap">
-                            <button
-                                type="button"
-                                onclick={() => copy(record)}
-                                class="cursor-pointer rounded p-1 text-blue-600 hover:bg-gray-100 dark:text-blue-400 dark:hover:bg-gray-700"
-                                data-testid="calorie-record-copy">コピー</button
-                            >
-                            <button
-                                type="button"
-                                onclick={() => edit(record)}
-                                class="cursor-pointer rounded p-1 text-blue-600 hover:bg-gray-100 dark:text-blue-400 dark:hover:bg-gray-700"
-                                >編集</button
-                            >
-                            <button
-                                type="button"
-                                onclick={() => onDelete(record)}
-                                class="cursor-pointer rounded p-1 text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/30"
-                                >削除</button
-                            >
-                        </td>
-                    </tr>
-                {:else}
-                    <tr
-                        ><td
-                            colspan="5"
-                            class="p-4 text-center text-gray-400 dark:text-gray-500"
-                            >この期間の記録はありません</td
-                        ></tr
+                    <td class="truncate p-2" title={record.item_name}
+                        >{record.item_name}</td
                     >
-                {/each}
-            </tbody>
-        </table>
-    </div>
+                    <td class="p-2 text-right">{record.quantity}</td>
+                    <td class="p-2 text-right">{record.total_kcal}</td>
+                    <td class="p-2 text-right">
+                        <div class="relative" data-record-menu>
+                            <button
+                                type="button"
+                                onclick={() =>
+                                    (openMenuId =
+                                        openMenuId === record.id
+                                            ? undefined
+                                            : record.id)}
+                                class="cursor-pointer rounded px-1 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+                                data-testid="calorie-record-menu-btn"
+                                aria-label="記録の操作"
+                                aria-haspopup="menu"
+                                aria-expanded={openMenuId === record.id}
+                                title="操作">⋯</button
+                            >
+                            {#if openMenuId === record.id}
+                                <div
+                                    class="absolute top-full right-0 z-20 min-w-max rounded border border-gray-200 bg-white py-1 text-left shadow-lg dark:border-gray-600 dark:bg-gray-800"
+                                    role="menu"
+                                    data-testid="calorie-record-menu"
+                                >
+                                    <button
+                                        type="button"
+                                        onclick={() => copy(record)}
+                                        class="block w-full cursor-pointer px-4 py-1.5 text-left text-blue-600 hover:bg-gray-100 dark:text-blue-400 dark:hover:bg-gray-700"
+                                        data-testid="calorie-record-copy"
+                                        role="menuitem">コピー</button
+                                    >
+                                    <button
+                                        type="button"
+                                        onclick={() => edit(record)}
+                                        class="block w-full cursor-pointer px-4 py-1.5 text-left text-blue-600 hover:bg-gray-100 dark:text-blue-400 dark:hover:bg-gray-700"
+                                        role="menuitem">編集</button
+                                    >
+                                    <button
+                                        type="button"
+                                        onclick={() => remove(record)}
+                                        class="block w-full cursor-pointer px-4 py-1.5 text-left text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/30"
+                                        role="menuitem">削除</button
+                                    >
+                                </div>
+                            {/if}
+                        </div>
+                    </td>
+                </tr>
+            {:else}
+                <tr
+                    ><td
+                        colspan="5"
+                        class="p-4 text-center text-gray-400 dark:text-gray-500"
+                        >この期間の記録はありません</td
+                    ></tr
+                >
+            {/each}
+        </tbody>
+    </table>
 </section>
