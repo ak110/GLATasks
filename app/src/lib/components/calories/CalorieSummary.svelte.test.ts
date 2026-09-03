@@ -37,7 +37,7 @@ describe("CalorieSummary", () => {
     expect(queryByText(/上回|下回/)).not.toBeInTheDocument();
   });
 
-  it("直近24時間カードへ目標値までの残りを表示する", () => {
+  it("1日当たりペースのカードへ目標値までの残りを表示する", () => {
     const { getByTestId } = render(CalorieSummary, {
       periods: [{ days: 1, daily_kcal: 1000, percentage: 61.9 }],
       goalKcal: 1615,

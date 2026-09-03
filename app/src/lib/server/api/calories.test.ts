@@ -26,7 +26,7 @@ const HOUR_MS = 60 * 60 * 1000;
 type SummaryRow = { consumed_at: Date; quantity: number; kcal: number };
 
 /** 与えた記録だけを対象に集計する（DBと利用者設定はモックする） */
-async function summarizeRows(rows: SummaryRow[]) {
+async function summarizeRows(rows: SummaryRow[], goalKcal = 1615) {
   vi.resetModules();
   vi.doMock("../db", () => ({
     getDb: () => ({
@@ -38,7 +38,7 @@ async function summarizeRows(rows: SummaryRow[]) {
     }),
   }));
   vi.doMock("./users", () => ({
-    getUserPreferences: () => Promise.resolve({ calorie_goal_kcal: 1615 }),
+    getUserPreferences: () => Promise.resolve({ calorie_goal_kcal: goalKcal }),
   }));
 
   try {
@@ -60,32 +60,59 @@ function makeRow(elapsedHours: number, kcal = 100): SummaryRow {
   };
 }
 
-it("期間別に1日当たり平均を四捨五入し、目標割合は期間合計から算出する", async () => {
-  const summary = await summarizeRows([makeRow(0, 969)]);
+/** 1日1500kcalを8時間間隔で3等分し、28日間続けた状態の記録 */
+function steadyRows(): SummaryRow[] {
+  return Array.from({ length: 84 }, (_, index) => makeRow(4 + index * 8, 500));
+}
 
-  expect(summary.periods).toEqual([
-    { days: 1, daily_kcal: 969, percentage: 60 },
-    { days: 7, daily_kcal: 138, percentage: 8.6 },
-    { days: 28, daily_kcal: 35, percentage: 2.1 },
-  ]);
-});
+it("ペースは経過時間に応じた重みで数え、平均は期間の合計を日数で割る", async () => {
+  const summary = await summarizeRows([0, 24, 48].map((h) => makeRow(h)));
 
-it("台形の重みで期間集計する", async () => {
-  const summary = await summarizeRows([21, 24, 27, 28].map((h) => makeRow(h)));
-
-  // 直近24時間は重み1・0.5・0・0の合計150kcal、7日間と28日間は4件とも重み1の合計400kcal
+  // ペースは重み1・e^-1・e^-2の合計150kcal、平均は3件の合計300kcalを日数で割った値
   expect(summary.periods).toEqual([
     { days: 1, daily_kcal: 150, percentage: 9.3 },
-    { days: 7, daily_kcal: 57, percentage: 3.5 },
-    { days: 28, daily_kcal: 14, percentage: 0.9 },
+    { days: 7, daily_kcal: 43, percentage: 2.7 },
+    { days: 28, daily_kcal: 11, percentage: 0.7 },
   ]);
 });
 
-it("連続摂取では窓長と摂取速度の積へ収束する", async () => {
+it("7日間平均と28日間平均は期間の内側の記録だけを数える", async () => {
+  const summary = await summarizeRows(
+    [7 * 24 - 1, 7 * 24 + 1].map((h) => makeRow(h)),
+  );
+
+  // 7日間平均は7日以内の1件だけ、28日間平均は2件とも数える
+  expect(summary.periods.map((period) => period.daily_kcal)).toEqual([
+    0, 14, 7,
+  ]);
+});
+
+it("目標どおりに食べ続けるとペースも平均も目標値と一致する", async () => {
+  const summary = await summarizeRows(steadyRows(), 1500);
+
+  // ペースは等比級数の和500×e^(-1/6)÷(1-e^(-1/3))=1493kcal
+  expect(summary.periods).toEqual([
+    { days: 1, daily_kcal: 1493, percentage: 99.5 },
+    { days: 7, daily_kcal: 1500, percentage: 100 },
+    { days: 28, daily_kcal: 1500, percentage: 100 },
+  ]);
+});
+
+it("摂取した分だけペースが増える", async () => {
+  const rows = steadyRows();
+
+  const before = await summarizeRows(rows, 1500);
+  const after = await summarizeRows([makeRow(0, 500), ...rows], 1500);
+
+  expect(after.periods[0].daily_kcal - before.periods[0].daily_kcal).toBe(500);
+});
+
+it("一定の速さで摂取し続けるとペースが1日当たり摂取量へ収束する", async () => {
   const intervalMinutes = 6;
   const kcalPerRecord = 100;
-  const rows = Array.from({ length: (30 * 60) / intervalMinutes }, (_, index) =>
-    makeRow((index * intervalMinutes) / 60, kcalPerRecord),
+  const rows = Array.from(
+    { length: (14 * 24 * 60) / intervalMinutes },
+    (_, index) => makeRow((index * intervalMinutes) / 60, kcalPerRecord),
   );
 
   const summary = await summarizeRows(rows);
@@ -184,7 +211,7 @@ describeDb("カロリー計算API", () => {
     expect(await getAllCalorieRecords(userId)).toHaveLength(3);
   });
 
-  it("窓長ちょうどの記録を重み0.5で数える", async () => {
+  it("期間の境界ちょうどの記録を平均へ含める", async () => {
     const userId = await createFixtureUser();
     userIds.push(userId);
     await createCalorieItem(userId, { name: "食品", kcal: 100, note: "" });
@@ -207,9 +234,9 @@ describeDb("カロリー計算API", () => {
       new Date("2026-09-01T12:00:00.000Z"),
     );
     expect(summary.goal_kcal).toBe(1615);
-    // 各期間の窓長ちょうどの記録は重み0.5、それより手前の記録は重み1で数える
+    // ペースは1日前の記録がe^-1、7日前と28日前の記録がそれぞれの期間の境界に入る
     expect(summary.periods.map((period) => period.daily_kcal)).toEqual([
-      50, 21, 9,
+      37, 29, 11,
     ]);
   });
 

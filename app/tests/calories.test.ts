@@ -74,7 +74,7 @@ test.describe("calories", () => {
     ).toBeVisible();
   });
 
-  test("集計カードは直近24時間へ残りを表示し平均カードを1行へ収める", async ({
+  test("集計カードは1日当たりペースへ残りを表示し平均カードを1行へ収める", async ({
     page,
   }) => {
     await expect(page.getByTestId("calorie-summary-remaining")).toHaveText(

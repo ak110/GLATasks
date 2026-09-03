@@ -14,7 +14,7 @@
     let { periods, goalKcal, onSaveGoal }: Props = $props();
 
     const periodLabels = {
-        1: "直近24時間",
+        1: "1日当たりペース",
         7: "直近7日間平均",
         28: "直近28日間平均",
     } as const;

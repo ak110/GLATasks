@@ -19,24 +19,38 @@ import { calorieItems, calorieRecords } from "../schema";
 import { getUserPreferences } from "./users";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-const WEIGHT_TRANSITION_MS = 3 * 60 * 60 * 1000;
+
+type SummaryRow = { consumed_at: Date; quantity: number; kcal: number };
 
 /**
- * 摂取からの経過時間に対する集計上の重みを返す
+ * 直近の摂取ペースを1日当たりのkcalとして返す
  *
- * 窓長の前後で重みを1から0へ直線的に減らす台形とする。
- * 台形の面積は窓長と等しいため、一定の速さで連続して摂取した場合の集計値が矩形の窓と一致し、
- * 「直近24時間」というカード名の意味を保てる。
- * 指数減衰は摂取直後から重みが減り続けてカード名の意味を変えるため採らない。
- * 面積を窓長へそろえた三角の窓も、窓長の半分の時点で重みが0.75まで下がり、
- * 直近の摂取ほど重く数えるため採らない。
+ * 摂取からの経過時間に対する重みを時定数24時間の指数減衰とし、重み付き合計を返す。
+ * 重みを時間で積分すると24時間になるため、一定の速さで摂取し続けた場合の値は
+ * 1日当たりの摂取量と一致する。
+ * 窓の境界を持たないため、摂取から一定時間が過ぎた時点で値が不連続に減らない。
+ * 摂取直後の重みが1であり、摂取したkcalがそのまま値へ加わる。
  */
-function periodWeight(elapsedMs: number, windowMs: number): number {
-  if (elapsedMs <= windowMs - WEIGHT_TRANSITION_MS) return 1;
-  if (elapsedMs >= windowMs + WEIGHT_TRANSITION_MS) return 0;
-  return (
-    (windowMs + WEIGHT_TRANSITION_MS - elapsedMs) / (2 * WEIGHT_TRANSITION_MS)
+function dailyPaceKcal(rows: SummaryRow[], now: Date): number {
+  return rows.reduce(
+    (sum, row) =>
+      sum +
+      row.kcal *
+        row.quantity *
+        Math.exp(-(now.getTime() - row.consumed_at.getTime()) / DAY_MS),
+    0,
   );
+}
+
+/** 指定した日数の窓に入る記録から1日当たりの平均kcalを返す */
+function averageDailyKcal(rows: SummaryRow[], now: Date, days: number): number {
+  const start = now.getTime() - days * DAY_MS;
+  const total = rows.reduce(
+    (sum, row) =>
+      row.consumed_at.getTime() >= start ? sum + row.kcal * row.quantity : sum,
+    0,
+  );
+  return total / days;
 }
 
 export type CalorieItem = {
@@ -301,7 +315,9 @@ export async function getCalorieSummary(
   goal_kcal: number;
   periods: Array<{ days: 1 | 7 | 28; daily_kcal: number; percentage: number }>;
 }> {
-  const start = new Date(now.getTime() - 28 * DAY_MS - WEIGHT_TRANSITION_MS);
+  // 28日より前の記録は指数減衰の重みがexp(-28)まで下がり、
+  // 28日間平均の窓からも外れるため取得しない
+  const start = new Date(now.getTime() - 28 * DAY_MS);
   const rows = await getDb()
     .select({
       consumed_at: calorieRecords.consumed_at,
@@ -321,19 +337,12 @@ export async function getCalorieSummary(
   const preferences = await getUserPreferences(userId);
   const goal = preferences.calorie_goal_kcal ?? DEFAULT_CALORIE_GOAL_KCAL;
   const periods = ([1, 7, 28] as const).map((days) => {
-    const windowMs = days * DAY_MS;
-    const total = rows.reduce(
-      (sum, row) =>
-        sum +
-        row.kcal *
-          row.quantity *
-          periodWeight(now.getTime() - row.consumed_at.getTime(), windowMs),
-      0,
-    );
+    const value =
+      days === 1 ? dailyPaceKcal(rows, now) : averageDailyKcal(rows, now, days);
     return {
       days,
-      daily_kcal: Math.round(total / days),
-      percentage: Math.round((total / (goal * days)) * 1000) / 10,
+      daily_kcal: Math.round(value),
+      percentage: Math.round((value / goal) * 1000) / 10,
     };
   });
   return { goal_kcal: goal, periods };
