@@ -19,6 +19,18 @@
         28: "直近28日間平均",
     } as const;
 
+    const dailyPeriod = $derived(periods.find((period) => period.days === 1));
+    const averagePeriods = $derived(
+        periods.filter((period) => period.days !== 1),
+    );
+    const remainingText = $derived.by(() => {
+        if (!dailyPeriod) return "";
+        const remaining = goalKcal - dailyPeriod.daily_kcal;
+        return remaining >= 0
+            ? `あと ${remaining.toLocaleString("ja-JP")} kcal`
+            : `${Math.abs(remaining).toLocaleString("ja-JP")} kcal 超過`;
+    });
+
     function colorClass(percentage: number): string {
         if (percentage <= 95) {
             return "border-sky-200 bg-sky-100 text-sky-950 dark:border-sky-700 dark:bg-sky-900/40 dark:text-sky-100";
@@ -73,22 +85,41 @@
         </form>
     </div>
 
-    <div class="grid gap-3 md:grid-cols-3">
-        {#each periods as period (period.days)}
+    <div class="grid gap-3 md:grid-cols-2">
+        {#if dailyPeriod}
             <article
-                class={`rounded border p-4 ${colorClass(period.percentage)}`}
-                data-testid={`calorie-summary-${period.days}`}
+                class={`rounded border p-4 ${colorClass(dailyPeriod.percentage)}`}
+                data-testid="calorie-summary-1"
             >
-                <h3 class="text-sm font-semibold">
-                    {periodLabels[period.days]}
-                </h3>
+                <h3 class="text-sm font-semibold">{periodLabels[1]}</h3>
                 <p class="mt-2 text-3xl font-bold">
-                    {period.daily_kcal.toLocaleString("ja-JP")}
+                    {dailyPeriod.daily_kcal.toLocaleString("ja-JP")}
                     <span class="text-base font-normal"
-                        >kcal ({period.percentage.toFixed(1)}%)</span
+                        >kcal ({dailyPeriod.percentage.toFixed(1)}%)</span
                     >
                 </p>
+                <p class="mt-2 text-sm" data-testid="calorie-summary-remaining">
+                    {remainingText}
+                </p>
             </article>
-        {/each}
+        {/if}
+        <div class="grid content-start gap-3">
+            {#each averagePeriods as period (period.days)}
+                <article
+                    class={`flex flex-wrap items-baseline justify-between gap-2 rounded border p-4 ${colorClass(period.percentage)}`}
+                    data-testid={`calorie-summary-${period.days}`}
+                >
+                    <h3 class="text-sm font-semibold">
+                        {periodLabels[period.days]}
+                    </h3>
+                    <p class="text-xl font-bold">
+                        {period.daily_kcal.toLocaleString("ja-JP")}
+                        <span class="text-base font-normal"
+                            >kcal ({period.percentage.toFixed(1)}%)</span
+                        >
+                    </p>
+                </article>
+            {/each}
+        </div>
     </div>
 </section>

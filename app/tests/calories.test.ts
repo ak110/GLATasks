@@ -41,6 +41,12 @@ async function addItem(page: Page, name: string, kcal = "100"): Promise<void> {
   ).toBeVisible();
 }
 
+async function requireBoundingBox(locator: Locator) {
+  const box = await locator.boundingBox();
+  if (!box) throw new Error("要素の境界ボックスを取得できません");
+  return box;
+}
+
 async function openRecordMenu(row: Locator): Promise<void> {
   await row.getByTestId("calorie-record-menu-btn").click();
   await expect(row.getByTestId("calorie-record-menu")).toBeVisible();
@@ -66,6 +72,27 @@ test.describe("calories", () => {
     await expect(
       page.getByRole("heading", { name: "カロリー計算" }),
     ).toBeVisible();
+  });
+
+  test("集計カードは直近24時間へ残りを表示し平均カードを1行へ収める", async ({
+    page,
+  }) => {
+    await expect(page.getByTestId("calorie-summary-remaining")).toHaveText(
+      /あと|超過/,
+    );
+
+    const weeklyCard = page.getByTestId("calorie-summary-7");
+    const heading = await requireBoundingBox(weeklyCard.getByRole("heading"));
+    const value = await requireBoundingBox(weeklyCard.locator("p"));
+    expect(heading.y).toBeLessThan(value.y + value.height);
+    expect(value.y).toBeLessThan(heading.y + heading.height);
+
+    const dailyCard = await requireBoundingBox(
+      page.getByTestId("calorie-summary-1"),
+    );
+    const weekly = await requireBoundingBox(weeklyCard);
+    expect(weekly.y).toBeGreaterThanOrEqual(dailyCard.y);
+    expect(weekly.y).toBeLessThan(dailyCard.y + dailyCard.height);
   });
 
   test("記録と品目を管理できる", async ({ page }) => {

@@ -37,6 +37,40 @@ describe("CalorieSummary", () => {
     expect(queryByText(/上回|下回/)).not.toBeInTheDocument();
   });
 
+  it("直近24時間カードへ目標値までの残りを表示する", () => {
+    const { getByTestId } = render(CalorieSummary, {
+      periods: [{ days: 1, daily_kcal: 1000, percentage: 61.9 }],
+      goalKcal: 1615,
+      onSaveGoal: vi.fn(),
+    });
+    expect(getByTestId("calorie-summary-remaining")).toHaveTextContent(
+      "あと 615 kcal",
+    );
+  });
+
+  it("目標値を超えた場合は超過量を表示する", () => {
+    const { getByTestId } = render(CalorieSummary, {
+      periods: [{ days: 1, daily_kcal: 1800, percentage: 111.5 }],
+      goalKcal: 1615,
+      onSaveGoal: vi.fn(),
+    });
+    expect(getByTestId("calorie-summary-remaining")).toHaveTextContent(
+      "185 kcal 超過",
+    );
+  });
+
+  it("7日間平均と28日間平均のカードへは残りを表示しない", () => {
+    const { queryByTestId } = render(CalorieSummary, {
+      periods: [
+        { days: 7, daily_kcal: 969, percentage: 60 },
+        { days: 28, daily_kcal: 969, percentage: 60 },
+      ],
+      goalKcal: 1615,
+      onSaveGoal: vi.fn(),
+    });
+    expect(queryByTestId("calorie-summary-remaining")).not.toBeInTheDocument();
+  });
+
   it("既定の整数目標値を妥当な値として保存できる", async () => {
     const onSaveGoal = vi.fn();
     const { getByLabelText, getByRole } = render(CalorieSummary, {

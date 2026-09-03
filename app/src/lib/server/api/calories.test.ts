@@ -20,22 +20,19 @@ import {
 
 const describeDb = process.env.DATABASE_URL ? describe : describe.skip;
 
-it("期間別に1日当たり平均を四捨五入し、目標割合は期間合計から算出する", async () => {
+const BASE_TIME_MS = new Date("2026-09-01T12:00:00.000Z").getTime();
+const HOUR_MS = 60 * 60 * 1000;
+
+type SummaryRow = { consumed_at: Date; quantity: number; kcal: number };
+
+/** 与えた記録だけを対象に集計する（DBと利用者設定はモックする） */
+async function summarizeRows(rows: SummaryRow[]) {
   vi.resetModules();
   vi.doMock("../db", () => ({
     getDb: () => ({
       select: () => ({
         from: () => ({
-          innerJoin: () => ({
-            where: () =>
-              Promise.resolve([
-                {
-                  consumed_at: new Date("2026-09-01T12:00:00.000Z"),
-                  quantity: 1,
-                  kcal: 969,
-                },
-              ]),
-          }),
+          innerJoin: () => ({ where: () => Promise.resolve(rows) }),
         }),
       }),
     }),
@@ -46,18 +43,57 @@ it("期間別に1日当たり平均を四捨五入し、目標割合は期間合
 
   try {
     const { getCalorieSummary: getSummary } = await import("./calories");
-    const summary = await getSummary(1, new Date("2026-09-01T12:00:00.000Z"));
-
-    expect(summary.periods).toEqual([
-      { days: 1, daily_kcal: 969, percentage: 60 },
-      { days: 7, daily_kcal: 138, percentage: 8.6 },
-      { days: 28, daily_kcal: 35, percentage: 2.1 },
-    ]);
+    return await getSummary(1, new Date(BASE_TIME_MS));
   } finally {
     vi.doUnmock("../db");
     vi.doUnmock("./users");
     vi.resetModules();
   }
+}
+
+/** 経過時間とkcalで指定した記録1件を返す */
+function makeRow(elapsedHours: number, kcal = 100): SummaryRow {
+  return {
+    consumed_at: new Date(BASE_TIME_MS - elapsedHours * HOUR_MS),
+    quantity: 1,
+    kcal,
+  };
+}
+
+it("期間別に1日当たり平均を四捨五入し、目標割合は期間合計から算出する", async () => {
+  const summary = await summarizeRows([makeRow(0, 969)]);
+
+  expect(summary.periods).toEqual([
+    { days: 1, daily_kcal: 969, percentage: 60 },
+    { days: 7, daily_kcal: 138, percentage: 8.6 },
+    { days: 28, daily_kcal: 35, percentage: 2.1 },
+  ]);
+});
+
+it("台形の重みで期間集計する", async () => {
+  const summary = await summarizeRows([21, 24, 27, 28].map((h) => makeRow(h)));
+
+  // 直近24時間は重み1・0.5・0・0の合計150kcal、7日間と28日間は4件とも重み1の合計400kcal
+  expect(summary.periods).toEqual([
+    { days: 1, daily_kcal: 150, percentage: 9.3 },
+    { days: 7, daily_kcal: 57, percentage: 3.5 },
+    { days: 28, daily_kcal: 14, percentage: 0.9 },
+  ]);
+});
+
+it("連続摂取では窓長と摂取速度の積へ収束する", async () => {
+  const intervalMinutes = 6;
+  const kcalPerRecord = 100;
+  const rows = Array.from({ length: (30 * 60) / intervalMinutes }, (_, index) =>
+    makeRow((index * intervalMinutes) / 60, kcalPerRecord),
+  );
+
+  const summary = await summarizeRows(rows);
+
+  const hourlyKcal = (kcalPerRecord * 60) / intervalMinutes;
+  const expected = hourlyKcal * 24;
+  const actual = summary.periods[0].daily_kcal;
+  expect(Math.abs(actual - expected) / expected).toBeLessThanOrEqual(0.005);
 });
 
 async function createFixtureUser(): Promise<number> {
@@ -148,7 +184,7 @@ describeDb("カロリー計算API", () => {
     expect(await getAllCalorieRecords(userId)).toHaveLength(3);
   });
 
-  it("24時間・7日間・28日間の開始端点を含める", async () => {
+  it("窓長ちょうどの記録を重み0.5で数える", async () => {
     const userId = await createFixtureUser();
     userIds.push(userId);
     await createCalorieItem(userId, { name: "食品", kcal: 100, note: "" });
@@ -171,8 +207,9 @@ describeDb("カロリー計算API", () => {
       new Date("2026-09-01T12:00:00.000Z"),
     );
     expect(summary.goal_kcal).toBe(1615);
+    // 各期間の窓長ちょうどの記録は重み0.5、それより手前の記録は重み1で数える
     expect(summary.periods.map((period) => period.daily_kcal)).toEqual([
-      100, 29, 11,
+      50, 21, 9,
     ]);
   });
 
