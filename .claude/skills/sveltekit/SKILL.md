@@ -24,7 +24,11 @@ description: >-
   - アクティブナビ: `text-sm font-semibold text-gray-200`（リンクなし）
 - 画面全体をスクロールさせない
   - ルートレイアウト（`+layout.svelte`）は`flex h-screen flex-col`とし、ヘッダーとページ本体を縦に並べる
-  - ページ本体の最上位要素へ`min-h-0 flex-1 overflow-y-auto`を付け、ヘッダーの下だけをスクロールさせる
+  - ページ本体の最上位要素には共通コンポーネント`PageScrollArea.svelte`を使い、ヘッダーの下だけをスクロールさせる
+    - 同コンポーネントは`relative min-h-0 flex-1 overflow-y-auto`を持ち、`data-testid="page-scroll-area"`を付与する
+    - `relative`は絶対配置の子孫の含有ブロックをスクロール領域へ固定する。
+      位置指定の祖先が無い絶対配置の要素は初期包含ブロックを基準に配置されるため、
+      `sr-only`のような要素がスクロール領域の外側へ出て文書ルートの高さが増える
   - 中央寄せと最大幅の指定はスクロール領域の内側の要素へ置き、スクロールバーを画面の右端へ表示する
   - ページ全体がスクロールすると、スクロールバーの有無でヘッダー右側の操作の位置が横へずれる
 - コンテンツ領域のアクションボタン: `cursor-pointer rounded bg-gray-100 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-200`

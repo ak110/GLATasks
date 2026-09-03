@@ -11,6 +11,7 @@
     } from "@tanstack/svelte-query";
 
     import Header from "$lib/components/layout/Header.svelte";
+    import PageScrollArea from "$lib/components/layout/PageScrollArea.svelte";
     import CalorieCsvControls from "$lib/components/calories/CalorieCsvControls.svelte";
     import CalorieItemTable from "$lib/components/calories/CalorieItemTable.svelte";
     import CalorieRecordTable from "$lib/components/calories/CalorieRecordTable.svelte";
@@ -166,10 +167,7 @@
 
 <Header page="calories" {isLoading} />
 
-<div
-    class="flex min-h-0 flex-1 flex-col overflow-y-auto"
-    data-testid="page-scroll-area"
->
+<PageScrollArea>
     <main class="mx-auto px-3 py-4 sm:px-4 sm:py-6 xl:max-w-285">
         <h1 class="mb-5 text-2xl font-bold text-gray-800 dark:text-gray-100">
             カロリー計算
@@ -207,7 +205,7 @@
             />
         </div>
     </main>
-</div>
+</PageScrollArea>
 
 <ConfirmDialog
     open={deleteTarget !== undefined}

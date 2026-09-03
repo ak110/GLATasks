@@ -5,6 +5,7 @@
 
     import { onDestroy, onMount } from "svelte";
     import Header from "$lib/components/layout/Header.svelte";
+    import PageScrollArea from "$lib/components/layout/PageScrollArea.svelte";
     import { extractErrorMessage } from "$lib/extract-error-message";
     import {
         getStoredTranslateSettings,
@@ -566,10 +567,7 @@
 
 <Header page="translate" isLoading={false} />
 
-<div
-    class="flex min-h-0 flex-1 flex-col overflow-y-auto"
-    data-testid="page-scroll-area"
->
+<PageScrollArea>
     <div
         class="mx-auto flex w-full max-w-7xl flex-1 flex-col px-3 py-4 sm:px-4 sm:py-6"
     >
@@ -747,4 +745,4 @@
             {/if}
         </div>
     </div>
-</div>
+</PageScrollArea>

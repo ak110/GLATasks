@@ -22,6 +22,7 @@
     import { subscribeOnMount } from "$lib/sse-subscribe";
     import type { TimerInfo, TimersResult } from "$lib/types";
     import Header from "$lib/components/layout/Header.svelte";
+    import PageScrollArea from "$lib/components/layout/PageScrollArea.svelte";
     import TimerCard from "$lib/components/timers/TimerCard.svelte";
     import TimerCreateDialog from "$lib/components/timers/TimerCreateDialog.svelte";
     import ConfirmDialog from "$lib/components/dialogs/ConfirmDialog.svelte";
@@ -326,10 +327,7 @@
 
 <Header page="timers" {isLoading} />
 
-<div
-    class="flex min-h-0 flex-1 flex-col overflow-y-auto"
-    data-testid="page-scroll-area"
->
+<PageScrollArea>
     <div class="mx-auto max-w-4xl px-3 py-4 sm:px-4 sm:py-6">
         <div class="mb-6 flex items-center justify-between">
             <h1 class="text-xl font-bold text-gray-800 dark:text-gray-100">
@@ -406,7 +404,7 @@
             </div>
         {/if}
     </div>
-</div>
+</PageScrollArea>
 
 <TimerCreateDialog
     open={dialog.open}
