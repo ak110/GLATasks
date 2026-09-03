@@ -1118,7 +1118,7 @@
     レスポンシブ幅はbootstrapのcontainer風に各ブレークポイントで細かく刻む方法もあるが、
     本画面では細かく刻まず、xl ブレークポイント以上での最大幅制限のみ行う。
 -->
-<div class="mx-auto flex h-[calc(100vh-3rem)] w-full xl:max-w-285">
+<div class="mx-auto flex min-h-0 w-full flex-1 xl:max-w-285">
     <ListSidebar
         {lists}
         {selectedListId}

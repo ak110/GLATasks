@@ -125,7 +125,7 @@
     {#if data.logged_in}
         <TimerAlarmMonitor />
     {/if}
-    <div class="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div class="flex h-screen flex-col bg-gray-50 dark:bg-gray-900">
         {@render children()}
     </div>
 </QueryClientProvider>

@@ -326,72 +326,86 @@
 
 <Header page="timers" {isLoading} />
 
-<div class="mx-auto max-w-4xl px-3 py-4 sm:px-4 sm:py-6">
-    <div class="mb-6 flex items-center justify-between">
-        <h1 class="text-xl font-bold text-gray-800 dark:text-gray-100">
-            タイマー
-        </h1>
-        <div class="flex gap-2">
-            <button
-                onclick={() => openCreateDialog(false)}
-                class="cursor-pointer rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700"
-                data-testid="timer-add-btn"
-            >
-                + 追加
-            </button>
-            <button
-                onclick={() => openCreateDialog(true)}
-                class="cursor-pointer rounded border border-blue-600 bg-white px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 dark:border-blue-400 dark:bg-gray-800 dark:text-blue-400 dark:hover:bg-blue-900/30"
-                title="満了後に確認なしで削除できる使い切りタイマー"
-                data-testid="timer-add-ephemeral-btn"
-            >
-                + 一時追加
-            </button>
+<div
+    class="flex min-h-0 flex-1 flex-col overflow-y-auto"
+    data-testid="page-scroll-area"
+>
+    <div class="mx-auto max-w-4xl px-3 py-4 sm:px-4 sm:py-6">
+        <div class="mb-6 flex items-center justify-between">
+            <h1 class="text-xl font-bold text-gray-800 dark:text-gray-100">
+                タイマー
+            </h1>
+            <div class="flex gap-2">
+                <button
+                    onclick={() => openCreateDialog(false)}
+                    class="cursor-pointer rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700"
+                    data-testid="timer-add-btn"
+                >
+                    + 追加
+                </button>
+                <button
+                    onclick={() => openCreateDialog(true)}
+                    class="cursor-pointer rounded border border-blue-600 bg-white px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 dark:border-blue-400 dark:bg-gray-800 dark:text-blue-400 dark:hover:bg-blue-900/30"
+                    title="満了後に確認なしで削除できる使い切りタイマー"
+                    data-testid="timer-add-ephemeral-btn"
+                >
+                    + 一時追加
+                </button>
+            </div>
         </div>
-    </div>
 
-    {#if timersList.length === 0 && !isLoading}
-        <div class="flex flex-col items-center justify-center py-16">
-            <p class="mb-4 text-gray-400 dark:text-gray-500">
-                タイマーがありません
-            </p>
-        </div>
-    {:else}
-        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {#each timersList as timer (timer.id)}
-                <TimerCard
-                    {timer}
-                    onStart={(id) =>
-                        startTimerMutation.mutate({
-                            timerId: id,
-                            tz_offset_minutes: getTzOffset(id),
-                        })}
-                    onPause={(id) => pauseTimerMutation.mutate(id)}
-                    onReset={(id) =>
-                        resetTimerMutation.mutate({
-                            timerId: id,
-                            tz_offset_minutes: getTzOffset(id),
-                        })}
-                    onAdjust={(id, minutes) =>
-                        adjustTimerMutation.mutate({ timerId: id, minutes })}
-                    onSetTime={(id, seconds, targetMinutes, tzOffsetMinutes) =>
-                        setTimerTimeMutation.mutate({
-                            timerId: id,
+        {#if timersList.length === 0 && !isLoading}
+            <div class="flex flex-col items-center justify-center py-16">
+                <p class="mb-4 text-gray-400 dark:text-gray-500">
+                    タイマーがありません
+                </p>
+            </div>
+        {:else}
+            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {#each timersList as timer (timer.id)}
+                    <TimerCard
+                        {timer}
+                        onStart={(id) =>
+                            startTimerMutation.mutate({
+                                timerId: id,
+                                tz_offset_minutes: getTzOffset(id),
+                            })}
+                        onPause={(id) => pauseTimerMutation.mutate(id)}
+                        onReset={(id) =>
+                            resetTimerMutation.mutate({
+                                timerId: id,
+                                tz_offset_minutes: getTzOffset(id),
+                            })}
+                        onAdjust={(id, minutes) =>
+                            adjustTimerMutation.mutate({
+                                timerId: id,
+                                minutes,
+                            })}
+                        onSetTime={(
+                            id,
                             seconds,
-                            target_minutes: targetMinutes,
-                            tz_offset_minutes: tzOffsetMinutes,
-                        })}
-                    onEdit={openEditDialog}
-                    onDelete={handleDelete}
-                    isDragging={dnd.isActive && dnd.draggedId === timer.id}
-                    dropIndicator={dnd.isActive && dnd.dropTargetId === timer.id
-                        ? dnd.dropPosition
-                        : null}
-                    onDragStart={dnd.handleDragStart}
-                />
-            {/each}
-        </div>
-    {/if}
+                            targetMinutes,
+                            tzOffsetMinutes,
+                        ) =>
+                            setTimerTimeMutation.mutate({
+                                timerId: id,
+                                seconds,
+                                target_minutes: targetMinutes,
+                                tz_offset_minutes: tzOffsetMinutes,
+                            })}
+                        onEdit={openEditDialog}
+                        onDelete={handleDelete}
+                        isDragging={dnd.isActive && dnd.draggedId === timer.id}
+                        dropIndicator={dnd.isActive &&
+                        dnd.dropTargetId === timer.id
+                            ? dnd.dropPosition
+                            : null}
+                        onDragStart={dnd.handleDragStart}
+                    />
+                {/each}
+            </div>
+        {/if}
+    </div>
 </div>
 
 <TimerCreateDialog

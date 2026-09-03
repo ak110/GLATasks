@@ -61,7 +61,7 @@
 </script>
 
 <header
-    class="sticky top-0 z-10 flex h-12 items-center gap-1 bg-gray-800 px-2 text-white shadow sm:gap-2 sm:px-4 dark:bg-gray-950"
+    class="z-10 flex h-12 shrink-0 items-center gap-1 bg-gray-800 px-2 text-white shadow sm:gap-2 sm:px-4 dark:bg-gray-950"
 >
     <a href={resolve("/")} class="font-bold hover:text-gray-300">GLATasks</a>
     <span class="hidden text-gray-400 sm:inline">|</span>

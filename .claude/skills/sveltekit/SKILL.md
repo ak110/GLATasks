@@ -19,9 +19,14 @@ description: >-
 - テキスト・絵文字ボタンには `rounded` + パディング + `hover:bg-*` を付与する
   - 通常背景: `rounded p-1 hover:bg-gray-100`（アイコン）/ `rounded px-3 py-1.5 hover:bg-*`（テキスト付き）
   - ダークヘッダー内: `hover:bg-gray-700`
-- ヘッダー: `sticky top-0 z-10 h-12 bg-gray-800` 固定。共通コンポーネント `Header.svelte` を使用する
+- ヘッダー: `z-10 h-12 shrink-0 bg-gray-800` 固定。共通コンポーネント `Header.svelte` を使用する
   - ナビリンク: `cursor-pointer rounded text-sm text-gray-300 hover:bg-gray-700 hover:text-white`
   - アクティブナビ: `text-sm font-semibold text-gray-200`（リンクなし）
+- 画面全体をスクロールさせない
+  - ルートレイアウト（`+layout.svelte`）は`flex h-screen flex-col`とし、ヘッダーとページ本体を縦に並べる
+  - ページ本体の最上位要素へ`min-h-0 flex-1 overflow-y-auto`を付け、ヘッダーの下だけをスクロールさせる
+  - 中央寄せと最大幅の指定はスクロール領域の内側の要素へ置き、スクロールバーを画面の右端へ表示する
+  - ページ全体がスクロールすると、スクロールバーの有無でヘッダー右側の操作の位置が横へずれる
 - コンテンツ領域のアクションボタン: `cursor-pointer rounded bg-gray-100 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-200`
 - ダイアログの共通パターン: ヘッダーにタイトル+✕閉じるボタン、キャンセルボタンは使わない
   - 確認・入力ダイアログはこのルールの適用除外（後述のダイアログ運用ルール参照）

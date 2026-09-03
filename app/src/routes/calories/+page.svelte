@@ -166,42 +166,48 @@
 
 <Header page="calories" {isLoading} />
 
-<main class="mx-auto px-3 py-4 sm:px-4 sm:py-6 xl:max-w-285">
-    <h1 class="mb-5 text-2xl font-bold text-gray-800 dark:text-gray-100">
-        カロリー計算
-    </h1>
-    {#if summaryQuery.data}
-        <CalorieSummary
-            periods={summaryQuery.data.periods}
-            goalKcal={summaryQuery.data.goal_kcal}
-            onSaveGoal={(goal) => updateGoalMutation.mutateAsync(goal)}
-        />
-    {/if}
-    <div class="mt-5 grid gap-5 lg:grid-cols-[1.4fr_1fr]">
-        <CalorieRecordTable
-            {items}
-            {records}
-            {windowOffset}
-            onWindowChange={(offset) => (windowOffset = offset)}
-            onCreate={(input) => createRecordMutation.mutateAsync(input)}
-            onUpdate={(input) => updateRecordMutation.mutateAsync(input)}
-            onDelete={(record) => (deleteTarget = record)}
-        />
-        <CalorieItemTable
-            {items}
-            onCreate={(input) => createItemMutation.mutateAsync(input)}
-            onUpdate={(input) => updateItemMutation.mutateAsync(input)}
-        />
-    </div>
-    <div class="mt-5">
-        <CalorieCsvControls
-            {items}
-            {allRecords}
-            onImportItems={(rows) => importItemsMutation.mutateAsync(rows)}
-            onImportRecords={(rows) => importRecordsMutation.mutateAsync(rows)}
-        />
-    </div>
-</main>
+<div
+    class="flex min-h-0 flex-1 flex-col overflow-y-auto"
+    data-testid="page-scroll-area"
+>
+    <main class="mx-auto px-3 py-4 sm:px-4 sm:py-6 xl:max-w-285">
+        <h1 class="mb-5 text-2xl font-bold text-gray-800 dark:text-gray-100">
+            カロリー計算
+        </h1>
+        {#if summaryQuery.data}
+            <CalorieSummary
+                periods={summaryQuery.data.periods}
+                goalKcal={summaryQuery.data.goal_kcal}
+                onSaveGoal={(goal) => updateGoalMutation.mutateAsync(goal)}
+            />
+        {/if}
+        <div class="mt-5 grid gap-5 lg:grid-cols-[1.4fr_1fr]">
+            <CalorieRecordTable
+                {items}
+                {records}
+                {windowOffset}
+                onWindowChange={(offset) => (windowOffset = offset)}
+                onCreate={(input) => createRecordMutation.mutateAsync(input)}
+                onUpdate={(input) => updateRecordMutation.mutateAsync(input)}
+                onDelete={(record) => (deleteTarget = record)}
+            />
+            <CalorieItemTable
+                {items}
+                onCreate={(input) => createItemMutation.mutateAsync(input)}
+                onUpdate={(input) => updateItemMutation.mutateAsync(input)}
+            />
+        </div>
+        <div class="mt-5">
+            <CalorieCsvControls
+                {items}
+                {allRecords}
+                onImportItems={(rows) => importItemsMutation.mutateAsync(rows)}
+                onImportRecords={(rows) =>
+                    importRecordsMutation.mutateAsync(rows)}
+            />
+        </div>
+    </main>
+</div>
 
 <ConfirmDialog
     open={deleteTarget !== undefined}
