@@ -40,6 +40,12 @@
 
     const navigationItems = [
         {
+            key: "tasks",
+            path: "/",
+            icon: "📋",
+            label: "タスク",
+        },
+        {
             key: "timers",
             path: "/timers",
             icon: "⏱",
@@ -63,11 +69,16 @@
 <header
     class="z-10 flex h-12 shrink-0 items-center gap-1 bg-gray-800 px-2 text-white shadow sm:gap-2 sm:px-4 dark:bg-gray-950"
 >
-    <a href={resolve("/")} class="font-bold hover:text-gray-300">GLATasks</a>
-    <span class="hidden text-gray-400 sm:inline">|</span>
     {#each navigationItems as item (item.key)}
+        {#if item.key !== "tasks"}
+            <span class="text-gray-400" data-testid="header-nav-separator"
+                >|</span
+            >
+        {/if}
         {#if page === item.key}
-            <span class="text-sm font-semibold text-gray-200"
+            <span
+                class="text-sm font-semibold text-gray-200"
+                data-testid={"header-nav-" + item.key}
                 >{item.icon}<span class="hidden sm:inline">{item.label}</span
                 ></span
             >
@@ -75,6 +86,7 @@
             <a
                 href={resolve(item.path)}
                 class="cursor-pointer rounded text-sm text-gray-300 hover:bg-gray-700 hover:text-white"
+                data-testid={"header-nav-" + item.key}
                 >{item.icon}<span class="hidden sm:inline">{item.label}</span
                 ></a
             >
