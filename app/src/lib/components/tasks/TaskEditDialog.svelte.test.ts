@@ -57,6 +57,16 @@ describe("TaskEditDialog", () => {
     ).toBeInTheDocument();
   });
 
+  it("ダイアログ本体の最大幅を4xlとする", () => {
+    render(TaskEditDialog, { props: makeDefaultProps() });
+
+    const dialogBody = screen.getByRole("group", {
+      name: "タスク編集フォーム（ファイルドロップ対応）",
+    });
+    expect(dialogBody).toHaveClass("max-w-4xl");
+    expect(dialogBody).not.toHaveClass("max-w-2xl");
+  });
+
   it("open=true のときテキストエリアが表示される", () => {
     render(TaskEditDialog, { props: makeDefaultProps() });
     expect(screen.getByRole("textbox", { name: "内容" })).toBeInTheDocument();

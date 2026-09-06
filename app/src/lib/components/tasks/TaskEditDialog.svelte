@@ -257,7 +257,7 @@
         onkeydown={handleDialogKeydown}
     >
         <div
-            class="w-full max-w-2xl rounded-lg shadow-xl {isDragOver
+            class="w-full max-w-4xl rounded-lg shadow-xl {isDragOver
                 ? FILE_DROP_HIGHLIGHT_CLASSES
                 : 'bg-white dark:bg-gray-800'}"
             role="group"
