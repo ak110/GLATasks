@@ -22,9 +22,8 @@ test.describe("狭い画面のヘッダーナビゲーション", () => {
   test("狭い画面ではナビゲーションのラベルを隠す", async ({ page }) => {
     const icons = ["📋", "⏱", "🌐", "🍴"];
     for (const [index, item] of PAGE_NAMES.entries()) {
-      await expect(page.getByTestId(`header-nav-${item}`)).toHaveText(
-        icons[index],
-      );
+      const text = await page.getByTestId(`header-nav-${item}`).innerText();
+      expect(text).toBe(icons[index]);
     }
   });
 });
