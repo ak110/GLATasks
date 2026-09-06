@@ -17,7 +17,11 @@
         const keyword = itemFilter.trim().toLowerCase();
         return keyword === ""
             ? items
-            : items.filter((item) => item.name.toLowerCase().includes(keyword));
+            : items.filter(
+                  (item) =>
+                      item.name.toLowerCase().includes(keyword) ||
+                      item.note.toLowerCase().includes(keyword),
+              );
     });
 
     function clearForm() {
@@ -131,9 +135,9 @@
                             bind:value={itemFilter}
                             autocomplete="off"
                             data-testid="calorie-item-filter"
-                            placeholder="品目で検索"
-                            aria-label="品目名で検索"
-                            class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-800 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+                            placeholder="品目名と備考で検索"
+                            aria-label="品目名と備考で品目を検索"
+                            class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-sm font-normal text-gray-800 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
                         /></th
                     ><th class="p-1"></th><th class="p-1"></th><th
                         class="p-1 text-right"
@@ -143,7 +147,7 @@
                             data-testid="calorie-item-filter-clear"
                             aria-label="品目の検索条件を消去"
                             title="検索条件を消去"
-                            class="cursor-pointer rounded p-1 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+                            class="cursor-pointer rounded p-1 font-normal text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
                             >×</button
                         ></th
                     ></tr

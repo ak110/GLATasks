@@ -65,6 +65,22 @@ test.describe("calories", () => {
     await openCalories(page);
   });
 
+  test("両表の検索欄とクリアボタンを太字にしない", async ({ page }) => {
+    const testIds = [
+      "calorie-record-filter",
+      "calorie-record-filter-clear",
+      "calorie-item-filter",
+      "calorie-item-filter-clear",
+    ];
+
+    for (const testId of testIds) {
+      const fontWeight = await page
+        .getByTestId(testId)
+        .evaluate((element) => getComputedStyle(element).fontWeight);
+      expect(fontWeight, testId).toBe("400");
+    }
+  });
+
   test("ヘッダーからカロリー計算へ移動できる", async ({ page }) => {
     await page.goto("/");
     await page.getByRole("link", { name: /カロリー/ }).click();

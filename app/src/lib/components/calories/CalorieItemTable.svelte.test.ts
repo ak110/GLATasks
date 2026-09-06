@@ -34,6 +34,31 @@ describe("CalorieItemTable", () => {
     expect(rows[0]).toHaveTextContent("飲料水");
   });
 
+  it("品目の検索は備考の部分一致でも行を表示する", async () => {
+    renderTable({ items });
+
+    await fireEvent.input(screen.getByTestId("calorie-item-filter"), {
+      target: { value: "み物" },
+    });
+
+    const rows = screen.getAllByTestId("calorie-item-row");
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toHaveTextContent("飲料水");
+  });
+
+  it("品目の検索入力欄へ検索対象を示す文言を表示する", () => {
+    renderTable({ items });
+
+    expect(screen.getByTestId("calorie-item-filter")).toHaveAttribute(
+      "placeholder",
+      "品目名と備考で検索",
+    );
+    expect(screen.getByTestId("calorie-item-filter")).toHaveAttribute(
+      "aria-label",
+      "品目名と備考で品目を検索",
+    );
+  });
+
   it("クリアボタンで品目の検索条件を消去できる", async () => {
     renderTable({ items });
     const filter = screen.getByTestId(

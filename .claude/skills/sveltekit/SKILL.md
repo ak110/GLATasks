@@ -36,6 +36,10 @@ description: >-
   - 確認・入力ダイアログはこのルールの適用除外（後述のダイアログ運用ルール参照）
 - タグバッジの色は`app/src/lib/tag-palette.ts`に集約し、Tailwindクラスを直接ハードコードしない
   - 色覚バリアフリー配色（Okabe-Ito系）を淡色化した8色パレットから`getTagColorClass()`経由で取得する
+- `th`など既定の文字装飾を持つ要素の中へフォームコントロールを置く場合は、`font-normal`などで字体を明示する
+  - Preflightが`input`・`button`・`select`・`textarea`へ`font: inherit`を適用するため、これらは祖先の字体を継承する
+  - `th`はHTML標準の既定スタイルが`font-weight: bold`のため、`thead`へ置いた検索欄は入力文字とplaceholderが太字になる
+  - 継承した字体はjsdomを使うVitestのコンポーネントテストでは観測できない。`app/tests/`配下のPlaywrightテストで算出スタイルを検証する
 
 ## ダークモードの色マッピング
 
