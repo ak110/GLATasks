@@ -97,3 +97,8 @@ Biomeへの移行は次の阻害要因により見送っている。
   （プロジェクト名は`docker compose config --format=json`の`name`で確認できる）。
   worktree内では`pnpm install --frozen-lockfile`のうえ`uvx pyfltr run <path>`までを実行し、
   E2Eとバックアップテストは主作業ツリーへ統合してから実行する
+- 新規に作成したgit worktreeでは、`pnpm install --frozen-lockfile`の後に`app`ディレクトリーで`pnpm exec svelte-kit sync`を実行し、`app/.svelte-kit/tsconfig.json`を生成してから検証コマンドを実行する。
+  `app/.svelte-kit`はgit管理外のため新しいworktreeには存在せず、生成前は`pnpm run test:unit`（`vitest run`）が`Tsconfig not found`と`[RESOLVE_ERROR] Could not resolve 'node:module'`で失敗する。
+  `svelte-kit sync`はSvelteKitのルートである`app`で実行する。
+  リポジトリールートで実行した場合はルート直下へ`.svelte-kit`を生成するため、`pnpm run test:unit`は失敗したままとなる。
+  `pnpm run check`（`svelte-check`）は自身が`svelte-kit sync`を実行するため、この生成を前提としない
