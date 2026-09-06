@@ -12,6 +12,13 @@
     let name = $state("");
     let kcal = $state("");
     let note = $state("");
+    let itemFilter = $state("");
+    let visibleItems = $derived.by(() => {
+        const keyword = itemFilter.trim().toLowerCase();
+        return keyword === ""
+            ? items
+            : items.filter((item) => item.name.toLowerCase().includes(keyword));
+    });
 
     function clearForm() {
         editingId = undefined;
@@ -117,10 +124,33 @@
                     ><th class="p-2">品目</th><th class="p-2 text-right"
                         >kcal</th
                     ><th class="p-2">備考</th><th class="p-2"></th></tr
+                ><tr
+                    ><th class="p-1"
+                        ><input
+                            type="search"
+                            bind:value={itemFilter}
+                            autocomplete="off"
+                            data-testid="calorie-item-filter"
+                            placeholder="品目で検索"
+                            aria-label="品目名で検索"
+                            class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-800 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+                        /></th
+                    ><th class="p-1"></th><th class="p-1"></th><th
+                        class="p-1 text-right"
+                        ><button
+                            type="button"
+                            onclick={() => (itemFilter = "")}
+                            data-testid="calorie-item-filter-clear"
+                            aria-label="品目の検索条件を消去"
+                            title="検索条件を消去"
+                            class="cursor-pointer rounded p-1 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+                            >×</button
+                        ></th
+                    ></tr
                 >
             </thead>
             <tbody>
-                {#each items as item (item.id)}
+                {#each visibleItems as item (item.id)}
                     <tr
                         class="border-b border-gray-200 text-gray-800 last:border-0 dark:border-gray-700 dark:text-gray-100"
                         data-testid="calorie-item-row"
@@ -147,7 +177,9 @@
                         ><td
                             colspan="4"
                             class="p-4 text-center text-gray-400 dark:text-gray-500"
-                            >品目がありません</td
+                            >{items.length === 0
+                                ? "品目がありません"
+                                : "該当する品目はありません"}</td
                         ></tr
                     >
                 {/each}

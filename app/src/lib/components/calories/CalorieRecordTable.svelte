@@ -39,6 +39,15 @@
     let consumedAt = $state(formatLocalMinute(new Date()));
     let itemName = $state("");
     let quantity = $state("1");
+    let recordFilter = $state("");
+    let visibleRecords = $derived.by(() => {
+        const keyword = recordFilter.trim().toLowerCase();
+        return keyword === ""
+            ? records
+            : records.filter((record) =>
+                  record.item_name.toLowerCase().includes(keyword),
+              );
+    });
 
     // 操作メニュー外クリック/Escapeで閉じる
     $effect(() => {
@@ -207,10 +216,33 @@
                 ><th class="p-2 text-right whitespace-nowrap">数量</th><th
                     class="p-2 text-right whitespace-nowrap">kcal</th
                 ><th class="p-2"></th></tr
+            ><tr
+                ><th class="p-1"></th><th class="p-1"
+                    ><input
+                        type="search"
+                        bind:value={recordFilter}
+                        autocomplete="off"
+                        data-testid="calorie-record-filter"
+                        placeholder="品目で検索"
+                        aria-label="品目で記録を検索"
+                        class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-800 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+                    /></th
+                ><th class="p-1"></th><th class="p-1"></th><th
+                    class="p-1 text-right"
+                    ><button
+                        type="button"
+                        onclick={() => (recordFilter = "")}
+                        data-testid="calorie-record-filter-clear"
+                        aria-label="記録の検索条件を消去"
+                        title="検索条件を消去"
+                        class="cursor-pointer rounded p-1 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+                        >×</button
+                    ></th
+                ></tr
             ></thead
         >
         <tbody>
-            {#each records as record (record.id)}
+            {#each visibleRecords as record (record.id)}
                 <tr
                     class="border-b border-gray-200 text-gray-800 last:border-0 dark:border-gray-700 dark:text-gray-100"
                     data-testid="calorie-record-row"
@@ -274,7 +306,9 @@
                     ><td
                         colspan="5"
                         class="p-4 text-center text-gray-400 dark:text-gray-500"
-                        >この期間の記録はありません</td
+                        >{records.length === 0
+                            ? "この期間の記録はありません"
+                            : "該当する記録はありません"}</td
                     ></tr
                 >
             {/each}

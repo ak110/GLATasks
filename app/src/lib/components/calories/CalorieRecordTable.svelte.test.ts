@@ -1,5 +1,5 @@
 /**
- * @fileoverview カロリー記録フォームの日時検証・取消操作と行操作メニューのテスト
+ * @fileoverview カロリー記録フォームの日時検証・取消操作、行操作メニュー及び品目の検索行のテスト
  */
 
 import { fireEvent, render, screen } from "@testing-library/svelte";
@@ -15,6 +15,16 @@ const record = {
   consumed_at: "2026-08-01T01:00:00.000Z",
   quantity: 2,
   total_kcal: 240,
+};
+
+const secondRecord = {
+  ...record,
+  id: 2,
+  item_id: 3,
+  item_name: "飲料水",
+  item_kcal: 0,
+  quantity: 1,
+  total_kcal: 0,
 };
 
 function renderTable(overrides: Record<string, unknown> = {}) {
@@ -100,5 +110,77 @@ describe("CalorieRecordTable", () => {
 
     expect(onDelete).toHaveBeenCalledWith(record);
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+  });
+
+  it("品目の検索に入力すると部分一致した記録行だけを表示する", async () => {
+    renderTable({ records: [record, secondRecord] });
+
+    await fireEvent.input(screen.getByTestId("calorie-record-filter"), {
+      target: { value: "飲料" },
+    });
+
+    const rows = screen.getAllByTestId("calorie-record-row");
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toHaveTextContent("飲料水");
+  });
+
+  it("クリアボタンで記録の検索条件を消去できる", async () => {
+    renderTable({ records: [record, secondRecord] });
+    const filter = screen.getByTestId(
+      "calorie-record-filter",
+    ) as HTMLInputElement;
+    await fireEvent.input(filter, { target: { value: "飲料" } });
+
+    await fireEvent.click(screen.getByTestId("calorie-record-filter-clear"));
+
+    expect(screen.getAllByTestId("calorie-record-row")).toHaveLength(2);
+    expect(filter.value).toBe("");
+  });
+
+  it("検索条件の入力ではonWindowChangeを呼び出さない", async () => {
+    const onWindowChange = vi.fn();
+    renderTable({ records: [record], onWindowChange });
+
+    await fireEvent.input(screen.getByTestId("calorie-record-filter"), {
+      target: { value: "食品" },
+    });
+
+    expect(onWindowChange).not.toHaveBeenCalled();
+  });
+
+  it("記録の検索は大文字小文字を区別せず空白だけの入力では全行を表示する", async () => {
+    renderTable({
+      records: [
+        { ...record, item_name: "Coke" },
+        { ...secondRecord, item_name: "水" },
+      ],
+    });
+    const filter = screen.getByTestId("calorie-record-filter");
+
+    await fireEvent.input(filter, { target: { value: "coke" } });
+    expect(screen.getAllByTestId("calorie-record-row")).toHaveLength(1);
+
+    await fireEvent.input(filter, { target: { value: " " } });
+    expect(screen.getAllByTestId("calorie-record-row")).toHaveLength(2);
+  });
+
+  it("記録が存在し検索結果が0件のときは該当なしの文面を表示する", async () => {
+    renderTable({ records: [record] });
+
+    await fireEvent.input(screen.getByTestId("calorie-record-filter"), {
+      target: { value: "該当なし" },
+    });
+
+    expect(screen.queryAllByTestId("calorie-record-row")).toHaveLength(0);
+    expect(screen.getByText("該当する記録はありません")).toBeInTheDocument();
+    expect(
+      screen.queryByText("この期間の記録はありません"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("記録が0件のときは既存の空状態の文面を表示する", () => {
+    renderTable({ records: [] });
+
+    expect(screen.getByText("この期間の記録はありません")).toBeInTheDocument();
   });
 });
