@@ -98,7 +98,7 @@
         event.preventDefault();
         const item = items.find((candidate) => candidate.name === itemName);
         const numericQuantity = Number(quantity);
-        if (!item || !Number.isInteger(numericQuantity) || numericQuantity <= 0)
+        if (!item || !Number.isInteger(numericQuantity) || numericQuantity < 0)
             return;
         const input = {
             consumed_at: consumedAt,
@@ -173,7 +173,7 @@
             bind:value={quantity}
             required
             type="number"
-            min="1"
+            min="0"
             step="1"
             placeholder="数量"
             class="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-800 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"

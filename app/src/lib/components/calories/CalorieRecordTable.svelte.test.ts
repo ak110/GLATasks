@@ -42,6 +42,29 @@ describe("CalorieRecordTable", () => {
     expect(input.validity.patternMismatch).toBe(false);
   });
 
+  it("数量入力欄は0を下限とする", () => {
+    renderTable();
+
+    expect(screen.getByLabelText("数量")).toHaveAttribute("min", "0");
+  });
+
+  it("数量0の記録を追加できる", async () => {
+    const onCreate = vi.fn();
+    renderTable({ items: [{ id: 1, name: "食品" }], onCreate });
+
+    await fireEvent.input(screen.getByLabelText("品目"), {
+      target: { value: "食品" },
+    });
+    await fireEvent.input(screen.getByLabelText("数量"), {
+      target: { value: "0" },
+    });
+    await fireEvent.click(screen.getByRole("button", { name: "追加" }));
+
+    expect(onCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ item_id: 1, quantity: 0 }),
+    );
+  });
+
   it("編集状態でなくても取消で入力欄を初期状態へ復元できる", async () => {
     renderTable();
     const datetime = screen.getByLabelText("日時") as HTMLInputElement;

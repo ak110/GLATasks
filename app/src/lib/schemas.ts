@@ -145,6 +145,7 @@ export const DEFAULT_CALORIE_GOAL_KCAL = 1615;
 export const MAX_CALORIE_CSV_ROWS = 10_000;
 
 const PositiveCalorieIntegerSchema = z.number().int().positive().max(1_000_000);
+const NonNegativeCalorieIntegerSchema = z.number().int().min(0).max(1_000_000);
 const LocalMinuteSchema = z
   .string()
   .regex(
@@ -179,7 +180,7 @@ export const UpdateCalorieItemSchema = CalorieItemInputSchema.extend({
 export const CalorieRecordInputSchema = z.object({
   consumed_at: LocalMinuteSchema,
   item_id: z.number().int().positive(),
-  quantity: PositiveCalorieIntegerSchema,
+  quantity: NonNegativeCalorieIntegerSchema,
   tz_offset_minutes: TimezoneOffsetSchema,
 });
 
@@ -204,7 +205,7 @@ export const CalorieItemCsvRowSchema = z.object({
 export const CalorieRecordCsvRowSchema = z.object({
   consumed_at: LocalMinuteSchema,
   item_name: z.string().min(1).max(255),
-  quantity: PositiveCalorieIntegerSchema,
+  quantity: NonNegativeCalorieIntegerSchema,
 });
 
 export const ImportCalorieItemsSchema = z.object({

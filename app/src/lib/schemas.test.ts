@@ -186,7 +186,7 @@ describe("カロリー計算スキーマ", () => {
     }
   });
 
-  it("記録の正の整数数量を受け入れ、小数と非正数を拒否する", () => {
+  it("記録の0以上の整数数量を受け入れ、小数と負数と非有限値と上限超過を拒否する", () => {
     expect(
       CalorieRecordInputSchema.parse({
         consumed_at: "2026/09/01 12:34",
@@ -195,7 +195,22 @@ describe("カロリー計算スキーマ", () => {
         tz_offset_minutes: 540,
       }).quantity,
     ).toBe(2);
-    for (const quantity of [0.5, 0, -1, Number.NaN]) {
+    expect(
+      CalorieRecordInputSchema.parse({
+        consumed_at: "2026/09/01 12:34",
+        item_id: 1,
+        quantity: 0,
+        tz_offset_minutes: 540,
+      }).quantity,
+    ).toBe(0);
+    expect(
+      CalorieRecordCsvRowSchema.parse({
+        consumed_at: "2026/09/01 12:34",
+        item_name: "食品",
+        quantity: 0,
+      }).quantity,
+    ).toBe(0);
+    for (const quantity of [0.5, -1, Number.NaN, 1_000_001]) {
       expect(() =>
         CalorieRecordInputSchema.parse({
           consumed_at: "2026/09/01 12:34",

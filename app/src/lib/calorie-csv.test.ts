@@ -107,6 +107,18 @@ describe("記録CSV", () => {
     ]);
   });
 
+  it("数量0の記録を出力し、そのまま再インポートする", () => {
+    const rows = [
+      {
+        consumed_at: "2026/09/01 12:34",
+        item_name: "食品",
+        quantity: 0,
+      },
+    ];
+
+    expect(parseCalorieRecordsCsv(exportCalorieRecordsCsv(rows))).toEqual(rows);
+  });
+
   it("品目名を独自変換せずに出力し、そのまま再インポートする", () => {
     const rows = PRESERVED_VALUES.map((itemName, index) => ({
       consumed_at: `2026/09/01 12:${String(index).padStart(2, "0")}`,
@@ -125,12 +137,12 @@ describe("記録CSV", () => {
     expect(parseCalorieRecordsCsv(csv)).toEqual(rows);
   });
 
-  it("不正日時と非正数と小数を拒否する", () => {
+  it("不正日時と負数と小数を拒否する", () => {
     expect(() =>
       parseCalorieRecordsCsv("日時,品目,数量\r\n2026/02/30 12:00,食品,1\r\n"),
     ).toThrow("2行目");
     expect(() =>
-      parseCalorieRecordsCsv("日時,品目,数量\r\n2026/02/28 12:00,食品,0\r\n"),
+      parseCalorieRecordsCsv("日時,品目,数量\r\n2026/02/28 12:00,食品,-1\r\n"),
     ).toThrow("2行目");
     expect(() =>
       parseCalorieRecordsCsv("日時,品目,数量\r\n2026/02/28 12:00,食品,1.5\r\n"),
