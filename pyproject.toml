@@ -12,6 +12,9 @@ javascript = true
 # JS 系ツールは package.json で管理するため pnpm runner を使う。
 # node_modules/.bin の実行ファイルを pnpm exec 経由で呼び出す。
 js-runner = "pnpm"
+# mise.tomlのsymlink_binsでPATHへ公開したactionlint本体を直接実行する。
+# mise runnerへ戻すと、CIコンテナ内の旧shimを解決して実体を見つけられない。
+actionlint-runner = "direct"
 
 # javascript ゲート経由で有効になるが、本プロジェクトでは未採用のため個別に無効化する。
 biome = false
