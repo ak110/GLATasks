@@ -1,5 +1,5 @@
 /**
- * @fileoverview カロリー記録フォームの日時検証・取消操作、行操作メニュー及び品目の検索行のテスト
+ * @fileoverview カロリー記録フォームの日時検証・一覧表示・取消操作、行操作メニュー及び品目の検索行のテスト
  */
 
 import { fireEvent, render, screen } from "@testing-library/svelte";
@@ -50,6 +50,17 @@ describe("CalorieRecordTable", () => {
       "[0-9]{4}/[0-9]{2}/[0-9]{2} [0-9]{2}:[0-9]{2}",
     );
     expect(input.validity.patternMismatch).toBe(false);
+  });
+
+  it("一覧の日時はモバイルで年を省略し広い画面で年を表示する", () => {
+    const consumedAt = new Date(2026, 7, 1, 1).toISOString();
+    renderTable({ records: [{ ...record, consumed_at: consumedAt }] });
+
+    expect(screen.getByText("08/01 01:00")).toHaveClass("sm:hidden");
+    expect(screen.getByText("2026/08/01 01:00")).toHaveClass(
+      "hidden",
+      "sm:inline",
+    );
   });
 
   it("数量入力欄は0を下限とする", () => {

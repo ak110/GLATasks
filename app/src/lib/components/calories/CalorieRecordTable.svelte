@@ -75,6 +75,10 @@
         return `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
     }
 
+    function formatLocalMonthDayMinute(date: Date): string {
+        return `${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    }
+
     function resetForm() {
         editingId = undefined;
         consumedAt = formatLocalMinute(new Date());
@@ -204,7 +208,7 @@
 
     <table class="w-full table-fixed text-left text-sm">
         <colgroup
-            ><col class="w-36" /><col /><col class="w-16" /><col
+            ><col class="w-24 sm:w-36" /><col /><col class="w-16" /><col
                 class="w-16"
             /><col class="w-10" /></colgroup
         >
@@ -247,9 +251,18 @@
                     class="border-b border-gray-200 text-gray-800 last:border-0 dark:border-gray-700 dark:text-gray-100"
                     data-testid="calorie-record-row"
                 >
-                    <td class="p-2 whitespace-nowrap"
-                        >{formatLocalMinute(new Date(record.consumed_at))}</td
-                    >
+                    <td class="p-2 whitespace-nowrap">
+                        <span class="sm:hidden"
+                            >{formatLocalMonthDayMinute(
+                                new Date(record.consumed_at),
+                            )}</span
+                        >
+                        <span class="hidden sm:inline"
+                            >{formatLocalMinute(
+                                new Date(record.consumed_at),
+                            )}</span
+                        >
+                    </td>
                     <td class="truncate p-2" title={record.item_name}
                         >{record.item_name}</td
                     >
