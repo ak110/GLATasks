@@ -1,3 +1,10 @@
 [tools]
-actionlint = "latest"
 typos = "latest"
+
+# actionlintの配布物はインストールrootへ実行ファイルと並んで`man`・`docs`のディレクトリを展開する。
+# miseは`bin`サブディレクトリを持たないツールのインストールrootをそのままPATHへ追加するため、
+# `symlink_bins`で実行ファイルだけを`.mise-bins`へ集める。既存導入へは再インストール又は版の更新後に反映される。
+# `mise upgrade --bump`でoptionsを失わないよう、inline tableではなく別テーブルで書く。
+[tools.actionlint]
+version = "latest"
+symlink_bins = true
