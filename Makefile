@@ -99,7 +99,18 @@ ps:
 	docker compose ps
 
 healthcheck:
-	curl --fail http://localhost:3000/healthcheck 2>/dev/null || docker compose exec app curl --fail http://localhost:3000/healthcheck
+	@attempt=1; \
+	while [ "$$attempt" -le 30 ]; do \
+		if curl --fail --silent --show-error --max-time 2 http://localhost:3000/healthcheck 2>/dev/null; then \
+			exit 0; \
+		fi; \
+		if docker compose exec -T app curl --fail --silent --show-error --max-time 2 http://localhost:3000/healthcheck; then \
+			exit 0; \
+		fi; \
+		if [ "$$attempt" -lt 30 ]; then sleep 2; fi; \
+		attempt=$$((attempt + 1)); \
+	done; \
+	exit 1
 
 start-app:
 	docker compose down app

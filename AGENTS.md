@@ -21,8 +21,7 @@ SvelteKit + tRPC + Drizzleで構築し、Docker Composeで運用する。
   - バックアップ/E2E系に変更を加えた場合は`make test-backup test-e2e`も実行する
   - Docker Compose環境は通常は開発マシン上で常時稼働しており`make test`（backup/e2eテスト含む）を実行できる
     - 停止している場合は`make start`で起動し、疎通を確認してからテストを実行する
-      （疎通確認コマンド:
-      `docker compose --profile=development exec app curl --fail http://localhost:3000/healthcheck`）
+      （疎通確認コマンド: `make healthcheck`）
   - エージェント実行を示す環境変数がある環境では`run`がJSON Lines出力を既定で採用するため、
     診断結果をそのまま解釈できる。環境制約による指定ではない
 
@@ -54,7 +53,8 @@ Biomeへの移行は次の阻害要因により見送っている。
   - nginx経由: `curl -k https://localhost:38180/healthcheck`
   - appコンテナ経由: `docker compose --profile=development exec app curl --fail http://localhost:3000/healthcheck`
   - `docker compose --profile=development exec web curl -fLk https://localhost/`
-  - `make healthcheck`はホスト直接 → コンテナ経由の順にフォールバックする
+  - 起動後の疎通確認には`make healthcheck`を使う。ホスト直接 → コンテナ経由の順で最大30回試行し、成功時に終了する
+    - 試行間隔は2秒、各HTTP要求の上限は2秒とする。最後の試行後は待機せず、全試行が失敗した場合は非0で終了する
 - 現在の`COMPOSE_PROFILE`を確認したいときは`make -p 2>/dev/null | grep -m1 '^COMPOSE_PROFILE '`で判別できる
   （`.env`を直接読み取れないことがあるため）。
   プロファイル指定は`COMPOSE_PROFILES`環境変数へ一括export済みであり、
