@@ -43,9 +43,10 @@ export default defineConfig({
       },
       {
         // DOM環境プロジェクト（Svelteコンポーネントテスト）
-        // svelte.config.js はルートからの相対パスで明示的に指定する
+        // svelte.config.js は絶対パスで明示的に指定する。
+        // 相対パスはこのprojectのroot（./app）を基準に解決され、app/app/svelte.config.js を探してしまう
         plugins: [
-          svelte({ configFile: "app/svelte.config.js" }),
+          svelte({ configFile: path.resolve("./app/svelte.config.js") }),
           svelteTesting(),
         ],
         resolve: { alias: libAlias },
