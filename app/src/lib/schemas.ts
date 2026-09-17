@@ -58,9 +58,26 @@ export const SearchTasksSchema = z.object({
 
 // ── タスク操作スキーマ ──
 
+/**
+ * タスク本文の最大バイト数（UTF-8）。
+ * DBカラム（mediumtext、最大16,777,215バイト）に安全余裕を残した値とする。
+ */
+export const MAX_TASK_TEXT_BYTES = 16_000_000;
+
+const taskTextEncoder = new TextEncoder();
+
+function isWithinMaxTaskTextBytes(text: string): boolean {
+  return taskTextEncoder.encode(text).length <= MAX_TASK_TEXT_BYTES;
+}
+
+const taskTextTooLongMessage = `タスク内容は${MAX_TASK_TEXT_BYTES.toLocaleString("ja-JP")}バイト以下にしてください`;
+
 export const CreateTaskSchema = z.object({
   listId: z.number().int().positive(),
-  text: z.string().min(1, "タスク内容は必須です").max(100000),
+  text: z
+    .string()
+    .min(1, "タスク内容は必須です")
+    .refine(isWithinMaxTaskTextBytes, taskTextTooLongMessage),
   tags: TagsSchema.optional(),
   kind: TaskKindSchema.optional(),
 });
@@ -69,7 +86,10 @@ export const UpdateTaskSchema = z
   .object({
     listId: z.number().int().positive(),
     taskId: z.number().int().positive(),
-    text: z.string().max(100000).optional(),
+    text: z
+      .string()
+      .refine(isWithinMaxTaskTextBytes, taskTextTooLongMessage)
+      .optional(),
     status: TaskStatusSchema.optional(),
     completed: z.string().datetime().nullable().optional(),
     move_to: z.number().int().positive().optional(),

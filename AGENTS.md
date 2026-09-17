@@ -85,6 +85,14 @@ Biomeへの移行は次の阻害要因により見送っている。
   移行しないと当該利用者の全設定が既定値へ戻る。
   JSON内の数値は`JSON_SET(preferences, '$.key', CEILING(JSON_VALUE(preferences, '$.key')))`で更新できる
   （MariaDB 12.3.2で動作を確認した）
+- `schemas.ts`のtext系フィールドへ大きめの容量上限を設計する場合は、DBカラム型の最大バイト数
+  （`mediumtext`は16,777,215バイト）を超えないことをUTF-8バイト長（`TextEncoder`）で検証する。
+  リクエスト・レスポンスの暗号化処理（`app/src/lib/server/crypto.ts`）はbase64展開で
+  約4/3倍に膨張するため、この最終リクエストボディサイズが`compose.*.yaml`の
+  `BODY_SIZE_LIMIT`へ収まることも確認する。
+  Zodの`.max()`は文字数（UTF-16コード単位）を数えるため、日本語のような3バイト文字が
+  多い本文では文字数ベースの上限だとバイト数の見積もりを誤る
+  （`MAX_TASK_TEXT_BYTES`・`app/src/lib/schemas.ts`が実装例）
 - DBスキーマを変更する`pnpm run db:generate`（`drizzle-kit generate`）は、列の新規追加か既存列の改名かを判別できない場合に対話プロンプトを表示する。
   対話端末を持たない実行では当該プロンプトの表示時点で例外終了するため、
   `script -qec "pnpm run db:generate" /dev/null`のように疑似端末を割り当てたうえで

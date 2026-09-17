@@ -10,6 +10,7 @@ import {
   CalorieRecordInputSchema,
   CreateTaskSchema,
   CreateTimerSchema,
+  MAX_TASK_TEXT_BYTES,
   SearchTasksSchema,
   TagInfoSchema,
   TaskStatusSchema,
@@ -282,5 +283,45 @@ describe("CreateTaskSchema / UpdateTaskSchema のタグ対応", () => {
 
   it("UpdateTaskSchema は更新対象なしを拒否する", () => {
     expect(() => UpdateTaskSchema.parse({ listId: 1, taskId: 2 })).toThrow();
+  });
+});
+
+describe("CreateTaskSchema / UpdateTaskSchema の本文バイト長上限", () => {
+  it("CreateTaskSchema は空文字列を拒否する", () => {
+    expect(() => CreateTaskSchema.parse({ listId: 1, text: "" })).toThrow(
+      "タスク内容は必須です",
+    );
+  });
+
+  it("CreateTaskSchema は上限バイト数ちょうどのASCII文字列を許容する", () => {
+    const text = "a".repeat(MAX_TASK_TEXT_BYTES);
+    const parsed = CreateTaskSchema.parse({ listId: 1, text });
+    expect(parsed.text).toHaveLength(MAX_TASK_TEXT_BYTES);
+  });
+
+  it("CreateTaskSchema は上限バイト数を1バイト超えるASCII文字列を拒否する", () => {
+    const text = "a".repeat(MAX_TASK_TEXT_BYTES + 1);
+    expect(() => CreateTaskSchema.parse({ listId: 1, text })).toThrow();
+  });
+
+  it("CreateTaskSchema はマルチバイト文字でバイト長を判定する", () => {
+    // 3バイト文字（日本語）を文字数では上限未満だがバイト長では上限超過になる個数だけ並べる
+    const charCount = Math.floor(MAX_TASK_TEXT_BYTES / 3) + 1;
+    const text = "あ".repeat(charCount);
+    expect(text.length).toBeLessThan(MAX_TASK_TEXT_BYTES);
+    expect(() => CreateTaskSchema.parse({ listId: 1, text })).toThrow();
+  });
+
+  it("UpdateTaskSchema は上限バイト数ちょうどのASCII文字列を許容する", () => {
+    const text = "a".repeat(MAX_TASK_TEXT_BYTES);
+    const parsed = UpdateTaskSchema.parse({ listId: 1, taskId: 2, text });
+    expect(parsed.text).toHaveLength(MAX_TASK_TEXT_BYTES);
+  });
+
+  it("UpdateTaskSchema は上限バイト数を1バイト超えるASCII文字列を拒否する", () => {
+    const text = "a".repeat(MAX_TASK_TEXT_BYTES + 1);
+    expect(() =>
+      UpdateTaskSchema.parse({ listId: 1, taskId: 2, text }),
+    ).toThrow();
   });
 });
