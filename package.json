@@ -19,19 +19,19 @@
     "@sveltejs/adapter-node": "^5.5.7",
     "@sveltejs/kit": "^2.70.3",
     "@tailwindcss/vite": "^4.3.3",
-    "@tanstack/svelte-query": "^6.1.48",
-    "@trpc/client": "^11.18.0",
-    "@trpc/server": "^11.18.0",
+    "@tanstack/svelte-query": "^6.2.1",
+    "@trpc/client": "^11.19.0",
+    "@trpc/server": "^11.19.0",
     "bcryptjs": "^3.0.3",
     "drizzle-orm": "^0.45.2",
     "jose": "^6.2.12",
     "mysql2": "^3.24.4",
     "papaparse": "^5.7.0",
     "rrule": "^2.8.1",
-    "svelte": "^5.57.0",
+    "svelte": "^5.57.1",
     "tailwindcss": "^4.3.3",
     "vite": "^8.3.0",
-    "zod": "^4.6.2"
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -39,17 +39,17 @@
     "@sveltejs/vite-plugin-svelte": "^7.3.0",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/svelte": "^5.4.2",
-    "@types/node": "^26.5.1",
+    "@types/node": "^26.6.2",
     "@types/papaparse": "^5.5.2",
-    "@vitest/ui": "^5.0.0",
+    "@vitest/ui": "^5.0.1",
     "drizzle-kit": "^0.31.10",
-    "eslint": "^10.10.0",
+    "eslint": "^10.11.0",
     "eslint-plugin-svelte": "^3.23.0",
     "globals": "^17.12.0",
     "happy-dom": "^20.14.5",
     "markdownlint-cli2": "^0.23.2",
-    "oxlint": "^1.82.0",
-    "prettier": "^3.9.6",
+    "oxlint": "^1.83.0",
+    "prettier": "^3.9.8",
     "prettier-plugin-svelte": "^4.1.1",
     "prettier-plugin-tailwindcss": "^0.8.1",
     "svelte-check": "^4.7.6",
@@ -59,7 +59,7 @@
     "textlint-rule-preset-jtf-style": "^3.0.3",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.70.0",
-    "vitest": "^5.0.0"
+    "vitest": "^5.0.1"
   },
-  "packageManager": "pnpm@12.4.1+sha512.2e81e399d73fe8390dab25e06aa788ab7a5908248d2f5a370f82b481147a6a7a367bf8048f9a6fdb6460f21a66f0542dedb8b94ca2c8723596741920b1656d4c"
+  "packageManager": "pnpm@12.5.1+sha512.e3f305bc784a2bc89f5ad3b6138889470fae8d2af5f36b61216ec91c2c3d64089775f9de38aac331044ea40f245cb0d5666392dfdf65824e1907ef6a2c62de5f"
 }
