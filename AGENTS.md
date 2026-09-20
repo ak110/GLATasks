@@ -1,4 +1,4 @@
-# CLAUDE.md: glatasks
+# AGENTS.md: glatasks
 
 タスク管理・カウントダウンタイマー・アラームを統合したWeb/PWAアプリ。
 SvelteKit + tRPC + Drizzleで構築し、Docker Composeで運用する。
