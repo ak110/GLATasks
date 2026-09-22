@@ -98,6 +98,17 @@ test.describe("calories", () => {
     );
 
     const weeklyCard = page.getByTestId("calorie-summary-7");
+    const pace = page.getByTestId("calorie-summary-pace");
+    const remaining = page.getByTestId("calorie-summary-remaining");
+    const averageSize = await weeklyCard
+      .locator("p")
+      .evaluate((element) => getComputedStyle(element).fontSize);
+    await expect(pace).toHaveCSS("font-size", averageSize);
+    const remainingSize = await remaining.evaluate((element) =>
+      Number.parseFloat(getComputedStyle(element).fontSize),
+    );
+    expect(remainingSize).toBeGreaterThan(Number.parseFloat(averageSize));
+    await expect(remaining).toHaveCSS("font-weight", "700");
     const heading = await requireBoundingBox(weeklyCard.getByRole("heading"));
     const value = await requireBoundingBox(weeklyCard.locator("p"));
     expect(heading.y).toBeLessThan(value.y + value.height);
@@ -111,74 +122,102 @@ test.describe("calories", () => {
     expect(weekly.y).toBeLessThan(dailyCard.y + dailyCard.height);
   });
 
-  test("記録と品目を管理できる", async ({ page }) => {
-    const itemName = `食品_${Date.now()}`;
-    const renamed = `${itemName}_変更`;
-    await addItem(page, itemName, "120");
-
-    await page.locator("#calorie-record-item").fill(itemName);
-    await page.locator("#calorie-record-quantity").fill("2");
-    const createResponse = waitForSuccessfulMutationResponse(
+  for (const width of [1280, 393]) {
+    test(`記録と品目をダイアログで編集できる（幅${width}）`, async ({
       page,
-      "calories.createRecord",
-    );
-    await page
-      .locator("#calorie-record-item")
-      .locator("..")
-      .getByRole("button", { name: "追加", exact: true })
-      .click();
-    await createResponse;
-    const recordRow = page
-      .getByTestId("calorie-record-row")
-      .filter({ hasText: itemName });
-    await expect(recordRow).toContainText("240");
+    }) => {
+      await page.setViewportSize({ width, height: 851 });
+      const itemName = `食品_${Date.now()}`;
+      const renamed = `${itemName}_変更`;
+      await addItem(page, itemName, "120");
 
-    await openRecordMenu(recordRow);
-    await recordRow.getByRole("menuitem", { name: "編集" }).click();
-    await page.locator("#calorie-record-quantity").fill("3");
-    const updateRecordResponse = waitForSuccessfulMutationResponse(
-      page,
-      "calories.updateRecord",
-    );
-    await page
-      .locator("#calorie-record-item")
-      .locator("..")
-      .getByRole("button", { name: "変更", exact: true })
-      .click();
-    await updateRecordResponse;
-    await expect(recordRow).toContainText("360");
+      await page.locator("#calorie-record-item").fill(itemName);
+      await page.locator("#calorie-record-quantity").fill("2");
+      const createResponse = waitForSuccessfulMutationResponse(
+        page,
+        "calories.createRecord",
+      );
+      await page
+        .locator("#calorie-record-item")
+        .locator("..")
+        .getByRole("button", { name: "追加", exact: true })
+        .click();
+      await createResponse;
+      const recordRow = page
+        .getByTestId("calorie-record-row")
+        .filter({ hasText: itemName });
+      await expect(recordRow).toContainText("240");
 
-    const itemRow = page
-      .getByTestId("calorie-item-row")
-      .filter({ hasText: itemName });
-    await itemRow.getByRole("button", { name: "編集" }).click();
-    await page.locator("#calorie-item-name").fill(renamed);
-    const updateItemResponse = waitForSuccessfulMutationResponse(
-      page,
-      "calories.updateItem",
-    );
-    await page
-      .locator("#calorie-item-name")
-      .locator("..")
-      .getByRole("button", { name: "変更", exact: true })
-      .click();
-    await updateItemResponse;
-    await expect(recordRow).toContainText(renamed);
+      await openRecordMenu(recordRow);
+      await recordRow.getByRole("menuitem", { name: "編集" }).click();
+      const recordDialog = page.getByRole("dialog", { name: "記録の編集" });
+      await expect(recordDialog).toBeVisible();
+      await expect(
+        recordDialog.getByLabel("品目", { exact: true }),
+      ).toHaveValue(itemName);
+      await expect(recordDialog.getByLabel("数量")).toHaveValue("2");
+      await recordDialog.getByLabel("数量").fill("9");
+      await recordDialog.getByRole("button", { name: "閉じる" }).click();
+      await expect(recordDialog).toHaveCount(0);
+      await expect(recordRow).toContainText("240");
+      await openRecordMenu(recordRow);
+      await recordRow.getByRole("menuitem", { name: "編集" }).click();
+      await expect(recordDialog.getByLabel("数量")).toHaveValue("2");
+      await recordDialog.getByLabel("数量").fill("3");
+      const updateRecordResponse = waitForSuccessfulMutationResponse(
+        page,
+        "calories.updateRecord",
+      );
+      await recordDialog
+        .getByRole("button", { name: "変更", exact: true })
+        .click();
+      await updateRecordResponse;
+      await expect(recordDialog).toHaveCount(0);
+      await expect(recordRow).toContainText("360");
 
-    const deleteResponse = waitForSuccessfulMutationResponse(
-      page,
-      "calories.deleteRecord",
-    );
-    await openRecordMenu(recordRow);
-    await recordRow.getByRole("menuitem", { name: "削除" }).click();
-    await page
-      .getByRole("dialog")
-      .last()
-      .getByRole("button", { name: "削除", exact: true })
-      .click();
-    await deleteResponse;
-    await expect(recordRow).toHaveCount(0);
-  });
+      const itemRow = page
+        .getByTestId("calorie-item-row")
+        .filter({ hasText: itemName });
+      await itemRow.getByRole("button", { name: "編集" }).click();
+      const itemDialog = page.getByRole("dialog", { name: "品目の編集" });
+      await expect(itemDialog).toBeVisible();
+      await expect(itemDialog.getByLabel("品目名")).toHaveValue(itemName);
+      await expect(itemDialog.getByLabel("kcal", { exact: true })).toHaveValue(
+        "120",
+      );
+      await itemDialog.getByLabel("品目名").fill("保存しない品目");
+      await page.keyboard.press("Escape");
+      await expect(itemDialog).toHaveCount(0);
+      await expect(itemRow).toContainText(itemName);
+      await itemRow.getByRole("button", { name: "編集" }).click();
+      await expect(itemDialog.getByLabel("品目名")).toHaveValue(itemName);
+      await itemDialog.getByLabel("品目名").fill(renamed);
+      const updateItemResponse = waitForSuccessfulMutationResponse(
+        page,
+        "calories.updateItem",
+      );
+      await itemDialog
+        .getByRole("button", { name: "変更", exact: true })
+        .click();
+      await updateItemResponse;
+      await expect(itemDialog).toHaveCount(0);
+      await expect(recordRow).toContainText(renamed);
+
+      const deleteResponse = waitForSuccessfulMutationResponse(
+        page,
+        "calories.deleteRecord",
+      );
+      await openRecordMenu(recordRow);
+      await recordRow.getByRole("menuitem", { name: "削除" }).click();
+      await page
+        .getByRole("dialog")
+        .last()
+        .getByRole("button", { name: "削除", exact: true })
+        .click();
+      await deleteResponse;
+      await expect(recordRow).toHaveCount(0);
+    });
+  }
 
   test("過去行を現在日時でコピーでき、前の30日を表示できる", async ({
     page,

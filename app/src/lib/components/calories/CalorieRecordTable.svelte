@@ -1,4 +1,6 @@
 <script lang="ts">
+    import CalorieEditDialog from "./CalorieEditDialog.svelte";
+
     type Item = { id: number; name: string };
     type RecordRow = {
         id: number;
@@ -153,58 +155,69 @@
         </div>
     </div>
 
-    <form
-        class="mb-4 grid gap-2 sm:grid-cols-[9rem_minmax(0,1fr)_4rem_auto]"
-        onsubmit={submit}
-    >
-        <label class="sr-only" for="calorie-record-datetime">日時</label>
-        <input
-            id="calorie-record-datetime"
-            bind:value={consumedAt}
-            required
-            pattern={"[0-9]{4}/[0-9]{2}/[0-9]{2} [0-9]{2}:[0-9]{2}"}
-            placeholder="yyyy/MM/dd HH:mm"
-            class="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-800 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
-        />
-        <label class="sr-only" for="calorie-record-item">品目</label>
-        <input
-            id="calorie-record-item"
-            bind:value={itemName}
-            list="calorie-item-options"
-            required
-            placeholder="品目"
-            autocomplete="off"
-            class="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-800 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
-        />
-        <datalist id="calorie-item-options">
-            {#each items as item (item.id)}<option value={item.name}
-                ></option>{/each}
-        </datalist>
-        <label class="sr-only" for="calorie-record-quantity">数量</label>
-        <input
-            id="calorie-record-quantity"
-            bind:value={quantity}
-            required
-            type="number"
-            min="0"
-            step="1"
-            placeholder="数量"
-            class="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-800 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
-        />
-        <div class="flex gap-1">
-            <button
-                type="submit"
-                class="cursor-pointer rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700"
-                >{editingId === undefined ? "追加" : "変更"}</button
-            >
-            <button
-                type="button"
-                onclick={resetForm}
-                class="cursor-pointer rounded bg-gray-100 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
-                >取消</button
-            >
-        </div>
-    </form>
+    {#snippet recordForm()}
+        <form
+            class={editingId === undefined
+                ? "mb-4 grid gap-2 sm:grid-cols-[9rem_minmax(0,1fr)_4rem_auto]"
+                : "grid gap-2"}
+            onsubmit={submit}
+        >
+            <label class="sr-only" for="calorie-record-datetime">日時</label>
+            <input
+                id="calorie-record-datetime"
+                bind:value={consumedAt}
+                required
+                pattern={"[0-9]{4}/[0-9]{2}/[0-9]{2} [0-9]{2}:[0-9]{2}"}
+                placeholder="yyyy/MM/dd HH:mm"
+                class="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-800 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+            />
+            <label class="sr-only" for="calorie-record-item">品目</label>
+            <input
+                id="calorie-record-item"
+                bind:value={itemName}
+                list="calorie-item-options"
+                required
+                placeholder="品目"
+                autocomplete="off"
+                class="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-800 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+            />
+            <datalist id="calorie-item-options">
+                {#each items as item (item.id)}<option value={item.name}
+                    ></option>{/each}
+            </datalist>
+            <label class="sr-only" for="calorie-record-quantity">数量</label>
+            <input
+                id="calorie-record-quantity"
+                bind:value={quantity}
+                required
+                type="number"
+                min="0"
+                step="1"
+                placeholder="数量"
+                class="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-800 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+            />
+            <div class="flex gap-1">
+                <button
+                    type="submit"
+                    class="cursor-pointer rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700"
+                    >{editingId === undefined ? "追加" : "変更"}</button
+                >
+                {#if editingId === undefined}<button
+                        type="button"
+                        onclick={resetForm}
+                        class="cursor-pointer rounded bg-gray-100 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                        >取消</button
+                    >{/if}
+            </div>
+        </form>
+    {/snippet}
+    {#if editingId !== undefined}
+        <CalorieEditDialog title="記録の編集" onClose={resetForm}>
+            {@render recordForm()}
+        </CalorieEditDialog>
+    {:else}
+        {@render recordForm()}
+    {/if}
 
     <table class="w-full table-fixed text-left text-sm">
         <colgroup

@@ -1,4 +1,6 @@
 <script lang="ts">
+    import CalorieEditDialog from "./CalorieEditDialog.svelte";
+
     type Item = { id: number; name: string; kcal: number; note: string };
     type ItemInput = { name: string; kcal: number; note: string };
     type Props = {
@@ -63,56 +65,58 @@
     >
         品目
     </h2>
-    <form
-        class="mb-4 grid gap-2 sm:grid-cols-[minmax(0,1fr)_4rem_5rem_auto]"
-        onsubmit={submit}
-    >
-        <label class="sr-only" for="calorie-item-name">品目名</label>
-        <input
-            id="calorie-item-name"
-            bind:value={name}
-            required
-            maxlength="255"
-            placeholder="品目名"
-            class="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-800 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
-        />
-        <label class="sr-only" for="calorie-item-kcal">kcal</label>
-        <input
-            id="calorie-item-kcal"
-            bind:value={kcal}
-            required
-            type="number"
-            min="1"
-            step="1"
-            placeholder="kcal"
-            class="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-800 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
-        />
-        <label class="sr-only" for="calorie-item-note">備考</label>
-        <input
-            id="calorie-item-note"
-            bind:value={note}
-            maxlength="10000"
-            placeholder="備考"
-            class="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-800 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
-        />
-        <div class="flex gap-1">
-            <button
-                type="submit"
-                class="cursor-pointer rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700"
-            >
-                {editingId === undefined ? "追加" : "変更"}
-            </button>
-            {#if editingId !== undefined}
+    {#snippet itemForm()}
+        <form
+            class={editingId === undefined
+                ? "mb-4 grid gap-2 sm:grid-cols-[minmax(0,1fr)_4rem_5rem_auto]"
+                : "grid gap-2"}
+            onsubmit={submit}
+        >
+            <label class="sr-only" for="calorie-item-name">品目名</label>
+            <input
+                id="calorie-item-name"
+                bind:value={name}
+                required
+                maxlength="255"
+                placeholder="品目名"
+                class="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-800 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+            />
+            <label class="sr-only" for="calorie-item-kcal">kcal</label>
+            <input
+                id="calorie-item-kcal"
+                bind:value={kcal}
+                required
+                type="number"
+                min="1"
+                step="1"
+                placeholder="kcal"
+                class="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-800 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+            />
+            <label class="sr-only" for="calorie-item-note">備考</label>
+            <input
+                id="calorie-item-note"
+                bind:value={note}
+                maxlength="10000"
+                placeholder="備考"
+                class="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-800 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+            />
+            <div class="flex gap-1">
                 <button
-                    type="button"
-                    onclick={clearForm}
-                    class="cursor-pointer rounded bg-gray-100 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                    type="submit"
+                    class="cursor-pointer rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700"
                 >
-                    取消
+                    {editingId === undefined ? "追加" : "変更"}
                 </button>
-            {/if}
-        </div>
-    </form>
+            </div>
+        </form>
+    {/snippet}
+    {#if editingId !== undefined}
+        <CalorieEditDialog title="品目の編集" onClose={clearForm}>
+            {@render itemForm()}
+        </CalorieEditDialog>
+    {:else}
+        {@render itemForm()}
+    {/if}
 
     <div class="overflow-x-auto">
         <table class="w-full table-fixed text-left text-sm">

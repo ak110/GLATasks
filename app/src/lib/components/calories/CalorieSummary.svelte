@@ -92,13 +92,19 @@
                 data-testid="calorie-summary-1"
             >
                 <h3 class="text-sm font-semibold">{periodLabels[1]}</h3>
-                <p class="mt-2 text-3xl font-bold">
+                <p
+                    class="mt-2 text-xl font-bold"
+                    data-testid="calorie-summary-pace"
+                >
                     {dailyPeriod.daily_kcal.toLocaleString("ja-JP")}
                     <span class="text-base font-normal"
                         >kcal ({dailyPeriod.percentage.toFixed(1)}%)</span
                     >
                 </p>
-                <p class="mt-2 text-sm" data-testid="calorie-summary-remaining">
+                <p
+                    class="mt-2 text-3xl font-bold"
+                    data-testid="calorie-summary-remaining"
+                >
                     {remainingText}
                 </p>
             </article>
