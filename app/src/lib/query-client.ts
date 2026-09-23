@@ -2,6 +2,7 @@
  * @fileoverview Tanstack Query クライアント設定
  */
 
+import { browser } from "$app/environment";
 import { QueryClient, QueryCache, MutationCache } from "@tanstack/svelte-query";
 import { showErrorToast } from "$lib/toast-store.svelte";
 import { checkConnectivity } from "$lib/connection-recovery.svelte";
@@ -15,6 +16,11 @@ export const queryClient = new QueryClient({
   mutationCache: new MutationCache({ onError: handleError }),
   defaultOptions: {
     queries: {
+      // svelte-query 6.2.3以降はSSR中もqueryを購読して取得を始める。
+      // サーバー上で取得が失敗すると、エラー処理の接続チェックがブラウザ専用API（document）へ触れて
+      // Node.jsプロセスが例外終了するため、取得はブラウザでだけ行う。
+      // 個別にenabledを指定するqueryは、SSR時の初期状態で条件が偽になることを前提とする
+      enabled: browser,
       staleTime: 5 * 60 * 1000, // 5分間はキャッシュ有効
       gcTime: 10 * 60 * 1000, // 10分間はガベージコレクション対象外
       refetchOnWindowFocus: "always",
