@@ -90,36 +90,145 @@ test.describe("calories", () => {
     ).toBeVisible();
   });
 
-  test("集計カードは1日当たりペースへ残りを表示し平均カードを1行へ収める", async ({
+  test("集計カードは見出しと値を1行へ収め、残りの数値だけを強調し、左右の余白を上下均等にする", async ({
     page,
   }) => {
-    await expect(page.getByTestId("calorie-summary-remaining")).toHaveText(
-      /あと|超過/,
-    );
-
-    const weeklyCard = page.getByTestId("calorie-summary-7");
-    const pace = page.getByTestId("calorie-summary-pace");
     const remaining = page.getByTestId("calorie-summary-remaining");
-    const averageSize = await weeklyCard
+    const remainingValue = page.getByTestId("calorie-summary-remaining-value");
+    await expect(remaining).toHaveText(/あと|超過/);
+
+    // 見出しと値の縦範囲が重なれば同じ行に並んでいる
+    for (const days of [1, 7, 28]) {
+      const card = page.getByTestId(`calorie-summary-${days}`);
+      const heading = await requireBoundingBox(card.getByRole("heading"));
+      const value = await requireBoundingBox(card.locator("p").first());
+      expect(heading.y, `${days}`).toBeLessThan(value.y + value.height);
+      expect(value.y, `${days}`).toBeLessThan(heading.y + heading.height);
+    }
+
+    const averageSize = await page
+      .getByTestId("calorie-summary-7")
       .locator("p")
       .evaluate((element) => getComputedStyle(element).fontSize);
-    await expect(pace).toHaveCSS("font-size", averageSize);
-    const remainingSize = await remaining.evaluate((element) =>
-      Number.parseFloat(getComputedStyle(element).fontSize),
+    await expect(page.getByTestId("calorie-summary-pace")).toHaveCSS(
+      "font-size",
+      averageSize,
     );
-    expect(remainingSize).toBeGreaterThan(Number.parseFloat(averageSize));
-    await expect(remaining).toHaveCSS("font-weight", "700");
-    const heading = await requireBoundingBox(weeklyCard.getByRole("heading"));
-    const value = await requireBoundingBox(weeklyCard.locator("p"));
-    expect(heading.y).toBeLessThan(value.y + value.height);
-    expect(value.y).toBeLessThan(heading.y + heading.height);
+    const fontSize = (element: Element) =>
+      Number.parseFloat(getComputedStyle(element).fontSize);
+    expect(await remainingValue.evaluate(fontSize)).toBeGreaterThan(
+      await remaining.evaluate(fontSize),
+    );
+    await expect(remainingValue).toHaveCSS("font-weight", "700");
+    await expect(remaining).toHaveCSS("font-weight", "400");
 
-    const dailyCard = await requireBoundingBox(
-      page.getByTestId("calorie-summary-1"),
+    // 左右のカード列は同じ高さに揃い、左カードの内容は上下中央に置かれる
+    const dailyCard = page.getByTestId("calorie-summary-1");
+    const daily = await requireBoundingBox(dailyCard);
+    const averageColumn = await requireBoundingBox(
+      page.getByTestId("calorie-summary-7").locator(".."),
     );
-    const weekly = await requireBoundingBox(weeklyCard);
-    expect(weekly.y).toBeGreaterThanOrEqual(dailyCard.y);
-    expect(weekly.y).toBeLessThan(dailyCard.y + dailyCard.height);
+    expect(Math.abs(daily.y - averageColumn.y)).toBeLessThanOrEqual(1);
+    expect(Math.abs(daily.height - averageColumn.height)).toBeLessThanOrEqual(
+      1,
+    );
+    const top = await requireBoundingBox(
+      dailyCard.getByRole("heading").locator(".."),
+    );
+    const bottom = await requireBoundingBox(remaining);
+    const topGap = top.y - daily.y;
+    const bottomGap = daily.y + daily.height - (bottom.y + bottom.height);
+    expect(Math.abs(topGap - bottomGap)).toBeLessThanOrEqual(2);
+  });
+
+  test("自動記録を追加し、ONとOFFを切り替えて削除できる", async ({ page }) => {
+    const itemName = `自動_${Date.now()}`;
+    await addItem(page, itemName);
+    await page.locator("#calorie-auto-time").fill("08:15");
+    await page.locator("#calorie-auto-item").fill(itemName);
+    await page.locator("#calorie-auto-quantity").fill("2");
+    const createResponse = waitForSuccessfulMutationResponse(
+      page,
+      "calories.createAutoRecord",
+    );
+    await page
+      .locator("#calorie-auto-item")
+      .locator("..")
+      .getByRole("button", { name: "追加", exact: true })
+      .click();
+    await createResponse;
+    const row = page
+      .getByTestId("calorie-auto-record-row")
+      .filter({ hasText: itemName });
+    await expect(row).toContainText("08:15");
+    const enabled = row.getByTestId("calorie-auto-record-enabled");
+    await expect(enabled).toBeChecked();
+
+    const toggleResponse = waitForSuccessfulMutationResponse(
+      page,
+      "calories.updateAutoRecord",
+    );
+    await enabled.click();
+    await toggleResponse;
+    await expect(enabled).not.toBeChecked();
+
+    const deleteResponse = waitForSuccessfulMutationResponse(
+      page,
+      "calories.deleteAutoRecord",
+    );
+    await row.getByRole("button", { name: "削除" }).click();
+    await page
+      .getByRole("dialog", { name: "自動記録の削除" })
+      .getByRole("button", { name: "削除", exact: true })
+      .click();
+    await deleteResponse;
+    await expect(row).toHaveCount(0);
+  });
+
+  test("期間を指定して記録を一括追加し、一括削除できる", async ({ page }) => {
+    const itemName = `一括_${Date.now()}`;
+    await addItem(page, itemName);
+    const records = page
+      .getByTestId("calorie-record-row")
+      .filter({ hasText: itemName });
+    const status = page.getByTestId("calorie-bulk-status");
+
+    // 記録表の既定表示（今日までの30日間）に入る直近3日間を指定する
+    const day = (offset: number) => {
+      const date = new Date(Date.now() - offset * 24 * 60 * 60 * 1000);
+      const pad = (value: number) => String(value).padStart(2, "0");
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+    };
+    const createForm = page.getByTestId("calorie-bulk-create-form");
+    await createForm.getByLabel("開始日").fill(day(3));
+    await createForm.getByLabel("終了日").fill(day(1));
+    await createForm.getByLabel("時刻").fill("07:00");
+    await createForm.getByLabel("品目").fill(itemName);
+    const createResponse = waitForSuccessfulMutationResponse(
+      page,
+      "calories.bulkCreateRecords",
+    );
+    await createForm.getByRole("button", { name: "一括追加" }).click();
+    await createResponse;
+    await expect(status).toHaveText("3件の記録を追加しました");
+    await expect(records).toHaveCount(3);
+
+    const deleteForm = page.getByTestId("calorie-bulk-delete-form");
+    await deleteForm.getByLabel("開始日").fill(day(2));
+    await deleteForm.getByLabel("終了日").fill(day(1));
+    await deleteForm.getByLabel("品目").fill(itemName);
+    await deleteForm.getByRole("button", { name: "一括削除" }).click();
+    const deleteResponse = waitForSuccessfulMutationResponse(
+      page,
+      "calories.bulkDeleteRecords",
+    );
+    await page
+      .getByRole("dialog", { name: "記録の一括削除" })
+      .getByRole("button", { name: "削除", exact: true })
+      .click();
+    await deleteResponse;
+    await expect(status).toHaveText("2件の記録を削除しました");
+    await expect(records).toHaveCount(1);
   });
 
   for (const width of [1280, 393]) {

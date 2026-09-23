@@ -85,7 +85,7 @@ sequenceDiagram
  （`lists:updated` / `tasks:updated` / `timers:updated` / `schedules:updated` /
   `users:preferences:updated` / `calories:updated` / `reset`）
 - クライアントはイベント受信時にTanStack Queryの `invalidateQueries` で該当データを再取得
-- 品目又は記録を変更した場合は`calories:updated`を通知し、受信側は品目、記録及び期間集計を再取得する。
+- 品目、記録又は自動記録設定を変更した場合は`calories:updated`を通知し、受信側はカロリーページの全データを再取得する。
   目標値を変更した場合は既存の`users:preferences:updated`を通知し、カロリーページは目標値と期間集計を再取得する
 - 接続の健全性はクライアント側で監視する。`EventSource`の自動再接続に加え、
   受信ウォッチドッグ（30秒周期で判定、最終受信から75秒経過で強制再接続）・
@@ -143,7 +143,7 @@ heartbeatの送出形式には名前付きイベント（`event: heartbeat`）�
 クライアント側の受信ウォッチドッグが`addEventListener("heartbeat", ...)`で
 最終受信時刻を更新できない。
 
-## 定期TODOスケジューラー
+## 定期処理スケジューラー
 
 `schedules`テーブルのRRULE（`app/src/lib/server/schema.ts`）を起点に、
 サーバー内`setInterval`が定期的にTODOタスクを自動生成する。実装は`app/src/lib/server/scheduler.ts`。
@@ -178,6 +178,14 @@ sequenceDiagram
 - スケジュールの`rrule`列は`DTSTART;TZID=Asia/Tokyo`形式でタイムゾーンを保持する。
   `rrule`の`between()`が返す`Date`はAsia/Tokyoのローカル時刻をUTCとしてマークした値であるため、
   市民時刻の時・分の取り出しには`getHours()`ではなく`getUTCHours()`等のUTC系アクセサを使う
+
+同じポーリングでカロリーの自動記録も処理する（`processCalorieAutoRecords`、`app/src/lib/server/api/calories.ts`）。
+
+- 各設定は次に記録する時刻を`calorie_auto_record.next_run_at`（UTC）に持つ。
+  ONの設定のうち`next_run_at`が現在時刻以前のものは、そこから1日刻みで現在時刻以前の時刻ごとに記録を追加し、
+  `next_run_at`を現在時刻より後の最初の時刻へ進める。記録を追加した利用者へ`calories:updated`を通知する
+- 設定の作成・変更（ON/OFFの切替を含む）のたびに`next_run_at`を現在時刻より後へ置き直す。
+  OFFの間に過ぎた時刻をONへ戻した時に遡って記録しないためである
 
 ## 認証設計
 
@@ -243,6 +251,8 @@ const withApiErrors = t.middleware(async ({ next }) => {
   品目名又はkcalを変更すると、既存記録の表示と期間集計へ反映される。
   kcal、数量及び1日当たり目標値は整数で保持する。
   利用者ごとの1日当たり目標値は`users.preferences.calorie_goal_kcal`へ保持する
+- カロリーの自動記録設定（`calorie_auto_record`）は、現地の時刻`time_of_day`と登録時の`tz_offset_minutes`を組で保持する。
+  他のカロリー入力と同じく固定の時差で解釈するため、夏時間の切り替えには追随しない
 
 ### バイナリ保存と `max_allowed_packet`
 

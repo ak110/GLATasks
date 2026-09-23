@@ -67,7 +67,11 @@ export {
 
 export { getUserPreferences, updateUserPreferences } from "./api/users";
 
-export type { CalorieItem, CalorieRecord } from "./api/calories";
+export type {
+  CalorieAutoRecord,
+  CalorieItem,
+  CalorieRecord,
+} from "./api/calories";
 export {
   getCalorieItems,
   createCalorieItem,
@@ -77,6 +81,12 @@ export {
   createCalorieRecord,
   updateCalorieRecord,
   deleteCalorieRecord,
+  bulkCreateCalorieRecords,
+  bulkDeleteCalorieRecords,
+  getCalorieAutoRecords,
+  createCalorieAutoRecord,
+  updateCalorieAutoRecord,
+  deleteCalorieAutoRecord,
   getCalorieSummary,
   importCalorieItems,
   importCalorieRecords,

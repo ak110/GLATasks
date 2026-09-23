@@ -4,7 +4,7 @@ import { verifySessionToken } from "$lib/server/session";
 import { startScheduler } from "$lib/server/scheduler";
 
 /**
- * サーバー起動時に定期TODOスケジューラーを起動する。
+ * サーバー起動時に定期処理スケジューラー（定期TODOとカロリー自動記録）を起動する。
  * `building` が真の間（ビルド時）は意図しない初期化処理を避けるため起動しない。
  */
 export const init: ServerInit = () => {

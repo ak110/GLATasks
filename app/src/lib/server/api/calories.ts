@@ -6,16 +6,20 @@ import { and, desc, eq, gte, lt, lte } from "drizzle-orm";
 
 import {
   DEFAULT_CALORIE_GOAL_KCAL,
+  type BulkCreateCalorieRecordsInput,
+  type BulkDeleteCalorieRecordsInput,
+  type CalorieAutoRecordInput,
   type CalorieItemCsvRow,
   type CalorieItemInput,
   type CalorieRecordCsvRow,
   type CalorieRecordInput,
   type ListCalorieRecordsInput,
+  type UpdateCalorieAutoRecordInput,
   type UpdateCalorieItemInput,
   type UpdateCalorieRecordInput,
 } from "$lib/schemas";
 import { getDb } from "../db";
-import { calorieItems, calorieRecords } from "../schema";
+import { calorieAutoRecords, calorieItems, calorieRecords } from "../schema";
 import { getUserPreferences } from "./users";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -70,13 +74,82 @@ export type CalorieRecord = {
   total_kcal: number;
 };
 
+export type CalorieAutoRecord = {
+  id: number;
+  item_id: number;
+  item_name: string;
+  time_of_day: string;
+  quantity: number;
+  enabled: boolean;
+};
+
+type LocalDate = { year: number; month: number; day: number };
+type LocalTime = { hour: number; minute: number };
+
+function parseLocalDate(value: string): LocalDate {
+  const [year, month, day] = value.split("/").map(Number);
+  return { year, month, day };
+}
+
+function parseLocalTime(value: string): LocalTime {
+  const [hour, minute] = value.split(":").map(Number);
+  return { hour, minute };
+}
+
+/**
+ * 現地の年月日・時分をUTCの時刻へ変換する。
+ * 日が月末を超える値（31日の翌日など）は`Date.UTC`が翌月へ繰り上げる。
+ */
+function localToUtc(
+  date: LocalDate,
+  time: LocalTime,
+  offsetMinutes: number,
+): Date {
+  return new Date(
+    Date.UTC(date.year, date.month - 1, date.day, time.hour, time.minute) -
+      offsetMinutes * 60_000,
+  );
+}
+
 function localMinuteToUtc(value: string, offsetMinutes: number): Date {
   const [datePart, timePart] = value.split(" ");
-  const [year, month, day] = datePart.split("/").map(Number);
-  const [hour, minute] = timePart.split(":").map(Number);
-  return new Date(
-    Date.UTC(year, month - 1, day, hour, minute) - offsetMinutes * 60_000,
+  return localToUtc(
+    parseLocalDate(datePart),
+    parseLocalTime(timePart),
+    offsetMinutes,
   );
+}
+
+/** 指定時刻のUTCから現地の年月日を返す */
+function toLocalDate(value: Date, offsetMinutes: number): LocalDate {
+  const local = new Date(value.getTime() + offsetMinutes * 60_000);
+  return {
+    year: local.getUTCFullYear(),
+    month: local.getUTCMonth() + 1,
+    day: local.getUTCDate(),
+  };
+}
+
+/** 開始日から終了日までの日数（両端を含む）を返す。終了日が開始日より前なら0以下になる */
+function countDays(start: LocalDate, end: LocalDate): number {
+  return (
+    (Date.UTC(end.year, end.month - 1, end.day) -
+      Date.UTC(start.year, start.month - 1, start.day)) /
+      DAY_MS +
+    1
+  );
+}
+
+/** 現地時刻`timeOfDay`のうち`now`より後で最初の時刻をUTCで返す */
+function nextRunAt(timeOfDay: string, offsetMinutes: number, now: Date): Date {
+  const today = localToUtc(
+    toLocalDate(now, offsetMinutes),
+    parseLocalTime(timeOfDay),
+    offsetMinutes,
+  );
+  return today.getTime() > now.getTime()
+    ? today
+    : new Date(today.getTime() + DAY_MS);
 }
 
 function calculateWindow(
@@ -84,14 +157,14 @@ function calculateWindow(
   offsetMinutes: number,
   now: Date,
 ): { start: Date; endExclusive: Date } {
-  const localNow = new Date(now.getTime() + offsetMinutes * 60_000);
-  const localTomorrow = Date.UTC(
-    localNow.getUTCFullYear(),
-    localNow.getUTCMonth(),
-    localNow.getUTCDate() + 1,
+  const localToday = toLocalDate(now, offsetMinutes);
+  const localTomorrow = localToUtc(
+    { ...localToday, day: localToday.day + 1 },
+    { hour: 0, minute: 0 },
+    offsetMinutes,
   );
   const endExclusive = new Date(
-    localTomorrow - offsetMinutes * 60_000 - windowOffset * 30 * DAY_MS,
+    localTomorrow.getTime() - windowOffset * 30 * DAY_MS,
   );
   return {
     start: new Date(endExclusive.getTime() - 30 * DAY_MS),
@@ -306,6 +379,226 @@ export async function deleteCalorieRecord(
     .where(
       and(eq(calorieRecords.id, recordId), eq(calorieRecords.user_id, userId)),
     );
+}
+
+/** 開始日から終了日まで、各日の指定時刻に記録を1件ずつ追加する */
+export async function bulkCreateCalorieRecords(
+  userId: number,
+  input: BulkCreateCalorieRecordsInput,
+): Promise<{ added: number }> {
+  const start = parseLocalDate(input.start_date);
+  const days = countDays(start, parseLocalDate(input.end_date));
+  await assertOwnedItem(userId, input.item_id);
+  const time = parseLocalTime(input.time_of_day);
+  const now = new Date();
+  const values = Array.from({ length: Math.max(days, 0) }, (_, index) => ({
+    user_id: userId,
+    item_id: input.item_id,
+    consumed_at: localToUtc(
+      { ...start, day: start.day + index },
+      time,
+      input.tz_offset_minutes,
+    ),
+    quantity: input.quantity,
+    created: now,
+    updated: now,
+  }));
+  if (values.length > 0) await getDb().insert(calorieRecords).values(values);
+  return { added: values.length };
+}
+
+/** 開始日の0時から終了日の翌日0時までにある、指定品目の記録を削除する */
+export async function bulkDeleteCalorieRecords(
+  userId: number,
+  input: BulkDeleteCalorieRecordsInput,
+): Promise<{ deleted: number }> {
+  const start = parseLocalDate(input.start_date);
+  const end = parseLocalDate(input.end_date);
+  await assertOwnedItem(userId, input.item_id);
+  const midnight = { hour: 0, minute: 0 };
+  const [result] = await getDb()
+    .delete(calorieRecords)
+    .where(
+      and(
+        eq(calorieRecords.user_id, userId),
+        eq(calorieRecords.item_id, input.item_id),
+        gte(
+          calorieRecords.consumed_at,
+          localToUtc(start, midnight, input.tz_offset_minutes),
+        ),
+        lt(
+          calorieRecords.consumed_at,
+          localToUtc(
+            { ...end, day: end.day + 1 },
+            midnight,
+            input.tz_offset_minutes,
+          ),
+        ),
+      ),
+    );
+  return { deleted: result.affectedRows };
+}
+
+export async function getCalorieAutoRecords(
+  userId: number,
+): Promise<CalorieAutoRecord[]> {
+  const rows = await getDb()
+    .select({
+      id: calorieAutoRecords.id,
+      item_id: calorieAutoRecords.item_id,
+      item_name: calorieItems.name,
+      time_of_day: calorieAutoRecords.time_of_day,
+      quantity: calorieAutoRecords.quantity,
+      enabled: calorieAutoRecords.enabled,
+    })
+    .from(calorieAutoRecords)
+    .innerJoin(
+      calorieItems,
+      and(
+        eq(calorieItems.id, calorieAutoRecords.item_id),
+        eq(calorieItems.user_id, userId),
+      ),
+    )
+    .where(eq(calorieAutoRecords.user_id, userId))
+    .orderBy(calorieAutoRecords.time_of_day, calorieAutoRecords.id);
+  return rows.map((row) => ({ ...row, enabled: row.enabled === 1 }));
+}
+
+async function assertOwnedAutoRecord(
+  userId: number,
+  autoRecordId: number,
+): Promise<void> {
+  const rows = await getDb()
+    .select({ id: calorieAutoRecords.id })
+    .from(calorieAutoRecords)
+    .where(
+      and(
+        eq(calorieAutoRecords.id, autoRecordId),
+        eq(calorieAutoRecords.user_id, userId),
+      ),
+    )
+    .limit(1);
+  if (rows.length === 0) throw new Error("calorie_auto_record_not_found");
+}
+
+/**
+ * 自動記録設定の保存値を組み立てる。
+ * 作成・変更のたびに次回時刻を`now`より後へ置き直すため、
+ * OFFの間に過ぎた時刻はONへ戻しても遡って記録しない。
+ */
+function autoRecordValues(input: CalorieAutoRecordInput, now: Date) {
+  return {
+    item_id: input.item_id,
+    time_of_day: input.time_of_day,
+    quantity: input.quantity,
+    enabled: input.enabled ? 1 : 0,
+    tz_offset_minutes: input.tz_offset_minutes,
+    next_run_at: nextRunAt(input.time_of_day, input.tz_offset_minutes, now),
+    updated: now,
+  };
+}
+
+export async function createCalorieAutoRecord(
+  userId: number,
+  input: CalorieAutoRecordInput,
+  now = new Date(),
+): Promise<void> {
+  await assertOwnedItem(userId, input.item_id);
+  await getDb()
+    .insert(calorieAutoRecords)
+    .values({
+      user_id: userId,
+      ...autoRecordValues(input, now),
+      created: now,
+    });
+}
+
+export async function updateCalorieAutoRecord(
+  userId: number,
+  input: UpdateCalorieAutoRecordInput,
+  now = new Date(),
+): Promise<void> {
+  await assertOwnedItem(userId, input.item_id);
+  await assertOwnedAutoRecord(userId, input.autoRecordId);
+  await getDb()
+    .update(calorieAutoRecords)
+    .set(autoRecordValues(input, now))
+    .where(
+      and(
+        eq(calorieAutoRecords.id, input.autoRecordId),
+        eq(calorieAutoRecords.user_id, userId),
+      ),
+    );
+}
+
+export async function deleteCalorieAutoRecord(
+  userId: number,
+  autoRecordId: number,
+): Promise<void> {
+  await assertOwnedAutoRecord(userId, autoRecordId);
+  await getDb()
+    .delete(calorieAutoRecords)
+    .where(
+      and(
+        eq(calorieAutoRecords.id, autoRecordId),
+        eq(calorieAutoRecords.user_id, userId),
+      ),
+    );
+}
+
+/**
+ * ONの自動記録設定のうち次回時刻が`now`以前のものについて、過ぎた時刻ごとに記録を追加し、
+ * 記録を追加した利用者のIDを返す。
+ *
+ * 次回時刻から1日刻みで`now`以前の時刻を記録し、次回時刻を`now`より後へ進める。
+ * 1件の失敗が他の設定の処理を止めないよう、設定ごとに例外を捕捉する。
+ * 単一プロセスから60秒間隔で呼ばれる前提であり、並行呼び出しの排他は持たない。
+ */
+export async function processCalorieAutoRecords(now: Date): Promise<number[]> {
+  const db = getDb();
+  const rules = await db
+    .select()
+    .from(calorieAutoRecords)
+    .where(
+      and(
+        eq(calorieAutoRecords.enabled, 1),
+        lte(calorieAutoRecords.next_run_at, now),
+      ),
+    );
+  const notifiedUserIds = new Set<number>();
+  for (const rule of rules) {
+    try {
+      const consumedAts: Date[] = [];
+      let next = rule.next_run_at.getTime();
+      while (next <= now.getTime()) {
+        consumedAts.push(new Date(next));
+        next += DAY_MS;
+      }
+      await db.transaction(async (tx) => {
+        await tx.insert(calorieRecords).values(
+          consumedAts.map((consumedAt) => ({
+            user_id: rule.user_id,
+            item_id: rule.item_id,
+            consumed_at: consumedAt,
+            quantity: rule.quantity,
+            created: now,
+            updated: now,
+          })),
+        );
+        await tx
+          .update(calorieAutoRecords)
+          .set({ next_run_at: new Date(next) })
+          .where(eq(calorieAutoRecords.id, rule.id));
+      });
+      notifiedUserIds.add(rule.user_id);
+    } catch (error) {
+      console.error(
+        `[scheduler] カロリー自動記録 ${rule.id} の処理に失敗しました`,
+        error,
+      );
+    }
+  }
+  return [...notifiedUserIds];
 }
 
 export async function getCalorieSummary(

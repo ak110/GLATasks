@@ -77,6 +77,33 @@ export const calorieRecords = mysqlTable(
   }),
 );
 
+/** カロリー計算の自動記録設定テーブル（毎日指定時刻に記録を追加する） */
+export const calorieAutoRecords = mysqlTable(
+  "calorie_auto_record",
+  {
+    id: int("id").primaryKey().autoincrement(),
+    user_id: int("user_id").notNull(),
+    item_id: int("item_id")
+      .notNull()
+      .references(() => calorieItems.id, {
+        onDelete: "restrict",
+        onUpdate: "cascade",
+      }),
+    // 現地の時刻（HH:mm）。登録時のtz_offset_minutesで解釈する
+    time_of_day: varchar("time_of_day", { length: 5 }).notNull(),
+    quantity: int("quantity").notNull(),
+    enabled: tinyint("enabled").notNull().default(1),
+    tz_offset_minutes: int("tz_offset_minutes").notNull(),
+    // 次に記録を追加する時刻（UTC）。スケジューラーはこの時刻を過ぎた分を追加して先へ進める
+    next_run_at: timestamp("next_run_at").notNull(),
+    created: timestamp("created").notNull(),
+    updated: timestamp("updated").notNull(),
+  },
+  (t) => ({
+    user_id_idx: index("calorie_auto_record_user_id_idx").on(t.user_id),
+  }),
+);
+
 /** list テーブル */
 export const lists = mysqlTable("list", {
   id: int("id").primaryKey().autoincrement(),

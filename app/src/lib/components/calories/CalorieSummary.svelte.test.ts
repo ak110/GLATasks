@@ -48,6 +48,25 @@ describe("CalorieSummary", () => {
     );
   });
 
+  it("1日当たりペースは見出しと値を同じ行へ並べ、残りは数値だけを強調する", () => {
+    const { getByTestId } = render(CalorieSummary, {
+      periods: [{ days: 1, daily_kcal: 1080, percentage: 67.5 }],
+      goalKcal: 1600,
+      onSaveGoal: vi.fn(),
+    });
+    const pace = getByTestId("calorie-summary-pace");
+    expect(pace.parentElement?.querySelector("h3")).toHaveTextContent(
+      "1日当たりペース",
+    );
+    expect(pace).toHaveTextContent("1,080 kcal (67.5%)");
+    const value = getByTestId("calorie-summary-remaining-value");
+    expect(value).toHaveTextContent(/^520$/);
+    expect(value).toHaveClass("font-bold");
+    expect(getByTestId("calorie-summary-remaining")).not.toHaveClass(
+      "font-bold",
+    );
+  });
+
   it("目標値を超えた場合は超過量を表示する", () => {
     const { getByTestId } = render(CalorieSummary, {
       periods: [{ days: 1, daily_kcal: 1800, percentage: 111.5 }],

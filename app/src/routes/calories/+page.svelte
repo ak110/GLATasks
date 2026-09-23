@@ -12,12 +12,21 @@
 
     import Header from "$lib/components/layout/Header.svelte";
     import PageScrollArea from "$lib/components/layout/PageScrollArea.svelte";
+    import CalorieAutoRecordPanel from "$lib/components/calories/CalorieAutoRecordPanel.svelte";
+    import CalorieBulkControls from "$lib/components/calories/CalorieBulkControls.svelte";
     import CalorieCsvControls from "$lib/components/calories/CalorieCsvControls.svelte";
     import CalorieItemTable from "$lib/components/calories/CalorieItemTable.svelte";
     import CalorieRecordTable from "$lib/components/calories/CalorieRecordTable.svelte";
     import CalorieSummary from "$lib/components/calories/CalorieSummary.svelte";
     import ConfirmDialog from "$lib/components/dialogs/ConfirmDialog.svelte";
-    import type { CalorieItemCsvRow, CalorieRecordCsvRow } from "$lib/schemas";
+    import type {
+        BulkCreateCalorieRecordsInput,
+        BulkDeleteCalorieRecordsInput,
+        CalorieAutoRecordInput,
+        CalorieItemCsvRow,
+        CalorieRecordCsvRow,
+        UpdateCalorieAutoRecordInput,
+    } from "$lib/schemas";
     import { SSE_EVENTS } from "$lib/sse-events";
     import { subscribeOnMount } from "$lib/sse-subscribe";
     import { trpc, type RouterOutputs } from "$lib/trpc";
@@ -53,6 +62,12 @@
     >(() => ({
         queryKey: ["calories", "all-records"] as const,
         queryFn: () => trpc.calories.allRecords.query(),
+    }));
+    const autoRecordsQuery = createQuery<
+        RouterOutputs["calories"]["autoRecords"]
+    >(() => ({
+        queryKey: ["calories", "auto-records"] as const,
+        queryFn: () => trpc.calories.autoRecords.query(),
     }));
     const summaryQuery = createQuery<RouterOutputs["calories"]["summary"]>(
         () => ({
@@ -149,7 +164,34 @@
         onSuccess: invalidateCalories,
     }));
 
+    const bulkCreateMutation = createMutation(() => ({
+        mutationFn: (input: BulkCreateCalorieRecordsInput) =>
+            trpc.calories.bulkCreateRecords.mutate(input),
+        onSuccess: invalidateCalories,
+    }));
+    const bulkDeleteMutation = createMutation(() => ({
+        mutationFn: (input: BulkDeleteCalorieRecordsInput) =>
+            trpc.calories.bulkDeleteRecords.mutate(input),
+        onSuccess: invalidateCalories,
+    }));
+    const createAutoRecordMutation = createMutation(() => ({
+        mutationFn: (input: CalorieAutoRecordInput) =>
+            trpc.calories.createAutoRecord.mutate(input),
+        onSuccess: invalidateCalories,
+    }));
+    const updateAutoRecordMutation = createMutation(() => ({
+        mutationFn: (input: UpdateCalorieAutoRecordInput) =>
+            trpc.calories.updateAutoRecord.mutate(input),
+        onSuccess: invalidateCalories,
+    }));
+    const deleteAutoRecordMutation = createMutation(() => ({
+        mutationFn: (autoRecordId: number) =>
+            trpc.calories.deleteAutoRecord.mutate({ autoRecordId }),
+        onSuccess: invalidateCalories,
+    }));
+
     const items = $derived(itemsQuery.data ?? []);
+    const autoRecords = $derived(autoRecordsQuery.data ?? []);
     const records = $derived(recordsQuery.data?.records ?? []);
     const allRecords = $derived(allRecordsQuery.data ?? []);
     const isLoading = $derived(
@@ -193,6 +235,23 @@
                 {items}
                 onCreate={(input) => createItemMutation.mutateAsync(input)}
                 onUpdate={(input) => updateItemMutation.mutateAsync(input)}
+            />
+        </div>
+        <div class="mt-5 grid gap-5 lg:grid-cols-2">
+            <CalorieAutoRecordPanel
+                {items}
+                {autoRecords}
+                onCreate={(input) =>
+                    createAutoRecordMutation.mutateAsync(input)}
+                onUpdate={(input) =>
+                    updateAutoRecordMutation.mutateAsync(input)}
+                onDelete={(autoRecordId) =>
+                    deleteAutoRecordMutation.mutateAsync(autoRecordId)}
+            />
+            <CalorieBulkControls
+                {items}
+                onBulkCreate={(input) => bulkCreateMutation.mutateAsync(input)}
+                onBulkDelete={(input) => bulkDeleteMutation.mutateAsync(input)}
             />
         </div>
         <div class="mt-5">

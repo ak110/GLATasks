@@ -166,6 +166,25 @@ export const MAX_CALORIE_CSV_ROWS = 10_000;
 
 const PositiveCalorieIntegerSchema = z.number().int().positive().max(1_000_000);
 const NonNegativeCalorieIntegerSchema = z.number().int().min(0).max(1_000_000);
+
+/** 年月日・時分がそのまま実在する日時を表すかを返す（2月30日や25時を拒否する） */
+function isRealDateTime(
+  year: number,
+  month: number,
+  day: number,
+  hour = 0,
+  minute = 0,
+): boolean {
+  const date = new Date(Date.UTC(year, month - 1, day, hour, minute));
+  return (
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day &&
+    date.getUTCHours() === hour &&
+    date.getUTCMinutes() === minute
+  );
+}
+
 const LocalMinuteSchema = z
   .string()
   .regex(
@@ -176,15 +195,22 @@ const LocalMinuteSchema = z
     const [datePart, timePart] = value.split(" ");
     const [year, month, day] = datePart.split("/").map(Number);
     const [hour, minute] = timePart.split(":").map(Number);
-    const date = new Date(Date.UTC(year, month - 1, day, hour, minute));
-    return (
-      date.getUTCFullYear() === year &&
-      date.getUTCMonth() === month - 1 &&
-      date.getUTCDate() === day &&
-      date.getUTCHours() === hour &&
-      date.getUTCMinutes() === minute
-    );
+    return isRealDateTime(year, month, day, hour, minute);
   }, "実在する日時を入力してください");
+const LocalDateSchema = z
+  .string()
+  .regex(/^\d{4}\/\d{2}\/\d{2}$/, "日付はyyyy/MM/dd形式で入力してください")
+  .refine((value) => {
+    const [year, month, day] = value.split("/").map(Number);
+    return isRealDateTime(year, month, day);
+  }, "実在する日付を入力してください");
+const LocalTimeSchema = z
+  .string()
+  .regex(/^\d{2}:\d{2}$/, "時刻はHH:mm形式で入力してください")
+  .refine((value) => {
+    const [hour, minute] = value.split(":").map(Number);
+    return hour < 24 && minute < 60;
+  }, "実在する時刻を入力してください");
 const TimezoneOffsetSchema = z.number().int().min(-720).max(840);
 
 export const CalorieItemInputSchema = z.object({
@@ -235,6 +261,39 @@ export const ImportCalorieItemsSchema = z.object({
 export const ImportCalorieRecordsSchema = z.object({
   rows: z.array(CalorieRecordCsvRowSchema).max(MAX_CALORIE_CSV_ROWS),
   tz_offset_minutes: TimezoneOffsetSchema,
+});
+
+export const BulkCreateCalorieRecordsSchema = z.object({
+  start_date: LocalDateSchema,
+  end_date: LocalDateSchema,
+  time_of_day: LocalTimeSchema,
+  item_id: z.number().int().positive(),
+  quantity: NonNegativeCalorieIntegerSchema,
+  tz_offset_minutes: TimezoneOffsetSchema,
+});
+
+export const BulkDeleteCalorieRecordsSchema = z.object({
+  start_date: LocalDateSchema,
+  end_date: LocalDateSchema,
+  item_id: z.number().int().positive(),
+  tz_offset_minutes: TimezoneOffsetSchema,
+});
+
+export const CalorieAutoRecordInputSchema = z.object({
+  time_of_day: LocalTimeSchema,
+  item_id: z.number().int().positive(),
+  quantity: NonNegativeCalorieIntegerSchema,
+  enabled: z.boolean(),
+  tz_offset_minutes: TimezoneOffsetSchema,
+});
+
+export const UpdateCalorieAutoRecordSchema =
+  CalorieAutoRecordInputSchema.extend({
+    autoRecordId: z.number().int().positive(),
+  });
+
+export const CalorieAutoRecordIdSchema = z.object({
+  autoRecordId: z.number().int().positive(),
 });
 
 // ── タイマー操作スキーマ ──
@@ -433,3 +492,15 @@ export type UpdateCalorieRecordInput = z.infer<
 export type ListCalorieRecordsInput = z.infer<typeof ListCalorieRecordsSchema>;
 export type CalorieItemCsvRow = z.infer<typeof CalorieItemCsvRowSchema>;
 export type CalorieRecordCsvRow = z.infer<typeof CalorieRecordCsvRowSchema>;
+export type BulkCreateCalorieRecordsInput = z.infer<
+  typeof BulkCreateCalorieRecordsSchema
+>;
+export type BulkDeleteCalorieRecordsInput = z.infer<
+  typeof BulkDeleteCalorieRecordsSchema
+>;
+export type CalorieAutoRecordInput = z.infer<
+  typeof CalorieAutoRecordInputSchema
+>;
+export type UpdateCalorieAutoRecordInput = z.infer<
+  typeof UpdateCalorieAutoRecordSchema
+>;

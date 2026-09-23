@@ -38,6 +38,11 @@ import {
   ListCalorieRecordsSchema,
   ImportCalorieItemsSchema,
   ImportCalorieRecordsSchema,
+  BulkCreateCalorieRecordsSchema,
+  BulkDeleteCalorieRecordsSchema,
+  CalorieAutoRecordInputSchema,
+  UpdateCalorieAutoRecordSchema,
+  CalorieAutoRecordIdSchema,
 } from "$lib/schemas";
 import {
   CreateScheduleSchema,
@@ -193,6 +198,10 @@ const API_ERRORS: Record<
   calorie_csv_unknown_item: {
     code: "BAD_REQUEST",
     message: "記録CSVに未登録の品目があります。品目CSVを先に取り込んでください",
+  },
+  calorie_auto_record_not_found: {
+    code: "NOT_FOUND",
+    message: "自動記録の設定が見つかりません",
   },
 };
 
@@ -385,6 +394,59 @@ export const appRouter = t.router({
         sendEvent(ctx.userId, SSE_EVENTS.caloriesUpdated, ctx.tabId);
         return result;
       }),
+
+    bulkCreateRecords: encryptedProcedure
+      .input(BulkCreateCalorieRecordsSchema)
+      .mutation(async ({ ctx, input }) => {
+        const result = await api.bulkCreateCalorieRecords(ctx.userId, input);
+        sendEvent(ctx.userId, SSE_EVENTS.caloriesUpdated, ctx.tabId);
+        return result;
+      }),
+
+    bulkDeleteRecords: encryptedProcedure
+      .input(BulkDeleteCalorieRecordsSchema)
+      .mutation(async ({ ctx, input }) => {
+        const result = await api.bulkDeleteCalorieRecords(ctx.userId, input);
+        sendEvent(ctx.userId, SSE_EVENTS.caloriesUpdated, ctx.tabId);
+        return result;
+      }),
+
+    autoRecords: encryptedProcedure.query(async ({ ctx }) => {
+      return api.getCalorieAutoRecords(ctx.userId);
+    }),
+
+    createAutoRecord: encryptedProcedure
+      .input(CalorieAutoRecordInputSchema)
+      .mutation(
+        eventMutationHandler(
+          SSE_EVENTS.caloriesUpdated,
+          async ({ ctx, input }) => {
+            await api.createCalorieAutoRecord(ctx.userId, input);
+          },
+        ),
+      ),
+
+    updateAutoRecord: encryptedProcedure
+      .input(UpdateCalorieAutoRecordSchema)
+      .mutation(
+        eventMutationHandler(
+          SSE_EVENTS.caloriesUpdated,
+          async ({ ctx, input }) => {
+            await api.updateCalorieAutoRecord(ctx.userId, input);
+          },
+        ),
+      ),
+
+    deleteAutoRecord: encryptedProcedure
+      .input(CalorieAutoRecordIdSchema)
+      .mutation(
+        eventMutationHandler(
+          SSE_EVENTS.caloriesUpdated,
+          async ({ ctx, input }) => {
+            await api.deleteCalorieAutoRecord(ctx.userId, input.autoRecordId);
+          },
+        ),
+      ),
   }),
 
   // ── 認証 ──

@@ -1,9 +1,10 @@
 /**
- * @fileoverview 定期TODOスケジューラー（起動時フィルフォワード + 定周期ポーリング）
+ * @fileoverview 定期処理スケジューラー（起動時フィルフォワード + 定周期ポーリング）
  *
  * `hooks.server.ts` の `init` エクスポートから `startScheduler()` を呼び出し、
  * サーバー起動時に一度だけ起動する。以降は60秒間隔のポーリングで発火予定を検出し、
- * `postTask` でTODOタスクを生成する。
+ * 定期TODOは `postTask` でTODOタスクを生成する。
+ * カロリーの自動記録は `processCalorieAutoRecords` が記録を追加する。
  *
  * 発火判定処理は `now` を引数化しており（`processSchedules`）、サーバー側vitestから
  * 任意の時刻を注入してテストできる（Playwrightの仮想時計はサーバー側の `setInterval` を
@@ -15,6 +16,7 @@ import { rrulestr } from "rrule";
 
 import { getDb } from "./db";
 import { lists, schedules } from "./schema";
+import { processCalorieAutoRecords } from "./api/calories";
 import { parseTags } from "./api/common";
 import { postTask } from "./api/tasks";
 import { sendEvent } from "./sse";
@@ -137,12 +139,17 @@ export async function processSchedules(now: Date): Promise<void> {
   }
 }
 
-/** 再入防止しつつ `processSchedules` を1tick分実行する */
+/** 再入防止しつつ定期TODOとカロリー自動記録を1tick分処理する */
 async function tick(): Promise<void> {
   if (processing) return;
   processing = true;
   try {
-    await processSchedules(new Date());
+    const now = new Date();
+    await processSchedules(now);
+    const userIds = await processCalorieAutoRecords(now);
+    for (const userId of userIds) {
+      sendEvent(userId, SSE_EVENTS.caloriesUpdated);
+    }
   } finally {
     processing = false;
   }
