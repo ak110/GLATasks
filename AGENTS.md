@@ -18,7 +18,12 @@ SvelteKit + tRPC + Drizzleで構築し、Docker Composeで運用する。
   - 修正後の再実行時は`--commands=eslint,prettier`等で限定して実行する（最終検証はCIに委ねる前提）
     - 利用可能なコマンドは`pyproject.toml`の`[tool.pyfltr]`設定とJS/TS連携で有効になるもの。
       例: `eslint`・`prettier`・`oxlint`・`vitest`・カスタムコマンドの`svelte-check`
-  - バックアップ/E2E系に変更を加えた場合は`make test-backup test-e2e`も実行する
+  - バックアップ機能を変更した場合は`make test-backup`も実行する
+  - 画面又は個別のE2E仕様を変更した場合は、変更した定義とその直接消費側に対応するspecだけを
+    `make test-e2e E2E_GREP="パターン"`で実行する。
+    全体E2EはCIのintegration jobがproduction環境で実行するため、近接E2Eの成功後に同じローカル環境で全体E2Eを重ねない
+  - 影響するspecの集合を変更箇所から限定できない共有基盤を変更した場合は、`make test-e2e`で全体E2Eを実行する。
+    Playwrightの共有fixture、全画面に共通する初期化、認証、SSE制御、Playwrightの実行設定などが該当する
   - Docker Compose環境は通常は開発マシン上で常時稼働しており`make test`（backup/e2eテスト含む）を実行できる
     - 停止している場合は`make start`で起動し、疎通を確認してからテストを実行する
       （疎通確認コマンド: `make healthcheck`）
