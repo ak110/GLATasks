@@ -410,6 +410,11 @@ export async function expectStubbedPageReady(
       "prompt",
     );
   }
+  // SSRの原文欄はhydration前から有効として描画されるため、利用可能エンジンの判定完了を待つ
+  await expect(page.getByTestId("translate-source-input")).toHaveAttribute(
+    "aria-busy",
+    "false",
+  );
   await expect(page.getByTestId("translate-source-input")).toBeEnabled();
 }
 

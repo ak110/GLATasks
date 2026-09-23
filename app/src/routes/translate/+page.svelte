@@ -649,6 +649,7 @@
                     value={sourceText}
                     oninput={handleSourceInput}
                     disabled={sourceDisabled}
+                    aria-busy={!initialized || !availabilityReady}
                     placeholder="翻訳する文章を入力"
                     class="min-h-64 flex-1 resize-none rounded border border-gray-300 bg-white p-3 text-gray-800 placeholder-gray-400 focus:border-blue-500 focus:outline-none disabled:cursor-not-allowed disabled:bg-gray-100 sm:min-h-0 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:placeholder-gray-500 dark:disabled:bg-gray-700"
                     data-testid="translate-source-input"></textarea>
