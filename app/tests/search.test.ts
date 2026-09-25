@@ -198,3 +198,45 @@ test("検索の表示種別と選択リスト優先表示が反映される", as
     await cleanupTestLists(browser, [activeListName, archivedListName]);
   }
 });
+
+test("検索結果に選択リストが無い場合は受信したグループ順を保つ", async ({
+  page,
+  browser,
+}) => {
+  test.setTimeout(60_000);
+  const stamp = Date.now();
+  const firstList = `検索結果先頭_${stamp}`;
+  const secondList = `検索結果次点_${stamp}`;
+  const emptyList = `検索結果なし_${stamp}`;
+  const keyword = `検索順序_${stamp}`;
+
+  try {
+    await setupTestLists(browser, [firstList, secondList, emptyList]);
+    await page.goto("/");
+    await selectList(page, firstList);
+    await addTask(page, `${keyword}_1a`);
+    await addTask(page, `${keyword}_1b`);
+    await selectList(page, secondList);
+    await addTask(page, `${keyword}_2`);
+    await page.getByTestId("search-input").fill(keyword);
+
+    async function groupTop(listName: string): Promise<number> {
+      const group = page.locator("main").getByRole("button", {
+        name: listName,
+        exact: true,
+      });
+      await expect(group).toBeVisible();
+      const box = await group.boundingBox();
+      if (!box) throw new Error("検索結果グループの位置を取得できない");
+      return box.y;
+    }
+
+    expect(await groupTop(secondList)).toBeLessThan(await groupTop(firstList));
+    await page.getByTestId("search-input").fill("");
+    await selectList(page, emptyList);
+    await page.getByTestId("search-input").fill(keyword);
+    expect(await groupTop(firstList)).toBeLessThan(await groupTop(secondList));
+  } finally {
+    await cleanupTestLists(browser, [firstList, secondList, emptyList]);
+  }
+});

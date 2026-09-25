@@ -9,6 +9,7 @@ import {
   type Request,
   type Response,
 } from "@playwright/test";
+import { createConnection } from "mysql2/promise";
 import {
   cleanupTestList,
   setupTestList,
@@ -807,6 +808,75 @@ test.describe("tasks", () => {
     ).not.toBeVisible({
       timeout: 15000,
     });
+  });
+
+  test("チェックボックスはアーカイブ状態と未知状態からも操作できる", async ({
+    page,
+  }) => {
+    const taskTitle = `旧状態テスト_${Date.now()}`;
+    await page.fill('textarea[placeholder*="タスクを追加"]', taskTitle);
+    await page.click('[data-testid="task-add-form"] button[type="submit"]');
+    const taskRow = page
+      .getByTestId("task-item")
+      .filter({ hasText: taskTitle });
+    await waitForPersistedTask(taskRow);
+    const taskId = Number(await taskRow.getAttribute("data-reorder-id"));
+    expect(taskId).toBeGreaterThan(0);
+
+    const db = await createConnection("mysql://glatasks:glatasks@db/glatasks");
+    try {
+      await db.execute("UPDATE task SET status = ? WHERE id = ?", [
+        "archived",
+        taskId,
+      ]);
+      await page.reload();
+      await page
+        .getByTestId("list-select-btn")
+        .filter({ hasText: LIST_NAME })
+        .click();
+      await page.locator("header select").selectOption("archived");
+      const archivedRow = page
+        .getByTestId("task-item")
+        .filter({ hasText: taskTitle });
+      await expect(archivedRow).toBeVisible();
+      const archivedUpdate = waitForSuccessfulMutationResponse(
+        page,
+        "tasks.update",
+      );
+      await archivedRow
+        .locator('input[type="checkbox"]')
+        .dispatchEvent("click");
+      await archivedUpdate;
+      await expect(archivedRow).toHaveCount(0);
+      await page.locator("header select").selectOption("all");
+      await expect(
+        page
+          .getByTestId("task-item")
+          .filter({ hasText: taskTitle })
+          .locator('input[type="checkbox"]'),
+      ).toBeChecked();
+
+      await db.execute("UPDATE task SET status = ? WHERE id = ?", [
+        "unknown",
+        taskId,
+      ]);
+      await page.reload();
+      await page
+        .getByTestId("list-select-btn")
+        .filter({ hasText: LIST_NAME })
+        .click();
+      await page.locator("header select").selectOption("all");
+      const unknownRow = page
+        .getByTestId("task-item")
+        .filter({ hasText: taskTitle });
+      await expect(unknownRow).toBeVisible();
+      const checkbox = unknownRow.locator('input[type="checkbox"]');
+      await toggleTaskAndWaitForUpdate(page, checkbox);
+      await expect(checkbox).toHaveJSProperty("indeterminate", true);
+      await expect(checkbox).not.toBeChecked();
+    } finally {
+      await db.end();
+    }
   });
 
   test("チェックボックスが実行中を経由して循環し、完了済み非表示の対象外になる", async ({
