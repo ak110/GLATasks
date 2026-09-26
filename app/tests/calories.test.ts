@@ -762,12 +762,20 @@ test.describe("calories temporary items", () => {
         row.getByTestId("calorie-record-temporary-badge"),
       ).toHaveCount(0);
 
+      // キーボードで確認ボタンへ移ると、どちらにフォーカスがあるかを枠で示す
       await convertButton.click();
+      const confirmButton = confirm.getByRole("button", {
+        name: "変換",
+        exact: true,
+      });
+      await page.keyboard.press("Tab");
+      await expect(confirmButton).toBeFocused();
+      await expect(confirmButton).toHaveCSS("outline-style", "solid");
       const response = waitForSuccessfulMutationResponse(
         page,
         "calories.updateRecord",
       );
-      await confirm.getByRole("button", { name: "変換", exact: true }).click();
+      await confirmButton.click();
       await response;
       await expect(recordDialog).toHaveCount(0);
       await expect(

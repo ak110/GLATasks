@@ -397,13 +397,13 @@
                 <div class="mt-6 flex justify-end gap-2">
                     <button
                         onclick={() => handleSubmit(false)}
-                        class="cursor-pointer rounded bg-gray-100 px-6 py-2 text-gray-700 hover:bg-gray-200 focus:outline-none dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+                        class="cursor-pointer rounded bg-gray-100 px-6 py-2 text-gray-700 hover:bg-gray-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
                         data-testid="task-edit-save-btn"
                         title="Ctrl+S">保存</button
                     >
                     <button
                         onclick={() => handleSubmit(true)}
-                        class="cursor-pointer rounded bg-blue-600 px-6 py-2 text-white hover:bg-blue-700 focus:outline-none"
+                        class="cursor-pointer rounded bg-blue-600 px-6 py-2 text-white hover:bg-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
                         data-testid="task-edit-save-close-btn"
                         >保存して閉じる</button
                     >

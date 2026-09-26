@@ -113,7 +113,7 @@
                     onChangeShowType(
                         e.currentTarget.value as "active" | "archived" | "all",
                     )}
-                class="cursor-pointer rounded bg-gray-700 px-1.5 py-0.5 text-xs text-white focus:outline-none"
+                class="cursor-pointer rounded bg-gray-700 px-1.5 py-0.5 text-xs text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
             >
                 <option value="active">表示中</option>
                 <option value="archived">アーカイブ</option>
