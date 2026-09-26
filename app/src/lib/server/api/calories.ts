@@ -204,13 +204,25 @@ function calculateWindow(
   };
 }
 
-function isDuplicateEntry(error: unknown): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    error.code === "ER_DUP_ENTRY"
+/**
+ * MariaDBのエラーコードが一致するかを返す
+ *
+ * drizzle-ormはドライバーのエラーをDrizzleQueryErrorで包み、元のエラーを`cause`へ置くため、
+ * 包まれたエラーと元のエラーの両方を調べる。
+ */
+function hasDbErrorCode(error: unknown, code: string): boolean {
+  if (typeof error !== "object" || error === null) return false;
+  return [error, "cause" in error ? error.cause : undefined].some(
+    (candidate) =>
+      typeof candidate === "object" &&
+      candidate !== null &&
+      "code" in candidate &&
+      candidate.code === code,
   );
+}
+
+function isDuplicateEntry(error: unknown): boolean {
+  return hasDbErrorCode(error, "ER_DUP_ENTRY");
 }
 
 async function assertOwnedItem(userId: number, itemId: number): Promise<void> {

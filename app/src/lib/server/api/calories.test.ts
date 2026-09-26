@@ -454,6 +454,25 @@ describeDb("カロリー計算API", () => {
     ]);
   });
 
+  it("同名の品目の追加と同名への変更を名前の重複として拒否する", async () => {
+    const userId = await createFixtureUser();
+    userIds.push(userId);
+    await createCalorieItem(userId, { name: "既存", kcal: 100, note: "" });
+    const other = await createFixtureItem(userId, "別名");
+
+    await expect(
+      createCalorieItem(userId, { name: "既存", kcal: 1, note: "" }),
+    ).rejects.toThrow("calorie_item_name_conflict");
+    await expect(
+      updateCalorieItem(userId, {
+        itemId: other.id,
+        name: "既存",
+        kcal: 1,
+        note: "",
+      }),
+    ).rejects.toThrow("calorie_item_name_conflict");
+  });
+
   it("30日窓を端点込みで分割し、全記録取得は窓外も含める", async () => {
     const userId = await createFixtureUser();
     userIds.push(userId);
