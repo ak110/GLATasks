@@ -106,7 +106,7 @@ description: >-
 
 ### 8. 検証
 
-- `uvx pyfltr run` をルートから実行
+- `uvx --exclude-newer-package pyfltr=false pyfltr run` をルートから実行
 - 開発環境で `make healthcheck` が通ることを確認
 - `trpc-zod-contract-reviewer` エージェントに差分レビューを依頼する (`.claude/agents/trpc-zod-contract-reviewer.md`)
 

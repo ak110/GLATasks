@@ -13,8 +13,8 @@ SvelteKit + tRPC + Drizzleで構築し、Docker Composeで運用する。
 
 全ターゲットの一覧は`make help`で確認できる。
 
-- コミット前の検証方法: `uvx pyfltr run`
-  - テストコードの単体実行なども極力`uvx pyfltr run <path>`を使う（直接呼び出さない）
+- コミット前の検証方法: `uvx --exclude-newer-package pyfltr=false pyfltr run`
+  - テストコードの単体実行なども極力`uvx --exclude-newer-package pyfltr=false pyfltr run <path>`を使う（直接呼び出さない）
   - 修正後の再実行時は`--commands=eslint,prettier`等で限定して実行する（最終検証はCIに委ねる前提）
     - 利用可能なコマンドは`pyproject.toml`の`[tool.pyfltr]`設定とJS/TS連携で有効になるもの。
       例: `eslint`・`prettier`・`oxlint`・`vitest`・カスタムコマンドの`svelte-check`
@@ -47,7 +47,7 @@ Biomeへの移行は次の阻害要因により見送っている。
   （当該機能はプロジェクト全体で使用している）
 
 `svelte-check`はpyfltrの`custom-commands`機能で統合されている。
-`uvx pyfltr run`から自動実行され、設定は`pyproject.toml`の
+`uvx --exclude-newer-package pyfltr=false pyfltr run`から自動実行され、設定は`pyproject.toml`の
 `[tool.pyfltr.custom-commands.svelte-check]`に置く。
 
 ## 注意点
@@ -111,7 +111,7 @@ Biomeへの移行は次の阻害要因により見送っている。
   Composeのプロジェクト名がworktreeのディレクトリ名になるため、`web`の公開ポート38180と
   `${DATA_DIR}`配下のMariaDBデータディレクトリが主作業ツリーで稼働中の環境と衝突する
   （プロジェクト名は`docker compose config --format=json`の`name`で確認できる）。
-  worktree内では`pnpm install --frozen-lockfile`のうえ`uvx pyfltr run <path>`までを実行し、
+  worktree内では`pnpm install --frozen-lockfile`のうえ`uvx --exclude-newer-package pyfltr=false pyfltr run <path>`までを実行し、
   E2Eとバックアップテストは主作業ツリーへ統合してから実行する
 - 新規に作成したgit worktreeでは、`pnpm install --frozen-lockfile`を実行する。
   その後に`app`ディレクトリーで`../node_modules/.bin/svelte-kit sync`を実行し、`app/.svelte-kit/tsconfig.json`を生成してから検証コマンドを実行する。
