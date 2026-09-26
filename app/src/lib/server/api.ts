@@ -76,6 +76,7 @@ export {
   getCalorieItems,
   createCalorieItem,
   updateCalorieItem,
+  deleteCalorieItem,
   getCalorieRecords,
   getAllCalorieRecords,
   createCalorieRecord,

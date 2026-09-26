@@ -32,6 +32,7 @@ import {
   UserPreferencesSchema,
   CalorieItemInputSchema,
   UpdateCalorieItemSchema,
+  CalorieItemIdSchema,
   CalorieRecordInputSchema,
   UpdateCalorieRecordSchema,
   CalorieRecordIdSchema,
@@ -192,6 +193,11 @@ const API_ERRORS: Record<
     code: "BAD_REQUEST",
     message: "同じ名前の品目が既にあります",
   },
+  calorie_item_in_use: {
+    code: "BAD_REQUEST",
+    message:
+      "この品目を使っている記録か自動記録があるため削除できません。先にそれらを削除するか、記録を一時項目へ変換してください",
+  },
   calorie_csv_duplicate_item: {
     code: "BAD_REQUEST",
     message: "品目CSVに重複した品目名があります",
@@ -331,6 +337,15 @@ export const appRouter = t.router({
         SSE_EVENTS.caloriesUpdated,
         async ({ ctx, input }) => {
           await api.updateCalorieItem(ctx.userId, input);
+        },
+      ),
+    ),
+
+    deleteItem: encryptedProcedure.input(CalorieItemIdSchema).mutation(
+      eventMutationHandler(
+        SSE_EVENTS.caloriesUpdated,
+        async ({ ctx, input }) => {
+          await api.deleteCalorieItem(ctx.userId, input.itemId);
         },
       ),
     ),

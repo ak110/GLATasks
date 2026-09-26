@@ -127,6 +127,11 @@
         }) => trpc.calories.updateItem.mutate(input),
         onSuccess: invalidateCalories,
     }));
+    const deleteItemMutation = createMutation(() => ({
+        mutationFn: (itemId: number) =>
+            trpc.calories.deleteItem.mutate({ itemId }),
+        onSuccess: invalidateCalories,
+    }));
     const createRecordMutation = createMutation(() => ({
         mutationFn: (input: CalorieRecordInput) =>
             trpc.calories.createRecord.mutate(input),
@@ -191,6 +196,29 @@
     const autoRecords = $derived(autoRecordsQuery.data ?? []);
     const records = $derived(recordsQuery.data?.records ?? []);
     const allRecords = $derived(allRecordsQuery.data ?? []);
+    // 品目ごとの使用件数。使用中の品目は削除できないため、品目表で理由として示す
+    const itemUsage = $derived.by(() => {
+        const recordCounts: Record<number, number> = {};
+        for (const record of allRecords) {
+            if (record.item_id === null) continue;
+            recordCounts[record.item_id] =
+                (recordCounts[record.item_id] ?? 0) + 1;
+        }
+        const autoRecordCounts: Record<number, number> = {};
+        for (const autoRecord of autoRecords) {
+            autoRecordCounts[autoRecord.item_id] =
+                (autoRecordCounts[autoRecord.item_id] ?? 0) + 1;
+        }
+        return new Map(
+            items.map((item) => [
+                item.id,
+                {
+                    records: recordCounts[item.id] ?? 0,
+                    autoRecords: autoRecordCounts[item.id] ?? 0,
+                },
+            ]),
+        );
+    });
     const isLoading = $derived(
         itemsQuery.isLoading ||
             recordsQuery.isLoading ||
@@ -231,8 +259,10 @@
             />
             <CalorieItemTable
                 {items}
+                usage={itemUsage}
                 onCreate={(input) => createItemMutation.mutateAsync(input)}
                 onUpdate={(input) => updateItemMutation.mutateAsync(input)}
+                onDelete={(itemId) => deleteItemMutation.mutateAsync(itemId)}
             />
         </div>
         <div class="mt-5 grid gap-5 lg:grid-cols-2">

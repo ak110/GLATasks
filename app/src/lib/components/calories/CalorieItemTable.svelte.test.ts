@@ -15,8 +15,10 @@ const items = [
 function renderTable(overrides: Record<string, unknown> = {}) {
   return render(CalorieItemTable, {
     items: [],
+    usage: new Map(),
     onCreate: vi.fn(),
     onUpdate: vi.fn(),
+    onDelete: vi.fn(),
     ...overrides,
   });
 }

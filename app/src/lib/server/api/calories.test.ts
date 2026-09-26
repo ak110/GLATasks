@@ -19,6 +19,7 @@ import {
   createCalorieItem,
   createCalorieRecord,
   deleteCalorieAutoRecord,
+  deleteCalorieItem,
   getAllCalorieRecords,
   getCalorieAutoRecords,
   getCalorieItems,
@@ -728,6 +729,44 @@ describeDb("カロリー計算API", () => {
 
     await deleteCalorieAutoRecord(userId, autoRecord.id);
     expect(await getCalorieAutoRecords(userId)).toEqual([]);
+  });
+
+  it("記録と自動記録のどちらからも使われていない自分の品目だけを削除できる", async () => {
+    const userId = await createFixtureUser();
+    const otherUserId = await createFixtureUser();
+    userIds.push(userId, otherUserId);
+    const unused = await createFixtureItem(userId, "未使用");
+    const usedByRecord = await createFixtureItem(userId, "記録で使用");
+    const usedByAutoRecord = await createFixtureItem(userId, "自動記録で使用");
+    const otherUsersItem = await createFixtureItem(otherUserId, "他人の品目");
+    await createCalorieRecord(userId, {
+      consumed_at: "2026/09/01 12:00",
+      item_id: usedByRecord.id,
+      quantity: 1,
+      tz_offset_minutes: 540,
+    });
+    await createCalorieAutoRecord(userId, {
+      time_of_day: "08:00",
+      item_id: usedByAutoRecord.id,
+      quantity: 1,
+      enabled: true,
+      tz_offset_minutes: 540,
+    });
+
+    await deleteCalorieItem(userId, unused.id);
+    for (const item of [usedByRecord, usedByAutoRecord]) {
+      await expect(deleteCalorieItem(userId, item.id)).rejects.toThrow(
+        "calorie_item_in_use",
+      );
+    }
+    await expect(deleteCalorieItem(userId, otherUsersItem.id)).rejects.toThrow(
+      "calorie_item_not_found",
+    );
+    expect((await getCalorieItems(userId)).map((item) => item.name)).toEqual(
+      expect.arrayContaining(["記録で使用", "自動記録で使用"]),
+    );
+    expect(await getCalorieItems(userId)).toHaveLength(2);
+    expect(await getCalorieItems(otherUserId)).toHaveLength(1);
   });
 
   it("他の利用者の品目と自動記録設定を操作できない", async () => {

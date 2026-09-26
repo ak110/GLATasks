@@ -225,6 +225,10 @@ function isDuplicateEntry(error: unknown): boolean {
   return hasDbErrorCode(error, "ER_DUP_ENTRY");
 }
 
+function isReferencedRow(error: unknown): boolean {
+  return hasDbErrorCode(error, "ER_ROW_IS_REFERENCED_2");
+}
+
 async function assertOwnedItem(userId: number, itemId: number): Promise<void> {
   const rows = await getDb()
     .select({ id: calorieItems.id })
@@ -293,6 +297,31 @@ export async function updateCalorieItem(
   } catch (error) {
     if (isDuplicateEntry(error)) {
       throw new Error("calorie_item_name_conflict", { cause: error });
+    }
+    throw error;
+  }
+}
+
+/**
+ * 記録と自動記録のどちらからも使われていない品目を削除する
+ *
+ * 使われている品目を削除すると記録の品目名とkcalが失われるため、
+ * 両テーブルの外部キー制約（ON DELETE RESTRICT）が拒否した削除を`calorie_item_in_use`として返す。
+ */
+export async function deleteCalorieItem(
+  userId: number,
+  itemId: number,
+): Promise<void> {
+  await assertOwnedItem(userId, itemId);
+  try {
+    await getDb()
+      .delete(calorieItems)
+      .where(
+        and(eq(calorieItems.id, itemId), eq(calorieItems.user_id, userId)),
+      );
+  } catch (error) {
+    if (isReferencedRow(error)) {
+      throw new Error("calorie_item_in_use", { cause: error });
     }
     throw error;
   }

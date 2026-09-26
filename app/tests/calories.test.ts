@@ -80,6 +80,11 @@ async function openRecordMenu(row: Locator): Promise<void> {
   await expect(row.getByTestId("calorie-record-menu")).toBeVisible();
 }
 
+async function openItemMenu(row: Locator): Promise<void> {
+  await row.getByTestId("calorie-item-menu-btn").click();
+  await expect(row.getByTestId("calorie-item-menu")).toBeVisible();
+}
+
 async function createContext(browser: Browser) {
   return browser.newContext({
     baseURL: BASE_URL,
@@ -380,7 +385,8 @@ test.describe("calories", () => {
       const itemRow = page
         .getByTestId("calorie-item-row")
         .filter({ hasText: itemName });
-      await itemRow.getByRole("button", { name: "編集" }).click();
+      await openItemMenu(itemRow);
+      await itemRow.getByRole("menuitem", { name: "編集" }).click();
       const itemDialog = page.getByRole("dialog", { name: "品目の編集" });
       await expect(itemDialog).toBeVisible();
       for (const label of ["品目名", "kcal", "備考"]) {
@@ -394,7 +400,8 @@ test.describe("calories", () => {
       await page.keyboard.press("Escape");
       await expect(itemDialog).toHaveCount(0);
       await expect(itemRow).toContainText(itemName);
-      await itemRow.getByRole("button", { name: "編集" }).click();
+      await openItemMenu(itemRow);
+      await itemRow.getByRole("menuitem", { name: "編集" }).click();
       await expect(itemDialog.getByLabel("品目名")).toHaveValue(itemName);
       await itemDialog.getByLabel("品目名").fill(renamed);
       const updateItemResponse = waitForSuccessfulMutationResponse(
@@ -763,6 +770,63 @@ test.describe("calories temporary items", () => {
     }
   });
 
+  test("使われていない品目だけを削除でき、使用中の品目は理由を示して削除させない", async ({
+    browser,
+  }) => {
+    // 削除する品目を表の最後の行にし、メニューが表の下端より外へ出る場合も確かめる
+    const { context, page } = await openCaloriesAsNewUser(browser);
+    try {
+      const unusedName = "品目Z_未使用";
+      const usedName = "品目A_使用中";
+      await addItem(page, unusedName);
+      await addItem(page, usedName);
+      await addRecordNow(page, usedName);
+
+      const usedRow = page
+        .getByTestId("calorie-item-row")
+        .filter({ hasText: usedName });
+      await openItemMenu(usedRow);
+      const usedDelete = usedRow.getByRole("menuitem", { name: /削除/ });
+      await expect(usedDelete).toBeDisabled();
+      await expect(usedDelete).toContainText("記録1件で使用中");
+      await page.keyboard.press("Escape");
+      await expect(usedRow.getByTestId("calorie-item-menu")).toHaveCount(0);
+
+      const unusedRow = page
+        .getByTestId("calorie-item-row")
+        .filter({ hasText: unusedName });
+      await openItemMenu(unusedRow);
+      const unusedDelete = unusedRow.getByRole("menuitem", { name: "削除" });
+      // メニューが周囲の要素に切り取られず、項目の中心を押すとその項目自身に届く
+      await expect
+        .poll(() =>
+          unusedDelete.evaluate((element) => {
+            const box = element.getBoundingClientRect();
+            return (
+              document.elementFromPoint(
+                box.x + box.width / 2,
+                box.y + box.height / 2,
+              ) === element
+            );
+          }),
+        )
+        .toBe(true);
+      await unusedDelete.click();
+      const confirm = page.getByRole("dialog", { name: "品目の削除" });
+      await expect(confirm).toContainText(`「${unusedName}」を削除しますか？`);
+      const response = waitForSuccessfulMutationResponse(
+        page,
+        "calories.deleteItem",
+      );
+      await confirm.getByRole("button", { name: "削除", exact: true }).click();
+      await response;
+      await expect(unusedRow).toHaveCount(0);
+      await expect(usedRow).toHaveCount(1);
+    } finally {
+      await context.close();
+    }
+  });
+
   test("記録の編集ダイアログから確認のうえ一時項目へ変換する", async ({
     browser,
   }) => {
@@ -833,7 +897,8 @@ test.describe("calories temporary items", () => {
       const itemRow = page
         .getByTestId("calorie-item-row")
         .filter({ hasText: name });
-      await itemRow.getByRole("button", { name: "編集" }).click();
+      await openItemMenu(itemRow);
+      await itemRow.getByRole("menuitem", { name: "編集" }).click();
       const itemDialog = page.getByRole("dialog", { name: "品目の編集" });
       await itemDialog.getByLabel("kcal", { exact: true }).fill("300");
       const itemResponse = waitForSuccessfulMutationResponse(

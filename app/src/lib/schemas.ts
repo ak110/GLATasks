@@ -223,6 +223,10 @@ export const UpdateCalorieItemSchema = CalorieItemInputSchema.extend({
   itemId: z.number().int().positive(),
 });
 
+export const CalorieItemIdSchema = z.object({
+  itemId: z.number().int().positive(),
+});
+
 /**
  * 記録の入力項目。品目の記録は`item_id`を、品目表へ登録しない一時項目の記録は
  * `temporary_name`を、どちらか一方だけ指定する。一時項目の`quantity`はkcalとして扱う

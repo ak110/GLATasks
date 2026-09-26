@@ -1,16 +1,23 @@
 <script lang="ts">
+    import ConfirmDialog from "$lib/components/dialogs/ConfirmDialog.svelte";
     import CalorieEditDialog from "./CalorieEditDialog.svelte";
 
     type Item = { id: number; name: string; kcal: number; note: string };
     type ItemInput = { name: string; kcal: number; note: string };
+    /** 品目を使っている記録と自動記録の件数 */
+    type ItemUsage = { records: number; autoRecords: number };
     type Props = {
         items: Item[];
+        usage: Map<number, ItemUsage>;
         onCreate: (input: ItemInput) => unknown;
         onUpdate: (input: ItemInput & { itemId: number }) => unknown;
+        onDelete: (itemId: number) => unknown;
     };
 
-    let { items, onCreate, onUpdate }: Props = $props();
+    let { items, usage, onCreate, onUpdate, onDelete }: Props = $props();
     let editingId = $state<number | undefined>();
+    let openMenuId = $state<number | undefined>();
+    let deleteTarget = $state<Item | undefined>();
     let name = $state("");
     let kcal = $state("");
     let note = $state("");
@@ -26,6 +33,42 @@
               );
     });
 
+    // 操作メニュー外クリック/Escapeで閉じる
+    $effect(() => {
+        if (openMenuId === undefined) return;
+        const onClick = (event: MouseEvent) => {
+            const target = event.target as HTMLElement | null;
+            if (!target?.closest("[data-item-menu]")) openMenuId = undefined;
+        };
+        const onKey = (event: KeyboardEvent) => {
+            if (event.key === "Escape") openMenuId = undefined;
+        };
+        document.addEventListener("mousedown", onClick);
+        document.addEventListener("keydown", onKey);
+        return () => {
+            document.removeEventListener("mousedown", onClick);
+            document.removeEventListener("keydown", onKey);
+        };
+    });
+
+    /** 使用中の品目は削除できないため、削除の代わりに使用件数を示す文言を返す */
+    function usageText(item: Item): string | undefined {
+        const counts = usage.get(item.id);
+        if (!counts || (counts.records === 0 && counts.autoRecords === 0))
+            return undefined;
+        const parts = [
+            counts.records > 0 ? `記録${counts.records}件` : "",
+            counts.autoRecords > 0 ? `自動記録${counts.autoRecords}件` : "",
+        ].filter(Boolean);
+        return `${parts.join("・")}で使用中`;
+    }
+
+    async function confirmDelete() {
+        if (!deleteTarget) return;
+        await onDelete(deleteTarget.id);
+        deleteTarget = undefined;
+    }
+
     function clearForm() {
         editingId = undefined;
         name = "";
@@ -34,6 +77,7 @@
     }
 
     function edit(item: Item) {
+        openMenuId = undefined;
         editingId = item.id;
         name = item.name;
         kcal = String(item.kcal);
@@ -160,80 +204,126 @@
         </CalorieEditDialog>
     {/if}
 
-    <div class="overflow-x-auto">
-        <table class="w-full table-fixed text-left text-sm">
-            <colgroup
-                ><col /><col class="w-16" /><col class="w-20" /><col
-                    class="w-14"
-                /></colgroup
+    <!-- 横スクロールの要素で囲むと、最後の行の「⋯」メニューが表の下端で切り取られるため囲まない -->
+    <table class="w-full table-fixed text-left text-sm">
+        <colgroup
+            ><col /><col class="w-16" /><col class="w-20" /><col
+                class="w-10"
+            /></colgroup
+        >
+        <thead
+            class="border-b border-gray-200 text-gray-600 dark:border-gray-700 dark:text-gray-300"
+        >
+            <tr
+                ><th class="p-2">品目</th><th class="p-2 text-right">kcal</th
+                ><th class="p-2">備考</th><th class="p-2"></th></tr
+            ><tr
+                ><th class="p-1"
+                    ><input
+                        type="search"
+                        bind:value={itemFilter}
+                        autocomplete="off"
+                        data-testid="calorie-item-filter"
+                        placeholder="品目名と備考で検索"
+                        aria-label="品目名と備考で品目を検索"
+                        class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-sm font-normal text-gray-800 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+                    /></th
+                ><th class="p-1"></th><th class="p-1"></th><th
+                    class="p-1 text-right"
+                    ><button
+                        type="button"
+                        onclick={() => (itemFilter = "")}
+                        data-testid="calorie-item-filter-clear"
+                        aria-label="品目の検索条件を消去"
+                        title="検索条件を消去"
+                        class="cursor-pointer rounded p-1 font-normal text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+                        >×</button
+                    ></th
+                ></tr
             >
-            <thead
-                class="border-b border-gray-200 text-gray-600 dark:border-gray-700 dark:text-gray-300"
-            >
+        </thead>
+        <tbody>
+            {#each visibleItems as item (item.id)}
                 <tr
-                    ><th class="p-2">品目</th><th class="p-2 text-right"
-                        >kcal</th
-                    ><th class="p-2">備考</th><th class="p-2"></th></tr
-                ><tr
-                    ><th class="p-1"
-                        ><input
-                            type="search"
-                            bind:value={itemFilter}
-                            autocomplete="off"
-                            data-testid="calorie-item-filter"
-                            placeholder="品目名と備考で検索"
-                            aria-label="品目名と備考で品目を検索"
-                            class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-sm font-normal text-gray-800 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
-                        /></th
-                    ><th class="p-1"></th><th class="p-1"></th><th
-                        class="p-1 text-right"
-                        ><button
-                            type="button"
-                            onclick={() => (itemFilter = "")}
-                            data-testid="calorie-item-filter-clear"
-                            aria-label="品目の検索条件を消去"
-                            title="検索条件を消去"
-                            class="cursor-pointer rounded p-1 font-normal text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
-                            >×</button
-                        ></th
-                    ></tr
+                    class="border-b border-gray-200 text-gray-800 last:border-0 dark:border-gray-700 dark:text-gray-100"
+                    data-testid="calorie-item-row"
                 >
-            </thead>
-            <tbody>
-                {#each visibleItems as item (item.id)}
-                    <tr
-                        class="border-b border-gray-200 text-gray-800 last:border-0 dark:border-gray-700 dark:text-gray-100"
-                        data-testid="calorie-item-row"
+                    <td class="truncate p-2" title={item.name}>{item.name}</td>
+                    <td class="p-2 text-right">{item.kcal}</td>
+                    <td
+                        class="truncate p-2 text-gray-600 dark:text-gray-300"
+                        title={item.note}>{item.note}</td
                     >
-                        <td class="truncate p-2" title={item.name}
-                            >{item.name}</td
-                        >
-                        <td class="p-2 text-right">{item.kcal}</td>
-                        <td
-                            class="truncate p-2 text-gray-600 dark:text-gray-300"
-                            title={item.note}>{item.note}</td
-                        >
-                        <td class="p-2 text-right whitespace-nowrap">
+                    <td class="p-2 text-right">
+                        <div class="relative" data-item-menu>
                             <button
                                 type="button"
-                                onclick={() => edit(item)}
-                                class="cursor-pointer rounded p-1 text-blue-600 hover:bg-gray-100 dark:text-blue-400 dark:hover:bg-gray-700"
-                                >編集</button
+                                onclick={() =>
+                                    (openMenuId =
+                                        openMenuId === item.id
+                                            ? undefined
+                                            : item.id)}
+                                class="cursor-pointer rounded px-1 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+                                data-testid="calorie-item-menu-btn"
+                                aria-label="品目の操作"
+                                aria-haspopup="menu"
+                                aria-expanded={openMenuId === item.id}
+                                title="操作">⋯</button
                             >
-                        </td>
-                    </tr>
-                {:else}
-                    <tr
-                        ><td
-                            colspan="4"
-                            class="p-4 text-center text-gray-400 dark:text-gray-500"
-                            >{items.length === 0
-                                ? "品目がありません"
-                                : "該当する品目はありません"}</td
-                        ></tr
-                    >
-                {/each}
-            </tbody>
-        </table>
-    </div>
+                            {#if openMenuId === item.id}
+                                {@const inUse = usageText(item)}
+                                <div
+                                    class="absolute top-full right-0 z-20 min-w-max rounded border border-gray-200 bg-white py-1 text-left shadow-lg dark:border-gray-600 dark:bg-gray-800"
+                                    role="menu"
+                                    data-testid="calorie-item-menu"
+                                >
+                                    <button
+                                        type="button"
+                                        onclick={() => edit(item)}
+                                        class="block w-full cursor-pointer px-4 py-1.5 text-left text-blue-600 hover:bg-gray-100 dark:text-blue-400 dark:hover:bg-gray-700"
+                                        role="menuitem">編集</button
+                                    >
+                                    <!-- 使用中の品目を削除すると記録の品目名とkcalが失われるため、削除を無効にして理由を示す -->
+                                    <button
+                                        type="button"
+                                        disabled={inUse !== undefined}
+                                        onclick={() => {
+                                            openMenuId = undefined;
+                                            deleteTarget = item;
+                                        }}
+                                        class="block w-full cursor-pointer px-4 py-1.5 text-left text-red-600 hover:bg-red-50 disabled:cursor-default disabled:text-gray-400 disabled:hover:bg-transparent dark:text-red-400 dark:hover:bg-red-900/30 dark:disabled:text-gray-500"
+                                        role="menuitem"
+                                        >削除{#if inUse}<span
+                                                class="block text-xs"
+                                                >{inUse}</span
+                                            >{/if}</button
+                                    >
+                                </div>
+                            {/if}
+                        </div>
+                    </td>
+                </tr>
+            {:else}
+                <tr
+                    ><td
+                        colspan="4"
+                        class="p-4 text-center text-gray-400 dark:text-gray-500"
+                        >{items.length === 0
+                            ? "品目がありません"
+                            : "該当する品目はありません"}</td
+                    ></tr
+                >
+            {/each}
+        </tbody>
+    </table>
 </section>
+
+<ConfirmDialog
+    open={deleteTarget !== undefined}
+    title="品目の削除"
+    message={deleteTarget ? `「${deleteTarget.name}」を削除しますか？` : ""}
+    confirmLabel="削除"
+    variant="danger"
+    onConfirm={confirmDelete}
+    onCancel={() => (deleteTarget = undefined)}
+/>
