@@ -49,11 +49,12 @@ Streamable HTTPトランスポートとOAuth 2.1認証で動作する。
 3. GLATasksにログインし「許可」を押す
 4. クライアントがアクセストークンを取得し、以降のMCPリクエストで利用する
 
-提供ツール（24件）:
+提供ツール（30件）:
 
 - `lists.*`: list / create / rename / delete / archive / unarchive / clear / merge
 - `tasks.*`: list / listActive / create / update / search / reorder
 - `timers.*`: list / create / update / delete / start / pause / reset / adjust / setTime / stop / reorder
+- `calories.*`: summary / listRecords / listItems（参照のみ）
 - `users.*`: getPreferences / updatePreferences
 
 各ツールの入力スキーマはMCPクライアント側で自動取得できる。

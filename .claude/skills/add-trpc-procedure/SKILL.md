@@ -80,7 +80,7 @@ description: >-
 - 既存ドメインに新規フィールドを追加した場合、
   `app/src/lib/server/mcp/server.ts`の同ドメイン`registerTool`ハンドラーが
   新規フィールドを転送しているかを確認する
-- 現状MCP tool定義があるドメイン: `lists`・`tasks`・`timers`・`users`
+- 現状MCP tool定義があるドメイン: `lists`・`tasks`・`timers`・`users`・`calories`（参照のみ）
 
 ### 6. 公開ドキュメント追従
 

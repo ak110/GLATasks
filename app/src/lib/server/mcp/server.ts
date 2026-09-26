@@ -2,7 +2,8 @@
  * @fileoverview MCP サーバー定義
  *
  * `app/src/lib/server/api/` 配下の関数を MCP ツールとして公開する。
- * tRPC ルーター（`trpc.ts`）と同じ24件の操作を網羅する。
+ * リスト・タスク・タイマー・利用者設定はtRPCルーター（`trpc.ts`）と同じ操作を網羅し、
+ * カロリーは参照だけを公開する。
  */
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -32,6 +33,8 @@ import {
   ReorderTasksSchema,
   ReorderTimersSchema,
   UserPreferencesSchema,
+  CalorieSummaryInputSchema,
+  ListCalorieRecordsSchema,
 } from "$lib/schemas";
 
 /** AuthInfo.extra からアプリ内ユーザーIDを取り出す */
@@ -65,7 +68,7 @@ export function createMcpServer(): McpServer {
     {
       capabilities: { tools: {} },
       instructions:
-        "GLATasks のタスク・リスト・タイマー操作を提供する。" +
+        "GLATasks のタスク・リスト・タイマー操作とカロリー記録の参照を提供する。" +
         "タスクは複数のリストに属し、タイマーは独立して動作する。",
     },
   );
@@ -420,6 +423,48 @@ export function createMcpServer(): McpServer {
       await api.reorderTimers(userId, input.timerIds);
       sendEvent(userId, SSE_EVENTS.timersUpdated, null);
       return successResult();
+    },
+  );
+
+  // ── カロリー（参照のみ） ──
+  server.registerTool(
+    "calories.summary",
+    {
+      description:
+        "カロリーの集計（1日当たりペース・7日間平均・28日間平均・達成状況）を取得する（tz_offset_minutes はUTCからの時差の分数で、日本時間は540）",
+      inputSchema: CalorieSummaryInputSchema,
+    },
+    async (input, { authInfo }) => {
+      const result = await api.getCalorieSummary(
+        getUserId(authInfo),
+        input.tz_offset_minutes,
+      );
+      return jsonResult(result);
+    },
+  );
+
+  server.registerTool(
+    "calories.listRecords",
+    {
+      description:
+        "カロリーの摂取記録を30日単位で新しい順に取得する（window_offset は0で今日までの30日、1でその前の30日。tz_offset_minutes はUTCからの時差の分数で、日本時間は540）",
+      inputSchema: ListCalorieRecordsSchema,
+    },
+    async (input, { authInfo }) => {
+      const result = await api.getCalorieRecords(getUserId(authInfo), input);
+      return jsonResult(result);
+    },
+  );
+
+  server.registerTool(
+    "calories.listItems",
+    {
+      description: "カロリーの品目（名前・1個当たりのkcal・備考）を取得する",
+      inputSchema: z.object({}),
+    },
+    async (_input, { authInfo }) => {
+      const result = await api.getCalorieItems(getUserId(authInfo));
+      return jsonResult(result);
     },
   );
 

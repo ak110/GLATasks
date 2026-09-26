@@ -21,6 +21,7 @@ vi.mock("../api", async (importOriginal) => {
         preferences = { ...preferences, ...input };
       },
     ),
+    getCalorieSummary: vi.fn(async () => ({ goal_kcal: 1615 })),
   };
 });
 
@@ -30,7 +31,8 @@ vi.mock("../sse", async (importOriginal) => {
 });
 
 const { createMcpServer } = await import("./server");
-const { getUserPreferences, updateUserPreferences } = await import("../api");
+const { getCalorieSummary, getUserPreferences, updateUserPreferences } =
+  await import("../api");
 const { sendEvent } = await import("../sse");
 
 const TOOL_CONTRACTS: Record<string, readonly [string, readonly string[]]> = {
@@ -123,6 +125,18 @@ const TOOL_CONTRACTS: Record<string, readonly [string, readonly string[]]> = {
     ["started_at", "timerId"],
   ],
   "timers.reorder": ["タイマー並び順を更新する", ["timerIds"]],
+  "calories.summary": [
+    "カロリーの集計（1日当たりペース・7日間平均・28日間平均・達成状況）を取得する（tz_offset_minutes はUTCからの時差の分数で、日本時間は540）",
+    ["tz_offset_minutes"],
+  ],
+  "calories.listRecords": [
+    "カロリーの摂取記録を30日単位で新しい順に取得する（window_offset は0で今日までの30日、1でその前の30日。tz_offset_minutes はUTCからの時差の分数で、日本時間は540）",
+    ["tz_offset_minutes", "window_offset"],
+  ],
+  "calories.listItems": [
+    "カロリーの品目（名前・1個当たりのkcal・備考）を取得する",
+    [],
+  ],
   "users.getPreferences": [
     "利用者の新規タイマーデフォルト値とカロリー目標値を取得する",
     [],
@@ -213,6 +227,29 @@ describe("利用者設定MCPツール", () => {
         SSE_EVENTS.usersPreferencesUpdated,
         null,
       );
+    } finally {
+      await client.close();
+      await server.close();
+    }
+  });
+
+  it("カロリーの集計は認証済み利用者と指定した時差で取得する", async () => {
+    const authInfo: AuthInfo = {
+      token: "test-token",
+      clientId: "test-client",
+      scopes: [],
+      extra: { userId: 42 },
+    };
+    const { client, server } = await createClient(authInfo);
+    try {
+      const result = await client.callTool({
+        name: "calories.summary",
+        arguments: { tz_offset_minutes: 540 },
+      });
+      expect(getCalorieSummary).toHaveBeenCalledWith(42, 540);
+      expect(result.content).toEqual([
+        { type: "text", text: JSON.stringify({ goal_kcal: 1615 }, null, 2) },
+      ]);
     } finally {
       await client.close();
       await server.close();
