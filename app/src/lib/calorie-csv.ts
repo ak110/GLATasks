@@ -13,7 +13,9 @@ import {
 } from "$lib/schemas";
 
 const ITEM_HEADERS = ["品目", "kcal", "備考"] as const;
-const RECORD_HEADERS = ["日時", "品目", "数量"] as const;
+const RECORD_HEADERS = ["日時", "品目", "数量", "一時項目"] as const;
+/** 一時項目の列を持たない旧形式。全行を品目の記録として取り込む */
+const LEGACY_RECORD_HEADERS = ["日時", "品目", "数量"] as const;
 
 export type CalorieItemCsvExportRow = {
   name: string;
@@ -25,6 +27,7 @@ export type CalorieRecordCsvExportRow = {
   consumed_at: string;
   item_name: string;
   quantity: number;
+  temporary: boolean;
 };
 
 function serialize(rows: Array<Array<string | number>>): string {
@@ -45,13 +48,18 @@ export function exportCalorieRecordsCsv(
 ): string {
   return serialize([
     [...RECORD_HEADERS],
-    ...rows.map((row) => [row.consumed_at, row.item_name, row.quantity]),
+    ...rows.map((row) => [
+      row.consumed_at,
+      row.item_name,
+      row.quantity,
+      row.temporary ? "1" : "",
+    ]),
   ]);
 }
 
 function parseRows(
   csv: string,
-  expectedHeaders: readonly string[],
+  ...acceptedHeaders: ReadonlyArray<readonly string[]>
 ): string[][] {
   const result = Papa.parse<string[]>(csv.replace(/^\uFEFF/, ""), {
     skipEmptyLines: "greedy",
@@ -61,11 +69,13 @@ function parseRows(
   }
   if (result.data.length === 0) throw new Error("CSVが空です");
   const [headers, ...rows] = result.data;
-  if (
-    headers.length !== expectedHeaders.length ||
-    headers.some((header, index) => header !== expectedHeaders[index])
-  ) {
-    throw new Error(`CSVヘッダーは${expectedHeaders.join(",")}が必要です`);
+  const expectedHeaders = acceptedHeaders.find(
+    (candidate) =>
+      headers.length === candidate.length &&
+      headers.every((header, index) => header === candidate[index]),
+  );
+  if (!expectedHeaders) {
+    throw new Error(`CSVヘッダーは${acceptedHeaders[0].join(",")}が必要です`);
   }
   if (rows.length > MAX_CALORIE_CSV_ROWS) {
     throw new Error(`CSVは${MAX_CALORIE_CSV_ROWS}行以下にしてください`);
@@ -96,14 +106,15 @@ export function parseCalorieItemsCsv(csv: string): CalorieItemCsvRow[] {
 }
 
 export function parseCalorieRecordsCsv(csv: string): CalorieRecordCsvRow[] {
-  return parseRows(csv, RECORD_HEADERS).map(
-    ([consumedAt, itemName, quantity], index) => {
+  return parseRows(csv, RECORD_HEADERS, LEGACY_RECORD_HEADERS).map(
+    ([consumedAt, itemName, quantity, temporary = ""], index) => {
       const result = CalorieRecordCsvRowSchema.safeParse({
         consumed_at: consumedAt,
         item_name: itemName,
         quantity: Number(quantity),
+        temporary: temporary === "1",
       });
-      if (!result.success) {
+      if (!result.success || (temporary !== "" && temporary !== "1")) {
         throw new Error(`記録CSVの${index + 2}行目が不正です`);
       }
       return result.data;

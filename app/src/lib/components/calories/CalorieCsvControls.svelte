@@ -13,6 +13,7 @@
         consumed_at: string;
         item_name: string;
         quantity: number;
+        temporary: boolean;
     };
     type Props = {
         items: Item[];

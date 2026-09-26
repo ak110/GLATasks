@@ -51,18 +51,24 @@ export const calorieItems = mysqlTable(
   }),
 );
 
-/** カロリー計算の摂取記録テーブル */
+/**
+ * カロリー計算の摂取記録テーブル
+ *
+ * 品目を参照する記録と、品目表へ登録せず名前を記録自身が持つ一時項目の記録がある。
+ * 一時項目は`quantity`をkcalとして扱い、品目のkcalと掛け算しない。
+ * `item_id`と`temporary_name`はどちらか一方だけを持つ。MariaDBはON UPDATE CASCADEの
+ * 外部キー列をCHECK制約に使えない（ERROR 1901）ため、この不変条件は書き込み側で守る。
+ */
 export const calorieRecords = mysqlTable(
   "calorie_record",
   {
     id: int("id").primaryKey().autoincrement(),
     user_id: int("user_id").notNull(),
-    item_id: int("item_id")
-      .notNull()
-      .references(() => calorieItems.id, {
-        onDelete: "restrict",
-        onUpdate: "cascade",
-      }),
+    item_id: int("item_id").references(() => calorieItems.id, {
+      onDelete: "restrict",
+      onUpdate: "cascade",
+    }),
+    temporary_name: varchar("temporary_name", { length: 255 }),
     consumed_at: timestamp("consumed_at").notNull(),
     quantity: int("quantity").notNull(),
     created: timestamp("created").notNull(),

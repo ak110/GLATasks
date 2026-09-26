@@ -14,6 +14,7 @@ import {
   SearchTasksSchema,
   TagInfoSchema,
   TaskStatusSchema,
+  UpdateCalorieRecordSchema,
   UpdateTaskSchema,
   UserPreferencesSchema,
 } from "./schemas";
@@ -252,6 +253,29 @@ describe("カロリー計算スキーマ", () => {
           quantity: 1,
           tz_offset_minutes: 540,
         }),
+      ).toThrow();
+    }
+  });
+
+  it("記録は品目と一時項目名のどちらか一方だけを受け入れ、一時項目名の前後の空白を除く", () => {
+    const base = {
+      consumed_at: "2026/09/01 12:34",
+      quantity: 450,
+      tz_offset_minutes: 540,
+    };
+    expect(
+      CalorieRecordInputSchema.parse({ ...base, temporary_name: " 外食 " }),
+    ).toMatchObject({ temporary_name: "外食" });
+    for (const target of [
+      {},
+      { item_id: 1, temporary_name: "外食" },
+      { temporary_name: "  " },
+    ]) {
+      expect(() =>
+        CalorieRecordInputSchema.parse({ ...base, ...target }),
+      ).toThrow();
+      expect(() =>
+        UpdateCalorieRecordSchema.parse({ ...base, ...target, recordId: 1 }),
       ).toThrow();
     }
   });

@@ -249,6 +249,10 @@ const withApiErrors = t.middleware(async ({ next }) => {
   クライアント側では満了到達時に削除ボタンを強調し、確認ダイアログを省略して削除できる体験に用いる
 - カロリー計算では、品目を利用者内で一意に保持し、記録は品目IDを参照する。
   品目名又はkcalを変更すると、既存記録の表示と期間集計へ反映される。
+  品目表へ登録しない一時項目の記録は品目IDを持たず、名前（`temporary_name`）とkcal（`quantity`）を記録自身が持つ。
+  品目IDと一時項目名はどちらか一方だけを持つ。
+  MariaDBは`ON UPDATE CASCADE`の外部キー列をCHECK制約に使えないため、この不変条件は書き込み側で守る。
+  記録の一覧と集計は品目を外部結合し、品目を参照しない一時項目の行も結果へ含める
   kcal、数量及び1日当たり目標値は整数で保持する。
   利用者ごとの1日当たり目標値は`users.preferences.calorie_goal_kcal`へ保持する
 - カロリーの自動記録設定（`calorie_auto_record`）は現地の時刻`time_of_day`と登録時の`tz_offset_minutes`を組で保持する。

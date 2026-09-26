@@ -65,57 +65,99 @@
     >
         品目
     </h2>
-    {#snippet itemForm()}
+    {#snippet nameInput()}
+        <input
+            id="calorie-item-name"
+            bind:value={name}
+            required
+            maxlength="255"
+            placeholder="品目名"
+            class="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-800 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+        />
+    {/snippet}
+    {#snippet kcalInput()}
+        <input
+            id="calorie-item-kcal"
+            bind:value={kcal}
+            required
+            type="number"
+            min="1"
+            step="1"
+            placeholder="kcal"
+            class="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-800 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+        />
+    {/snippet}
+    {#snippet noteInput()}
+        <input
+            id="calorie-item-note"
+            bind:value={note}
+            maxlength="10000"
+            placeholder="備考"
+            class="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-800 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+        />
+    {/snippet}
+
+    {#if editingId === undefined}
         <form
-            class={editingId === undefined
-                ? "mb-4 grid gap-2 sm:grid-cols-[minmax(0,1fr)_4rem_5rem_auto]"
-                : "grid gap-2"}
+            class="mb-4 grid gap-2 sm:grid-cols-[minmax(0,1fr)_4rem_5rem_auto]"
             onsubmit={submit}
         >
             <label class="sr-only" for="calorie-item-name">品目名</label>
-            <input
-                id="calorie-item-name"
-                bind:value={name}
-                required
-                maxlength="255"
-                placeholder="品目名"
-                class="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-800 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
-            />
+            {@render nameInput()}
             <label class="sr-only" for="calorie-item-kcal">kcal</label>
-            <input
-                id="calorie-item-kcal"
-                bind:value={kcal}
-                required
-                type="number"
-                min="1"
-                step="1"
-                placeholder="kcal"
-                class="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-800 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
-            />
+            {@render kcalInput()}
             <label class="sr-only" for="calorie-item-note">備考</label>
-            <input
-                id="calorie-item-note"
-                bind:value={note}
-                maxlength="10000"
-                placeholder="備考"
-                class="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-800 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
-            />
+            {@render noteInput()}
             <div class="flex gap-1">
                 <button
                     type="submit"
                     class="cursor-pointer rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700"
                 >
-                    {editingId === undefined ? "追加" : "変更"}
+                    追加
                 </button>
             </div>
         </form>
-    {/snippet}
-    {#if editingId !== undefined}
-        <CalorieEditDialog title="品目の編集" onClose={clearForm}>
-            {@render itemForm()}
-        </CalorieEditDialog>
     {:else}
-        {@render itemForm()}
+        <CalorieEditDialog title="品目の編集" onClose={clearForm}>
+            <!-- ダイアログの幅が足りればラベルを左・入力欄を右に並べ、狭ければラベルの下に入力欄を置く -->
+            <form class="@container" onsubmit={submit}>
+                <div
+                    class="grid gap-3 @sm:grid-cols-[4rem_minmax(0,1fr)] @sm:items-center"
+                >
+                    <div class="grid gap-1 @sm:contents">
+                        <label
+                            for="calorie-item-name"
+                            class="text-sm font-medium text-gray-700 dark:text-gray-200"
+                            >品目名</label
+                        >
+                        {@render nameInput()}
+                    </div>
+                    <div class="grid gap-1 @sm:contents">
+                        <label
+                            for="calorie-item-kcal"
+                            class="text-sm font-medium text-gray-700 dark:text-gray-200"
+                            >kcal</label
+                        >
+                        {@render kcalInput()}
+                    </div>
+                    <div class="grid gap-1 @sm:contents">
+                        <label
+                            for="calorie-item-note"
+                            class="text-sm font-medium text-gray-700 dark:text-gray-200"
+                            >備考</label
+                        >
+                        {@render noteInput()}
+                    </div>
+                </div>
+                <div class="mt-5 flex justify-end">
+                    <button
+                        type="submit"
+                        class="cursor-pointer rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700"
+                        >変更</button
+                    >
+                </div>
+            </form>
+        </CalorieEditDialog>
     {/if}
 
     <div class="overflow-x-auto">

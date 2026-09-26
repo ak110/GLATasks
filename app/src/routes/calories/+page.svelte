@@ -26,7 +26,9 @@
         CalorieAutoRecordInput,
         CalorieItemCsvRow,
         CalorieRecordCsvRow,
+        CalorieRecordInput,
         UpdateCalorieAutoRecordInput,
+        UpdateCalorieRecordInput,
     } from "$lib/schemas";
     import { SSE_EVENTS } from "$lib/sse-events";
     import { subscribeOnMount } from "$lib/sse-subscribe";
@@ -126,22 +128,13 @@
         onSuccess: invalidateCalories,
     }));
     const createRecordMutation = createMutation(() => ({
-        mutationFn: (input: {
-            consumed_at: string;
-            item_id: number;
-            quantity: number;
-            tz_offset_minutes: number;
-        }) => trpc.calories.createRecord.mutate(input),
+        mutationFn: (input: CalorieRecordInput) =>
+            trpc.calories.createRecord.mutate(input),
         onSuccess: invalidateCalories,
     }));
     const updateRecordMutation = createMutation(() => ({
-        mutationFn: (input: {
-            recordId: number;
-            consumed_at: string;
-            item_id: number;
-            quantity: number;
-            tz_offset_minutes: number;
-        }) => trpc.calories.updateRecord.mutate(input),
+        mutationFn: (input: UpdateCalorieRecordInput) =>
+            trpc.calories.updateRecord.mutate(input),
         onSuccess: invalidateCalories,
     }));
     const deleteRecordMutation = createMutation(() => ({

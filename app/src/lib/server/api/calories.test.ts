@@ -28,6 +28,7 @@ import {
   processCalorieAutoRecords,
   updateCalorieAutoRecord,
   updateCalorieItem,
+  updateCalorieRecord,
 } from "./calories";
 
 const describeDb = process.env.DATABASE_URL ? describe : describe.skip;
@@ -35,7 +36,13 @@ const describeDb = process.env.DATABASE_URL ? describe : describe.skip;
 const BASE_TIME_MS = new Date("2026-09-01T12:00:00.000Z").getTime();
 const HOUR_MS = 60 * 60 * 1000;
 
-type SummaryRow = { consumed_at: Date; quantity: number; kcal: number };
+/** 集計が取得する記録1件（品目の記録。一時項目の集計はDBを使うテストで確かめる） */
+type SummaryRow = {
+  consumed_at: Date;
+  quantity: number;
+  item_kcal: number | null;
+  temporary_name: string | null;
+};
 
 /**
  * 与えた記録だけを対象に集計する（DBと利用者設定はモックする）
@@ -57,7 +64,7 @@ async function summarizeRows(
     getDb: () => ({
       select: () => ({
         from: () => ({
-          innerJoin: () => ({ where: () => Promise.resolve(rows) }),
+          leftJoin: () => ({ where: () => Promise.resolve(rows) }),
           where: () => ({
             orderBy: () => ({
               limit: () =>
@@ -93,7 +100,8 @@ function makeRow(elapsedHours: number, kcal = 100): SummaryRow {
   return {
     consumed_at: new Date(BASE_TIME_MS - elapsedHours * HOUR_MS),
     quantity: 1,
-    kcal,
+    item_kcal: kcal,
+    temporary_name: null,
   };
 }
 
@@ -172,7 +180,8 @@ describe("達成状況", () => {
         TODAY_START_MS - daysAgo * 24 * HOUR_MS + 8 * HOUR_MS,
       ),
       quantity: 1,
-      kcal,
+      item_kcal: kcal,
+      temporary_name: null,
     };
   }
 
@@ -193,18 +202,20 @@ describe("達成状況", () => {
   });
 
   it("早朝4時の区切りと端末の時差で記録の日を分ける", async () => {
-    const rows = [
+    const rows: SummaryRow[] = [
       // 時差0では前日の3:59、時差+9時間では当日の12:59
       {
         consumed_at: new Date("2026-09-01T03:59:00.000Z"),
         quantity: 1,
-        kcal: 700,
+        item_kcal: 700,
+        temporary_name: null,
       },
       // 時差0では当日の4:00
       {
         consumed_at: new Date("2026-09-01T04:00:00.000Z"),
         quantity: 1,
-        kcal: 7000,
+        item_kcal: 7000,
+        temporary_name: null,
       },
     ];
 
@@ -373,6 +384,76 @@ describeDb("カロリー計算API", () => {
     ]);
   });
 
+  it("一時項目は品目と掛け算せず、同名の品目を後から作成しても一時項目のまま一覧と集計へ含める", async () => {
+    const userId = await createFixtureUser();
+    userIds.push(userId);
+    await createCalorieRecord(userId, {
+      consumed_at: "2026/08/31 12:00",
+      temporary_name: "外食",
+      quantity: 850,
+      tz_offset_minutes: 0,
+    });
+    const item = await createFixtureItem(userId, "外食");
+    await createCalorieRecord(userId, {
+      consumed_at: "2026/08/31 18:00",
+      item_id: item.id,
+      quantity: 2,
+      tz_offset_minutes: 0,
+    });
+
+    expect(await getAllCalorieRecords(userId)).toMatchObject([
+      {
+        item_id: item.id,
+        item_name: "外食",
+        total_kcal: 200,
+        temporary: false,
+      },
+      {
+        item_id: null,
+        item_name: "外食",
+        item_kcal: null,
+        quantity: 850,
+        total_kcal: 850,
+        temporary: true,
+      },
+    ]);
+    const summary = await getCalorieSummary(
+      userId,
+      0,
+      new Date("2026-09-01T12:00:00.000Z"),
+    );
+    // ペースは850×e^-1+200×e^-0.75、7日間平均は1050kcalを7日、28日間平均は28日で割った値
+    expect(summary.periods.map((period) => period.daily_kcal)).toEqual([
+      407, 150, 38,
+    ]);
+
+    const [converted] = await getAllCalorieRecords(userId);
+    await updateCalorieRecord(userId, {
+      recordId: converted.id,
+      consumed_at: "2026/08/31 18:00",
+      temporary_name: "外食",
+      quantity: 200,
+      tz_offset_minutes: 0,
+    });
+    await importCalorieRecords(
+      userId,
+      [
+        {
+          consumed_at: "2026/08/30 12:00",
+          item_name: "未登録の間食",
+          quantity: 300,
+          temporary: true,
+        },
+      ],
+      0,
+    );
+    expect(await getAllCalorieRecords(userId)).toMatchObject([
+      { item_id: null, total_kcal: 200, temporary: true },
+      { item_id: null, total_kcal: 850, temporary: true },
+      { item_name: "未登録の間食", total_kcal: 300, temporary: true },
+    ]);
+  });
+
   it("30日窓を端点込みで分割し、全記録取得は窓外も含める", async () => {
     const userId = await createFixtureUser();
     userIds.push(userId);
@@ -454,11 +535,13 @@ describeDb("カロリー計算API", () => {
             consumed_at: "2026/09/01 10:00",
             item_name: "既知",
             quantity: 1,
+            temporary: false,
           },
           {
             consumed_at: "2026/09/01 11:00",
             item_name: "未知",
             quantity: 1,
+            temporary: false,
           },
         ],
         0,

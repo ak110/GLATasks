@@ -223,16 +223,37 @@ export const UpdateCalorieItemSchema = CalorieItemInputSchema.extend({
   itemId: z.number().int().positive(),
 });
 
-export const CalorieRecordInputSchema = z.object({
+/**
+ * 記録の入力項目。品目の記録は`item_id`を、品目表へ登録しない一時項目の記録は
+ * `temporary_name`を、どちらか一方だけ指定する。一時項目の`quantity`はkcalとして扱う
+ */
+const CalorieRecordFieldsSchema = z.object({
   consumed_at: LocalMinuteSchema,
-  item_id: z.number().int().positive(),
+  item_id: z.number().int().positive().optional(),
+  temporary_name: z.string().trim().min(1).max(255).optional(),
   quantity: NonNegativeCalorieIntegerSchema,
   tz_offset_minutes: TimezoneOffsetSchema,
 });
 
-export const UpdateCalorieRecordSchema = CalorieRecordInputSchema.extend({
+function hasItemOrTemporaryName(data: {
+  item_id?: number;
+  temporary_name?: string;
+}): boolean {
+  return (data.item_id === undefined) !== (data.temporary_name === undefined);
+}
+
+const itemOrTemporaryNameMessage = {
+  message: "品目か一時項目名のどちらか一方を指定してください",
+};
+
+export const CalorieRecordInputSchema = CalorieRecordFieldsSchema.refine(
+  hasItemOrTemporaryName,
+  itemOrTemporaryNameMessage,
+);
+
+export const UpdateCalorieRecordSchema = CalorieRecordFieldsSchema.extend({
   recordId: z.number().int().positive(),
-});
+}).refine(hasItemOrTemporaryName, itemOrTemporaryNameMessage);
 
 export const CalorieRecordIdSchema = z.object({
   recordId: z.number().int().positive(),
@@ -256,6 +277,8 @@ export const CalorieRecordCsvRowSchema = z.object({
   consumed_at: LocalMinuteSchema,
   item_name: z.string().min(1).max(255),
   quantity: NonNegativeCalorieIntegerSchema,
+  // 一時項目の行は品目表と照合せず、quantityをkcalとして取り込む
+  temporary: z.boolean().default(false),
 });
 
 export const ImportCalorieItemsSchema = z.object({

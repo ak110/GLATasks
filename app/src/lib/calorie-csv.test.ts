@@ -90,21 +90,46 @@ describe("品目CSV", () => {
 });
 
 describe("記録CSV", () => {
-  it("固定ヘッダーで日時・品目・数量を往復する", () => {
-    const csv = exportCalorieRecordsCsv([
+  it("固定ヘッダーで日時・品目・数量・一時項目を往復する", () => {
+    const rows = [
       {
         consumed_at: "2026/09/01 12:34",
         item_name: "+食品",
         quantity: 2,
+        temporary: false,
       },
-    ]);
-    expect(parseCalorieRecordsCsv(csv)).toEqual([
       {
-        consumed_at: "2026/09/01 12:34",
-        item_name: "+食品",
+        consumed_at: "2026/09/01 19:00",
+        item_name: "外食",
+        quantity: 850,
+        temporary: true,
+      },
+    ];
+    const csv = exportCalorieRecordsCsv(rows);
+
+    expect(csv.split("\r\n")[0]).toBe("\uFEFF日時,品目,数量,一時項目");
+    expect(parseCalorieRecordsCsv(csv)).toEqual(rows);
+  });
+
+  it("一時項目の列を持たない旧形式は全行を品目の記録として取り込む", () => {
+    expect(
+      parseCalorieRecordsCsv("日時,品目,数量\r\n2026/09/01 12:00,食品,2\r\n"),
+    ).toEqual([
+      {
+        consumed_at: "2026/09/01 12:00",
+        item_name: "食品",
         quantity: 2,
+        temporary: false,
       },
     ]);
+  });
+
+  it("一時項目の列が1と空以外の行を拒否する", () => {
+    expect(() =>
+      parseCalorieRecordsCsv(
+        "日時,品目,数量,一時項目\r\n2026/09/01 12:00,外食,850,0\r\n",
+      ),
+    ).toThrow("2行目");
   });
 
   it("数量0の記録を出力し、そのまま再インポートする", () => {
@@ -113,6 +138,7 @@ describe("記録CSV", () => {
         consumed_at: "2026/09/01 12:34",
         item_name: "食品",
         quantity: 0,
+        temporary: false,
       },
     ];
 
@@ -124,6 +150,7 @@ describe("記録CSV", () => {
       consumed_at: `2026/09/01 12:${String(index).padStart(2, "0")}`,
       item_name: itemName,
       quantity: index + 1,
+      temporary: false,
     }));
     const csv = exportCalorieRecordsCsv(rows);
     const rawRows = Papa.parse<string[]>(csv.replace(/^\uFEFF/, ""), {

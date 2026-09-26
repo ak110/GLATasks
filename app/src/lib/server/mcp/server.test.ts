@@ -130,7 +130,7 @@ const TOOL_CONTRACTS: Record<string, readonly [string, readonly string[]]> = {
     ["tz_offset_minutes"],
   ],
   "calories.listRecords": [
-    "カロリーの摂取記録を30日単位で新しい順に取得する（window_offset は0で今日までの30日、1でその前の30日。tz_offset_minutes はUTCからの時差の分数で、日本時間は540）",
+    "カロリーの摂取記録を30日単位で新しい順に取得する（window_offset は0で今日までの30日、1でその前の30日。tz_offset_minutes はUTCからの時差の分数で、日本時間は540。品目表へ登録しない一時項目の記録は temporary が true で、quantity がkcal）",
     ["tz_offset_minutes", "window_offset"],
   ],
   "calories.listItems": [

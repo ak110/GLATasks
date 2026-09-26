@@ -1,19 +1,23 @@
 <script lang="ts">
+    import ConfirmDialog from "$lib/components/dialogs/ConfirmDialog.svelte";
     import CalorieEditDialog from "./CalorieEditDialog.svelte";
 
-    type Item = { id: number; name: string };
+    type Item = { id: number; name: string; kcal: number };
     type RecordRow = {
         id: number;
-        item_id: number;
+        item_id: number | null;
         item_name: string;
-        item_kcal: number;
+        item_kcal: number | null;
         consumed_at: string;
         quantity: number;
         total_kcal: number;
+        temporary: boolean;
     };
+    /** 品目の記録は`item_id`を、一時項目の記録は`temporary_name`を持つ */
     type RecordInput = {
         consumed_at: string;
-        item_id: number;
+        item_id?: number;
+        temporary_name?: string;
         quantity: number;
         tz_offset_minutes: number;
     };
@@ -41,6 +45,12 @@
     let consumedAt = $state(formatLocalMinute(new Date()));
     let itemName = $state("");
     let quantity = $state("1");
+    // 一時項目の記録を編集・コピーした間は、同名の品目があっても一時項目のまま扱う
+    let keepTemporary = $state(false);
+    let editForm = $state<HTMLFormElement | undefined>();
+    let conversion = $state<
+        { itemKcal: number; quantity: number; kcal: number } | undefined
+    >();
     let recordFilter = $state("");
     let visibleRecords = $derived.by(() => {
         const keyword = recordFilter.trim().toLowerCase();
@@ -50,6 +60,15 @@
                   record.item_name.toLowerCase().includes(keyword),
               );
     });
+    const matchedItem = $derived(
+        items.find((item) => item.name === itemName.trim()),
+    );
+    // 品目表に無い名前は一時項目として記録し、数量欄の値をkcalとして扱う。品目欄が空の間は判定しない
+    const temporary = $derived(
+        itemName.trim() !== "" && (keepTemporary || matchedItem === undefined),
+    );
+    const convertible = $derived(!keepTemporary && matchedItem !== undefined);
+    const quantityLabel = $derived(temporary ? "kcal" : "数量");
 
     // 操作メニュー外クリック/Escapeで閉じる
     $effect(() => {
@@ -86,6 +105,8 @@
         consumedAt = formatLocalMinute(new Date());
         itemName = "";
         quantity = "1";
+        keepTemporary = false;
+        conversion = undefined;
     }
 
     function edit(record: RecordRow) {
@@ -94,6 +115,7 @@
         consumedAt = formatLocalMinute(new Date(record.consumed_at));
         itemName = record.item_name;
         quantity = String(record.quantity);
+        keepTemporary = record.temporary;
     }
 
     function copy(record: RecordRow) {
@@ -102,6 +124,7 @@
         consumedAt = formatLocalMinute(new Date());
         itemName = record.item_name;
         quantity = String(record.quantity);
+        keepTemporary = record.temporary;
     }
 
     function remove(record: RecordRow) {
@@ -109,20 +132,55 @@
         onDelete(record);
     }
 
+    function parseQuantity(): number | undefined {
+        const value = Number(quantity);
+        return Number.isInteger(value) && value >= 0 ? value : undefined;
+    }
+
     async function submit(event: SubmitEvent) {
         event.preventDefault();
-        const item = items.find((candidate) => candidate.name === itemName);
-        const numericQuantity = Number(quantity);
-        if (!item || !Number.isInteger(numericQuantity) || numericQuantity < 0)
-            return;
+        const name = itemName.trim();
+        const numericQuantity = parseQuantity();
+        const target = temporary
+            ? { temporary_name: name }
+            : matchedItem && { item_id: matchedItem.id };
+        if (name === "" || !target || numericQuantity === undefined) return;
         const input = {
             consumed_at: consumedAt,
-            item_id: item.id,
+            ...target,
             quantity: numericQuantity,
             tz_offset_minutes: -new Date().getTimezoneOffset(),
         };
         if (editingId === undefined) await onCreate(input);
         else await onUpdate({ recordId: editingId, ...input });
+        resetForm();
+    }
+
+    /** 入力中の品目と数量から変換後のkcalを求め、確認ダイアログを開く */
+    function requestConversion() {
+        const numericQuantity = parseQuantity();
+        if (
+            !editForm?.reportValidity() ||
+            !matchedItem ||
+            numericQuantity === undefined
+        )
+            return;
+        conversion = {
+            itemKcal: matchedItem.kcal,
+            quantity: numericQuantity,
+            kcal: matchedItem.kcal * numericQuantity,
+        };
+    }
+
+    async function confirmConversion() {
+        if (!conversion || editingId === undefined) return;
+        await onUpdate({
+            recordId: editingId,
+            consumed_at: consumedAt,
+            temporary_name: itemName.trim(),
+            quantity: conversion.kcal,
+            tz_offset_minutes: -new Date().getTimezoneOffset(),
+        });
         resetForm();
     }
 </script>
@@ -155,68 +213,152 @@
         </div>
     </div>
 
-    {#snippet recordForm()}
+    {#snippet datetimeInput()}
+        <input
+            id="calorie-record-datetime"
+            bind:value={consumedAt}
+            required
+            pattern={"[0-9]{4}/[0-9]{2}/[0-9]{2} [0-9]{2}:[0-9]{2}"}
+            placeholder="yyyy/MM/dd HH:mm"
+            class="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-800 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+        />
+    {/snippet}
+    {#snippet itemInput()}
+        <input
+            id="calorie-record-item"
+            bind:value={itemName}
+            list="calorie-item-options"
+            required
+            maxlength="255"
+            placeholder="品目"
+            autocomplete="off"
+            class="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-800 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+        />
+        <datalist id="calorie-item-options">
+            {#each items as item (item.id)}<option value={item.name}
+                ></option>{/each}
+        </datalist>
+    {/snippet}
+    {#snippet quantityInput()}
+        <input
+            id="calorie-record-quantity"
+            bind:value={quantity}
+            required
+            type="number"
+            min="0"
+            step="1"
+            placeholder={quantityLabel}
+            class="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-800 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+        />
+    {/snippet}
+    <!-- 追加欄は数量の欄のラベルを表示しないため、kcalを入力することも案内する -->
+    {#snippet temporaryNotice(inDialog: boolean)}
+        <p
+            class="text-sm text-gray-600 dark:text-gray-300"
+            data-testid="calorie-record-temporary-notice"
+        >
+            {inDialog
+                ? "一時項目として記録します（品目表には登録しません）。"
+                : "一時項目として記録します。数量の欄にはkcalを入力してください。"}
+        </p>
+    {/snippet}
+
+    {#if editingId === undefined}
         <form
-            class={editingId === undefined
-                ? "mb-4 grid gap-2 sm:grid-cols-[9rem_minmax(0,1fr)_4rem_auto]"
-                : "grid gap-2"}
+            class="mb-4 grid gap-2 sm:grid-cols-[9rem_minmax(0,1fr)_4rem_auto]"
             onsubmit={submit}
         >
             <label class="sr-only" for="calorie-record-datetime">日時</label>
-            <input
-                id="calorie-record-datetime"
-                bind:value={consumedAt}
-                required
-                pattern={"[0-9]{4}/[0-9]{2}/[0-9]{2} [0-9]{2}:[0-9]{2}"}
-                placeholder="yyyy/MM/dd HH:mm"
-                class="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-800 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
-            />
+            {@render datetimeInput()}
             <label class="sr-only" for="calorie-record-item">品目</label>
-            <input
-                id="calorie-record-item"
-                bind:value={itemName}
-                list="calorie-item-options"
-                required
-                placeholder="品目"
-                autocomplete="off"
-                class="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-800 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
-            />
-            <datalist id="calorie-item-options">
-                {#each items as item (item.id)}<option value={item.name}
-                    ></option>{/each}
-            </datalist>
-            <label class="sr-only" for="calorie-record-quantity">数量</label>
-            <input
-                id="calorie-record-quantity"
-                bind:value={quantity}
-                required
-                type="number"
-                min="0"
-                step="1"
-                placeholder="数量"
-                class="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-800 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
-            />
+            {@render itemInput()}
+            <label class="sr-only" for="calorie-record-quantity"
+                >{quantityLabel}</label
+            >
+            {@render quantityInput()}
             <div class="flex gap-1">
                 <button
                     type="submit"
                     class="cursor-pointer rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700"
-                    >{editingId === undefined ? "追加" : "変更"}</button
+                    >追加</button
                 >
-                {#if editingId === undefined}<button
-                        type="button"
-                        onclick={resetForm}
-                        class="cursor-pointer rounded bg-gray-100 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
-                        >取消</button
-                    >{/if}
+                <button
+                    type="button"
+                    onclick={resetForm}
+                    class="cursor-pointer rounded bg-gray-100 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                    >取消</button
+                >
             </div>
+            {#if temporary}
+                <div class="sm:col-span-4">
+                    {@render temporaryNotice(false)}
+                </div>
+            {/if}
         </form>
-    {/snippet}
-    {#if editingId !== undefined}
-        <CalorieEditDialog title="記録の編集" onClose={resetForm}>
-            {@render recordForm()}
-        </CalorieEditDialog>
     {:else}
-        {@render recordForm()}
+        <CalorieEditDialog title="記録の編集" onClose={resetForm}>
+            <!-- ダイアログの幅が足りればラベルを左・入力欄を右に並べ、狭ければラベルの下に入力欄を置く -->
+            <form bind:this={editForm} class="@container" onsubmit={submit}>
+                <div
+                    class="grid gap-3 @sm:grid-cols-[4rem_minmax(0,1fr)] @sm:items-center"
+                >
+                    <div class="grid gap-1 @sm:contents">
+                        <label
+                            for="calorie-record-datetime"
+                            class="text-sm font-medium text-gray-700 dark:text-gray-200"
+                            >日時</label
+                        >
+                        {@render datetimeInput()}
+                    </div>
+                    <div class="grid gap-1 @sm:contents">
+                        <label
+                            for="calorie-record-item"
+                            class="text-sm font-medium text-gray-700 dark:text-gray-200"
+                            >品目</label
+                        >
+                        {@render itemInput()}
+                    </div>
+                    <div class="grid gap-1 @sm:contents">
+                        <label
+                            for="calorie-record-quantity"
+                            class="text-sm font-medium text-gray-700 dark:text-gray-200"
+                            >{quantityLabel}</label
+                        >
+                        {@render quantityInput()}
+                    </div>
+                </div>
+                {#if temporary}
+                    <div class="mt-3">{@render temporaryNotice(true)}</div>
+                {/if}
+                <div class="mt-5 flex items-center gap-2">
+                    {#if convertible}
+                        <button
+                            type="button"
+                            onclick={requestConversion}
+                            class="cursor-pointer rounded bg-gray-100 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                            >一時項目に変換</button
+                        >
+                    {/if}
+                    <button
+                        type="submit"
+                        class="ml-auto cursor-pointer rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700"
+                        >変更</button
+                    >
+                </div>
+            </form>
+            <!-- 編集ダイアログはshowModalで最前面に表示されるため、確認ダイアログをその内側へ描画して操作可能にする -->
+            <ConfirmDialog
+                open={conversion !== undefined}
+                title="一時項目への変換"
+                message={conversion
+                    ? `「${itemName.trim()}」を${conversion.kcal} kcal（${conversion.itemKcal} kcal × ${conversion.quantity}）の一時項目として保存します。変換後は品目のkcalを変更しても、この記録には反映されません。`
+                    : ""}
+                confirmLabel="変換"
+                variant="danger"
+                onConfirm={confirmConversion}
+                onCancel={() => (conversion = undefined)}
+            />
+        </CalorieEditDialog>
     {/if}
 
     <table class="w-full table-fixed text-left text-sm">
@@ -276,10 +418,17 @@
                             )}</span
                         >
                     </td>
-                    <td class="truncate p-2" title={record.item_name}
-                        >{record.item_name}</td
+                    <td class="truncate p-2" title={record.item_name}>
+                        {#if record.temporary}<span
+                                class="mr-1 rounded bg-gray-100 px-1 text-xs text-gray-600 dark:bg-gray-700 dark:text-gray-300"
+                                data-testid="calorie-record-temporary-badge"
+                                >一時</span
+                            >{/if}{record.item_name}
+                    </td>
+                    <!-- 一時項目は数量欄の値をkcalとして持つため、数量の列は空にする -->
+                    <td class="p-2 text-right"
+                        >{record.temporary ? "" : record.quantity}</td
                     >
-                    <td class="p-2 text-right">{record.quantity}</td>
                     <td class="p-2 text-right">{record.total_kcal}</td>
                     <td class="p-2 text-right">
                         <div class="relative" data-record-menu>

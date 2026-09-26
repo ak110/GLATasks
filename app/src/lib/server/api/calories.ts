@@ -2,7 +2,18 @@
  * @fileoverview カロリー計算API
  */
 
-import { and, asc, desc, eq, gte, lt, lte } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gte,
+  isNotNull,
+  lt,
+  lte,
+  or,
+  sql,
+} from "drizzle-orm";
 
 import {
   DEFAULT_CALORIE_GOAL_KCAL,
@@ -24,7 +35,24 @@ import { getUserPreferences } from "./users";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-type SummaryRow = { consumed_at: Date; quantity: number; kcal: number };
+type SummaryRow = { consumed_at: Date; total_kcal: number };
+
+/**
+ * 1件の記録の合計kcalを返す
+ *
+ * 一時項目は数量欄の値をkcalとして持ち、品目のkcalと掛け算しない。
+ */
+function recordTotalKcal(row: {
+  temporary_name: string | null;
+  item_kcal: number | null;
+  quantity: number;
+}): number {
+  if (row.temporary_name !== null) return row.quantity;
+  if (row.item_kcal === null) {
+    throw new Error("品目を参照しない記録に一時項目名がありません");
+  }
+  return row.item_kcal * row.quantity;
+}
 
 /**
  * 直近の摂取ペースを1日当たりのkcalとして返す
@@ -39,8 +67,7 @@ function dailyPaceKcal(rows: SummaryRow[], now: Date): number {
   return rows.reduce(
     (sum, row) =>
       sum +
-      row.kcal *
-        row.quantity *
+      row.total_kcal *
         Math.exp(-(now.getTime() - row.consumed_at.getTime()) / DAY_MS),
     0,
   );
@@ -51,7 +78,7 @@ function averageDailyKcal(rows: SummaryRow[], now: Date, days: number): number {
   const start = now.getTime() - days * DAY_MS;
   const total = rows.reduce(
     (sum, row) =>
-      row.consumed_at.getTime() >= start ? sum + row.kcal * row.quantity : sum,
+      row.consumed_at.getTime() >= start ? sum + row.total_kcal : sum,
     0,
   );
   return total / days;
@@ -66,12 +93,17 @@ export type CalorieItem = {
 
 export type CalorieRecord = {
   id: number;
-  item_id: number;
+  /** 一時項目ではnull */
+  item_id: number | null;
+  /** 品目の記録では品目名、一時項目では一時項目名 */
   item_name: string;
-  item_kcal: number;
+  /** 一時項目ではnull */
+  item_kcal: number | null;
   consumed_at: string;
+  /** 一時項目ではkcal */
   quantity: number;
   total_kcal: number;
+  temporary: boolean;
 };
 
 export type CalorieAutoRecord = {
@@ -254,6 +286,22 @@ export async function updateCalorieItem(
   }
 }
 
+/**
+ * 利用者の記録を選ぶ条件（品目との外部結合と組で使う）
+ *
+ * 一時項目の記録は品目を参照しないため外部結合で残し、
+ * 品目の記録は利用者自身の品目を参照するものだけを対象とする。
+ */
+function ownRecordCondition(userId: number) {
+  return and(
+    eq(calorieRecords.user_id, userId),
+    or(
+      isNotNull(calorieRecords.temporary_name),
+      eq(calorieItems.user_id, userId),
+    ),
+  );
+}
+
 async function selectRecords(
   userId: number,
   range?: { start: Date; endExclusive: Date },
@@ -268,25 +316,21 @@ async function selectRecords(
     .select({
       id: calorieRecords.id,
       item_id: calorieRecords.item_id,
-      item_name: calorieItems.name,
+      item_name: sql<string>`COALESCE(${calorieRecords.temporary_name}, ${calorieItems.name})`,
       item_kcal: calorieItems.kcal,
+      temporary_name: calorieRecords.temporary_name,
       consumed_at: calorieRecords.consumed_at,
       quantity: calorieRecords.quantity,
     })
     .from(calorieRecords)
-    .innerJoin(
-      calorieItems,
-      and(
-        eq(calorieItems.id, calorieRecords.item_id),
-        eq(calorieItems.user_id, userId),
-      ),
-    )
-    .where(and(eq(calorieRecords.user_id, userId), rangeCondition))
+    .leftJoin(calorieItems, eq(calorieItems.id, calorieRecords.item_id))
+    .where(and(ownRecordCondition(userId), rangeCondition))
     .orderBy(desc(calorieRecords.consumed_at), desc(calorieRecords.id));
-  return rows.map((row) => ({
+  return rows.map(({ temporary_name, ...row }) => ({
     ...row,
     consumed_at: row.consumed_at.toISOString(),
-    total_kcal: row.item_kcal * row.quantity,
+    total_kcal: recordTotalKcal({ ...row, temporary_name }),
+    temporary: temporary_name !== null,
   }));
 }
 
@@ -312,17 +356,34 @@ export async function getAllCalorieRecords(
   return selectRecords(userId);
 }
 
+/**
+ * 記録の品目参照又は一時項目名を保存値へ変換する
+ *
+ * 一時項目名は品目表と照合しない。同名の品目があっても一時項目のまま保存し、掛け算の対象にしない。
+ */
+async function recordTargetValues(
+  userId: number,
+  input: { item_id?: number; temporary_name?: string },
+): Promise<{ item_id: number | null; temporary_name: string | null }> {
+  if (input.temporary_name !== undefined) {
+    return { item_id: null, temporary_name: input.temporary_name };
+  }
+  if (input.item_id === undefined) throw new Error("calorie_item_not_found");
+  await assertOwnedItem(userId, input.item_id);
+  return { item_id: input.item_id, temporary_name: null };
+}
+
 export async function createCalorieRecord(
   userId: number,
   input: CalorieRecordInput,
 ): Promise<void> {
-  await assertOwnedItem(userId, input.item_id);
+  const target = await recordTargetValues(userId, input);
   const now = new Date();
   await getDb()
     .insert(calorieRecords)
     .values({
       user_id: userId,
-      item_id: input.item_id,
+      ...target,
       consumed_at: localMinuteToUtc(input.consumed_at, input.tz_offset_minutes),
       quantity: input.quantity,
       created: now,
@@ -334,7 +395,7 @@ export async function updateCalorieRecord(
   userId: number,
   input: UpdateCalorieRecordInput,
 ): Promise<void> {
-  await assertOwnedItem(userId, input.item_id);
+  const target = await recordTargetValues(userId, input);
   const existing = await getDb()
     .select({ id: calorieRecords.id })
     .from(calorieRecords)
@@ -349,7 +410,7 @@ export async function updateCalorieRecord(
   await getDb()
     .update(calorieRecords)
     .set({
-      item_id: input.item_id,
+      ...target,
       consumed_at: localMinuteToUtc(input.consumed_at, input.tz_offset_minutes),
       quantity: input.quantity,
       updated: new Date(),
@@ -669,7 +730,7 @@ function calculateAchievement(
       (todayStart - row.consumed_at.getTime()) / DAY_MS,
     );
     if (daysAgo >= 1 && daysAgo < totals.length) {
-      totals[daysAgo] += row.kcal * row.quantity;
+      totals[daysAgo] += row.total_kcal;
     }
   }
   const averageOf = (daysAgo: number): number | undefined => {
@@ -735,22 +796,26 @@ export async function getCalorieSummary(
         (ACHIEVEMENT_DAYS + ACHIEVEMENT_AVERAGE_DAYS - 1) * DAY_MS,
     ),
   );
-  const rows = await getDb()
+  const recordRows = await getDb()
     .select({
       consumed_at: calorieRecords.consumed_at,
       quantity: calorieRecords.quantity,
-      kcal: calorieItems.kcal,
+      item_kcal: calorieItems.kcal,
+      temporary_name: calorieRecords.temporary_name,
     })
     .from(calorieRecords)
-    .innerJoin(calorieItems, eq(calorieItems.id, calorieRecords.item_id))
+    .leftJoin(calorieItems, eq(calorieItems.id, calorieRecords.item_id))
     .where(
       and(
-        eq(calorieRecords.user_id, userId),
-        eq(calorieItems.user_id, userId),
+        ownRecordCondition(userId),
         gte(calorieRecords.consumed_at, start),
         lte(calorieRecords.consumed_at, now),
       ),
     );
+  const rows = recordRows.map((row) => ({
+    consumed_at: row.consumed_at,
+    total_kcal: recordTotalKcal(row),
+  }));
   const [firstRecord] = await getDb()
     .select({ consumed_at: calorieRecords.consumed_at })
     .from(calorieRecords)
@@ -825,12 +890,13 @@ export async function importCalorieRecords(
   const items = await getCalorieItems(userId);
   const itemIds = new Map(items.map((item) => [item.name, item.id]));
   const values = rows.map((row) => {
-    const itemId = itemIds.get(row.item_name);
+    const itemId = row.temporary ? null : itemIds.get(row.item_name);
     if (itemId === undefined) throw new Error("calorie_csv_unknown_item");
     const now = new Date();
     return {
       user_id: userId,
       item_id: itemId,
+      temporary_name: row.temporary ? row.item_name : null,
       consumed_at: localMinuteToUtc(row.consumed_at, offsetMinutes),
       quantity: row.quantity,
       created: now,

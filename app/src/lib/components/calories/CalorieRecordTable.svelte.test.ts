@@ -15,6 +15,7 @@ const record = {
   consumed_at: "2026-08-01T01:00:00.000Z",
   quantity: 2,
   total_kcal: 240,
+  temporary: false,
 };
 
 const secondRecord = {
@@ -71,7 +72,7 @@ describe("CalorieRecordTable", () => {
 
   it("数量0の記録を追加できる", async () => {
     const onCreate = vi.fn();
-    renderTable({ items: [{ id: 1, name: "食品" }], onCreate });
+    renderTable({ items: [{ id: 1, name: "食品", kcal: 120 }], onCreate });
 
     await fireEvent.input(screen.getByLabelText("品目"), {
       target: { value: "食品" },
@@ -102,9 +103,58 @@ describe("CalorieRecordTable", () => {
     expect(quantity.value).toBe("1");
   });
 
+  it("一時項目のコピーは同名の品目があっても一時項目のまま扱い、品目欄が空の間は案内せず、取消で引き継ぎを解除する", async () => {
+    const onCreate = vi.fn();
+    renderTable({
+      items: [{ id: 1, name: "外食", kcal: 100 }],
+      records: [
+        {
+          ...record,
+          item_id: null,
+          item_name: "外食",
+          item_kcal: null,
+          quantity: 850,
+          total_kcal: 850,
+          temporary: true,
+        },
+      ],
+      onCreate,
+    });
+
+    await fireEvent.click(screen.getByRole("button", { name: "記録の操作" }));
+    await fireEvent.click(screen.getByRole("menuitem", { name: "コピー" }));
+    expect(screen.getByLabelText("kcal")).toHaveValue(850);
+    await fireEvent.click(screen.getByRole("button", { name: "追加" }));
+    expect(onCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ temporary_name: "外食", quantity: 850 }),
+    );
+    expect(onCreate.mock.calls[0][0]).not.toHaveProperty("item_id");
+
+    await fireEvent.click(screen.getByRole("button", { name: "記録の操作" }));
+    await fireEvent.click(screen.getByRole("menuitem", { name: "コピー" }));
+    await fireEvent.input(screen.getByLabelText("品目"), {
+      target: { value: "" },
+    });
+    expect(
+      screen.queryByTestId("calorie-record-temporary-notice"),
+    ).not.toBeInTheDocument();
+    await fireEvent.click(screen.getByRole("button", { name: "取消" }));
+    await fireEvent.input(screen.getByLabelText("品目"), {
+      target: { value: "外食" },
+    });
+    expect(screen.getByLabelText("数量")).toBeInTheDocument();
+    expect(
+      screen.queryByTestId("calorie-record-temporary-notice"),
+    ).not.toBeInTheDocument();
+  });
+
   it("行の操作メニューからコピーと削除を実行できる", async () => {
     const onDelete = vi.fn();
-    renderTable({ records: [record], onDelete });
+    renderTable({
+      items: [{ id: 2, name: "食品", kcal: 120 }],
+      records: [record],
+      onDelete,
+    });
 
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
     await fireEvent.click(screen.getByRole("button", { name: "記録の操作" }));

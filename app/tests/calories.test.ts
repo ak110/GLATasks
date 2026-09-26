@@ -2,6 +2,8 @@
  * @fileoverview カロリー計算のエンドユーザー操作テスト
  */
 
+import { readFile } from "node:fs/promises";
+
 import {
   expect,
   test,
@@ -45,6 +47,32 @@ async function requireBoundingBox(locator: Locator) {
   const box = await locator.boundingBox();
   if (!box) throw new Error("要素の境界ボックスを取得できません");
   return box;
+}
+
+/**
+ * 編集ダイアログの欄のラベルと入力欄の配置を検証する
+ *
+ * 横幅が足りる場合はラベルが入力欄の左で同じ行に、狭い場合はラベルが入力欄の上に並ぶ。
+ */
+async function expectLabelPlacement(
+  dialog: Locator,
+  label: string,
+  sideBySide: boolean,
+): Promise<void> {
+  const labelBox = await requireBoundingBox(
+    dialog.locator("label", { hasText: new RegExp(`^${label}$`) }),
+  );
+  const inputBox = await requireBoundingBox(
+    dialog.getByLabel(label, { exact: true }),
+  );
+  if (sideBySide) {
+    expect(labelBox.x + labelBox.width).toBeLessThanOrEqual(inputBox.x);
+    const labelCenterY = labelBox.y + labelBox.height / 2;
+    expect(labelCenterY).toBeGreaterThan(inputBox.y);
+    expect(labelCenterY).toBeLessThan(inputBox.y + inputBox.height);
+  } else {
+    expect(labelBox.y + labelBox.height).toBeLessThanOrEqual(inputBox.y);
+  }
 }
 
 async function openRecordMenu(row: Locator): Promise<void> {
@@ -261,6 +289,25 @@ test.describe("calories", () => {
       await recordRow.getByRole("menuitem", { name: "編集" }).click();
       const recordDialog = page.getByRole("dialog", { name: "記録の編集" });
       await expect(recordDialog).toBeVisible();
+      // 幅393ではダイアログの内容が狭く、ラベルの下に入力欄を置く
+      const sideBySide = width === 1280;
+      for (const label of ["日時", "品目", "数量"]) {
+        await expectLabelPlacement(recordDialog, label, sideBySide);
+      }
+      const dialogBox = await requireBoundingBox(recordDialog);
+      const convertBox = await requireBoundingBox(
+        recordDialog.getByRole("button", { name: "一時項目に変換" }),
+      );
+      const submitBox = await requireBoundingBox(
+        recordDialog.getByRole("button", { name: "変更", exact: true }),
+      );
+      // 変換ボタンを左端側、変更ボタンを右端側へ置く
+      expect(convertBox.x - dialogBox.x).toBeLessThan(
+        dialogBox.x + dialogBox.width - (convertBox.x + convertBox.width),
+      );
+      expect(
+        dialogBox.x + dialogBox.width - (submitBox.x + submitBox.width),
+      ).toBeLessThan(submitBox.x - dialogBox.x);
       await expect(
         recordDialog.getByLabel("品目", { exact: true }),
       ).toHaveValue(itemName);
@@ -290,6 +337,9 @@ test.describe("calories", () => {
       await itemRow.getByRole("button", { name: "編集" }).click();
       const itemDialog = page.getByRole("dialog", { name: "品目の編集" });
       await expect(itemDialog).toBeVisible();
+      for (const label of ["品目名", "kcal", "備考"]) {
+        await expectLabelPlacement(itemDialog, label, sideBySide);
+      }
       await expect(itemDialog.getByLabel("品目名")).toHaveValue(itemName);
       await expect(itemDialog.getByLabel("kcal", { exact: true })).toHaveValue(
         "120",
@@ -376,7 +426,8 @@ test.describe("calories", () => {
     await itemResponse;
     await expect(page.getByRole("status")).toContainText("品目を1件追加");
 
-    const recordCsv = `\uFEFF日時,品目,数量\r\n2026/09/01 12:00,${itemName},2\r\n`;
+    const temporaryName = `CSV一時_${Date.now()}`;
+    const recordCsv = `\uFEFF日時,品目,数量,一時項目\r\n2026/09/01 12:00,${itemName},2,\r\n2026/09/01 19:00,${temporaryName},850,1\r\n`;
     await page.getByTestId("calorie-records-import").setInputFiles({
       name: "records.csv",
       mimeType: "text/csv",
@@ -399,6 +450,10 @@ test.describe("calories", () => {
     await page.getByRole("button", { name: "記録をエクスポート" }).click();
     const download = await downloadPromise;
     expect(download.suggestedFilename()).toBe("カロリー記録.csv");
+    // 取り込んだ一時項目は、エクスポートで一時項目の列が1の行になる
+    const exported = await readFile(await download.path(), "utf8");
+    expect(exported).toContain(`2026/09/01 19:00,${temporaryName},850,1`);
+    expect(exported).toContain(`2026/09/01 12:00,${itemName},2,`);
   });
 
   test("記録追加と目標値変更が別ブラウザへ同期される", async ({ browser }) => {
@@ -598,6 +653,145 @@ test.describe("calories achievement", () => {
       await expect(
         page.getByTestId("calorie-summary-ring"),
       ).toHaveAccessibleName(/^目標に対して11\d\.\d%$/);
+    } finally {
+      await context.close();
+    }
+  });
+});
+
+test.describe("calories temporary items", () => {
+  test("品目表に無い名前は一時項目として記録し、同名の品目を後から追加しても掛け算しない", async ({
+    browser,
+  }) => {
+    const { context, page } = await openCaloriesAsNewUser(browser);
+    try {
+      const name = "外食";
+      const quantity = page.locator("#calorie-record-quantity");
+      await page.locator("#calorie-record-item").fill(name);
+      await expect(
+        page.getByTestId("calorie-record-temporary-notice"),
+      ).toBeVisible();
+      await expect(quantity).toHaveAccessibleName("kcal");
+      await quantity.fill("450");
+      await addRecordNow(page, name);
+
+      const rows = page
+        .getByTestId("calorie-record-row")
+        .filter({ hasText: name });
+      await expect(rows).toHaveCount(1);
+      await expect(
+        rows.first().getByTestId("calorie-record-temporary-badge"),
+      ).toBeVisible();
+      await expect(rows.first().locator("td").nth(3)).toHaveText("450");
+      await expect(page.getByTestId("calorie-summary-pace")).toContainText(
+        "450 kcal",
+      );
+
+      await addItem(page, name, "100");
+      await openRecordMenu(rows.first());
+      await rows.first().getByTestId("calorie-record-copy").click();
+      await expect(
+        page.getByTestId("calorie-record-temporary-notice"),
+      ).toBeVisible();
+      await expect(quantity).toHaveValue("450");
+      const response = waitForSuccessfulMutationResponse(
+        page,
+        "calories.createRecord",
+      );
+      await page
+        .locator("#calorie-record-item")
+        .locator("..")
+        .getByRole("button", { name: "追加", exact: true })
+        .click();
+      await response;
+
+      await expect(rows).toHaveCount(2);
+      for (const row of await rows.all()) {
+        await expect(
+          row.getByTestId("calorie-record-temporary-badge"),
+        ).toBeVisible();
+        await expect(row.locator("td").nth(3)).toHaveText("450");
+      }
+    } finally {
+      await context.close();
+    }
+  });
+
+  test("記録の編集ダイアログから確認のうえ一時項目へ変換する", async ({
+    browser,
+  }) => {
+    const { context, page } = await openCaloriesAsNewUser(browser);
+    try {
+      const name = "変換元";
+      await addItem(page, name, "120");
+      await page.locator("#calorie-record-quantity").fill("2");
+      await addRecordNow(page, name);
+      const row = page
+        .getByTestId("calorie-record-row")
+        .filter({ hasText: name });
+      await expect(row).toContainText("240");
+
+      await openRecordMenu(row);
+      await row.getByRole("menuitem", { name: "編集" }).click();
+      const recordDialog = page.getByRole("dialog", { name: "記録の編集" });
+      const convertButton = recordDialog.getByRole("button", {
+        name: "一時項目に変換",
+      });
+      const confirm = page.getByRole("dialog", { name: "一時項目への変換" });
+
+      // 変換ボタンは品目名が品目表と一致する間だけ表示する
+      const itemInput = recordDialog.getByLabel("品目", { exact: true });
+      await itemInput.fill("");
+      await expect(convertButton).toHaveCount(0);
+      await itemInput.fill(name);
+      await expect(convertButton).toBeVisible();
+
+      // キャンセルとEscapeでは確認だけを閉じ、編集ダイアログと記録を保つ
+      await convertButton.click();
+      await expect(confirm).toContainText("240 kcal（120 kcal × 2）");
+      await confirm.getByRole("button", { name: "キャンセル" }).click();
+      await expect(confirm).toHaveCount(0);
+      await expect(recordDialog).toBeVisible();
+      await convertButton.click();
+      await expect(confirm).toBeVisible();
+      await page.keyboard.press("Escape");
+      await expect(confirm).toHaveCount(0);
+      await expect(recordDialog).toBeVisible();
+      await expect(recordDialog.getByLabel("数量")).toHaveValue("2");
+      await expect(
+        row.getByTestId("calorie-record-temporary-badge"),
+      ).toHaveCount(0);
+
+      await convertButton.click();
+      const response = waitForSuccessfulMutationResponse(
+        page,
+        "calories.updateRecord",
+      );
+      await confirm.getByRole("button", { name: "変換", exact: true }).click();
+      await response;
+      await expect(recordDialog).toHaveCount(0);
+      await expect(
+        row.getByTestId("calorie-record-temporary-badge"),
+      ).toBeVisible();
+      await expect(row.locator("td").nth(3)).toHaveText("240");
+
+      // 変換後は品目のkcalを変えても記録のkcalは変わらない
+      const itemRow = page
+        .getByTestId("calorie-item-row")
+        .filter({ hasText: name });
+      await itemRow.getByRole("button", { name: "編集" }).click();
+      const itemDialog = page.getByRole("dialog", { name: "品目の編集" });
+      await itemDialog.getByLabel("kcal", { exact: true }).fill("300");
+      const itemResponse = waitForSuccessfulMutationResponse(
+        page,
+        "calories.updateItem",
+      );
+      await itemDialog
+        .getByRole("button", { name: "変更", exact: true })
+        .click();
+      await itemResponse;
+      await expect(itemRow).toContainText("300");
+      await expect(row.locator("td").nth(3)).toHaveText("240");
     } finally {
       await context.close();
     }
