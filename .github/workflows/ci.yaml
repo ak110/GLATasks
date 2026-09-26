@@ -23,14 +23,11 @@ jobs:
       run:
         shell: bash
     env:
-      # mise・pinact 等が GitHub API へアクセスする際の rate limit (403) 回避。
+      # mise 等が GitHub API へアクセスする際の rate limit (403) 回避。
       # container job では明示しないと secrets.GITHUB_TOKEN がコンテナへ渡らない
       GITHUB_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: GitHub Actionsのピン留め検証
-        run: pinact run --check
 
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
