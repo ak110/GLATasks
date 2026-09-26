@@ -297,6 +297,9 @@ importers:
       textlint-rule-ja-no-abusage:
         specifier: ^3.0.0
         version: 3.0.0
+      textlint-rule-preset-ai-words-ja:
+        specifier: ^1.2.1
+        version: 1.2.1
       textlint-rule-preset-ja-technical-writing:
         specifier: ^12.0.2
         version: 12.0.2
@@ -4034,6 +4037,9 @@ packages:
 
   textlint-rule-no-zero-width-spaces@1.0.1:
     resolution: {integrity: sha512-AkxpzBILGB4YsXddzHx2xqpXmqMv5Yd+PQm4anUV+ADSJuwLP1Jd6yHf/LOtu9j3ps8K3XM9vQrXRK73z0bU3A==}
+
+  textlint-rule-preset-ai-words-ja@1.2.1:
+    resolution: {integrity: sha512-yTXyIn+3QvtTBffSqLAJoGfhCNkR6hjTlGbOJ6vnlN9/qhtqMWOo69DyYeDj7WVWjlljgxbadFkLQd6winGb1w==}
 
   textlint-rule-preset-ja-technical-writing@12.0.2:
     resolution: {integrity: sha512-BBVY6oA5V799k5wRfP+gCpDHsp6vWjWX2UT+/KLlAFFsNdmRB8Z6qyOnqiOjfzmLGIRgoMcPI1dXj5upOqnD6Q==}
@@ -8352,6 +8358,11 @@ snapshots:
       textlint-rule-helper: 2.5.0
 
   textlint-rule-no-zero-width-spaces@1.0.1: {}
+
+  textlint-rule-preset-ai-words-ja@1.2.1:
+    dependencies:
+      kuromojin: 3.0.1
+      morpheme-match-textlint: 2.0.6
 
   textlint-rule-preset-ja-technical-writing@12.0.2:
     dependencies:
