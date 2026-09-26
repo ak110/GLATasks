@@ -35,7 +35,11 @@ await Promise.all([
 
 ## 複数ブラウザ・マルチタブ
 
-`browser.newContext()`を使う場合は`baseURL`を明示する（`page.goto("/")`が動くため）。
+Playwright Testの`browser.newContext()`では、呼び出しで指定しなかったキーへ`playwright.config.ts`の`use`（`storageState`・`baseURL`・`ignoreHTTPSErrors`を含む）が既定値として入る。
+このため、オプションを省略したコンテキストは共通テスト利用者でログイン済みになる。
+未ログインのコンテキストや、テスト内で新しい利用者を登録するコンテキストでは`storageState: { cookies: [], origins: [] }`を明示する。
+省略すると`/auth/regist_user`などの認証画面がトップページへリダイレクトされる。
+新規利用者を登録する記述例は`app/tests/calories.test.ts`の`openCaloriesAsNewUser`にある。
 
 複数ブラウザ（多端末同期）のテスト:
 
