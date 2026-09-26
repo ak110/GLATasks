@@ -159,7 +159,7 @@ make backup
 ```
 
 バックアップ先: `${DATA_DIR}/backups/YYYYMMDD_HHMMSS/`（DBダンプ + キーファイル）。
-既定で直近5世代を保持する（`BACKUP_KEEP`環境変数で変更可能）。
+何も指定しなければ直近5世代を保持する（`BACKUP_KEEP`環境変数で変更可能）。
 DBコンテナが停止中の場合はエラー終了する。初回デプロイなどDBがない状態では`SKIP_DB_DUMP=1`でスキップ可能。
 
 ### リストア

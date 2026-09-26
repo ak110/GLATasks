@@ -27,7 +27,7 @@ SvelteKit + tRPC + Drizzleで構築し、Docker Composeで運用する。
   - Docker Compose環境は通常は開発マシン上で常時稼働しており`make test`（backup/e2eテスト含む）を実行できる
     - 停止している場合は`make start`で起動し、疎通を確認してからテストを実行する
       （疎通確認コマンド: `make healthcheck`）
-  - エージェント実行を示す環境変数がある環境では`run`がJSON Lines出力を既定で採用するため、
+  - エージェント実行を示す環境変数がある環境では`run`がオプションなしでJSON Lines形式で出力するため、
     診断結果をそのまま解釈できる。環境制約による指定ではない
 
 ## 実装上の不変条件・コーディング規約
@@ -71,7 +71,7 @@ Biomeへの移行は次の阻害要因により見送っている。
   `app/package.json`はルート`package.json`へのシンボリックリンクであり、
   `app/`配下から実行すると`pnpm-lock.yaml`に不正な`app:` importerセクションが生成され
   `--frozen-lockfile`検証が失敗する
-- 依存パッケージの版を切り替えて問題を切り分ける場合は、切り替えのたびに
+- 依存パッケージの版を切り替えて問題の原因を調べる場合は、切り替えのたびに
   `rm -rf node_modules && pnpm install`でクリーンインストールしてから検証する。
   `pnpm add`で版を切り替えても切り替え前の版が`node_modules/.pnpm`配下へ残り、
   型チェックが複数版の型定義を拾って実在しない失敗を報告する
@@ -98,7 +98,7 @@ Biomeへの移行は次の阻害要因により見送っている。
   Zodの`.max()`は文字数（UTF-16コード単位）を数えるため、日本語のような3バイト文字が
   多い本文では文字数ベースの上限だとバイト数の見積もりを誤る
   （`MAX_TASK_TEXT_BYTES`・`app/src/lib/schemas.ts`が実装例）
-- DBスキーマを変更する`pnpm run db:generate`（`drizzle-kit generate`）は、列の新規追加か既存列の改名かを判別できない場合に対話プロンプトを表示する。
+- DBスキーマを変更する`pnpm run db:generate`（`drizzle-kit generate`）は列の新規追加か既存列の改名かを判別できない場合に対話プロンプトを表示する。
   対話端末を持たない実行では当該プロンプトの表示時点で例外終了するため、
   `script -qec "pnpm run db:generate" /dev/null`のように疑似端末を割り当てたうえで
   列の追加か改名かの問いに応答し、生成されたマイグレーションファイルの内容を確認して手直しする

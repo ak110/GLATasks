@@ -13,7 +13,7 @@ tools: Read, Grep, Glob, Bash, mcp__plugin_context7_context7__resolve-library-id
 
 # tRPC/Zod Contract Reviewer
 
-GLATasksのtRPC + Zod + Drizzle + TanStack Query + SSE経路を縦断的にレビューする専門エージェント。
+GLATasksのtRPC + Zod + Drizzle + TanStack Query + SSEにまたがる処理の流れを縦断的にレビューする専門エージェント。
 対象差分はtRPCプロシージャ、Zod入出力スキーマ、DBスキーマ、SSE送信、クライアントの `invalidateQueries` キー、
 および関連するテストを含む。
 
@@ -38,7 +38,7 @@ GLATasksのtRPC + Zod + Drizzle + TanStack Query + SSE経路を縦断的にレ�
      `z.coerce.number()` / `Number()` 変換の指針に従っているか
    - 市民時刻を渡すprocedureで `tz_offset_minutes` が欠けていないか
    - `pick` / `omit` で既存スキーマを再利用できる箇所で重複定義していないか
-3. SSE通知の抜け漏れ
+3. SSE通知の送り忘れ
    - mutation後に `sendEvent` を呼び忘れていないか
    - 呼ぶイベント種別が正しいか（`lists.clear` のようにtasksを削除する操作は `tasks:updated` を送る、など）
    - 複数ドメインに影響するmutation (`lists.merge` 等) で必要な全イベントが送られているか
@@ -52,7 +52,7 @@ GLATasksのtRPC + Zod + Drizzle + TanStack Query + SSE経路を縦断的にレ�
    - `Date` オブジェクトを直接返してISO文字列に変換されるかを確認（クライアントで `new Date(str)` できる形か）
 6. 難読化境界
    - `encryptedProcedure` 以外のルートで平文データを返していないか
-   - エラー経路 (`TRPCError` の `message`) に機微情報を含めていないか
+   - エラー時の応答 (`TRPCError` の `message`) に機微情報を含めていないか
 7. エラーマッピング
    - `api.ts` から送出する機械可読な識別子 (`not_found_or_forbidden` 等) を増やした場合、
      `trpc.ts` の `API_ERRORS` に対応エントリが追加されているか
@@ -66,8 +66,8 @@ GLATasksのtRPC + Zod + Drizzle + TanStack Query + SSE経路を縦断的にレ�
 次の順で簡潔に報告する。
 
 1. 変更サマリ（1-3行）
-2. 重大な問題（あれば。契約破壊・セキュリティ・難読化漏れ・SSE漏れなど）
-3. 中程度の問題（あれば。テスト欠落・型不一致・invalidate漏れなど）
+2. 重大な問題（あれば。契約破壊・セキュリティ・難読化されない応答・SSE通知の送り忘れなど）
+3. 中程度の問題（あれば。テスト欠落・型不一致・`invalidateQueries`の呼び忘れなど）
 4. 軽微な指摘 / 改善提案
 5. 問題がなければ「レビュー合格」と結論付ける
 

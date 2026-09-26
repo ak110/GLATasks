@@ -20,7 +20,7 @@ description: >-
 # tRPC Procedure 追加手順 (GLATasks)
 
 新しいtRPC procedureを追加するときは、以下のチェックリストをTaskCreateに展開してから着手する。
-項目に漏れがあると、難読化漏れ、SSE通知漏れ、クライアント側の再取得漏れ、型不一致などの致命的なバグを招きやすい。
+項目を1つでも実施しないと、応答が難読化されないことやSSE通知が送られないこと、クライアントが再取得しないことや型が一致しないことなどの致命的なバグを招きやすい。
 
 ## チェックリスト
 
@@ -30,7 +30,7 @@ description: >-
 - 数値パラメータは `z.coerce.number()` か、呼び出し側で `Number()` 変換するかの方針を明示する（文字列混入を防ぐため）
 - 市民時刻を扱う場合は `tz_offset_minutes: z.number()` を必ず含める（既存のタイマー系スキーマを参照）
 - 型推論用の型エクスポート (`export type FooInput = z.infer<typeof FooSchema>`) は必要な場合のみ追加する
-- 取得系procedureが画面状態（表示範囲・表示種別など）を入力に取る場合、同種データを返す既存の全取得経路（tRPC・MCP）へ
+- 取得系procedureが画面状態（表示範囲・表示種別など）を入力に取る場合、同種データを返す既存の全取得手段（tRPC・MCP）へ
   当該入力が伝播しているか確認する
 
 ### 2. DB 層の実装
@@ -120,8 +120,8 @@ schemas.tsの命名規約は`<Verb><Domain>Schema`を基本とする（例: `Cre
 `trpc.attachments.download.query({ attachmentId })`等）と一致確認する。
 
 型迂回箇所（`as any`・`@ts-ignore`、および`vi.mock()`のモックファクトリで
-戻り値の型情報を失った状態の呼び出し等）では、引数キー不整合をTypeScript型検査で
-自動検出できない。
+戻り値の型情報を失った状態の呼び出し等）では、引数キーの不整合をTypeScriptの型チェックでは
+自動で検出できない。
 当該箇所は`app/src/lib/schemas.ts`の対応するスキーマ定義と引数キーが一致しているかを目視確認する。
 
 ## 参考ファイル

@@ -100,15 +100,15 @@ sequenceDiagram
   SSE側で何らかのイベントを受信した時点で健全へ復帰しポーリングを停止する。
   フォールバックはデータ再取得に専念し、リロード誘導は行わない。
   SSE接続自体はポーリング期間中も維持する
-- 検出はSSEとは独立した能動検出経路が担う。`/healthcheck`へ能動的にチェックし、
+- 接続の不健全検出はSSEの受信途絶監視とは独立した仕組みが担う。`/healthcheck`へ能動的に問い合わせ、
   HTTPステータス200・`application/json`・本文の`status`値が`ok`の3点が揃った場合のみ健全と判断する。
   キャプティブポータルはステータス200で認証用HTMLを返すことがあるため、
-  ステータスだけで判別せず`Content-Type`と本文の値まで検査する。
+  ステータスだけで判別せず`Content-Type`と本文の値まで確かめる。
   定期ポーリング（30秒間隔・非表示タブでは停止）に加え、可視復帰・オンライン復帰・
   SSE不健全遷移・操作失敗を前倒しトリガーとする。
   不健全検知時は、非入力中なら即時リロードして認証画面への遷移を促し、
   入力中ならバナーで案内し回復検知時に自動解除する
-- 接続判定と検出トリガーの正本は`app/src/lib/connectivity-check.js`である。アプリ本体の
+- 接続判定と検出トリガーは`app/src/lib/connectivity-check.js`が定める。アプリ本体の
   `connection-recovery.svelte.ts`とService Workerが返すオフライン画面
   （`app/src/routes/offline.html/+server.ts`）が同じモジュールを使う。オフライン画面は、
   オフライン時に追加のスクリプトを取得できずキャッシュ対象を増やせないため、Viteの`?raw`で
@@ -163,7 +163,7 @@ sequenceDiagram
 
 - 起動時と定期ポーリングの双方でfill-forward方式を採用する。
   各スケジュールの`last_fired`（未設定時は`created`）を起点に、現在時刻までの未発火分を遡って生成する
-- fill-forwardは`rrule`のiterator経路で発火予定を1件ずつ検出し、
+- fill-forwardは`rrule`のiteratorで発火予定を1件ずつ取り出し、
   上限30件に達した時点で走査を打ち切る。
   長期未発火の日次スケジュールでも全発火予定を配列化せずメモリ使用量を抑える
 - 上限30件を超える発火予定は31件目以降を生成せずスキップする。
@@ -251,7 +251,7 @@ const withApiErrors = t.middleware(async ({ next }) => {
   品目名又はkcalを変更すると、既存記録の表示と期間集計へ反映される。
   kcal、数量及び1日当たり目標値は整数で保持する。
   利用者ごとの1日当たり目標値は`users.preferences.calorie_goal_kcal`へ保持する
-- カロリーの自動記録設定（`calorie_auto_record`）は、現地の時刻`time_of_day`と登録時の`tz_offset_minutes`を組で保持する。
+- カロリーの自動記録設定（`calorie_auto_record`）は現地の時刻`time_of_day`と登録時の`tz_offset_minutes`を組で保持する。
   他のカロリー入力と同じく固定の時差で解釈するため、夏時間の切り替えには追随しない
 
 ### バイナリ保存と `max_allowed_packet`

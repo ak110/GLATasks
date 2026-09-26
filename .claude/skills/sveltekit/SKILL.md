@@ -109,7 +109,7 @@ Tailwind CSS v4の `@custom-variant dark` を使用。`<html>` に `.dark` ク�
   - 未充足なら同一計画内で修正する
 - `role="dialog"`要素上のwindow keydownリスナーまたはネストするダイアログの追加・変更時は、事前にkeydown競合を確認する
   - 競合時はガード条件（`confirmDeleteTarget === null`等）を付与するか、要素スコープ`onkeydown` + `stopPropagation`（`ImageLightbox.svelte`パターン）へ切り替える
-- ダイアログの`aria-label`・`role`・`<label for>`・`id`属性の変更・削除では、参照テストの照合対象名を事前検査する
+- ダイアログの`aria-label`・`role`・`<label for>`・`id`属性を変更または削除する前に、それらを名前で参照するテストを探して影響を確認する
   - 対象は`*.svelte.test.ts`・`*.spec.ts`の`getByRole`・`getByLabel`の`name`引数
   - 衝突するアクセシブル名変更が計画に無いかを確認する
 
@@ -135,7 +135,7 @@ Svelteはkey値の変化でコンポーネントインスタンスを再生成�
 
 ### アーキテクチャ前提（変更禁止の制約）
 
-tRPC v11 + Zod v3経路全体の前提条件。
+tRPC v11 + Zod v3を使う処理全体の前提条件。
 `add-trpc-procedure`スキルおよび`trpc-zod-contract-reviewer`エージェントはこの制約に従う。
 
 - ルーター本体は現状`app/src/lib/server/trpc.ts`単一だが、
