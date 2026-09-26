@@ -38,17 +38,33 @@
         dailyPeriod ? Math.min(Math.max(dailyPeriod.percentage, 0), 100) : 0,
     );
 
-    function colorClass(percentage: number): string {
-        if (percentage <= 95) {
-            return "border-sky-200 bg-sky-100 text-sky-950 dark:border-sky-700 dark:bg-sky-900/40 dark:text-sky-100";
-        }
-        if (percentage <= 105) {
-            return "border-gray-200 bg-white text-gray-900 dark:border-gray-600 dark:bg-gray-100 dark:text-gray-900";
-        }
-        if (percentage <= 110) {
-            return "border-yellow-300 bg-yellow-100 text-yellow-950 dark:border-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-100";
-        }
-        return "border-red-300 bg-red-100 text-red-950 dark:border-red-700 dark:bg-red-900/40 dark:text-red-100";
+    /** 1食分の目安。配色の境目はすべてこの量から決める */
+    const MEAL_KCAL = 700;
+    /** 平均が目標から離れたとみなす幅。1週間に1食分の差を1日当たりへ換算した値 */
+    const AVERAGE_MARGIN_KCAL = MEAL_KCAL / 7;
+
+    // 緑系は達成状況と同じ「目標内」の色とする。
+    // 目標の前後の細かい揺れでは色を変えないよう、1食分に満たない差は通常の色にする
+    const toneClasses = {
+        good: "border-emerald-300 bg-emerald-50 text-emerald-950 dark:border-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-100",
+        neutral:
+            "border-gray-200 bg-white text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100",
+        caution:
+            "border-amber-300 bg-amber-50 text-amber-950 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-100",
+    } as const;
+
+    /** 残りが1食分以上なら次の食事を取れる状態として緑系にする。食後の小さな超過は通常の色とする */
+    function paceColorClass(dailyKcal: number): string {
+        return goalKcal - dailyKcal >= MEAL_KCAL
+            ? toneClasses.good
+            : toneClasses.neutral;
+    }
+
+    function averageColorClass(dailyKcal: number): string {
+        const diff = dailyKcal - goalKcal;
+        if (diff <= -AVERAGE_MARGIN_KCAL) return toneClasses.good;
+        if (diff >= AVERAGE_MARGIN_KCAL) return toneClasses.caution;
+        return toneClasses.neutral;
     }
 
     function handleGoalSubmit(event: SubmitEvent) {
@@ -96,7 +112,7 @@
     <div class="grid gap-3 md:grid-cols-2">
         {#if dailyPeriod && remaining}
             <article
-                class={`flex items-center gap-4 rounded border p-4 ${colorClass(dailyPeriod.percentage)}`}
+                class={`flex items-center gap-4 rounded border p-4 ${paceColorClass(dailyPeriod.daily_kcal)}`}
                 data-testid="calorie-summary-1"
             >
                 <!-- 円周を100とし、目標比の分だけ円弧を伸ばす。目標を超えたら全周を塗る -->
@@ -161,7 +177,7 @@
         <div class="grid content-center gap-3">
             {#each averagePeriods as period (period.days)}
                 <article
-                    class={`flex flex-wrap items-baseline justify-between gap-2 rounded border p-4 ${colorClass(period.percentage)}`}
+                    class={`flex flex-wrap items-baseline justify-between gap-2 rounded border p-4 ${averageColorClass(period.daily_kcal)}`}
                     data-testid={`calorie-summary-${period.days}`}
                 >
                     <h3 class="text-sm font-semibold">

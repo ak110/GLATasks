@@ -9,21 +9,42 @@ import CalorieSummary from "./CalorieSummary.svelte";
 
 describe("CalorieSummary", () => {
   it.each([
-    [95.04, "bg-sky-100"],
-    [95.05, "bg-white"],
-    [105.04, "bg-white"],
-    [105.05, "bg-yellow-100"],
-    [110.04, "bg-yellow-100"],
-    [110.05, "bg-red-100"],
-  ] as const)("丸め後の割合 %s に対応する色を使う", (raw, color) => {
-    const percentage = Math.round(raw * 10) / 10;
-    const { getByTestId } = render(CalorieSummary, {
-      periods: [{ days: 1, daily_kcal: 100, percentage }],
-      goalKcal: 1615,
-      onSaveGoal: vi.fn(),
-    });
-    expect(getByTestId("calorie-summary-1")).toHaveClass(color);
-  });
+    [1515, "bg-emerald-50"],
+    [1516, "bg-white"],
+    [1714, "bg-white"],
+    [1715, "bg-amber-50"],
+  ] as const)(
+    "平均 %s kcal は目標との差が1日当たり100 kcal以上の場合だけ色を変える",
+    (dailyKcal, color) => {
+      const { getByTestId } = render(CalorieSummary, {
+        periods: [
+          { days: 7, daily_kcal: dailyKcal, percentage: 0 },
+          { days: 28, daily_kcal: dailyKcal, percentage: 0 },
+        ],
+        goalKcal: 1615,
+        onSaveGoal: vi.fn(),
+      });
+      expect(getByTestId("calorie-summary-7")).toHaveClass(color);
+      expect(getByTestId("calorie-summary-28")).toHaveClass(color);
+    },
+  );
+
+  it.each([
+    [915, "bg-emerald-50"],
+    [916, "bg-white"],
+    [1615, "bg-white"],
+    [2000, "bg-white"],
+  ] as const)(
+    "1日当たりペース %s kcal は目標までの残りが1食分以上の場合だけ緑系にする",
+    (dailyKcal, color) => {
+      const { getByTestId } = render(CalorieSummary, {
+        periods: [{ days: 1, daily_kcal: dailyKcal, percentage: 0 }],
+        goalKcal: 1615,
+        onSaveGoal: vi.fn(),
+      });
+      expect(getByTestId("calorie-summary-1")).toHaveClass(color);
+    },
+  );
 
   it("1日当たりkcalと割合を1行へまとめ、上下判定の状態文言を追加しない", () => {
     const { getByTestId, queryByText } = render(CalorieSummary, {

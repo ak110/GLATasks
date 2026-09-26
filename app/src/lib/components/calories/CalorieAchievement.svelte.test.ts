@@ -94,21 +94,22 @@ describe("CalorieAchievement", () => {
     expect(queryByTestId("calorie-achievement-streak")).not.toBeInTheDocument();
   });
 
-  it("昨日までの7日平均を表示し、判定前は案内を表示する", () => {
+  it("昨日までの7日平均は表示せず、判定前だけ案内を表示する", () => {
     const rated = render(CalorieAchievement, {
       achievement: makeAchievement(["missed"], { latest_average_kcal: 1690 }),
     });
-    expect(rated.getByTestId("calorie-achievement-average")).toHaveTextContent(
-      "昨日までの7日平均 1,690 kcal",
-    );
+    expect(rated.queryByText(/1,690/)).not.toBeInTheDocument();
+    expect(
+      rated.queryByTestId("calorie-achievement-guide"),
+    ).not.toBeInTheDocument();
     rated.unmount();
 
     const unrated = render(CalorieAchievement, {
       achievement: makeAchievement([], { latest_average_kcal: null }),
     });
-    expect(
-      unrated.getByTestId("calorie-achievement-average"),
-    ).toHaveTextContent("記録が7日分たまると判定を始めます");
+    expect(unrated.getByTestId("calorie-achievement-guide")).toHaveTextContent(
+      "記録が7日分たまると判定を始めます",
+    );
   });
 
   it.each([

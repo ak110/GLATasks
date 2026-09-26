@@ -531,9 +531,6 @@ test.describe("calories achievement", () => {
       await expect(page.getByTestId("calorie-achievement-streak")).toHaveText(
         "2日連続で目標内",
       );
-      await expect(page.getByTestId("calorie-achievement-average")).toHaveText(
-        "昨日までの7日平均 1,000 kcal",
-      );
       const days = page.getByTestId("calorie-achievement-day");
       await expect(days).toHaveCount(28);
       await expect(days.nth(27)).toHaveAttribute("data-status", "achieved");
@@ -550,9 +547,9 @@ test.describe("calories achievement", () => {
       await addItem(page, "超過", "2000");
       await bulkCreate(page, "超過", 8, 1);
 
-      await expect(page.getByTestId("calorie-achievement-average")).toHaveText(
-        "昨日までの7日平均 2,000 kcal",
-      );
+      await expect(
+        page.getByTestId("calorie-achievement-day").nth(26),
+      ).toHaveAttribute("data-status", "missed");
       await expect(page.getByTestId("calorie-achievement")).toHaveAttribute(
         "data-achieved",
         "false",
