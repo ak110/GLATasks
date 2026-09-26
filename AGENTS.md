@@ -67,10 +67,13 @@ Biomeへの移行は次の阻害要因により見送っている。
 - 特定のe2eテストだけを実行したい場合、`make test-e2e E2E_GREP="パターン"`で対象を限定できる
 - ブラウザ内蔵AI API（`Translator`・`LanguageDetector`・`LanguageModel`）はPlaywright同梱のChromiumに存在しない。
   これらに依存する画面のe2eテストは`page.addInitScript`でグローバルをスタブしてから検証する
-- 新規依存を追加する`pnpm add`はプロジェクトルートから実行する。
+- pnpmのコマンドは`add`・`exec`などのサブコマンドによらずリポジトリールートから起動し、
+  `app/`配下をカレントディレクトリーにしない（`--dir app`での起動も同じ）。
   `app/package.json`はルート`package.json`へのシンボリックリンクであり、
-  `app/`配下から実行すると`pnpm-lock.yaml`に不正な`app:` importerセクションが生成され
-  `--frozen-lockfile`検証が失敗する
+  `pnpm-workspace.yaml`の`packages`には`app`が無いため、`app/`配下で起動したpnpmは`app`を独立したプロジェクトとして扱う。
+  例えば`pnpm add`は`pnpm-lock.yaml`に不正な`app:` importerセクションを生成し、
+  `--frozen-lockfile`検証が失敗する。
+  `app`で実行ファイルを動かす場合は、ルートに導入済みの`node_modules/.bin`配下を直接呼ぶ
 - 依存パッケージの版を切り替えて問題の原因を調べる場合は、切り替えのたびに
   `rm -rf node_modules && pnpm install`でクリーンインストールしてから検証する。
   `pnpm add`で版を切り替えても切り替え前の版が`node_modules/.pnpm`配下へ残り、
@@ -110,8 +113,12 @@ Biomeへの移行は次の阻害要因により見送っている。
   （プロジェクト名は`docker compose config --format=json`の`name`で確認できる）。
   worktree内では`pnpm install --frozen-lockfile`のうえ`uvx pyfltr run <path>`までを実行し、
   E2Eとバックアップテストは主作業ツリーへ統合してから実行する
-- 新規に作成したgit worktreeでは、`pnpm install --frozen-lockfile`の後に`app`ディレクトリーで`pnpm exec svelte-kit sync`を実行し、`app/.svelte-kit/tsconfig.json`を生成してから検証コマンドを実行する。
+- 新規に作成したgit worktreeでは、`pnpm install --frozen-lockfile`を実行する。
+  その後に`app`ディレクトリーで`../node_modules/.bin/svelte-kit sync`を実行し、`app/.svelte-kit/tsconfig.json`を生成してから検証コマンドを実行する。
   `app/.svelte-kit`はgit管理外のため新しいworktreeには存在せず、生成前は`pnpm run test:unit`（`vitest run`）が`Tsconfig not found`と`[RESOLVE_ERROR] Could not resolve 'node:module'`で失敗する。
   `svelte-kit sync`はSvelteKitのルートである`app`で実行する。
   リポジトリールートで実行した場合はルート直下へ`.svelte-kit`を生成するため、`pnpm run test:unit`は失敗したままとなる。
+  `app`でpnpm経由で`svelte-kit sync`を実行すると、前述のとおりpnpmが`app`を独立したプロジェクトとして扱って依存の導入を始め、
+  `app/pnpm-lock.yaml`・`app/pnpm-workspace.yaml`・`app/node_modules`を生成したうえで`ERR_PNPM_IGNORED_BUILDS`で終了し、`svelte-kit sync`へ到達しない。
+  誤ってこれらを生成した場合は3つとも削除する。
   `pnpm run check`（`svelte-check`）は自身が`svelte-kit sync`を実行するため、この生成を前提としない
