@@ -96,8 +96,12 @@
         return `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
     }
 
-    function formatLocalMonthDayMinute(date: Date): string {
-        return `${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    function formatLocalMonthDay(date: Date): string {
+        return `${pad(date.getMonth() + 1)}/${pad(date.getDate())}`;
+    }
+
+    function formatLocalTime(date: Date): string {
+        return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
     }
 
     function resetForm() {
@@ -362,9 +366,10 @@
     {/if}
 
     <table class="w-full table-fixed text-left text-sm">
+        <!-- 狭い画面でも品目の列幅を残すため、日時を2行にし、数値の列を詰める -->
         <colgroup
-            ><col class="w-24 sm:w-36" /><col /><col class="w-16" /><col
-                class="w-16"
+            ><col class="w-14 sm:w-36" /><col /><col class="w-12 sm:w-16" /><col
+                class="w-14 sm:w-16"
             /><col class="w-10" /></colgroup
         >
         <thead
@@ -407,10 +412,16 @@
                     data-testid="calorie-record-row"
                 >
                     <td class="p-2 whitespace-nowrap">
-                        <span class="sm:hidden"
-                            >{formatLocalMonthDayMinute(
-                                new Date(record.consumed_at),
-                            )}</span
+                        <span class="grid sm:hidden"
+                            ><span
+                                >{formatLocalMonthDay(
+                                    new Date(record.consumed_at),
+                                )}</span
+                            ><span
+                                >{formatLocalTime(
+                                    new Date(record.consumed_at),
+                                )}</span
+                            ></span
                         >
                         <span class="hidden sm:inline"
                             >{formatLocalMinute(

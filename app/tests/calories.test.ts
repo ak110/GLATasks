@@ -204,13 +204,59 @@ test.describe("calories", () => {
       page,
       "calories.deleteAutoRecord",
     );
-    await row.getByRole("button", { name: "削除" }).click();
+    await row.getByTestId("calorie-auto-record-menu-btn").click();
+    await row.getByRole("menuitem", { name: "削除" }).click();
     await page
       .getByRole("dialog", { name: "自動記録の削除" })
       .getByRole("button", { name: "削除", exact: true })
       .click();
     await deleteResponse;
     await expect(row).toHaveCount(0);
+  });
+
+  test("幅320でも記録と自動記録の表の見出しと値が各列の幅に収まる", async ({
+    page,
+  }) => {
+    const itemName = `狭幅_${Date.now()}`;
+    await addItem(page, itemName, "1200");
+    await page.locator("#calorie-record-quantity").fill("3");
+    await addRecordNow(page, itemName);
+    await page.setViewportSize({ width: 320, height: 800 });
+
+    /** 要素の内容が、幅0でない列の幅に収まっているか */
+    const fitsInCell = (cell: Locator) =>
+      expect
+        .poll(() =>
+          cell.evaluate(
+            (element) =>
+              element.clientWidth > 0 &&
+              element.scrollWidth <= element.clientWidth,
+          ),
+        )
+        .toBe(true);
+
+    for (const titleId of [
+      "#calorie-records-title",
+      "#calorie-auto-records-title",
+    ]) {
+      const headers = page
+        .locator("section", { has: page.locator(titleId) })
+        .locator("thead tr")
+        .first()
+        .locator("th");
+      for (const header of await headers.all()) {
+        await fitsInCell(header);
+      }
+    }
+    // 品目名は省略表示するため、日時・数量・kcalの値を確かめる
+    const cells = page
+      .getByTestId("calorie-record-row")
+      .filter({ hasText: itemName })
+      .locator("td");
+    for (const index of [0, 2, 3]) {
+      await fitsInCell(cells.nth(index));
+    }
+    await expect(cells.nth(3)).toHaveText("3600");
   });
 
   test("期間を指定して記録を一括追加し、一括削除できる", async ({ page }) => {

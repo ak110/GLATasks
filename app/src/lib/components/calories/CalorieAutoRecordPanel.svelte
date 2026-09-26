@@ -35,9 +35,29 @@
     let { items, autoRecords, onCreate, onUpdate, onDelete }: Props = $props();
     let editing = $state<AutoRecord | undefined>();
     let deleteTarget = $state<AutoRecord | undefined>();
+    let openMenuId = $state<number | undefined>();
     let timeOfDay = $state("");
     let itemName = $state("");
     let quantity = $state("1");
+
+    // 操作メニュー外クリック/Escapeで閉じる
+    $effect(() => {
+        if (openMenuId === undefined) return;
+        const onClick = (event: MouseEvent) => {
+            const target = event.target as HTMLElement | null;
+            if (!target?.closest("[data-auto-record-menu]"))
+                openMenuId = undefined;
+        };
+        const onKey = (event: KeyboardEvent) => {
+            if (event.key === "Escape") openMenuId = undefined;
+        };
+        document.addEventListener("mousedown", onClick);
+        document.addEventListener("keydown", onKey);
+        return () => {
+            document.removeEventListener("mousedown", onClick);
+            document.removeEventListener("keydown", onKey);
+        };
+    });
 
     function tzOffsetMinutes(): number {
         return -new Date().getTimezoneOffset();
@@ -51,6 +71,7 @@
     }
 
     function edit(autoRecord: AutoRecord) {
+        openMenuId = undefined;
         editing = autoRecord;
         timeOfDay = autoRecord.time_of_day;
         itemName = autoRecord.item_name;
@@ -162,11 +183,12 @@
         {@render autoRecordForm()}
     {/if}
 
+    <!-- 狭い画面でも品目の列幅を残すため、行の操作は「⋯」メニューへまとめる -->
     <table class="w-full table-fixed text-left text-sm">
         <colgroup
             ><col class="w-16" /><col /><col class="w-14" /><col
                 class="w-14"
-            /><col class="w-28" /></colgroup
+            /><col class="w-10" /></colgroup
         >
         <thead
             class="border-b border-gray-200 text-gray-600 dark:border-gray-700 dark:text-gray-300"
@@ -199,19 +221,46 @@
                             class="cursor-pointer"
                         /></td
                     >
-                    <td class="p-2 text-right whitespace-nowrap">
-                        <button
-                            type="button"
-                            onclick={() => edit(autoRecord)}
-                            class="cursor-pointer rounded px-1.5 py-0.5 text-blue-600 hover:bg-gray-100 dark:text-blue-400 dark:hover:bg-gray-700"
-                            >編集</button
-                        >
-                        <button
-                            type="button"
-                            onclick={() => (deleteTarget = autoRecord)}
-                            class="cursor-pointer rounded px-1.5 py-0.5 text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/30"
-                            >削除</button
-                        >
+                    <td class="p-2 text-right">
+                        <div class="relative" data-auto-record-menu>
+                            <button
+                                type="button"
+                                onclick={() =>
+                                    (openMenuId =
+                                        openMenuId === autoRecord.id
+                                            ? undefined
+                                            : autoRecord.id)}
+                                class="cursor-pointer rounded px-1 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
+                                data-testid="calorie-auto-record-menu-btn"
+                                aria-label="自動記録の操作"
+                                aria-haspopup="menu"
+                                aria-expanded={openMenuId === autoRecord.id}
+                                title="操作">⋯</button
+                            >
+                            {#if openMenuId === autoRecord.id}
+                                <div
+                                    class="absolute top-full right-0 z-20 min-w-max rounded border border-gray-200 bg-white py-1 text-left shadow-lg dark:border-gray-600 dark:bg-gray-800"
+                                    role="menu"
+                                    data-testid="calorie-auto-record-menu"
+                                >
+                                    <button
+                                        type="button"
+                                        onclick={() => edit(autoRecord)}
+                                        class="block w-full cursor-pointer px-4 py-1.5 text-left text-blue-600 hover:bg-gray-100 dark:text-blue-400 dark:hover:bg-gray-700"
+                                        role="menuitem">編集</button
+                                    >
+                                    <button
+                                        type="button"
+                                        onclick={() => {
+                                            openMenuId = undefined;
+                                            deleteTarget = autoRecord;
+                                        }}
+                                        class="block w-full cursor-pointer px-4 py-1.5 text-left text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/30"
+                                        role="menuitem">削除</button
+                                    >
+                                </div>
+                            {/if}
+                        </div>
                     </td>
                 </tr>
             {:else}

@@ -53,11 +53,13 @@ describe("CalorieRecordTable", () => {
     expect(input.validity.patternMismatch).toBe(false);
   });
 
-  it("一覧の日時はモバイルで年を省略し広い画面で年を表示する", () => {
+  it("一覧の日時はモバイルで年を省略して日付と時刻を2行に分け、広い画面で年を表示する", () => {
     const consumedAt = new Date(2026, 7, 1, 1).toISOString();
     renderTable({ records: [{ ...record, consumed_at: consumedAt }] });
 
-    expect(screen.getByText("08/01 01:00")).toHaveClass("sm:hidden");
+    const mobile = screen.getByText("08/01").parentElement;
+    expect(mobile).toHaveClass("sm:hidden");
+    expect(mobile).toHaveTextContent("08/0101:00");
     expect(screen.getByText("2026/08/01 01:00")).toHaveClass(
       "hidden",
       "sm:inline",
