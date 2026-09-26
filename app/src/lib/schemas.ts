@@ -243,6 +243,10 @@ export const ListCalorieRecordsSchema = z.object({
   tz_offset_minutes: TimezoneOffsetSchema,
 });
 
+export const CalorieSummaryInputSchema = z.object({
+  tz_offset_minutes: TimezoneOffsetSchema,
+});
+
 export const CalorieItemCsvRowSchema = z.object({
   name: z.string().min(1, "品目名は必須です").max(255),
   kcal: PositiveCalorieIntegerSchema,

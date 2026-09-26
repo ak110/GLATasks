@@ -67,6 +67,28 @@ describe("CalorieSummary", () => {
     );
   });
 
+  it.each([
+    [45.5, "45.5 100"],
+    [100, "100 100"],
+    [111.5, "100 100"],
+  ] as const)(
+    "残量リングは目標比 %s%% の分だけ円弧を伸ばし、超過時は全周にする",
+    (percentage, dasharray) => {
+      const { getByTestId } = render(CalorieSummary, {
+        periods: [{ days: 1, daily_kcal: 1000, percentage }],
+        goalKcal: 1615,
+        onSaveGoal: vi.fn(),
+      });
+      expect(getByTestId("calorie-summary-ring-arc")).toHaveAttribute(
+        "stroke-dasharray",
+        dasharray,
+      );
+      expect(getByTestId("calorie-summary-ring")).toHaveAccessibleName(
+        `目標に対して${percentage.toFixed(1)}%`,
+      );
+    },
+  );
+
   it("目標値を超えた場合は超過量を表示する", () => {
     const { getByTestId } = render(CalorieSummary, {
       periods: [{ days: 1, daily_kcal: 1800, percentage: 111.5 }],

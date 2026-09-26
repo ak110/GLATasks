@@ -2,7 +2,7 @@
  * @fileoverview カロリー計算API
  */
 
-import { and, desc, eq, gte, lt, lte } from "drizzle-orm";
+import { and, asc, desc, eq, gte, lt, lte } from "drizzle-orm";
 
 import {
   DEFAULT_CALORIE_GOAL_KCAL,
@@ -601,16 +601,140 @@ export async function processCalorieAutoRecords(now: Date): Promise<number[]> {
   return [...notifiedUserIds];
 }
 
+/** 確定日の現地の区切り時刻。深夜の摂取を前日へ数える */
+const DAY_BOUNDARY_HOUR = 4;
+/** 達成状況を表示する確定日の数 */
+const ACHIEVEMENT_DAYS = 28;
+/** 達成を判定する平均の日数 */
+const ACHIEVEMENT_AVERAGE_DAYS = 7;
+
+export type CalorieAchievementStatus = "achieved" | "missed" | "unrated";
+
+export type CalorieAchievement = {
+  /** 直近の確定日（古い順）。日付は区切り時刻で始まる日の現地の年月日 */
+  days: Array<{
+    date: string;
+    average_kcal: number | null;
+    status: CalorieAchievementStatus;
+  }>;
+  /** 昨日から遡って続く達成日の数（最大で`days`の件数） */
+  streak_days: number;
+  /** 昨日の7日平均。判定対象外ならnull */
+  latest_average_kcal: number | null;
+  /** 昨日の7日平均から7日前の7日平均を引いた値。いずれかが判定対象外ならnull */
+  weekly_change_kcal: number | null;
+};
+
+/** 指定時刻を含む確定日の開始時刻をUTCで返す */
+function dayStartOf(value: Date, offsetMinutes: number): Date {
+  const shifted = new Date(value.getTime() - DAY_BOUNDARY_HOUR * 60 * 60_000);
+  return localToUtc(
+    toLocalDate(shifted, offsetMinutes),
+    { hour: DAY_BOUNDARY_HOUR, minute: 0 },
+    offsetMinutes,
+  );
+}
+
+function formatLocalDate(date: LocalDate): string {
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${date.year}/${pad(date.month)}/${pad(date.day)}`;
+}
+
+/**
+ * 確定日ごとの7日平均から達成状況を求める
+ *
+ * 当日は摂取が続くため判定しない。7日の窓が最初の記録の日より前へかかる日は、
+ * 記録を始める前の期間を0kcalとして達成扱いにしないよう判定対象外とする。
+ * 記録の無い日は0kcalとして平均へ含める。
+ */
+function calculateAchievement(
+  rows: SummaryRow[],
+  firstRecordAt: Date | undefined,
+  goal: number,
+  now: Date,
+  offsetMinutes: number,
+): CalorieAchievement {
+  const todayStart = dayStartOf(now, offsetMinutes).getTime();
+  const firstDayStart =
+    firstRecordAt === undefined
+      ? undefined
+      : dayStartOf(firstRecordAt, offsetMinutes).getTime();
+  // totals[n]は当日からn日前の確定日の合計（n=0は当日で使わない）
+  const totals = Array.from(
+    { length: ACHIEVEMENT_DAYS + ACHIEVEMENT_AVERAGE_DAYS },
+    () => 0,
+  );
+  for (const row of rows) {
+    const daysAgo = Math.ceil(
+      (todayStart - row.consumed_at.getTime()) / DAY_MS,
+    );
+    if (daysAgo >= 1 && daysAgo < totals.length) {
+      totals[daysAgo] += row.kcal * row.quantity;
+    }
+  }
+  const averageOf = (daysAgo: number): number | undefined => {
+    const windowStart =
+      todayStart - (daysAgo + ACHIEVEMENT_AVERAGE_DAYS - 1) * DAY_MS;
+    if (firstDayStart === undefined || windowStart < firstDayStart) {
+      return undefined;
+    }
+    const sum = totals
+      .slice(daysAgo, daysAgo + ACHIEVEMENT_AVERAGE_DAYS)
+      .reduce((acc, value) => acc + value, 0);
+    return sum / ACHIEVEMENT_AVERAGE_DAYS;
+  };
+
+  // 新しい順に求めてから古い順へ並べ替える
+  const newestFirst = Array.from({ length: ACHIEVEMENT_DAYS }, (_, index) => {
+    const daysAgo = index + 1;
+    const average = averageOf(daysAgo);
+    const averageKcal = average === undefined ? null : Math.round(average);
+    const status: CalorieAchievementStatus =
+      averageKcal === null
+        ? "unrated"
+        : averageKcal <= goal
+          ? "achieved"
+          : "missed";
+    return {
+      date: formatLocalDate(
+        toLocalDate(new Date(todayStart - daysAgo * DAY_MS), offsetMinutes),
+      ),
+      average_kcal: averageKcal,
+      status,
+    };
+  });
+  const missedIndex = newestFirst.findIndex((day) => day.status !== "achieved");
+  const latest = averageOf(1);
+  const previous = averageOf(1 + ACHIEVEMENT_AVERAGE_DAYS);
+  return {
+    days: [...newestFirst].reverse(),
+    streak_days: missedIndex === -1 ? ACHIEVEMENT_DAYS : missedIndex,
+    latest_average_kcal: latest === undefined ? null : Math.round(latest),
+    weekly_change_kcal:
+      latest === undefined || previous === undefined
+        ? null
+        : Math.round(latest - previous),
+  };
+}
+
 export async function getCalorieSummary(
   userId: number,
+  tzOffsetMinutes: number,
   now = new Date(),
 ): Promise<{
   goal_kcal: number;
   periods: Array<{ days: 1 | 7 | 28; daily_kcal: number; percentage: number }>;
+  achievement: CalorieAchievement;
 }> {
-  // 28日より前の記録は指数減衰の重みがexp(-28)まで下がり、
-  // 28日間平均の窓からも外れるため取得しない
-  const start = new Date(now.getTime() - 28 * DAY_MS);
+  // 28日間平均の窓と、達成状況の最も古い確定日の7日平均に要する日を取得する。
+  // それより前の記録は指数減衰の重みがexp(-28)未満となるため取得しない
+  const start = new Date(
+    Math.min(
+      now.getTime() - 28 * DAY_MS,
+      dayStartOf(now, tzOffsetMinutes).getTime() -
+        (ACHIEVEMENT_DAYS + ACHIEVEMENT_AVERAGE_DAYS - 1) * DAY_MS,
+    ),
+  );
   const rows = await getDb()
     .select({
       consumed_at: calorieRecords.consumed_at,
@@ -627,6 +751,12 @@ export async function getCalorieSummary(
         lte(calorieRecords.consumed_at, now),
       ),
     );
+  const [firstRecord] = await getDb()
+    .select({ consumed_at: calorieRecords.consumed_at })
+    .from(calorieRecords)
+    .where(eq(calorieRecords.user_id, userId))
+    .orderBy(asc(calorieRecords.consumed_at))
+    .limit(1);
   const preferences = await getUserPreferences(userId);
   const goal = preferences.calorie_goal_kcal ?? DEFAULT_CALORIE_GOAL_KCAL;
   const periods = ([1, 7, 28] as const).map((days) => {
@@ -638,7 +768,14 @@ export async function getCalorieSummary(
       percentage: Math.round((value / goal) * 1000) / 10,
     };
   });
-  return { goal_kcal: goal, periods };
+  const achievement = calculateAchievement(
+    rows,
+    firstRecord?.consumed_at,
+    goal,
+    now,
+    tzOffsetMinutes,
+  );
+  return { goal_kcal: goal, periods, achievement };
 }
 
 export async function importCalorieItems(

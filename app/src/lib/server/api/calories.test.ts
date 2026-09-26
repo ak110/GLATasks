@@ -37,14 +37,35 @@ const HOUR_MS = 60 * 60 * 1000;
 
 type SummaryRow = { consumed_at: Date; quantity: number; kcal: number };
 
-/** 与えた記録だけを対象に集計する（DBと利用者設定はモックする） */
-async function summarizeRows(rows: SummaryRow[], goalKcal = 1615) {
+/**
+ * 与えた記録だけを対象に集計する（DBと利用者設定はモックする）
+ *
+ * 最初の記録日時は省略時に与えた記録の最も古い日時とする。
+ */
+async function summarizeRows(
+  rows: SummaryRow[],
+  goalKcal = 1615,
+  options: { tzOffsetMinutes?: number; firstRecordAt?: Date } = {},
+) {
+  const firstRecordAt =
+    options.firstRecordAt ??
+    [...rows.map((row) => row.consumed_at)].sort(
+      (a, b) => a.getTime() - b.getTime(),
+    )[0];
   vi.resetModules();
   vi.doMock("../db", () => ({
     getDb: () => ({
       select: () => ({
         from: () => ({
           innerJoin: () => ({ where: () => Promise.resolve(rows) }),
+          where: () => ({
+            orderBy: () => ({
+              limit: () =>
+                Promise.resolve(
+                  firstRecordAt ? [{ consumed_at: firstRecordAt }] : [],
+                ),
+            }),
+          }),
         }),
       }),
     }),
@@ -55,7 +76,11 @@ async function summarizeRows(rows: SummaryRow[], goalKcal = 1615) {
 
   try {
     const { getCalorieSummary: getSummary } = await import("./calories");
-    return await getSummary(1, new Date(BASE_TIME_MS));
+    return await getSummary(
+      1,
+      options.tzOffsetMinutes ?? 0,
+      new Date(BASE_TIME_MS),
+    );
   } finally {
     vi.doUnmock("../db");
     vi.doUnmock("./users");
@@ -133,6 +158,156 @@ it("一定の速さで摂取し続けるとペースが1日当たり摂取量へ
   const expected = hourlyKcal * 24;
   const actual = summary.periods[0].daily_kcal;
   expect(Math.abs(actual - expected) / expected).toBeLessThanOrEqual(0.005);
+});
+
+describe("達成状況", () => {
+  // 時差0では2026-09-01T04:00Zが当日の開始で、それより前が確定日となる
+  const TODAY_START_MS = new Date("2026-09-01T04:00:00.000Z").getTime();
+  const LONG_AGO = new Date(TODAY_START_MS - 60 * 24 * HOUR_MS);
+
+  /** 指定した日数前の確定日の正午（UTC）に摂取した記録を返す */
+  function dayRow(daysAgo: number, kcal: number): SummaryRow {
+    return {
+      consumed_at: new Date(
+        TODAY_START_MS - daysAgo * 24 * HOUR_MS + 8 * HOUR_MS,
+      ),
+      quantity: 1,
+      kcal,
+    };
+  }
+
+  function daysRows(from: number, to: number, kcal: number): SummaryRow[] {
+    return Array.from({ length: to - from + 1 }, (_, index) =>
+      dayRow(from + index, kcal),
+    );
+  }
+
+  it("直近28確定日を古い順に並べ、当日を含めない", async () => {
+    const { achievement } = await summarizeRows([], 1615, {
+      firstRecordAt: LONG_AGO,
+    });
+
+    expect(achievement.days).toHaveLength(28);
+    expect(achievement.days[0].date).toBe("2026/08/04");
+    expect(achievement.days[27].date).toBe("2026/08/31");
+  });
+
+  it("早朝4時の区切りと端末の時差で記録の日を分ける", async () => {
+    const rows = [
+      // 時差0では前日の3:59、時差+9時間では当日の12:59
+      {
+        consumed_at: new Date("2026-09-01T03:59:00.000Z"),
+        quantity: 1,
+        kcal: 700,
+      },
+      // 時差0では当日の4:00
+      {
+        consumed_at: new Date("2026-09-01T04:00:00.000Z"),
+        quantity: 1,
+        kcal: 7000,
+      },
+    ];
+
+    const utc = await summarizeRows(rows, 1615, { firstRecordAt: LONG_AGO });
+    const jst = await summarizeRows(rows, 1615, {
+      firstRecordAt: LONG_AGO,
+      tzOffsetMinutes: 540,
+    });
+
+    expect(utc.achievement.latest_average_kcal).toBe(100);
+    expect(jst.achievement.latest_average_kcal).toBe(0);
+    expect(jst.achievement.days[27].date).toBe("2026/08/31");
+  });
+
+  it("7日平均が目標と等しい日を達成とし、超えた日で連続日数が止まる", async () => {
+    // 昨日の窓（1〜7日前）は平均1000、一昨日の窓（2〜8日前）は平均1001
+    const rows = [...daysRows(1, 7, 1000), dayRow(8, 1007)];
+
+    const { achievement } = await summarizeRows(rows, 1000, {
+      firstRecordAt: LONG_AGO,
+    });
+
+    expect(achievement.days[27]).toEqual({
+      date: "2026/08/31",
+      average_kcal: 1000,
+      status: "achieved",
+    });
+    expect(achievement.days[26].status).toBe("missed");
+    expect(achievement.streak_days).toBe(1);
+  });
+
+  it("最初の記録の日より前へかかる窓は判定対象外とする", async () => {
+    const rows = daysRows(1, 8, 100);
+
+    const { achievement } = await summarizeRows(rows);
+
+    // 8日前が最初の記録の日なので、1日前と2日前の窓だけが判定できる
+    expect(achievement.days.slice(-2).map((day) => day.status)).toEqual([
+      "achieved",
+      "achieved",
+    ]);
+    expect(achievement.days[25]).toEqual({
+      date: "2026/08/29",
+      average_kcal: null,
+      status: "unrated",
+    });
+    expect(achievement.streak_days).toBe(2);
+  });
+
+  it("記録が無い利用者はすべて判定対象外とする", async () => {
+    const { achievement } = await summarizeRows([]);
+
+    expect(achievement.days.every((day) => day.status === "unrated")).toBe(
+      true,
+    );
+    expect(achievement.streak_days).toBe(0);
+    expect(achievement.latest_average_kcal).toBeNull();
+    expect(achievement.weekly_change_kcal).toBeNull();
+  });
+
+  it("記録の無い日を0kcalとして平均へ含める", async () => {
+    // 30日前の記録だけがあり、以降の日は記録が無い
+    const { achievement } = await summarizeRows([dayRow(30, 700)]);
+
+    // 24日前の窓（24〜30日前）は平均100、それより新しい窓は平均0で、いずれも達成
+    expect(achievement.days[4]).toEqual({
+      date: "2026/08/08",
+      average_kcal: 100,
+      status: "achieved",
+    });
+    expect(achievement.days[3].status).toBe("unrated");
+    expect(achievement.latest_average_kcal).toBe(0);
+    expect(achievement.streak_days).toBe(24);
+  });
+
+  it("28確定日すべてが達成なら連続日数は28となる", async () => {
+    const { achievement } = await summarizeRows([], 1615, {
+      firstRecordAt: LONG_AGO,
+    });
+
+    expect(achievement.streak_days).toBe(28);
+  });
+
+  it("先週比は昨日の7日平均から7日前の7日平均を引いた値とする", async () => {
+    const rows = [...daysRows(1, 7, 1000), ...daysRows(8, 14, 1500)];
+
+    const decreased = await summarizeRows(rows);
+    const increased = await summarizeRows([
+      ...daysRows(1, 7, 1500),
+      ...daysRows(8, 14, 1000),
+    ]);
+
+    expect(decreased.achievement.latest_average_kcal).toBe(1000);
+    expect(decreased.achievement.weekly_change_kcal).toBe(-500);
+    expect(increased.achievement.weekly_change_kcal).toBe(500);
+  });
+
+  it("7日前の窓が判定対象外なら先週比を算出しない", async () => {
+    const { achievement } = await summarizeRows(daysRows(1, 10, 1000));
+
+    expect(achievement.latest_average_kcal).toBe(1000);
+    expect(achievement.weekly_change_kcal).toBeNull();
+  });
 });
 
 async function createFixtureUser(): Promise<number> {
@@ -256,6 +431,7 @@ describeDb("カロリー計算API", () => {
 
     const summary = await getCalorieSummary(
       userId,
+      0,
       new Date("2026-09-01T12:00:00.000Z"),
     );
     expect(summary.goal_kcal).toBe(1615);

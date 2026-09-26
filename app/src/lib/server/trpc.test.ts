@@ -45,7 +45,7 @@ vi.mock("$lib/server/crypto", () => ({
 
 const { appRouter } = await import("./trpc");
 const { createAttachment, deleteAttachment } = await import("$lib/server/api");
-const { createCalorieItem, getCalorieRecords } =
+const { createCalorieItem, getCalorieRecords, getCalorieSummary } =
   await import("$lib/server/api");
 const { sendEvent } = await import("$lib/server/sse");
 
@@ -156,6 +156,14 @@ describe("caloriesルーター", () => {
       SSE_EVENTS.caloriesUpdated,
       "tab-calorie",
     );
+  });
+
+  it("集計の入力の時差をAPIへ渡す", async () => {
+    const caller = appRouter.createCaller(makeCtx(42, null));
+
+    await caller.calories.summary({ tz_offset_minutes: 540 });
+
+    expect(getCalorieSummary).toHaveBeenCalledWith(42, 540);
   });
 
   it("品目名衝突をBAD_REQUESTへ変換する", async () => {

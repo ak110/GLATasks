@@ -34,6 +34,10 @@
         };
     });
 
+    const ringLength = $derived(
+        dailyPeriod ? Math.min(Math.max(dailyPeriod.percentage, 0), 100) : 0,
+    );
+
     function colorClass(percentage: number): string {
         if (percentage <= 95) {
             return "border-sky-200 bg-sky-100 text-sky-950 dark:border-sky-700 dark:bg-sky-900/40 dark:text-sky-100";
@@ -92,30 +96,66 @@
     <div class="grid gap-3 md:grid-cols-2">
         {#if dailyPeriod && remaining}
             <article
-                class={`flex flex-col justify-center gap-2 rounded border p-4 ${colorClass(dailyPeriod.percentage)}`}
+                class={`flex items-center gap-4 rounded border p-4 ${colorClass(dailyPeriod.percentage)}`}
                 data-testid="calorie-summary-1"
             >
-                <div
-                    class="flex flex-wrap items-baseline justify-between gap-2"
+                <!-- 円周を100とし、目標比の分だけ円弧を伸ばす。目標を超えたら全周を塗る -->
+                <svg
+                    viewBox="0 0 36 36"
+                    class="size-16 shrink-0 -rotate-90"
+                    role="img"
+                    aria-label={`目標に対して${dailyPeriod.percentage.toFixed(1)}%`}
+                    data-testid="calorie-summary-ring"
                 >
-                    <h3 class="text-sm font-semibold">{periodLabels[1]}</h3>
-                    <p
-                        class="text-xl font-bold"
-                        data-testid="calorie-summary-pace"
+                    <circle
+                        cx="18"
+                        cy="18"
+                        r="15.9155"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="3.5"
+                        class="opacity-15"
+                    />
+                    <circle
+                        cx="18"
+                        cy="18"
+                        r="15.9155"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="3.5"
+                        stroke-dasharray={`${ringLength} 100`}
+                        class="transition-[stroke-dasharray] duration-300 ease-out motion-reduce:transition-none"
+                        data-testid="calorie-summary-ring-arc"
+                    />
+                </svg>
+                <div class="flex min-w-0 flex-1 flex-col gap-2">
+                    <div
+                        class="flex flex-wrap items-baseline justify-between gap-2"
                     >
-                        {dailyPeriod.daily_kcal.toLocaleString("ja-JP")}
-                        <span class="text-base font-normal"
-                            >kcal ({dailyPeriod.percentage.toFixed(1)}%)</span
+                        <h3 class="text-sm font-semibold">{periodLabels[1]}</h3>
+                        <p
+                            class="text-xl font-bold"
+                            data-testid="calorie-summary-pace"
                         >
+                            {dailyPeriod.daily_kcal.toLocaleString("ja-JP")}
+                            <span class="text-base font-normal"
+                                >kcal ({dailyPeriod.percentage.toFixed(
+                                    1,
+                                )}%)</span
+                            >
+                        </p>
+                    </div>
+                    <p
+                        class="text-base"
+                        data-testid="calorie-summary-remaining"
+                    >
+                        {remaining.prefix}<span
+                            class="text-3xl font-bold"
+                            data-testid="calorie-summary-remaining-value"
+                            >{remaining.value}</span
+                        >{remaining.suffix}
                     </p>
                 </div>
-                <p class="text-base" data-testid="calorie-summary-remaining">
-                    {remaining.prefix}<span
-                        class="text-3xl font-bold"
-                        data-testid="calorie-summary-remaining-value"
-                        >{remaining.value}</span
-                    >{remaining.suffix}
-                </p>
             </article>
         {/if}
         <div class="grid content-center gap-3">

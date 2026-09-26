@@ -12,6 +12,7 @@
 
     import Header from "$lib/components/layout/Header.svelte";
     import PageScrollArea from "$lib/components/layout/PageScrollArea.svelte";
+    import CalorieAchievement from "$lib/components/calories/CalorieAchievement.svelte";
     import CalorieAutoRecordPanel from "$lib/components/calories/CalorieAutoRecordPanel.svelte";
     import CalorieBulkControls from "$lib/components/calories/CalorieBulkControls.svelte";
     import CalorieCsvControls from "$lib/components/calories/CalorieCsvControls.svelte";
@@ -71,8 +72,11 @@
     }));
     const summaryQuery = createQuery<RouterOutputs["calories"]["summary"]>(
         () => ({
-            queryKey: ["calories", "summary"] as const,
-            queryFn: () => trpc.calories.summary.query(),
+            queryKey: ["calories", "summary", tzOffsetMinutes] as const,
+            queryFn: () =>
+                trpc.calories.summary.query({
+                    tz_offset_minutes: tzOffsetMinutes,
+                }),
         }),
     );
 
@@ -220,6 +224,7 @@
                 goalKcal={summaryQuery.data.goal_kcal}
                 onSaveGoal={(goal) => updateGoalMutation.mutateAsync(goal)}
             />
+            <CalorieAchievement achievement={summaryQuery.data.achievement} />
         {/if}
         <div class="mt-5 grid gap-5 lg:grid-cols-[1.4fr_1fr]">
             <CalorieRecordTable

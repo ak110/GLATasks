@@ -450,3 +450,159 @@ test.describe("calories", () => {
     }
   });
 });
+
+/** 他のテストの記録に影響されないよう、新しく登録した利用者でカロリー計算を開く */
+async function openCaloriesAsNewUser(browser: Browser) {
+  // 設定ファイルの共通テスト利用者のログイン状態を引き継がないよう空の状態を渡す
+  const context = await browser.newContext({
+    baseURL: BASE_URL,
+    storageState: { cookies: [], origins: [] },
+    ignoreHTTPSErrors: true,
+  });
+  const page = await context.newPage();
+  const userId = `cal${Date.now()}${Math.random().toString(36).slice(2, 6)}`;
+  await page.goto("/auth/regist_user");
+  await page.fill('[name="user_id"]', userId);
+  await page.fill('[name="password"]', "e2etestpass123");
+  await page.fill('[name="password_confirm"]', "e2etestpass123");
+  await page.click('button[type="submit"]');
+  await page.waitForURL((url) => !url.pathname.startsWith("/auth/"), {
+    timeout: 30_000,
+  });
+  await openCalories(page);
+  return { context, page };
+}
+
+/**
+ * 早朝4時で区切った日で、指定した日数前の確定日の日付を返す
+ *
+ * 深夜0時〜4時に実行しても、記録が意図した確定日へ入るようにする。
+ */
+function confirmedDay(daysAgo: number): string {
+  const date = new Date(Date.now() - (4 + daysAgo * 24) * 60 * 60 * 1000);
+  const pad = (value: number) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+/** 指定した日数前の範囲の各確定日の正午へ、品目の記録を1件ずつ追加する */
+async function bulkCreate(
+  page: Page,
+  itemName: string,
+  fromDaysAgo: number,
+  toDaysAgo: number,
+): Promise<void> {
+  const createForm = page.getByTestId("calorie-bulk-create-form");
+  await createForm.getByLabel("開始日").fill(confirmedDay(fromDaysAgo));
+  await createForm.getByLabel("終了日").fill(confirmedDay(toDaysAgo));
+  await createForm.getByLabel("時刻").fill("12:00");
+  await createForm.getByLabel("品目").fill(itemName);
+  const response = waitForSuccessfulMutationResponse(
+    page,
+    "calories.bulkCreateRecords",
+  );
+  await createForm.getByRole("button", { name: "一括追加" }).click();
+  await response;
+}
+
+async function addRecordNow(page: Page, itemName: string): Promise<void> {
+  await page.locator("#calorie-record-item").fill(itemName);
+  const response = waitForSuccessfulMutationResponse(
+    page,
+    "calories.createRecord",
+  );
+  await page
+    .locator("#calorie-record-item")
+    .locator("..")
+    .getByRole("button", { name: "追加", exact: true })
+    .click();
+  await response;
+}
+
+test.describe("calories achievement", () => {
+  test("目標内の日が続くと達成状況を表示する", async ({ browser }) => {
+    const { context, page } = await openCaloriesAsNewUser(browser);
+    try {
+      await addItem(page, "目標内", "1000");
+      await bulkCreate(page, "目標内", 8, 1);
+
+      // 8日前が最初の記録の日なので、昨日と一昨日の2日が判定され、いずれも平均1000kcal
+      const block = page.getByTestId("calorie-achievement");
+      await expect(block).toHaveAttribute("data-achieved", "true");
+      await expect(page.getByTestId("calorie-achievement-streak")).toHaveText(
+        "2日連続で目標内",
+      );
+      await expect(page.getByTestId("calorie-achievement-average")).toHaveText(
+        "昨日までの7日平均 1,000 kcal",
+      );
+      const days = page.getByTestId("calorie-achievement-day");
+      await expect(days).toHaveCount(28);
+      await expect(days.nth(27)).toHaveAttribute("data-status", "achieved");
+      await expect(days.nth(26)).toHaveAttribute("data-status", "achieved");
+      await expect(days.nth(25)).toHaveAttribute("data-status", "unrated");
+    } finally {
+      await context.close();
+    }
+  });
+
+  test("目標超過が続くと達成表示をしない", async ({ browser }) => {
+    const { context, page } = await openCaloriesAsNewUser(browser);
+    try {
+      await addItem(page, "超過", "2000");
+      await bulkCreate(page, "超過", 8, 1);
+
+      await expect(page.getByTestId("calorie-achievement-average")).toHaveText(
+        "昨日までの7日平均 2,000 kcal",
+      );
+      await expect(page.getByTestId("calorie-achievement")).toHaveAttribute(
+        "data-achieved",
+        "false",
+      );
+      await expect(
+        page.getByTestId("calorie-achievement-streak"),
+      ).not.toBeAttached();
+      await expect(
+        page.getByTestId("calorie-achievement-day").nth(27),
+      ).toHaveAttribute("data-status", "missed");
+    } finally {
+      await context.close();
+    }
+  });
+
+  test("平均が下がると先週比を表示する", async ({ browser }) => {
+    const { context, page } = await openCaloriesAsNewUser(browser);
+    try {
+      await addItem(page, "前の週", "1500");
+      await addItem(page, "直近の週", "1000");
+      await bulkCreate(page, "前の週", 14, 8);
+      await bulkCreate(page, "直近の週", 7, 1);
+
+      await expect(
+        page.getByTestId("calorie-achievement-weekly-change"),
+      ).toHaveText("先週より −500 kcal/日");
+    } finally {
+      await context.close();
+    }
+  });
+
+  test("残量リングが目標比を示す", async ({ browser }) => {
+    const { context, page } = await openCaloriesAsNewUser(browser);
+    try {
+      await addItem(page, "少なめ", "800");
+      await addItem(page, "多め", "1000");
+      const arc = page.getByTestId("calorie-summary-ring-arc");
+
+      // 初期目標1615kcalに対し、直後の摂取800kcalはおよそ49.5%
+      await addRecordNow(page, "少なめ");
+      await expect(arc).toHaveAttribute("stroke-dasharray", /^49\.\d 100$/);
+
+      // 合計1800kcalで目標を超えると全周になる
+      await addRecordNow(page, "多め");
+      await expect(arc).toHaveAttribute("stroke-dasharray", "100 100");
+      await expect(
+        page.getByTestId("calorie-summary-ring"),
+      ).toHaveAccessibleName(/^目標に対して11\d\.\d%$/);
+    } finally {
+      await context.close();
+    }
+  });
+});

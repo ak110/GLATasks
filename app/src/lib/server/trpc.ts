@@ -36,6 +36,7 @@ import {
   UpdateCalorieRecordSchema,
   CalorieRecordIdSchema,
   ListCalorieRecordsSchema,
+  CalorieSummaryInputSchema,
   ImportCalorieItemsSchema,
   ImportCalorieRecordsSchema,
   BulkCreateCalorieRecordsSchema,
@@ -371,9 +372,11 @@ export const appRouter = t.router({
       ),
     ),
 
-    summary: encryptedProcedure.query(async ({ ctx }) => {
-      return api.getCalorieSummary(ctx.userId);
-    }),
+    summary: encryptedProcedure
+      .input(CalorieSummaryInputSchema)
+      .query(async ({ ctx, input }) => {
+        return api.getCalorieSummary(ctx.userId, input.tz_offset_minutes);
+      }),
 
     importItems: encryptedProcedure
       .input(ImportCalorieItemsSchema)
