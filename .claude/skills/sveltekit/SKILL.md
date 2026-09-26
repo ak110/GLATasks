@@ -135,7 +135,7 @@ Svelteはkey値の変化でコンポーネントインスタンスを再生成�
 
 ### アーキテクチャ前提（変更禁止の制約）
 
-tRPC v11 + Zod v3を使う処理全体の前提条件。
+tRPC v11 + Zod 4を使う処理全体の前提条件。
 `add-trpc-procedure`スキルおよび`trpc-zod-contract-reviewer`エージェントはこの制約に従う。
 
 - ルーター本体は現状`app/src/lib/server/trpc.ts`単一だが、
@@ -156,7 +156,9 @@ tRPC v11 + Zod v3を使う処理全体の前提条件。
   タイマー起動時刻のように「市民時刻」を扱う場合は、既存のタイマー系プロシージャを参考に
   `tz_offset_minutes`を入力スキーマに含める
 - 数値はJSONボディで文字列として届くことがあるため、Zod側で`z.coerce.number()`もしくは
-  `z.number()` + 上流での`Number()`変換のどちらか一方を明示的に採用する
+  `z.number()` + 上流での`Number()`変換のどちらか一方を明示的に採用する。
+  Zod 4では`z.coerce.number()`の入力型が`unknown`になり、tRPCクライアント側で推論される入力型からそのフィールドの`number`の制約が外れるため、
+  クライアントの入力型で`number`を強制したい場合は後者を選ぶ
 - APIハンドラ（`app/src/lib/server/api/`配下）の関数引数は`Record<string, unknown>`を使わず、
   Zodスキーマから`z.infer`で得た型を引数に取る。Drizzleの型推論が正しく機能する形を維持する
 
