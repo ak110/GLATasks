@@ -20,6 +20,7 @@ function renderTable(overrides: Record<string, unknown> = {}) {
     onUpdate: vi.fn(),
     onDelete: vi.fn(),
     filterKeywords: [],
+    onClearFilter: vi.fn(),
     ...overrides,
   });
 }

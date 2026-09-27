@@ -1,6 +1,7 @@
 <script lang="ts">
     import ConfirmDialog from "$lib/components/dialogs/ConfirmDialog.svelte";
     import CalorieEditDialog from "./CalorieEditDialog.svelte";
+    import CalorieFilterStatus from "./CalorieFilterStatus.svelte";
 
     type Item = { id: number; name: string; kcal: number; note: string };
     type ItemInput = { name: string; kcal: number; note: string };
@@ -14,8 +15,9 @@
         onDelete: (itemId: number) => unknown;
         /** 追加フォームの品目名欄の値。ページが両表の検索語として使う */
         addName?: string;
-        /** 正規化済みの検索語。全ての語がそれぞれ品目名か備考に含まれる品目だけを表示する */
+        /** 前後の空白を除いた検索語。大文字小文字を区別せず、全ての語がそれぞれ品目名か備考に含まれる品目だけを表示する */
         filterKeywords: string[];
+        onClearFilter: () => void;
     };
 
     let {
@@ -26,6 +28,7 @@
         onDelete,
         addName = $bindable(""),
         filterKeywords,
+        onClearFilter,
     }: Props = $props();
     let editingId = $state<number | undefined>();
     let openMenuId = $state<number | undefined>();
@@ -39,10 +42,10 @@
         items.filter((item) => {
             const itemName = item.name.toLowerCase();
             const itemNote = item.note.toLowerCase();
-            return filterKeywords.every(
-                (keyword) =>
-                    itemName.includes(keyword) || itemNote.includes(keyword),
-            );
+            return filterKeywords.every((keyword) => {
+                const lowered = keyword.toLowerCase();
+                return itemName.includes(lowered) || itemNote.includes(lowered);
+            });
         }),
     );
 
@@ -226,6 +229,7 @@
     {/if}
 
     <!-- 横スクロールの要素で囲むと、最後の行の「⋯」メニューが表の下端で切り取られるため囲まない -->
+    <CalorieFilterStatus keywords={filterKeywords} onClear={onClearFilter} />
     <table class="w-full table-fixed text-left text-sm">
         <colgroup
             ><col /><col class="w-16" /><col class="w-20" /><col

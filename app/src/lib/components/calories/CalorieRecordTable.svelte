@@ -1,6 +1,7 @@
 <script lang="ts">
     import ConfirmDialog from "$lib/components/dialogs/ConfirmDialog.svelte";
     import CalorieEditDialog from "./CalorieEditDialog.svelte";
+    import CalorieFilterStatus from "./CalorieFilterStatus.svelte";
 
     type Item = { id: number; name: string; kcal: number };
     type RecordRow = {
@@ -31,8 +32,9 @@
         onDelete: (record: RecordRow) => void;
         /** 追加フォームの品目欄の値。ページが両表の検索語として使う */
         addItemName?: string;
-        /** 正規化済みの検索語。全ての語を品目名に含む記録だけを表示する */
+        /** 前後の空白を除いた検索語。大文字小文字を区別せず、全ての語を品目名に含む記録だけを表示する */
         filterKeywords: string[];
+        onClearFilter: () => void;
     };
 
     let {
@@ -45,6 +47,7 @@
         onDelete,
         addItemName = $bindable(""),
         filterKeywords,
+        onClearFilter,
     }: Props = $props();
     let editingId = $state<number | undefined>();
     let openMenuId = $state<number | undefined>();
@@ -64,7 +67,9 @@
     const visibleRecords = $derived(
         records.filter((record) => {
             const name = record.item_name.toLowerCase();
-            return filterKeywords.every((keyword) => name.includes(keyword));
+            return filterKeywords.every((keyword) =>
+                name.includes(keyword.toLowerCase()),
+            );
         }),
     );
     const matchedItem = $derived(
@@ -380,6 +385,7 @@
         </CalorieEditDialog>
     {/if}
 
+    <CalorieFilterStatus keywords={filterKeywords} onClear={onClearFilter} />
     <table class="w-full table-fixed text-left text-sm">
         <!-- 狭い画面でも品目の列幅を残すため、日時を2行にし、数値の列を詰める -->
         <colgroup

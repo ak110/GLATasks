@@ -44,9 +44,14 @@
     let itemAddName = $state("");
     const filterKeywords = $derived(
         [recordAddItemName, itemAddName]
-            .map((value) => value.trim().toLowerCase())
+            .map((value) => value.trim())
             .filter((keyword) => keyword !== ""),
     );
+
+    function clearFilter() {
+        recordAddItemName = "";
+        itemAddName = "";
+    }
     const tzOffsetMinutes = -new Date().getTimezoneOffset();
 
     const itemsQuery = createQuery<RouterOutputs["calories"]["items"]>(() => ({
@@ -266,6 +271,7 @@
                 onDelete={(record) => (deleteTarget = record)}
                 bind:addItemName={recordAddItemName}
                 {filterKeywords}
+                onClearFilter={clearFilter}
             />
             <CalorieItemTable
                 {items}
@@ -275,6 +281,7 @@
                 onDelete={(itemId) => deleteItemMutation.mutateAsync(itemId)}
                 bind:addName={itemAddName}
                 {filterKeywords}
+                onClearFilter={clearFilter}
             />
         </div>
         <div class="mt-5 grid gap-5 lg:grid-cols-2">

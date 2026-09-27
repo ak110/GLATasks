@@ -917,7 +917,9 @@ test.describe("calories filter", () => {
       const itemInput = page.locator("#calorie-item-name");
       const records = page.getByTestId("calorie-record-row");
       const items = page.getByTestId("calorie-item-row");
+      const statuses = page.getByTestId("calorie-filter-status");
       await expect(page.getByRole("searchbox")).toHaveCount(0);
+      await expect(statuses).toHaveCount(0);
       await expect(records).toHaveCount(2);
       await expect(items).toHaveCount(2);
 
@@ -933,6 +935,11 @@ test.describe("calories filter", () => {
       await expect(records).toHaveCount(1);
       await expect(items).toHaveCount(1);
       await itemInput.fill("バナナ");
+      // 検索中は両表に検索語を示す
+      await expect(statuses).toHaveCount(2);
+      for (const status of await statuses.all()) {
+        await expect(status).toHaveText(/「apple」「バナナ」で検索中/);
+      }
       await expect(records).toHaveCount(0);
       await expect(page.getByText("該当する記録はありません")).toBeVisible();
       await expect(items).toHaveCount(0);
@@ -945,7 +952,15 @@ test.describe("calories filter", () => {
       await expect(items).toContainText("バナナ");
       await expect(records).toHaveCount(0);
 
-      await itemInput.fill("");
+      // 解除ボタンは両方の追加欄を空にして全件表示へ戻す
+      await recordInput.fill("apple");
+      await statuses
+        .first()
+        .getByRole("button", { name: "検索を解除" })
+        .click();
+      await expect(recordInput).toHaveValue("");
+      await expect(itemInput).toHaveValue("");
+      await expect(statuses).toHaveCount(0);
       await expect(records).toHaveCount(2);
       await expect(items).toHaveCount(2);
 
