@@ -636,9 +636,18 @@ test.describe("calories achievement", () => {
       await expect(days.nth(2)).toHaveAttribute("data-status", "unrated");
 
       await page.setViewportSize({ width: 320, height: 800 });
-      await expect(page.getByTestId("calorie-achievement-order")).toContainText(
-        "昨日 → 28日前（横にスクロール）",
-      );
+      const order = page.getByTestId("calorie-achievement-order");
+      await expect(order).toContainText("昨日 → 28日前（横にスクロール）");
+      await expect(order).toBeInViewport();
+      await expect
+        .poll(() =>
+          page
+            .getByRole("main")
+            .evaluate((element) =>
+              Math.ceil(element.getBoundingClientRect().width),
+            ),
+        )
+        .toBeLessThanOrEqual(320);
       const dayList = page.getByRole("list", {
         name: "直近28日の達成状況",
       });
@@ -665,6 +674,7 @@ test.describe("calories achievement", () => {
       await expect
         .poll(() => dayList.evaluate((element) => element.scrollLeft))
         .toBeGreaterThan(0);
+      await expect(days.nth(27)).toBeInViewport();
     } finally {
       await context.close();
     }
