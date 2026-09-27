@@ -119,10 +119,11 @@ Biomeへの移行は次の阻害要因により見送っている。
   E2Eとバックアップテストは主作業ツリーへ統合してから実行する
 - 新規に作成したgit worktreeでは、`pnpm install --frozen-lockfile`を実行する。
   その後に`app`ディレクトリーで`../node_modules/.bin/svelte-kit sync`を実行し、`app/.svelte-kit/tsconfig.json`を生成してから検証コマンドを実行する。
-  `app/.svelte-kit`はgit管理外のため新しいworktreeには存在せず、生成前は`pnpm run test:unit`（`vitest run`）が`Tsconfig not found`と`[RESOLVE_ERROR] Could not resolve 'node:module'`で失敗する。
+  `app/.svelte-kit`はgit管理外のため新しいworktreeとCIのチェックアウトには存在せず、生成前はvitest（`pyfltr run`経由を含む）が`Tsconfig not found`と`[RESOLVE_ERROR] Could not resolve 'node:module'`で失敗する。
   `svelte-kit sync`はSvelteKitのルートである`app`で実行する。
-  リポジトリールートで実行した場合はルート直下へ`.svelte-kit`を生成するため、`pnpm run test:unit`は失敗したままとなる。
+  リポジトリールートで実行した場合はルート直下へ`.svelte-kit`を生成するため、vitestは失敗したままとなる。
   `app`でpnpm経由で`svelte-kit sync`を実行すると、前述のとおりpnpmが`app`を独立したプロジェクトとして扱って依存の導入を始め、
   `app/pnpm-lock.yaml`・`app/pnpm-workspace.yaml`・`app/node_modules`を生成したうえで`ERR_PNPM_IGNORED_BUILDS`で終了し、`svelte-kit sync`へ到達しない。
   誤ってこれらを生成した場合は3つとも削除する。
-  `pnpm run check`（`svelte-check`）は自身が`svelte-kit sync`を実行するため、この生成を前提としない
+  `pnpm run check`（`svelte-check`）と`pnpm run test:unit`（`make test-unit`・`make test-db`とCIのDB統合テストが使う）は自身が`svelte-kit sync`を実行するため、この生成を前提としない。
+  vitestを実行する手段を新設する場合は、`pnpm run test:unit`を経由するか、先に`svelte-kit sync`を実行する

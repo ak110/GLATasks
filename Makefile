@@ -232,7 +232,7 @@ test-db:  # DBへ実接続する統合テスト（Docker環境が起動してい
 		bash -xc '\
 			$(PLAYWRIGHT_PATH) &&\
 			$(PLAYWRIGHT_INSTALL) &&\
-			vitest run --project node\
+			pnpm run test:unit --project node\
 		'
 
 .PHONY: help setup sync backup deploy build start stop restart-app logs ps healthcheck shell node-shell update update-actions format test test-unit test-backup test-db test-e2e start-app logs-app migrate db-studio sql docs
