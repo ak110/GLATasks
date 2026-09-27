@@ -158,14 +158,43 @@ make docs
 make backup
 ```
 
-バックアップ先: `${DATA_DIR}/backups/YYYYMMDD_HHMMSS/`（DBダンプ + キーファイル）。
-何も指定しなければ直近5世代を保持する（`BACKUP_KEEP`環境変数で変更可能）。
-DBコンテナが停止中の場合はエラー終了する。初回デプロイなどDBがない状態では`SKIP_DB_DUMP=1`でスキップ可能。
+バックアップ先: `${DATA_DIR}/backups/YYYYMMDD_HHMMSS/`。
+DBダンプと、存在する`.encrypt_key`・`.secret_key`・`.mcp_clients.json`を同じ世代へ保存する。
+MCP登録ファイルが無い場合も成功する。存在するファイルの保存に失敗した場合は、未完成の世代を残さずエラー終了する。
+何も指定しなければ直近5世代を保持する（`BACKUP_KEEP`で変更可能）。
+DBコンテナが停止中の場合はエラー終了する。初回デプロイなどDBがない状態では`SKIP_DB_DUMP=1`でスキップできるが、その世代にはSQLが入らない。
 
 ### リストア
 
-`${DATA_DIR}/backups/YYYYMMDD_HHMMSS/`配下のSQLとキーファイルをDBコンテナへリストア後、
-`make restart-app`を実行する。
+復旧先のリポジトリルートで、`.env`と`web/ssl`を用意する。これらはバックアップに含まれない。
+`.env`の`DATA_DIR`を復旧先の絶対パスへ設定し、次の例の`DATA_DIR`にも同じ値を指定する。
+`COMPOSE_PROFILES`には`.env`の`COMPOSE_PROFILE`と同じ値を指定する。
+SQLのある完成世代を選ぶ。以下の操作は復旧先の`glatasks`データベースを入れ替えるため、現在のデータを残す場合は先に別の場所へ退避する。
+
+```bash
+export DATA_DIR=/復旧先のデータディレクトリ
+export COMPOSE_PROFILES=production
+BACKUP="$DATA_DIR/backups/YYYYMMDD_HHMMSS"
+test -s "$BACKUP/glatasks.sql"
+docker compose stop app
+docker compose up -d db
+docker compose exec -T db mariadb -uroot -pglatasks -e 'DROP DATABASE IF EXISTS glatasks; CREATE DATABASE glatasks CHARACTER SET utf8mb4'
+docker compose exec -T db mariadb -uglatasks -pglatasks glatasks < "$BACKUP/glatasks.sql"
+mkdir -p "$DATA_DIR"
+for name in .encrypt_key .secret_key .mcp_clients.json; do
+    if test -f "$BACKUP/$name"; then
+        cp -p "$BACKUP/$name" "$DATA_DIR/$name"
+    else
+        rm -f "$DATA_DIR/$name"
+    fi
+done
+docker compose up -d app
+make healthcheck
+```
+
+鍵とMCP登録情報はDBコンテナではなくアプリの`DATA_DIR`から読み込まれるため、ファイルを戻してからアプリを起動する。
+復旧後にブラウザーでタスクと添付ファイルを開いて内容を確認し、登録済みのMCPクライアントを再接続して登録情報を確認する。
+MCP未使用の世代では`.mcp_clients.json`がなく、復旧先に以前の登録ファイルを残さない。
 
 ## リリース手順
 

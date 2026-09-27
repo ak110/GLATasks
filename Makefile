@@ -49,28 +49,10 @@ sync:  # 最新化と各種更新
 
 BACKUP_KEEP ?= 5
 
-backup:  # デプロイ前バックアップ（DB + キーファイル）
-	$(eval BACKUP_DIR := $(DATA_DIR)/backups/$(shell date +%Y%m%d_%H%M%S))
-	@echo "バックアップを開始します: $(BACKUP_DIR)"
-	mkdir -p $(BACKUP_DIR)
-	@# DBダンプ実行（停止中はエラー。SKIP_DB_DUMP=1 でスキップ可）
-	@if [ "$(SKIP_DB_DUMP)" = "1" ]; then \
-		echo "SKIP_DB_DUMP=1: DBダンプをスキップします"; \
-	elif docker compose ps db --format='{{.State}}' 2>/dev/null | grep -q running; then \
-		docker compose exec -T db \
-			mariadb-dump -uglatasks -pglatasks --single-transaction --routines --triggers glatasks \
-			> $(BACKUP_DIR)/glatasks.sql \
-		&& echo "DBダンプが完了しました" \
-		|| (echo "DBダンプに失敗しました" && \rm -f $(BACKUP_DIR)/glatasks.sql && exit 1); \
-	else \
-		echo "DBコンテナが起動していません" && exit 1; \
-	fi
-	cp -p $(DATA_DIR)/.encrypt_key $(BACKUP_DIR)/ 2>/dev/null || true
-	cp -p $(DATA_DIR)/.secret_key $(BACKUP_DIR)/ 2>/dev/null || true
-	@echo "バックアップが完了しました: $(BACKUP_DIR)"
-	@# 古いバックアップを削除（直近 BACKUP_KEEP 世代を保持）
-	@ls -dt $(DATA_DIR)/backups/*/ 2>/dev/null | tail -n +$$(($(BACKUP_KEEP) + 1)) | xargs \rm -rf 2>/dev/null || true
-	@echo "古いバックアップを削除しました（保持: $(BACKUP_KEEP) 世代）"
+backup:  # デプロイ前バックアップ（DB・鍵・MCP登録情報）
+	@DATA_DIR="$(DATA_DIR)" BACKUP_KEEP="$(BACKUP_KEEP)" \
+		SKIP_DB_DUMP="$(SKIP_DB_DUMP)" BACKUP_DB_CONTAINER="$(BACKUP_DB_CONTAINER)" \
+		bash db/backup.sh
 
 deploy:
 	$(MAKE) build
@@ -175,25 +157,8 @@ db-studio:  # Drizzle Studio起動
 
 PNPM_VERSION = $(shell node -e "const p=require('./package.json'); console.log((p.packageManager||'').split('@')[1]?.split('+')[0]||'latest')" 2>/dev/null || echo latest)
 
-test-backup:  # バックアップ機能のテスト（Docker環境が起動していること）
-	@echo "バックアップテストを開始します"
-	@TEST_BACKUP_DIR=$$(mktemp -d) && \
-	trap '\rm -rf "$$TEST_BACKUP_DIR"' EXIT && \
-	\
-	echo "--- テスト1: バックアップ作成 ---" && \
-	$(MAKE) backup DATA_DIR=$$TEST_BACKUP_DIR && \
-	BACKUP=$$(ls -d $$TEST_BACKUP_DIR/backups/*/ | head -1) && \
-	test -f "$$BACKUP/glatasks.sql" && echo "DBダンプが存在します" && \
-	grep -q "CREATE TABLE" "$$BACKUP/glatasks.sql" && echo "DBダンプにテーブル定義が含まれます" && \
-	\
-	echo "--- テスト2: 世代管理 ---" && \
-	for i in 1 2 3; do \
-		sleep 1 && $(MAKE) backup DATA_DIR=$$TEST_BACKUP_DIR BACKUP_KEEP=2; \
-	done && \
-	BACKUP_COUNT=$$(ls -d $$TEST_BACKUP_DIR/backups/*/ | wc -l) && \
-	test "$$BACKUP_COUNT" -eq 2 && echo "世代管理: $$BACKUP_COUNT 世代のみ保持されています" && \
-	\
-	echo "全テストが成功しました"
+test-backup:  # バックアップ機能の隔離復元テスト（Dockerが利用できること）
+	@bash db/test-backup.sh
 
 docs:  # ドキュメントサイトをローカルで起動
 	$(call RUN_NODE, cd docs && pnpm dev --host=0.0.0.0 --port=5173, --rm --interactive --tty -p 5173:5173)
