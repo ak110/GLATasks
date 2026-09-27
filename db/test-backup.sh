@@ -21,7 +21,7 @@ cleanup() {
 trap cleanup EXIT
 
 start_database() {
-    docker run --detach --rm --network none \
+    docker run --detach --rm --init --network none \
         --tmpfs /var/lib/mysql:rw,size=512m \
         --env MARIADB_ROOT_PASSWORD=glatasks \
         --env MARIADB_DATABASE=glatasks \
@@ -135,13 +135,13 @@ rmdir -- "$data_dir/.mcp_clients.json"
 echo "MCP未使用時と世代管理を検証します"
 sleep 1
 backup
-generations=("$data_dir"/backups/[0-9][0-9][0-9][0-9][0-9][0-9][0-9]_[0-9][0-9][0-9][0-9][0-9][0-9])
+generations=("$data_dir"/backups/[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]_[0-9][0-9][0-9][0-9][0-9][0-9])
 [[ "${#generations[@]}" == 2 ]]
 [[ ! -e "${generations[1]}/.mcp_clients.json" ]]
 mv -- "$test_root/mcp-clients.json" "$data_dir/.mcp_clients.json"
 sleep 1
 backup
-generations=("$data_dir"/backups/[0-9][0-9][0-9][0-9][0-9][0-9][0-9]_[0-9][0-9][0-9][0-9][0-9][0-9])
+generations=("$data_dir"/backups/[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]_[0-9][0-9][0-9][0-9][0-9][0-9])
 [[ "${#generations[@]}" == 2 ]]
 [[ ! -e "$first_backup" ]]
 [[ -f "${generations[1]}/.mcp_clients.json" ]]
@@ -153,7 +153,7 @@ if backup; then
     echo "ダンプ失敗が成功扱いになりました" >&2
     exit 1
 fi
-remaining=("$data_dir"/backups/[0-9][0-9][0-9][0-9][0-9][0-9][0-9]_[0-9][0-9][0-9][0-9][0-9][0-9])
+remaining=("$data_dir"/backups/[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]_[0-9][0-9][0-9][0-9][0-9][0-9])
 [[ "${#remaining[@]}" == 2 ]]
 [[ "${remaining[*]}" == "${generations[*]}" ]]
 incomplete=("$data_dir"/backups/.incomplete.*)
