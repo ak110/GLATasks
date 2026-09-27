@@ -90,6 +90,28 @@ jobs:
       - name: Run backup test
         run: make test-backup
 
+      # 作業ツリーをplaywrightコンテナーへマウントするため、導入したpnpmと依存を後続のstepでも使う
+      - name: Install dependencies for playwright container
+        run: |
+          docker compose --profile=production --profile=ci run --rm \
+            playwright \
+            bash -xc '
+              PNPM_VERSION=$(node -e "const p=require(\"./package.json\"); console.log((p.packageManager||\"\").split(\"@\")[1]?.split(\"+\")[0]||\"latest\")") &&
+              npm install -g pnpm@${PNPM_VERSION} --prefix=${PWD}/.cache/playwright --force &&
+              export PATH=${PWD}/.cache/playwright/bin:${PWD}/node_modules/.bin:$PATH &&
+              pnpm install --frozen-lockfile
+            '
+
+      - name: Run DB integration test
+        run: |
+          docker compose --profile=production --profile=ci run --rm \
+            --env=DATABASE_URL=mysql://glatasks:glatasks@db/glatasks \
+            playwright \
+            bash -xc '
+              export PATH=${PWD}/.cache/playwright/bin:${PWD}/node_modules/.bin:$PATH &&
+              vitest run --project node
+            '
+
       - name: Run e2e test
         run: |
           docker compose --profile=production --profile=ci run --rm \
@@ -97,10 +119,7 @@ jobs:
             --env=CI=true \
             playwright \
             bash -xc '
-              PNPM_VERSION=$(node -e "const p=require(\"./package.json\"); console.log((p.packageManager||\"\").split(\"@\")[1]?.split(\"+\")[0]||\"latest\")") &&
-              npm install -g pnpm@${PNPM_VERSION} --prefix=${PWD}/.cache/playwright --force &&
               export PATH=${PWD}/.cache/playwright/bin:${PWD}/node_modules/.bin:$PATH &&
-              pnpm install --frozen-lockfile &&
               pnpm run test:e2e
             '
 

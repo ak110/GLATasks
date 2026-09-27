@@ -151,6 +151,7 @@ format:  # 整形 + 軽量lint
 test:  # 全チェック実行（これを通過すればコミット可能）
 	uvx --exclude-newer-package pyfltr=false pyfltr run
 	$(MAKE) test-backup
+	$(MAKE) test-db
 	$(MAKE) test-e2e
 
 test-unit:  # vitestによるユニットテスト実行（node/domの両projectを実行）
@@ -197,6 +198,13 @@ test-backup:  # バックアップ機能のテスト（Docker環境が起動し�
 docs:  # ドキュメントサイトをローカルで起動
 	$(call RUN_NODE, cd docs && pnpm dev --host=0.0.0.0 --port=5173, --rm --interactive --tty -p 5173:5173)
 
+# playwrightサービスのコンテナー内で使うPATHと、pnpm・依存の導入手順（test-e2eとtest-dbで共有）
+PLAYWRIGHT_PATH = export PATH=${PWD}/.cache/playwright/bin:${PWD}/node_modules/.bin:$$PATH
+PLAYWRIGHT_INSTALL = mkdir -p ${PWD}/.cache/playwright/bin &&\
+	corepack enable --install-directory=${PWD}/.cache/playwright/bin &&\
+	corepack prepare pnpm@$(PNPM_VERSION) --activate &&\
+	pnpm install --frozen-lockfile
+
 # E2E_GREPの値に`$`や`"`を含む場合は`sql`ターゲットと同じ制約が生じる
 test-e2e:  # E2Eテスト（E2E_GREP=... 指定で対象限定実行）
 	docker compose run --rm \
@@ -207,14 +215,24 @@ test-e2e:  # E2Eテスト（E2E_GREP=... 指定で対象限定実行）
 		--env=E2E_SKIP_INSTALL=$(E2E_SKIP_INSTALL) \
 		playwright \
 		bash -xc '\
-			export PATH=${PWD}/.cache/playwright/bin:${PWD}/node_modules/.bin:$$PATH &&\
+			$(PLAYWRIGHT_PATH) &&\
 			if [ "$$E2E_SKIP_INSTALL" != "1" ]; then\
-				mkdir -p ${PWD}/.cache/playwright/bin &&\
-				corepack enable --install-directory=${PWD}/.cache/playwright/bin &&\
-				corepack prepare pnpm@$(PNPM_VERSION) --activate &&\
-				pnpm install --frozen-lockfile;\
+				$(PLAYWRIGHT_INSTALL);\
 			fi &&\
 			pnpm run test:e2e $(if $(E2E_GREP),-g "$(E2E_GREP)")\
 		'
 
-.PHONY: help setup sync backup deploy build start stop restart-app logs ps healthcheck shell node-shell update update-actions format test test-unit test-backup test-e2e start-app logs-app migrate db-studio sql docs
+# `describeDb`のテストは`DATABASE_URL`があるときだけ実行されるため、DBと同じネットワークのplaywrightサービスから
+# node project全体を実行する。対象ファイルを列挙しないため、`describeDb`を新設したファイルも登録なしで実行される
+test-db:  # DBへ実接続する統合テスト（Docker環境が起動していること）
+	docker compose run --rm \
+		--env=DATABASE_URL=mysql://glatasks:glatasks@db/glatasks \
+		--env=COREPACK_ENABLE_DOWNLOAD_PROMPT=0 \
+		playwright \
+		bash -xc '\
+			$(PLAYWRIGHT_PATH) &&\
+			$(PLAYWRIGHT_INSTALL) &&\
+			vitest run --project node\
+		'
+
+.PHONY: help setup sync backup deploy build start stop restart-app logs ps healthcheck shell node-shell update update-actions format test test-unit test-backup test-db test-e2e start-app logs-app migrate db-studio sql docs
