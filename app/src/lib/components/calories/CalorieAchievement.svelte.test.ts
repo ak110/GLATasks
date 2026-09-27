@@ -39,20 +39,20 @@ function makeAchievement(
 }
 
 describe("CalorieAchievement", () => {
-  it("28確定日を区分ごとの点で古い順に表示する", () => {
+  it("28確定日を区分ごとの点で新しい順に表示する", () => {
     const { getAllByTestId } = render(CalorieAchievement, {
       achievement: makeAchievement(["missed", "achieved"], { streak_days: 1 }),
     });
 
     const days = getAllByTestId("calorie-achievement-day");
     expect(days).toHaveLength(28);
-    expect(days[0]).toHaveAttribute("data-status", "unrated");
-    expect(days[26]).toHaveAttribute("data-status", "missed");
-    expect(days[27]).toHaveAttribute("data-status", "achieved");
-    expect(days[27]).toHaveAccessibleName(
+    expect(days[0]).toHaveAttribute("data-status", "achieved");
+    expect(days[1]).toHaveAttribute("data-status", "missed");
+    expect(days[27]).toHaveAttribute("data-status", "unrated");
+    expect(days[0]).toHaveAccessibleName(
       "2026/08/31 7日平均 1,500 kcal 目標内",
     );
-    expect(days[0]).toHaveAccessibleName("2026/08/04 判定対象外");
+    expect(days[27]).toHaveAccessibleName("2026/08/04 判定対象外");
   });
 
   it("昨日が達成日なら連続日数を表示し、配色を緑系へ変える", () => {

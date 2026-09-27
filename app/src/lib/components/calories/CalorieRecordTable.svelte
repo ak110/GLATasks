@@ -428,11 +428,7 @@
                         >
                     </td>
                     <td class="truncate p-2" title={record.item_name}>
-                        {#if record.temporary}<span
-                                class="mr-1 rounded bg-gray-100 px-1 text-xs text-gray-600 dark:bg-gray-700 dark:text-gray-300"
-                                data-testid="calorie-record-temporary-badge"
-                                >一時</span
-                            >{/if}{record.item_name}
+                        {record.item_name}
                     </td>
                     <!-- 一時項目は数量欄の値をkcalとして持つため、数量の列は空にする -->
                     <td class="p-2 text-right"

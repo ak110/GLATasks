@@ -72,9 +72,9 @@
             先週より −{formatKcal(Math.abs(achievement.weekly_change_kcal))} kcal/日
         </p>
     {/if}
-    <!-- 左が最も古い確定日、右が昨日 -->
+    <!-- 左が昨日、右が最も古い確定日 -->
     <ol class="ml-auto flex flex-wrap gap-1.5" aria-label="直近28日の達成状況">
-        {#each achievement.days as day (day.date)}
+        {#each achievement.days.toReversed() as day (day.date)}
             <li
                 class={`size-3 rounded-full ${dotClasses[day.status]}`}
                 title={dotLabel(day)}

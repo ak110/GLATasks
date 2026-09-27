@@ -627,9 +627,13 @@ test.describe("calories achievement", () => {
       );
       const days = page.getByTestId("calorie-achievement-day");
       await expect(days).toHaveCount(28);
-      await expect(days.nth(27)).toHaveAttribute("data-status", "achieved");
-      await expect(days.nth(26)).toHaveAttribute("data-status", "achieved");
-      await expect(days.nth(25)).toHaveAttribute("data-status", "unrated");
+      await expect(days.nth(0)).toHaveAttribute("data-status", "achieved");
+      await expect(days.nth(0)).toHaveAttribute(
+        "aria-label",
+        new RegExp(`^${confirmedDay(1).replaceAll("-", "/")}`),
+      );
+      await expect(days.nth(1)).toHaveAttribute("data-status", "achieved");
+      await expect(days.nth(2)).toHaveAttribute("data-status", "unrated");
     } finally {
       await context.close();
     }
@@ -642,7 +646,7 @@ test.describe("calories achievement", () => {
       await bulkCreate(page, "超過", 8, 1);
 
       await expect(
-        page.getByTestId("calorie-achievement-day").nth(26),
+        page.getByTestId("calorie-achievement-day").nth(1),
       ).toHaveAttribute("data-status", "missed");
       await expect(page.getByTestId("calorie-achievement")).toHaveAttribute(
         "data-achieved",
@@ -652,7 +656,7 @@ test.describe("calories achievement", () => {
         page.getByTestId("calorie-achievement-streak"),
       ).not.toBeAttached();
       await expect(
-        page.getByTestId("calorie-achievement-day").nth(27),
+        page.getByTestId("calorie-achievement-day").nth(0),
       ).toHaveAttribute("data-status", "missed");
     } finally {
       await context.close();
@@ -718,9 +722,8 @@ test.describe("calories temporary items", () => {
         .getByTestId("calorie-record-row")
         .filter({ hasText: name });
       await expect(rows).toHaveCount(1);
-      await expect(
-        rows.first().getByTestId("calorie-record-temporary-badge"),
-      ).toBeVisible();
+      await expect(rows.first().locator("td").nth(1)).toHaveText(name);
+      await expect(rows.first().locator("td").nth(2)).toBeEmpty();
       await expect(rows.first().locator("td").nth(3)).toHaveText("450");
       await expect(page.getByTestId("calorie-summary-pace")).toContainText(
         "450 kcal",
@@ -746,9 +749,8 @@ test.describe("calories temporary items", () => {
 
       await expect(rows).toHaveCount(2);
       for (const row of await rows.all()) {
-        await expect(
-          row.getByTestId("calorie-record-temporary-badge"),
-        ).toBeVisible();
+        await expect(row.locator("td").nth(1)).toHaveText(name);
+        await expect(row.locator("td").nth(2)).toBeEmpty();
         await expect(row.locator("td").nth(3)).toHaveText("450");
       }
     } finally {
@@ -854,9 +856,8 @@ test.describe("calories temporary items", () => {
       await expect(confirm).toHaveCount(0);
       await expect(recordDialog).toBeVisible();
       await expect(recordDialog.getByLabel("数量")).toHaveValue("2");
-      await expect(
-        row.getByTestId("calorie-record-temporary-badge"),
-      ).toHaveCount(0);
+      await expect(row.locator("td").nth(1)).toHaveText(name);
+      await expect(row.locator("td").nth(2)).toHaveText("2");
 
       // キーボードで確認ボタンへ移ると、どちらにフォーカスがあるかを枠で示す
       await convertButton.click();
@@ -874,9 +875,8 @@ test.describe("calories temporary items", () => {
       await confirmButton.click();
       await response;
       await expect(recordDialog).toHaveCount(0);
-      await expect(
-        row.getByTestId("calorie-record-temporary-badge"),
-      ).toBeVisible();
+      await expect(row.locator("td").nth(1)).toHaveText(name);
+      await expect(row.locator("td").nth(2)).toBeEmpty();
       await expect(row.locator("td").nth(3)).toHaveText("240");
 
       // 変換後は品目のkcalを変えても記録のkcalは変わらない
