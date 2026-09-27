@@ -72,16 +72,26 @@
             先週より −{formatKcal(Math.abs(achievement.weekly_change_kcal))} kcal/日
         </p>
     {/if}
-    <!-- 左が昨日、右が最も古い確定日 -->
-    <ol class="ml-auto flex flex-wrap gap-1.5" aria-label="直近28日の達成状況">
-        {#each achievement.days.toReversed() as day (day.date)}
-            <li
-                class={`size-3 rounded-full ${dotClasses[day.status]}`}
-                title={dotLabel(day)}
-                aria-label={dotLabel(day)}
-                data-testid="calorie-achievement-day"
-                data-status={day.status}
-            ></li>
-        {/each}
-    </ol>
+    <div class="ml-auto max-w-full min-w-0">
+        <p
+            class="mb-1 text-right text-xs text-gray-600 dark:text-gray-300"
+            data-testid="calorie-achievement-order"
+        >
+            昨日 → 28日前<span class="sm:hidden">（横にスクロール）</span>
+        </p>
+        <ol
+            class="flex max-w-full gap-1.5 overflow-x-auto"
+            aria-label="直近28日の達成状況"
+        >
+            {#each achievement.days.toReversed() as day (day.date)}
+                <li
+                    class={`size-3 shrink-0 rounded-full ${dotClasses[day.status]}`}
+                    title={dotLabel(day)}
+                    aria-label={dotLabel(day)}
+                    data-testid="calorie-achievement-day"
+                    data-status={day.status}
+                ></li>
+            {/each}
+        </ol>
+    </div>
 </section>

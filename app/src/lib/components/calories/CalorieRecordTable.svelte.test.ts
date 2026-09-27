@@ -125,6 +125,10 @@ describe("CalorieRecordTable", () => {
       onCreate,
     });
 
+    expect(
+      screen.getByRole("cell", { name: "一時項目のため数量欄は空欄" }),
+    ).toBeInTheDocument();
+
     await fireEvent.click(screen.getByRole("button", { name: "記録の操作" }));
     await fireEvent.click(screen.getByRole("menuitem", { name: "コピー" }));
     expect(screen.getByLabelText("kcal")).toHaveValue(850);

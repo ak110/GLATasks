@@ -431,7 +431,11 @@
                         {record.item_name}
                     </td>
                     <!-- 一時項目は数量欄の値をkcalとして持つため、数量の列は空にする -->
-                    <td class="p-2 text-right"
+                    <td
+                        class="p-2 text-right"
+                        aria-label={record.temporary
+                            ? "一時項目のため数量欄は空欄"
+                            : undefined}
                         >{record.temporary ? "" : record.quantity}</td
                     >
                     <td class="p-2 text-right">{record.total_kcal}</td>

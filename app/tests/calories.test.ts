@@ -634,6 +634,37 @@ test.describe("calories achievement", () => {
       );
       await expect(days.nth(1)).toHaveAttribute("data-status", "achieved");
       await expect(days.nth(2)).toHaveAttribute("data-status", "unrated");
+
+      await page.setViewportSize({ width: 320, height: 800 });
+      await expect(page.getByTestId("calorie-achievement-order")).toContainText(
+        "昨日 → 28日前（横にスクロール）",
+      );
+      const dayList = page.getByRole("list", {
+        name: "直近28日の達成状況",
+      });
+      await expect
+        .poll(() =>
+          days.evaluateAll(
+            (elements) =>
+              new Set(
+                elements.map((element) =>
+                  Math.round(element.getBoundingClientRect().top),
+                ),
+              ).size,
+          ),
+        )
+        .toBe(1);
+      expect(
+        await dayList.evaluate(
+          (element) => element.scrollWidth > element.clientWidth,
+        ),
+      ).toBe(true);
+      await dayList.evaluate((element) => {
+        element.scrollLeft = element.scrollWidth;
+      });
+      await expect
+        .poll(() => dayList.evaluate((element) => element.scrollLeft))
+        .toBeGreaterThan(0);
     } finally {
       await context.close();
     }
@@ -723,7 +754,10 @@ test.describe("calories temporary items", () => {
         .filter({ hasText: name });
       await expect(rows).toHaveCount(1);
       await expect(rows.first().locator("td").nth(1)).toHaveText(name);
-      await expect(rows.first().locator("td").nth(2)).toBeEmpty();
+      await expect(rows.first().locator("td").nth(2)).toHaveText("");
+      await expect(rows.first().locator("td").nth(2)).toHaveAccessibleName(
+        "一時項目のため数量欄は空欄",
+      );
       await expect(rows.first().locator("td").nth(3)).toHaveText("450");
       await expect(page.getByTestId("calorie-summary-pace")).toContainText(
         "450 kcal",
@@ -750,7 +784,7 @@ test.describe("calories temporary items", () => {
       await expect(rows).toHaveCount(2);
       for (const row of await rows.all()) {
         await expect(row.locator("td").nth(1)).toHaveText(name);
-        await expect(row.locator("td").nth(2)).toBeEmpty();
+        await expect(row.locator("td").nth(2)).toHaveText("");
         await expect(row.locator("td").nth(3)).toHaveText("450");
       }
     } finally {
@@ -876,7 +910,7 @@ test.describe("calories temporary items", () => {
       await response;
       await expect(recordDialog).toHaveCount(0);
       await expect(row.locator("td").nth(1)).toHaveText(name);
-      await expect(row.locator("td").nth(2)).toBeEmpty();
+      await expect(row.locator("td").nth(2)).toHaveText("");
       await expect(row.locator("td").nth(3)).toHaveText("240");
 
       // 変換後は品目のkcalを変えても記録のkcalは変わらない
