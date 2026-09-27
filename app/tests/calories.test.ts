@@ -98,22 +98,6 @@ test.describe("calories", () => {
     await openCalories(page);
   });
 
-  test("両表の検索欄とクリアボタンを太字にしない", async ({ page }) => {
-    const testIds = [
-      "calorie-record-filter",
-      "calorie-record-filter-clear",
-      "calorie-item-filter",
-      "calorie-item-filter-clear",
-    ];
-
-    for (const testId of testIds) {
-      const fontWeight = await page
-        .getByTestId(testId)
-        .evaluate((element) => getComputedStyle(element).fontWeight);
-      expect(fontWeight, testId).toBe("400");
-    }
-  });
-
   test("ヘッダーからカロリー計算へ移動できる", async ({ page }) => {
     await page.goto("/");
     await page.getByRole("link", { name: /カロリー/ }).click();
@@ -624,6 +608,8 @@ async function addRecordNow(page: Page, itemName: string): Promise<void> {
     .getByRole("button", { name: "追加", exact: true })
     .click();
   await response;
+  // フォームは一覧の再取得後に空へ戻るため、続けて入力する前に空になるのを待つ
+  await expect(page.locator("#calorie-record-item")).toHaveValue("");
 }
 
 test.describe("calories achievement", () => {
@@ -911,6 +897,72 @@ test.describe("calories temporary items", () => {
       await itemResponse;
       await expect(itemRow).toContainText("300");
       await expect(row.locator("td").nth(3)).toHaveText("240");
+    } finally {
+      await context.close();
+    }
+  });
+});
+
+test.describe("calories filter", () => {
+  test("追加欄への入力で記録と品目を検索する", async ({ browser }) => {
+    const { context, page } = await openCaloriesAsNewUser(browser);
+    try {
+      await addItem(page, "Apple Pie");
+      await page.locator("#calorie-item-note").fill("朝食");
+      await addItem(page, "バナナ");
+      await addRecordNow(page, "Apple Pie");
+      await addRecordNow(page, "バナナ");
+
+      const recordInput = page.locator("#calorie-record-item");
+      const itemInput = page.locator("#calorie-item-name");
+      const records = page.getByTestId("calorie-record-row");
+      const items = page.getByTestId("calorie-item-row");
+      await expect(page.getByRole("searchbox")).toHaveCount(0);
+      await expect(records).toHaveCount(2);
+      await expect(items).toHaveCount(2);
+
+      // 記録の品目欄は大文字小文字を区別せず両表を検索する
+      await recordInput.fill("apple");
+      await expect(records).toHaveCount(1);
+      await expect(records).toContainText("Apple Pie");
+      await expect(items).toHaveCount(1);
+      await expect(items).toContainText("Apple Pie");
+
+      // 両欄の語はAND条件になる
+      await itemInput.fill("pie");
+      await expect(records).toHaveCount(1);
+      await expect(items).toHaveCount(1);
+      await itemInput.fill("バナナ");
+      await expect(records).toHaveCount(0);
+      await expect(page.getByText("該当する記録はありません")).toBeVisible();
+      await expect(items).toHaveCount(0);
+      await expect(page.getByText("該当する品目はありません")).toBeVisible();
+
+      // 品目表は備考にも一致し、記録表は品目名だけに一致する
+      await recordInput.fill("");
+      await itemInput.fill("朝食");
+      await expect(items).toHaveCount(1);
+      await expect(items).toContainText("バナナ");
+      await expect(records).toHaveCount(0);
+
+      await itemInput.fill("");
+      await expect(records).toHaveCount(2);
+      await expect(items).toHaveCount(2);
+
+      // 編集ダイアログの品目名では検索せず、編集を始めると追加欄の入力を破棄する
+      await recordInput.fill("apple");
+      const appleRow = records.filter({ hasText: "Apple Pie" });
+      await openRecordMenu(appleRow);
+      await appleRow.getByRole("menuitem", { name: "編集" }).click();
+      const recordDialog = page.getByRole("dialog", { name: "記録の編集" });
+      await expect(
+        recordDialog.getByLabel("品目", { exact: true }),
+      ).toHaveValue("Apple Pie");
+      await expect(records).toHaveCount(2);
+      await recordDialog.getByRole("button", { name: "閉じる" }).click();
+      await expect(recordDialog).toHaveCount(0);
+      await expect(recordInput).toHaveValue("");
+      await expect(records).toHaveCount(2);
     } finally {
       await context.close();
     }

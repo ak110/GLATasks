@@ -39,6 +39,14 @@
     const queryClient = useQueryClient();
     let windowOffset = $state(0);
     let deleteTarget = $state<RecordRow | undefined>();
+    // 記録と品目の追加フォームへの入力を、両表の検索語として共有する
+    let recordAddItemName = $state("");
+    let itemAddName = $state("");
+    const filterKeywords = $derived(
+        [recordAddItemName, itemAddName]
+            .map((value) => value.trim().toLowerCase())
+            .filter((keyword) => keyword !== ""),
+    );
     const tzOffsetMinutes = -new Date().getTimezoneOffset();
 
     const itemsQuery = createQuery<RouterOutputs["calories"]["items"]>(() => ({
@@ -256,6 +264,8 @@
                 onCreate={(input) => createRecordMutation.mutateAsync(input)}
                 onUpdate={(input) => updateRecordMutation.mutateAsync(input)}
                 onDelete={(record) => (deleteTarget = record)}
+                bind:addItemName={recordAddItemName}
+                {filterKeywords}
             />
             <CalorieItemTable
                 {items}
@@ -263,6 +273,8 @@
                 onCreate={(input) => createItemMutation.mutateAsync(input)}
                 onUpdate={(input) => updateItemMutation.mutateAsync(input)}
                 onDelete={(itemId) => deleteItemMutation.mutateAsync(itemId)}
+                bind:addName={itemAddName}
+                {filterKeywords}
             />
         </div>
         <div class="mt-5 grid gap-5 lg:grid-cols-2">

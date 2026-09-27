@@ -12,26 +12,39 @@
         onCreate: (input: ItemInput) => unknown;
         onUpdate: (input: ItemInput & { itemId: number }) => unknown;
         onDelete: (itemId: number) => unknown;
+        /** 追加フォームの品目名欄の値。ページが両表の検索語として使う */
+        addName?: string;
+        /** 正規化済みの検索語。全ての語がそれぞれ品目名か備考に含まれる品目だけを表示する */
+        filterKeywords: string[];
     };
 
-    let { items, usage, onCreate, onUpdate, onDelete }: Props = $props();
+    let {
+        items,
+        usage,
+        onCreate,
+        onUpdate,
+        onDelete,
+        addName = $bindable(""),
+        filterKeywords,
+    }: Props = $props();
     let editingId = $state<number | undefined>();
     let openMenuId = $state<number | undefined>();
     let deleteTarget = $state<Item | undefined>();
-    let name = $state("");
+    // 編集ダイアログの品目名欄は追加フォームと別に持ち、編集中の名前を検索語にしない
+    let editName = $state("");
+    const name = $derived(editingId === undefined ? addName : editName);
     let kcal = $state("");
     let note = $state("");
-    let itemFilter = $state("");
-    let visibleItems = $derived.by(() => {
-        const keyword = itemFilter.trim().toLowerCase();
-        return keyword === ""
-            ? items
-            : items.filter(
-                  (item) =>
-                      item.name.toLowerCase().includes(keyword) ||
-                      item.note.toLowerCase().includes(keyword),
-              );
-    });
+    const visibleItems = $derived(
+        items.filter((item) => {
+            const itemName = item.name.toLowerCase();
+            const itemNote = item.note.toLowerCase();
+            return filterKeywords.every(
+                (keyword) =>
+                    itemName.includes(keyword) || itemNote.includes(keyword),
+            );
+        }),
+    );
 
     // 操作メニュー外クリック/Escapeで閉じる
     $effect(() => {
@@ -71,15 +84,23 @@
 
     function clearForm() {
         editingId = undefined;
-        name = "";
+        addName = "";
+        editName = "";
         kcal = "";
         note = "";
+    }
+
+    function setName(value: string) {
+        if (editingId === undefined) addName = value;
+        else editName = value;
     }
 
     function edit(item: Item) {
         openMenuId = undefined;
         editingId = item.id;
-        name = item.name;
+        // 編集の開始で追加フォームの入力を破棄するため、検索も解除される
+        addName = "";
+        editName = item.name;
         kcal = String(item.kcal);
         note = item.note;
     }
@@ -112,7 +133,7 @@
     {#snippet nameInput()}
         <input
             id="calorie-item-name"
-            bind:value={name}
+            bind:value={() => name, setName}
             required
             maxlength="255"
             placeholder="品目名"
@@ -217,29 +238,6 @@
             <tr
                 ><th class="p-2">品目</th><th class="p-2 text-right">kcal</th
                 ><th class="p-2">備考</th><th class="p-2"></th></tr
-            ><tr
-                ><th class="p-1"
-                    ><input
-                        type="search"
-                        bind:value={itemFilter}
-                        autocomplete="off"
-                        data-testid="calorie-item-filter"
-                        placeholder="品目名と備考で検索"
-                        aria-label="品目名と備考で品目を検索"
-                        class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-sm font-normal text-gray-800 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
-                    /></th
-                ><th class="p-1"></th><th class="p-1"></th><th
-                    class="p-1 text-right"
-                    ><button
-                        type="button"
-                        onclick={() => (itemFilter = "")}
-                        data-testid="calorie-item-filter-clear"
-                        aria-label="品目の検索条件を消去"
-                        title="検索条件を消去"
-                        class="cursor-pointer rounded p-1 font-normal text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
-                        >×</button
-                    ></th
-                ></tr
             >
         </thead>
         <tbody>

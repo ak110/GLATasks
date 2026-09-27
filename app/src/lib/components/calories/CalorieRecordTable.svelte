@@ -29,6 +29,10 @@
         onCreate: (input: RecordInput) => unknown;
         onUpdate: (input: RecordInput & { recordId: number }) => unknown;
         onDelete: (record: RecordRow) => void;
+        /** 追加フォームの品目欄の値。ページが両表の検索語として使う */
+        addItemName?: string;
+        /** 正規化済みの検索語。全ての語を品目名に含む記録だけを表示する */
+        filterKeywords: string[];
     };
 
     let {
@@ -39,11 +43,17 @@
         onCreate,
         onUpdate,
         onDelete,
+        addItemName = $bindable(""),
+        filterKeywords,
     }: Props = $props();
     let editingId = $state<number | undefined>();
     let openMenuId = $state<number | undefined>();
     let consumedAt = $state(formatLocalMinute(new Date()));
-    let itemName = $state("");
+    // 編集ダイアログの品目欄は追加フォームと別に持ち、編集中の名前を検索語にしない
+    let editItemName = $state("");
+    const itemName = $derived(
+        editingId === undefined ? addItemName : editItemName,
+    );
     let quantity = $state("1");
     // 一時項目の記録を編集・コピーした間は、同名の品目があっても一時項目のまま扱う
     let keepTemporary = $state(false);
@@ -51,15 +61,12 @@
     let conversion = $state<
         { itemKcal: number; quantity: number; kcal: number } | undefined
     >();
-    let recordFilter = $state("");
-    let visibleRecords = $derived.by(() => {
-        const keyword = recordFilter.trim().toLowerCase();
-        return keyword === ""
-            ? records
-            : records.filter((record) =>
-                  record.item_name.toLowerCase().includes(keyword),
-              );
-    });
+    const visibleRecords = $derived(
+        records.filter((record) => {
+            const name = record.item_name.toLowerCase();
+            return filterKeywords.every((keyword) => name.includes(keyword));
+        }),
+    );
     const matchedItem = $derived(
         items.find((item) => item.name === itemName.trim()),
     );
@@ -107,17 +114,25 @@
     function resetForm() {
         editingId = undefined;
         consumedAt = formatLocalMinute(new Date());
-        itemName = "";
+        addItemName = "";
+        editItemName = "";
         quantity = "1";
         keepTemporary = false;
         conversion = undefined;
+    }
+
+    function setItemName(value: string) {
+        if (editingId === undefined) addItemName = value;
+        else editItemName = value;
     }
 
     function edit(record: RecordRow) {
         openMenuId = undefined;
         editingId = record.id;
         consumedAt = formatLocalMinute(new Date(record.consumed_at));
-        itemName = record.item_name;
+        // 編集の開始で追加フォームの入力を破棄するため、検索も解除される
+        addItemName = "";
+        editItemName = record.item_name;
         quantity = String(record.quantity);
         keepTemporary = record.temporary;
     }
@@ -126,7 +141,7 @@
         openMenuId = undefined;
         editingId = undefined;
         consumedAt = formatLocalMinute(new Date());
-        itemName = record.item_name;
+        addItemName = record.item_name;
         quantity = String(record.quantity);
         keepTemporary = record.temporary;
     }
@@ -230,7 +245,7 @@
     {#snippet itemInput()}
         <input
             id="calorie-record-item"
-            bind:value={itemName}
+            bind:value={() => itemName, setItemName}
             list="calorie-item-options"
             required
             maxlength="255"
@@ -380,29 +395,6 @@
                 ><th class="p-2 text-right whitespace-nowrap">数量</th><th
                     class="p-2 text-right whitespace-nowrap">kcal</th
                 ><th class="p-2"></th></tr
-            ><tr
-                ><th class="p-1"></th><th class="p-1"
-                    ><input
-                        type="search"
-                        bind:value={recordFilter}
-                        autocomplete="off"
-                        data-testid="calorie-record-filter"
-                        placeholder="品目で検索"
-                        aria-label="品目で記録を検索"
-                        class="w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-sm font-normal text-gray-800 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
-                    /></th
-                ><th class="p-1"></th><th class="p-1"></th><th
-                    class="p-1 text-right"
-                    ><button
-                        type="button"
-                        onclick={() => (recordFilter = "")}
-                        data-testid="calorie-record-filter-clear"
-                        aria-label="記録の検索条件を消去"
-                        title="検索条件を消去"
-                        class="cursor-pointer rounded p-1 font-normal text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
-                        >×</button
-                    ></th
-                ></tr
             ></thead
         >
         <tbody>
