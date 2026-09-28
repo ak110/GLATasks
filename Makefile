@@ -118,6 +118,8 @@ node-shell:
 update:
 	$(call RUN_NODE, corepack prepare pnpm@latest --activate && corepack use pnpm@latest && pnpm update --latest --recursive && pnpm prune && pnpm store prune && rm -rf app/.svelte-kit && cd app && svelte-kit sync, --rm)
 	$(MAKE) update-actions
+	$(MAKE) restart-app
+	$(MAKE) healthcheck
 	$(MAKE) test
 
 # GitHub Actionsのアクションをハッシュピンで最新化（mise未導入時はスキップ）

@@ -49,6 +49,8 @@ e2eテスト（`make test-e2e`）は開発環境（`make deploy`）が起動し�
 ### 依存更新後の追随作業
 
 `make update`は`pnpm update --latest`により`package.json`の指定範囲を超えて更新する。
+稼働中の開発サーバーが更新前のモジュールを保持したままだとE2Eが失敗するため、`make update`は依存更新後に`app`を再起動し、疎通を確認してから検証する。
+`RUN_NODE`相当のコンテナーで`pnpm add`などを実行して手動で依存を入れ替えた場合も、E2Eの前に`make restart-app`、`make healthcheck`の順に実行する。
 実行後は次の3点を確認する。
 
 TypeScriptの版を6系に留める。
