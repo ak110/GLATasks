@@ -130,11 +130,11 @@ DBが半端な状態になった場合は`make sql`から`__drizzle_migrations`�
 典型例として、`make start`時に`migrate-dev`がexit 1で失敗し
 `ALTER TABLE ... ADD ... Duplicate column name`が出る場合がある。
 `drizzle-kit push`でスキーマを先行適用すると実スキーマは最新だが
-`__drizzle_migrations`に当該マイグレーションが記録されず、再適用で重複エラーになる。
-実スキーマが当該マイグレーション到達済みであることを確認したうえで、
+`__drizzle_migrations`に先行適用したマイグレーションが記録されず、再適用で重複エラーになる。
+実スキーマに先行適用したマイグレーションの変更が反映済みであることを確認したうえで、
 `__drizzle_migrations`へ記録行を1行挿入して整合させる。
-`hash`は当該マイグレーションSQLファイル全文のsha256、`created_at`は
-`drizzle/migrations/meta/_journal.json`の当該エントリの`when`値を用いる。
+`hash`には先行適用したマイグレーションSQLファイル全文のsha256を、`created_at`には
+`drizzle/migrations/meta/_journal.json`にある同じマイグレーションのエントリの`when`値を設定する。
 
 ## CI/CD
 

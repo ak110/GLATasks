@@ -235,7 +235,7 @@
         if (alarmedIds.has(timerId)) return;
         alarmedIds = new Set([...alarmedIds, timerId]);
 
-        // 当該タイマーの ring_seconds 秒だけビープをループ再生する
+        // アラーム対象のタイマーに設定された ring_seconds 秒だけビープをループ再生する
         const timers = timersQuery.data?.timers ?? [];
         const timer = timers.find((t) => t.id === timerId);
         const ringSeconds = timer?.ring_seconds ?? TIMER_DEFAULT_RING_SECONDS;

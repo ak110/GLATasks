@@ -31,7 +31,7 @@ description: >-
 - 市民時刻を扱う場合は `tz_offset_minutes: z.number()` を必ず含める（既存のタイマー系スキーマを参照）
 - 型推論用の型エクスポート (`export type FooInput = z.infer<typeof FooSchema>`) は必要な場合のみ追加する
 - 取得系procedureが画面状態（表示範囲・表示種別など）を入力に取る場合、同種データを返す既存の全取得手段（tRPC・MCP）へ
-  当該入力が伝播しているか確認する
+  画面状態の入力が伝播しているか確認する
 
 ### 2. DB 層の実装
 
@@ -71,7 +71,7 @@ description: >-
 
 - 新しいprocedureは `trpc.<domain>.<name>.mutate(...) / .query(...)` として呼び出す。
   呼び出し箇所は `app/src/routes/**/*.svelte` や `app/src/lib/components/**/*.svelte` に置く
-- `$layout.svelte` / SSEハンドラで当該イベント種別を購読しており、TanStack Queryの `invalidateQueries` が動くかを確認する
+- `$layout.svelte` / SSEハンドラで更新対象のイベント種別を購読しており、TanStack Queryの `invalidateQueries` が動くかを確認する
 - 新ドメインを増やす場合はSSEイベント一覧とハンドラを更新する
 - 難読化はtRPCクライアントが自動で行うため、呼び出し側の明示的な暗号化処理は不要
 
@@ -122,7 +122,7 @@ schemas.tsの命名規約は`<Verb><Domain>Schema`を基本とする（例: `Cre
 型迂回箇所（`as any`・`@ts-ignore`、および`vi.mock()`のモックファクトリで
 戻り値の型情報を失った状態の呼び出し等）では、引数キーの不整合をTypeScriptの型チェックでは
 自動で検出できない。
-当該箇所は`app/src/lib/schemas.ts`の対応するスキーマ定義と引数キーが一致しているかを目視確認する。
+型の制約が働かない呼び出しでは`app/src/lib/schemas.ts`の対応するスキーマ定義と引数キーが一致しているかを目視確認する。
 
 ## 参考ファイル
 

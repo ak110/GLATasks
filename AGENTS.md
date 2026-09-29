@@ -23,7 +23,7 @@ SvelteKit + tRPC + Drizzleで構築し、Docker Composeで運用する。
   - DBアクセスを変更した場合は`make test-db`も実行する。
     `pyfltr run`とCIの`test` jobは`DATABASE_URL`を持たず、`describeDb`のテストをスキップする。
     `test-db`はvitestの`node` project全体をDBへ接続して実行するため、`describeDb`を新設したファイルも対象へ登録せずに実行される
-  - 画面又は個別のE2E仕様を変更した場合は、変更した定義とその直接消費側に対応するspecだけを
+  - 画面または個別のE2E仕様を変更した場合は、変更した定義とその直接消費側に対応するspecだけを
     `make test-e2e E2E_GREP="パターン"`で実行する。
     全体E2EはCIのintegration jobがproduction環境で実行するため、近接E2Eの成功後に同じローカル環境で全体E2Eを重ねない
   - 影響するspecの集合を変更箇所から限定できない共有基盤を変更した場合は、`make test-e2e`で全体E2Eを実行する。
@@ -48,7 +48,7 @@ Biomeへの移行は次の阻害要因により見送っている。
   （現在は`prettier-plugin-svelte`が全体を統一的に処理する）
 - Tailwind CSSクラスソート非対応。
   `prettier-plugin-tailwindcss`に相当する機能がBiomeに存在しない
-  （当該機能はプロジェクト全体で使用している）
+  （Tailwind CSSクラスソートはプロジェクト全体で使用している）
 
 `svelte-check`はpyfltrの`custom-commands`機能で統合されている。
 `uvx --exclude-newer-package pyfltr=false pyfltr run`から自動実行され、設定は`pyproject.toml`の
@@ -94,7 +94,7 @@ Biomeへの移行は次の阻害要因により見送っている。
   `UserPreferencesSchema`の`safeParse`が失敗すると設定全体を空として扱う
   （`app/src/lib/server/api/users.ts`）。
   既存値が不正になる方向へスキーマを狭める場合は、同じマイグレーションで既存値を新しい制約へ適合させる。
-  移行しないと当該利用者の全設定が既定値へ戻る。
+  移行しないと、既存の設定値が新しい制約に合わない利用者の全設定が既定値へ戻る。
   JSON内の数値は`JSON_SET(preferences, '$.key', CEILING(JSON_VALUE(preferences, '$.key')))`で更新できる
   （MariaDB 12.3.2で動作を確認した）
 - `schemas.ts`のtext系フィールドへ大きめの容量上限を設計する場合は、DBカラム型の最大バイト数
@@ -106,7 +106,7 @@ Biomeへの移行は次の阻害要因により見送っている。
   多い本文では文字数ベースの上限だとバイト数の見積もりを誤る
   （`MAX_TASK_TEXT_BYTES`・`app/src/lib/schemas.ts`が実装例）
 - DBスキーマを変更する`pnpm run db:generate`（`drizzle-kit generate`）は列の新規追加か既存列の改名かを判別できない場合に対話プロンプトを表示する。
-  対話端末を持たない実行では当該プロンプトの表示時点で例外終了するため、
+  対話端末を持たない実行では列の追加か改名かを問うプロンプトの表示時点で例外終了するため、
   `script -qec "pnpm run db:generate" /dev/null`のように疑似端末を割り当てたうえで
   列の追加か改名かの問いに応答し、生成されたマイグレーションファイルの内容を確認して手直しする
 - Docker Compose環境と`make`ターゲットは主作業ツリー（`git worktree list`の先頭に表示される作業ツリー）で実行する。

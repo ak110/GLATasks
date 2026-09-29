@@ -1,5 +1,5 @@
 /**
- * @fileoverview カロリー記録フォームの日時検証・一覧表示・取消操作、行操作メニュー及び検索語による表示のテスト
+ * @fileoverview カロリー記録フォームの日時検証・一覧表示・取消操作、行操作メニューおよび検索語による表示のテスト
  */
 
 import { fireEvent, render, screen } from "@testing-library/svelte";

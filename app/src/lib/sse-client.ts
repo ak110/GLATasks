@@ -194,7 +194,7 @@ export function subscribe(
   }
   callbacks.add(callback);
 
-  // 接続中なら当該 eventType のディスパッチャーを用意する。
+  // 接続中なら購読対象の eventType のディスパッチャーを用意する。
   // 未接続時は connect 時に subscribers 全体へ一括登録されるため、ここでは不要。
   ensureDispatcher(eventType);
 

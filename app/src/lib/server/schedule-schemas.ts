@@ -4,7 +4,7 @@
  * `rrule`（RFC5545パーサー）はCJSモジュールでありnamed exportの解決がNode実行系
  * （Vite変換を経ないPlaywright e2eテスト実行系など）に依存する。`$lib/schemas.ts`
  * は `attachment.test.ts` から直接importされVite変換を経ずにNodeへ読み込まれるため、
- * 当該ファイルへ `rrule` への依存を持ち込むと読み込みに失敗する。
+ * `$lib/schemas.ts`へ `rrule` への依存を持ち込むと読み込みに失敗する。
  * 本ファイルはサーバー側実装（`trpc.ts`・`api/schedules.ts`）専用とし、
  * Vite SSR経由でのみ読み込まれる前提を維持することでこの制約を切り分ける。
  */

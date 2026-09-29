@@ -85,7 +85,7 @@ sequenceDiagram
  （`lists:updated` / `tasks:updated` / `timers:updated` / `schedules:updated` /
   `users:preferences:updated` / `calories:updated` / `reset`）
 - クライアントはイベント受信時にTanStack Queryの `invalidateQueries` で該当データを再取得
-- 品目、記録又は自動記録設定を変更した場合は`calories:updated`を通知し、受信側はカロリーページの全データを再取得する。
+- 品目、記録または自動記録設定を変更した場合は`calories:updated`を通知し、受信側はカロリーページの全データを再取得する。
   目標値を変更した場合は既存の`users:preferences:updated`を通知し、カロリーページは目標値と期間集計を再取得する
 - 接続の健全性はクライアント側で監視する。`EventSource`の自動再接続に加え、
   受信ウォッチドッグ（30秒周期で判定、最終受信から75秒経過で強制再接続）・
@@ -248,12 +248,12 @@ const withApiErrors = t.middleware(async ({ next }) => {
   作成時のみ設定でき、`adjust` / `reset` / `setTime` などの操作で変更されない。
   クライアント側では満了到達時に削除ボタンを強調し、確認ダイアログを省略して削除できる体験に用いる
 - カロリー計算では、品目を利用者内で一意に保持し、記録は品目IDを参照する。
-  品目名又はkcalを変更すると、既存記録の表示と期間集計へ反映される。
+  品目名またはkcalを変更すると、既存記録の表示と期間集計へ反映される。
   品目表へ登録しない一時項目の記録は品目IDを持たず、名前（`temporary_name`）とkcal（`quantity`）を記録自身が持つ。
   品目IDと一時項目名はどちらか一方だけを持つ。
   MariaDBは`ON UPDATE CASCADE`の外部キー列をCHECK制約に使えないため、この不変条件は書き込み側で守る。
   記録の一覧と集計は品目を外部結合し、品目を参照しない一時項目の行も結果へ含める
-  kcal、数量及び1日当たり目標値は整数で保持する。
+  kcal、数量および1日当たり目標値は整数で保持する。
   利用者ごとの1日当たり目標値は`users.preferences.calorie_goal_kcal`へ保持する
 - カロリーの自動記録設定（`calorie_auto_record`）は現地の時刻`time_of_day`と登録時の`tz_offset_minutes`を組で保持する。
   他のカロリー入力と同じく固定の時差で解釈するため、夏時間の切り替えには追随しない

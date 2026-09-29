@@ -179,7 +179,7 @@ tRPCの戻り値型は`AppRouter`から推論する。
 
 ## ルーティング命名規約
 
-ファイル・ディレクトリ名が`.`または`_`で始まる場合、SvelteKitは当該パスをprivate扱いしルート対象から除外する。
+ファイル・ディレクトリ名が`.`または`_`で始まる場合、SvelteKitはこれらの名前を持つパスをprivate扱いしルート対象から除外する。
 公開する必要があれば`[x+<hex>]`エスケープ構文でディレクトリ名を表現する（例: `/.well-known/foo`は`src/routes/[x+2e]well-known/foo/+server.ts`）。
 
 ## ESLintルール対応
@@ -187,7 +187,7 @@ tRPCの戻り値型は`AppRouter`から推論する。
 ### svelte/no-navigation-without-resolve
 
 内部リンク用の`<a href="/...">`・`goto("/...")`は`$app/paths`の`resolve()`経由で書く。
-`<!-- svelte-ignore -->`HTMLコメントは当該ルールには作用しないため、`resolve()`を利用できない場合は`<button type="button" onclick>`等のbutton要素へ置換する。
+`<!-- svelte-ignore -->`HTMLコメントは`svelte/no-navigation-without-resolve`ルールには作用しないため、`resolve()`を利用できない場合は`<button type="button" onclick>`等のbutton要素へ置換する。
 
 ## rune使用時のファイル拡張子
 
@@ -203,7 +203,7 @@ rune（`$state`・`$effect`等）を使うユーティリティは`.svelte.ts`�
 ## D&D 並び替えユーティリティ
 
 並び替え可能なリストには共通D&Dユーティリティ（`$lib/dnd-reorder.svelte.ts`）を利用する。
-状態・操作関数の仕様は当該ファイルのexportを参照し、各コンポーネントで再実装しない。
+状態・操作関数の仕様は`$lib/dnd-reorder.svelte.ts`のexportを参照し、各コンポーネントで再実装しない。
 Pointer Events APIへ統一することで、マウス・タッチ・ペンの全入力をブラウザ標準の単一APIで扱える。
 
 ## Vitest テスト環境
