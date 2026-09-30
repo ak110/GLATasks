@@ -420,7 +420,14 @@ test.describe("calories", () => {
   }) => {
     const itemName = `コピー_${Date.now()}`;
     await addItem(page, itemName);
-    await page.locator("#calorie-record-datetime").fill("2026/08/01 01:00");
+    // 実行日によらず「前の30日」の内側に入り、端末と同じタイムゾーンになる日時を使う。
+    const pastDateTime = await page.evaluate(() => {
+      const date = new Date();
+      date.setDate(date.getDate() - 45);
+      const pad = (value: number) => String(value).padStart(2, "0");
+      return `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())} 12:00`;
+    });
+    await page.locator("#calorie-record-datetime").fill(pastDateTime);
     await page.locator("#calorie-record-item").fill(itemName);
     const createResponse = waitForSuccessfulMutationResponse(
       page,
@@ -444,7 +451,7 @@ test.describe("calories", () => {
     await copiedRow.getByTestId("calorie-record-copy").click();
     await expect(page.locator("#calorie-record-item")).toHaveValue(itemName);
     await expect(page.locator("#calorie-record-datetime")).not.toHaveValue(
-      "2026/08/01 01:00",
+      pastDateTime,
     );
   });
 
@@ -896,6 +903,9 @@ test.describe("calories temporary items", () => {
       await expect(recordDialog).toBeVisible();
       await convertButton.click();
       await expect(confirm).toBeVisible();
+      await expect(
+        confirm.getByRole("button", { name: "キャンセル", exact: true }),
+      ).toBeFocused();
       await page.keyboard.press("Escape");
       await expect(confirm).toHaveCount(0);
       await expect(recordDialog).toBeVisible();

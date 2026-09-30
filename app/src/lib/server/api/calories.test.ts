@@ -692,7 +692,9 @@ describeDb("カロリー計算API", () => {
     expect(await consumedAts()).toEqual([]);
 
     const firstRun = new Date("2026-08-01T23:00:00.000Z");
-    expect(await processCalorieAutoRecords(firstRun)).toContain(userId);
+    expect((await processCalorieAutoRecords(firstRun)).userIds).toContain(
+      userId,
+    );
     await processCalorieAutoRecords(firstRun);
     expect(await consumedAts()).toEqual(["2026-08-01T23:00:00.000Z"]);
 

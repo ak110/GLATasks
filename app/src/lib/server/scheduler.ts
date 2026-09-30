@@ -41,6 +41,31 @@ let started = false;
 /** 実行中の1tickが完了する前に次のtickが開始しないようにする再入防止フラグ */
 let processing = false;
 
+let lastSuccessAt: Date | undefined;
+let lastFinishedAt: Date | undefined;
+let lastRunFailed = false;
+
+/** 定期処理の停止・失敗を運用監視へ返す。 */
+export function getSchedulerHealth(now = new Date()) {
+  let status: "ok" | "starting" | "error" | "stale";
+  if (lastRunFailed) {
+    status = "error";
+  } else if (!lastSuccessAt) {
+    status = "starting";
+  } else {
+    // 次の実行が1周期遅れても猶予を持ち、それを超える停止を検出する。
+    status =
+      now.getTime() - lastSuccessAt.getTime() > POLL_INTERVAL_MS * 2
+        ? "stale"
+        : "ok";
+  }
+  return {
+    status,
+    last_success_at: lastSuccessAt?.toISOString() ?? null,
+    last_finished_at: lastFinishedAt?.toISOString() ?? null,
+  };
+}
+
 /**
  * 指定スケジュールの `after` 以降 `now` 以前の発火予定を、先頭 `FILL_FORWARD_LIMIT`
  * 件までiterator経路で収集する。
@@ -89,7 +114,7 @@ function collectDueOccurrences(
  * `list.user_id` と `last_fired` の更新競合により重複タスク生成が起こり得るが、
  * これは上記フィルフォワード上限と同様に「重複可」の許容範囲に収まる。
  */
-export async function processSchedules(now: Date): Promise<void> {
+export async function processSchedules(now: Date): Promise<boolean> {
   const db = getDb();
   const rows = await db
     .select({ schedule: schedules, userId: lists.user_id })
@@ -97,6 +122,7 @@ export async function processSchedules(now: Date): Promise<void> {
     .innerJoin(lists, eq(schedules.list_id, lists.id))
     .where(eq(schedules.enabled, 1));
 
+  let succeeded = true;
   for (const { schedule, userId } of rows) {
     try {
       const after = schedule.last_fired ?? schedule.created;
@@ -131,12 +157,14 @@ export async function processSchedules(now: Date): Promise<void> {
       sendEvent(userId, SSE_EVENTS.tasksUpdated);
       sendEvent(userId, SSE_EVENTS.schedulesUpdated);
     } catch (error) {
+      succeeded = false;
       console.error(
         `[scheduler] スケジュール ${schedule.id} の処理に失敗しました`,
         error,
       );
     }
   }
+  return succeeded;
 }
 
 /** 再入防止しつつ定期TODOとカロリー自動記録を1tick分処理する */
@@ -145,12 +173,21 @@ async function tick(): Promise<void> {
   processing = true;
   try {
     const now = new Date();
-    await processSchedules(now);
-    const userIds = await processCalorieAutoRecords(now);
-    for (const userId of userIds) {
+    const schedulesSucceeded = await processSchedules(now);
+    const caloriesResult = await processCalorieAutoRecords(now);
+    for (const userId of caloriesResult.userIds) {
       sendEvent(userId, SSE_EVENTS.caloriesUpdated);
     }
+    lastRunFailed = !schedulesSucceeded || !caloriesResult.succeeded;
+    if (!lastRunFailed) lastSuccessAt = new Date();
+  } catch (error) {
+    lastRunFailed = true;
+    console.error(
+      "[scheduler] 定期処理に失敗しました。DB接続と直前のログを確認してください。次の周期で再試行します。",
+      error,
+    );
   } finally {
+    lastFinishedAt = new Date();
     processing = false;
   }
 }

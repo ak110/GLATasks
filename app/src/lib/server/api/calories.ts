@@ -650,13 +650,15 @@ export async function deleteCalorieAutoRecord(
 
 /**
  * ONの自動記録設定のうち次回時刻が`now`以前のものについて、過ぎた時刻ごとに記録を追加し、
- * 記録を追加した利用者のIDを返す。
+ * 記録を追加した利用者のIDと、全設定を正常に処理できたかを返す。
  *
  * 次回時刻から1日刻みで`now`以前の時刻を記録し、次回時刻を`now`より後へ進める。
  * 1件の失敗が他の設定の処理を止めないよう、設定ごとに例外を捕捉する。
  * 単一プロセスから60秒間隔で呼ばれる前提であり、並行呼び出しの排他は持たない。
  */
-export async function processCalorieAutoRecords(now: Date): Promise<number[]> {
+export async function processCalorieAutoRecords(
+  now: Date,
+): Promise<{ userIds: number[]; succeeded: boolean }> {
   const db = getDb();
   const rules = await db
     .select()
@@ -668,6 +670,7 @@ export async function processCalorieAutoRecords(now: Date): Promise<number[]> {
       ),
     );
   const notifiedUserIds = new Set<number>();
+  let succeeded = true;
   for (const rule of rules) {
     try {
       const consumedAts: Date[] = [];
@@ -694,13 +697,14 @@ export async function processCalorieAutoRecords(now: Date): Promise<number[]> {
       });
       notifiedUserIds.add(rule.user_id);
     } catch (error) {
+      succeeded = false;
       console.error(
         `[scheduler] カロリー自動記録 ${rule.id} の処理に失敗しました`,
         error,
       );
     }
   }
-  return [...notifiedUserIds];
+  return { userIds: [...notifiedUserIds], succeeded };
 }
 
 /** 確定日の現地の区切り時刻。深夜の摂取を前日へ数える */

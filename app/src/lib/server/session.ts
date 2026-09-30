@@ -6,6 +6,8 @@ import type { Cookies } from "@sveltejs/kit";
 import { SignJWT, jwtVerify } from "jose";
 import { getJwtSecret } from "./env";
 
+const SESSION_AUDIENCE = "glatasks-session";
+
 /**
  * セッション署名用の秘密鍵を取得する（Uint8Array形式で）。
  */
@@ -21,6 +23,7 @@ export async function createSessionToken(userId: number): Promise<string> {
   return new SignJWT({ sub: String(userId) })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
+    .setAudience(SESSION_AUDIENCE)
     .setExpirationTime("365d")
     .sign(getSecret());
 }
@@ -52,7 +55,13 @@ export async function verifySessionToken(
   token: string,
 ): Promise<number | null> {
   try {
-    const { payload } = await jwtVerify(token, getSecret());
+    const { payload } = await jwtVerify(token, getSecret(), {
+      algorithms: ["HS256"],
+    });
+    // 既存のaud無しCookieは維持し、同じ鍵で署名したMCP用JWTの転用を拒否する。
+    if (payload.aud !== undefined && payload.aud !== SESSION_AUDIENCE) {
+      return null;
+    }
     const userId = payload.sub ? parseInt(payload.sub, 10) : null;
     return userId !== null && !isNaN(userId) ? userId : null;
   } catch {
