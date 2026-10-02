@@ -9,7 +9,29 @@
  * - 並び替え対象から外す行には `data-reorder-id` を付与しない（位置指定の基準から除外される）。
  * - ドラッグハンドル要素には `onpointerdown` を設定し、CSS で `touch-action: none` を適用する
  *   （タッチ操作で縦スクロールにハイジャックされるのを防ぐため）。
+ * - 並び替え対象の行は縦スクロール要素（`overflow-y: auto | scroll`）の内側に置く。
+ *   ドラッグ中はハンドルから最も近い縦スクロール要素を自動スクロールの対象とし、
+ *   ポインターがその上端・下端付近にある間スクロールする（`touch-action: none` で止めた
+ *   指によるスクロールの代わりに、表示範囲外の位置へ1回のドラッグで到達させるため）。
  */
+
+/** 自動スクロールを開始する端からの距離（px）。要素の高さの1/4を上限とする。 */
+const AUTO_SCROLL_EDGE = 48;
+/** 自動スクロールの1フレームあたりの最大移動量（px）。 */
+const AUTO_SCROLL_MAX_SPEED = 16;
+
+/** 要素から祖先へ遡り、最も近い縦方向のスクロール要素を返す。 */
+function findScrollContainer(start: Element | null): HTMLElement | null {
+  let el: Element | null = start;
+  while (el && el !== document.body && el !== document.documentElement) {
+    if (el instanceof HTMLElement) {
+      const overflowY = getComputedStyle(el).overflowY;
+      if (overflowY === "auto" || overflowY === "scroll") return el;
+    }
+    el = el.parentElement;
+  }
+  return null;
+}
 
 /**
  * D&D 並び替えに必要な最小共通インターフェース。
@@ -83,6 +105,11 @@ export function createDragReorder<T extends Orderable>(
   let startY = 0;
   let activePointerId: number | null = null;
   let captureElement: Element | null = null;
+  // 自動スクロールの状態
+  let scrollContainer: HTMLElement | null = null;
+  let lastX = 0;
+  let lastY = 0;
+  let autoScrollFrame: number | null = null;
 
   /**
    * pointerdown ハンドラ。
@@ -99,6 +126,9 @@ export function createDragReorder<T extends Orderable>(
     startY = event.clientY;
     activePointerId = event.pointerId;
     captureElement = event.currentTarget as Element | null;
+    scrollContainer = findScrollContainer(captureElement);
+    lastX = event.clientX;
+    lastY = event.clientY;
 
     // setPointerCapture が失敗してもドラッグ自体は継続させる
     // （happy-dom など一部環境では NotFoundError を送出することがあるため）
@@ -132,12 +162,24 @@ export function createDragReorder<T extends Orderable>(
       updateDragState(true);
     }
 
-    if (!Number.isFinite(event.clientX) || !Number.isFinite(event.clientY)) {
+    lastX = event.clientX;
+    lastY = event.clientY;
+    updateDropCandidates(event.clientX, event.clientY);
+    scheduleAutoScroll();
+  }
+
+  /**
+   * 座標から外部ドロップ先・並び替え対象・before/after を判定して候補を更新する。
+   * pointermove と自動スクロールの各フレームで共有する（指を止めたまま一覧だけが
+   * 動く間は pointermove が届かないため）。
+   */
+  function updateDropCandidates(x: number, y: number) {
+    if (!Number.isFinite(x) || !Number.isFinite(y)) {
       clearDropCandidates();
       return;
     }
 
-    const externalTarget = findExternalDropTarget(event.clientX, event.clientY);
+    const externalTarget = findExternalDropTarget(x, y);
     if (externalTarget !== null) {
       dropTargetId = null;
       dropPosition = null;
@@ -145,7 +187,7 @@ export function createDragReorder<T extends Orderable>(
       return;
     }
 
-    const target = findReorderTarget(event.clientX, event.clientY);
+    const target = findReorderTarget(x, y);
     if (target === null || target.id === draggedId) {
       clearDropCandidates();
       return;
@@ -154,7 +196,62 @@ export function createDragReorder<T extends Orderable>(
     const rect = target.element.getBoundingClientRect();
     const midY = rect.top + rect.height / 2;
     dropTargetId = target.id;
-    dropPosition = event.clientY < midY ? "before" : "after";
+    dropPosition = y < midY ? "before" : "after";
+  }
+
+  /**
+   * 現在のポインター位置に応じた1フレームあたりのスクロール量を返す（負は上方向）。
+   * 横方向がスクロール要素の範囲外（2ペイン表示でサイドバーへドラッグ中など）は 0。
+   */
+  function autoScrollDelta(): number {
+    if (!isActive || scrollContainer === null) return 0;
+    if (!Number.isFinite(lastX) || !Number.isFinite(lastY)) return 0;
+    const rect = scrollContainer.getBoundingClientRect();
+    if (lastX < rect.left || lastX > rect.right) return 0;
+    const edge = Math.min(AUTO_SCROLL_EDGE, rect.height / 4);
+    if (edge <= 0) return 0;
+    const maxScrollTop =
+      scrollContainer.scrollHeight - scrollContainer.clientHeight;
+    if (lastY < rect.top + edge && scrollContainer.scrollTop > 0) {
+      const depth = Math.min(1, (rect.top + edge - lastY) / edge);
+      return -Math.max(1, Math.round(AUTO_SCROLL_MAX_SPEED * depth));
+    }
+    if (
+      lastY > rect.bottom - edge &&
+      scrollContainer.scrollTop < maxScrollTop
+    ) {
+      const depth = Math.min(1, (lastY - (rect.bottom - edge)) / edge);
+      return Math.max(1, Math.round(AUTO_SCROLL_MAX_SPEED * depth));
+    }
+    return 0;
+  }
+
+  /** 端の帯にいる間だけ requestAnimationFrame の反復を予約する。 */
+  function scheduleAutoScroll() {
+    if (autoScrollFrame !== null) return;
+    if (autoScrollDelta() === 0) return;
+    autoScrollFrame = requestAnimationFrame(runAutoScroll);
+  }
+
+  /** 1フレーム分スクロールし、スクロール後の位置でドロップ候補を再判定する。 */
+  function runAutoScroll() {
+    autoScrollFrame = null;
+    const delta = autoScrollDelta();
+    if (delta === 0 || scrollContainer === null) return;
+    const before = scrollContainer.scrollTop;
+    scrollContainer.scrollTop = before + delta;
+    if (scrollContainer.scrollTop === before) return;
+    updateDropCandidates(lastX, lastY);
+    scheduleAutoScroll();
+  }
+
+  /** 予約済みの自動スクロールを取り消し、対象要素の参照を解放する。 */
+  function stopAutoScroll() {
+    if (autoScrollFrame !== null) {
+      cancelAnimationFrame(autoScrollFrame);
+      autoScrollFrame = null;
+    }
+    scrollContainer = null;
   }
 
   /**
@@ -234,6 +331,7 @@ export function createDragReorder<T extends Orderable>(
 
   /** window へ登録した pointer 系リスナーを撤去する。 */
   function cleanupPointerListeners() {
+    stopAutoScroll();
     window.removeEventListener("pointermove", handlePointerMove);
     window.removeEventListener("pointerup", handlePointerUp);
     window.removeEventListener("pointercancel", handlePointerCancel);

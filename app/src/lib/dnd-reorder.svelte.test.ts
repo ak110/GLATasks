@@ -417,3 +417,141 @@ describe("createDragReorder", () => {
     expect(onExternalDropTargetChange).toHaveBeenLastCalledWith(null);
   });
 });
+
+describe("createDragReorder の自動スクロール", () => {
+  /** requestAnimationFrame を手動で進めるためのキュー */
+  let frames: Map<number, FrameRequestCallback>;
+  let nextFrameId: number;
+
+  /** 予約済みのフレームを1つずつ実行する */
+  function runFrames(count: number) {
+    for (let i = 0; i < count; i++) {
+      const entry = frames.entries().next();
+      if (entry.done) return;
+      const [id, callback] = entry.value;
+      frames.delete(id);
+      callback(0);
+    }
+  }
+
+  /**
+   * 縦スクロール要素（表示高さ400px、内容1000px）と、その内側のハンドルを生成する。
+   * 横範囲は x=0〜300。
+   */
+  function setupScrollContainer() {
+    const container = document.createElement("div");
+    container.style.overflowY = "auto";
+    Object.defineProperty(container, "scrollHeight", { value: 1000 });
+    Object.defineProperty(container, "clientHeight", { value: 400 });
+    vi.spyOn(container, "getBoundingClientRect").mockReturnValue({
+      top: 0,
+      bottom: 400,
+      height: 400,
+      left: 0,
+      right: 300,
+      width: 300,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    });
+    const handle = document.createElement("span");
+    container.appendChild(handle);
+    document.body.appendChild(container);
+    return { container, handle };
+  }
+
+  afterEach(() => {
+    document.body.innerHTML = "";
+    vi.restoreAllMocks();
+  });
+
+  function mockAnimationFrame() {
+    frames = new Map();
+    nextFrameId = 1;
+    vi.spyOn(window, "requestAnimationFrame").mockImplementation((cb) => {
+      const id = nextFrameId++;
+      frames.set(id, cb);
+      return id;
+    });
+    vi.spyOn(window, "cancelAnimationFrame").mockImplementation((id) => {
+      frames.delete(id);
+    });
+  }
+
+  it("下端付近で保持すると下へスクロールし、スクロール後の行をドロップ先として再判定する", () => {
+    mockAnimationFrame();
+    const { container, handle } = setupScrollContainer();
+    const onReorder = vi.fn();
+    const dnd = createDragReorder(() => makeItems([1, 2, 3]), onReorder);
+
+    const row2 = makeRowElement(2, { top: 350, height: 40 });
+    const row3 = makeRowElement(3, { top: 350, height: 40 });
+    let hit: Element = row2;
+    vi.spyOn(document, "elementFromPoint").mockImplementation(() => hit);
+
+    dnd.handleDragStart(1, makeStartEvent(handle, 100, 10));
+    dispatchPointerMove(100, 390);
+    expect(dnd.dropTargetId).toBe(2);
+    expect(frames.size).toBe(1);
+
+    // 指を止めたまま一覧だけが動き、ポインター下の行が変わる
+    hit = row3;
+    runFrames(1);
+    expect(container.scrollTop).toBeGreaterThan(0);
+    expect(dnd.dropTargetId).toBe(3);
+    expect(dnd.dropPosition).toBe("after");
+
+    dispatchPointerUp();
+    expect(onReorder).toHaveBeenCalledWith([2, 3, 1]);
+  });
+
+  it("上端付近で保持すると上へスクロールする", () => {
+    mockAnimationFrame();
+    const { container, handle } = setupScrollContainer();
+    container.scrollTop = 300;
+    const dnd = createDragReorder(() => makeItems([1, 2, 3]), vi.fn());
+    vi.spyOn(document, "elementFromPoint").mockReturnValue(null);
+
+    dnd.handleDragStart(3, makeStartEvent(handle, 100, 200));
+    dispatchPointerMove(100, 5);
+    runFrames(1);
+    expect(container.scrollTop).toBeLessThan(300);
+    dispatchPointerCancel();
+  });
+
+  it("横方向がスクロール要素の範囲外ならスクロールしない", () => {
+    mockAnimationFrame();
+    const { container, handle } = setupScrollContainer();
+    const dnd = createDragReorder(() => makeItems([1, 2, 3]), vi.fn());
+    vi.spyOn(document, "elementFromPoint").mockReturnValue(null);
+
+    dnd.handleDragStart(1, makeStartEvent(handle, 100, 10));
+    dispatchPointerMove(500, 390);
+    runFrames(5);
+    expect(frames.size).toBe(0);
+    expect(container.scrollTop).toBe(0);
+    dispatchPointerCancel();
+  });
+
+  it("ドロップまたはキャンセル後は予約済みのスクロールを取り消し、以後スクロールしない", () => {
+    mockAnimationFrame();
+    const { container, handle } = setupScrollContainer();
+    const dnd = createDragReorder(() => makeItems([1, 2, 3]), vi.fn());
+    vi.spyOn(document, "elementFromPoint").mockReturnValue(null);
+
+    dnd.handleDragStart(1, makeStartEvent(handle, 100, 10));
+    dispatchPointerMove(100, 390);
+    expect(frames.size).toBe(1);
+    dispatchPointerUp();
+    expect(frames.size).toBe(0);
+    runFrames(5);
+    expect(container.scrollTop).toBe(0);
+
+    dnd.handleDragStart(1, makeStartEvent(handle, 100, 10, 2));
+    dispatchPointerMove(100, 390, 2);
+    expect(frames.size).toBe(1);
+    dispatchPointerCancel(2);
+    expect(frames.size).toBe(0);
+    expect(container.scrollTop).toBe(0);
+  });
+});
