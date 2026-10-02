@@ -15,7 +15,7 @@
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.30.1",
+    "@modelcontextprotocol/sdk": "^1.31.0",
     "@sveltejs/adapter-node": "^5.5.7",
     "@sveltejs/kit": "^2.70.3",
     "@tailwindcss/vite": "^4.3.3",
@@ -25,7 +25,7 @@
     "bcryptjs": "^3.0.3",
     "drizzle-orm": "^0.45.3",
     "jose": "^6.2.12",
-    "mysql2": "^3.24.4",
+    "mysql2": "^3.24.5",
     "papaparse": "^5.7.0",
     "rrule": "^2.8.1",
     "svelte": "^5.57.1",
@@ -41,14 +41,14 @@
     "@testing-library/svelte": "^5.4.2",
     "@types/node": "^26.6.3",
     "@types/papaparse": "^5.5.2",
-    "@vitest/ui": "^5.0.2",
+    "@vitest/ui": "^5.0.3",
     "drizzle-kit": "^0.31.11",
     "eslint": "^10.11.0",
     "eslint-plugin-svelte": "^3.23.0",
-    "globals": "^17.12.0",
+    "globals": "^17.13.0",
     "happy-dom": "^20.14.5",
     "markdownlint-cli2": "^0.23.3",
-    "oxlint": "^1.85.0",
+    "oxlint": "^1.86.0",
     "prettier": "^3.9.9",
     "prettier-plugin-svelte": "^4.1.1",
     "prettier-plugin-tailwindcss": "^0.8.1",
@@ -59,8 +59,8 @@
     "textlint-rule-preset-ja-technical-writing": "^12.0.2",
     "textlint-rule-preset-jtf-style": "^3.0.3",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.70.1",
-    "vitest": "^5.0.2"
+    "typescript-eslint": "^8.71.0",
+    "vitest": "^5.0.3"
   },
-  "packageManager": "pnpm@12.6.0+sha512.3ef68f951cb111ac204b4a5a16f0b2ddf0da56a96e0413e81d855d9f0b55ef926714709028e1cd00c405c2c5fb7b9e8ec4dc46777c805d0373c2f2ff00fd20ec"
+  "packageManager": "pnpm@12.8.1+sha512.f64ba907507f5ceafe06c8d38e6052d0179444580ec1279ddd5bfc11cb48aa8a2644b66598e07e761da84872a9fc57d5f902b87fa49d024198d558612aabbe45"
 }
