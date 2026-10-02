@@ -284,13 +284,11 @@ describe("createDragReorder", () => {
     const onReorder = vi.fn();
     const onExternalDrop = vi.fn();
     const onExternalDropTargetChange = vi.fn();
-    const onDragStateChange = vi.fn();
     const dnd = createDragReorder(() => makeItems([1, 2, 3]), onReorder, {
       externalDropTargetSelector: "[data-task-drop-list-id]",
       externalDropTargetIdAttribute: "taskDropListId",
       onExternalDropTargetChange,
       onExternalDrop,
-      onDragStateChange,
     });
 
     const row = makeRowElement(2);
@@ -326,8 +324,6 @@ describe("createDragReorder", () => {
     expect(onReorder).not.toHaveBeenCalled();
     expect(dnd.draggedId).toBeNull();
     expect(dnd.isActive).toBe(false);
-    expect(onDragStateChange).toHaveBeenNthCalledWith(1, true);
-    expect(onDragStateChange).toHaveBeenLastCalledWith(false);
     expect(onExternalDropTargetChange).toHaveBeenLastCalledWith(null);
   });
 

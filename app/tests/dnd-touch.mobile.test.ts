@@ -1,5 +1,8 @@
 /**
  * @fileoverview モバイル相当の viewport におけるタスクD&Dのe2eテスト
+ *
+ * 2ペイン表示にならない幅では、D&Dをリスト内の並び替えに限定し、
+ * ドラッグ中もリスト一覧へ切り替えず別リストへの移動を受け付けないことを検証する。
  */
 
 import { test, expect, type Page, type Request } from "@playwright/test";
@@ -10,8 +13,8 @@ import {
 } from "./helpers/common";
 
 const stamp = Date.now();
-const sourceListName = `タッチ移動元_${stamp}`;
-const targetListName = `タッチ移動先_${stamp}`;
+const sourceListName = `タッチ並び替え元_${stamp}`;
+const otherListName = `タッチ並び替え他_${stamp}`;
 
 async function dispatchPointerEvent(
   page: Page,
@@ -36,16 +39,40 @@ async function dispatchPointerEvent(
   );
 }
 
-test.describe("dnd task move (mobile viewport)", () => {
+async function addTask(page: Page, title: string): Promise<void> {
+  const form = page.getByTestId("task-add-form");
+  await form.locator("textarea").fill(title);
+  const createResponsePromise = page.waitForResponse((response) =>
+    response.url().includes("/api/trpc/tasks.create"),
+  );
+  await form.locator('button[type="submit"]').click();
+  const createResponse = await createResponsePromise;
+  expect(createResponse.ok()).toBe(true);
+  const taskRow = page.getByTestId("task-item").filter({ hasText: title });
+  await expect(taskRow).toBeVisible({ timeout: 15000 });
+  await waitForPersistedTask(taskRow);
+}
+
+async function taskTitlesInOrder(
+  page: Page,
+  titles: string[],
+): Promise<string[]> {
+  const texts = await page.getByTestId("task-item").allTextContents();
+  return texts.flatMap((text) => titles.filter((t) => text.includes(t)));
+}
+
+test.describe("dnd task reorder (mobile viewport)", () => {
   test.beforeAll(async ({ browser }) => {
-    await setupTestLists(browser, [sourceListName, targetListName]);
+    await setupTestLists(browser, [sourceListName, otherListName]);
   });
 
   test.afterAll(async ({ browser }) => {
-    await cleanupTestLists(browser, [sourceListName, targetListName]);
+    await cleanupTestLists(browser, [sourceListName, otherListName]);
   });
 
-  test("タッチ操作でタスクを別リストへ移動できる", async ({ page }) => {
+  test("タッチ操作のD&Dはリスト内の並び替えだけを行い、リスト一覧へ切り替えない", async ({
+    page,
+  }) => {
     await Promise.all([
       page.goto("/"),
       page.waitForResponse((res) => res.url().includes("/api/trpc")),
@@ -56,26 +83,18 @@ test.describe("dnd task move (mobile viewport)", () => {
       .click();
     await page.getByTestId("task-add-form").waitFor({ timeout: 15000 });
 
-    const taskTitle = `タッチ別リスト移動_${Date.now()}`;
-    const form = page.getByTestId("task-add-form");
-    await form.locator("textarea").fill(taskTitle);
-    const createResponsePromise = page.waitForResponse((response) =>
-      response.url().includes("/api/trpc/tasks.create"),
-    );
-    await form.locator('button[type="submit"]').click();
-    const createResponse = await createResponsePromise;
-    expect(createResponse.ok()).toBe(true);
+    const firstTitle = `タッチ並び替えA_${Date.now()}`;
+    const secondTitle = `タッチ並び替えB_${Date.now()}`;
+    await addTask(page, firstTitle);
+    await addTask(page, secondTitle);
+    const titles = [firstTitle, secondTitle];
+    const initialOrder = await taskTitlesInOrder(page, titles);
+    expect(initialOrder).toHaveLength(2);
 
-    const taskRow = page
-      .getByTestId("task-item")
-      .filter({ hasText: taskTitle });
-    await expect(taskRow).toBeVisible({ timeout: 15000 });
-    await waitForPersistedTask(taskRow);
-
-    const targetList = page
+    const otherList = page
       .getByTestId("list-item")
-      .filter({ hasText: targetListName });
-    await expect(targetList).not.toBeVisible();
+      .filter({ hasText: otherListName });
+    await expect(otherList).not.toBeVisible();
 
     let updateRequestCount = 0;
     const onRequest = (request: Request) => {
@@ -85,10 +104,18 @@ test.describe("dnd task move (mobile viewport)", () => {
     };
     page.on("request", onRequest);
     try {
-      const handle = taskRow.getByTestId("task-drag-handle");
+      const sourceRow = page
+        .getByTestId("task-item")
+        .filter({ hasText: initialOrder[0] });
+      const targetRow = page
+        .getByTestId("task-item")
+        .filter({ hasText: initialOrder[1] });
+      const handle = sourceRow.getByTestId("task-drag-handle");
       const handleBox = await handle.boundingBox();
-      if (!handleBox)
+      const targetBox = await targetRow.boundingBox();
+      if (!handleBox || !targetBox) {
         throw new Error("タッチ操作対象の境界ボックスを取得できない");
+      }
       const startX = handleBox.x + handleBox.width / 2;
       const startY = handleBox.y + handleBox.height / 2;
 
@@ -99,84 +126,27 @@ test.describe("dnd task move (mobile viewport)", () => {
         clientX: startX,
         clientY: startY,
       });
-      await dispatchPointerEvent(
-        page,
-        "pointermove",
-        1,
-        startX + 20,
-        startY + 20,
-      );
-      await expect(targetList).toBeVisible({ timeout: 5000 });
+      await dispatchPointerEvent(page, "pointermove", 1, startX, startY + 20);
 
-      await dispatchPointerEvent(
-        page,
-        "pointercancel",
-        1,
-        startX + 20,
-        startY + 20,
-      );
-      await expect(targetList).not.toBeVisible({ timeout: 5000 });
+      // ドラッグ中もタスク一覧を表示したままとし、リスト一覧へ切り替えない
       await expect(page.getByTestId("task-add-form")).toBeVisible();
+      await expect(otherList).not.toBeVisible();
+
+      const dropX = targetBox.x + targetBox.width / 2;
+      const dropY = targetBox.y + targetBox.height * 0.75;
+      const reorderResponsePromise = page.waitForResponse((response) =>
+        response.url().includes("/api/trpc/tasks.reorder"),
+      );
+      await dispatchPointerEvent(page, "pointermove", 1, dropX, dropY);
+      await dispatchPointerEvent(page, "pointerup", 1, dropX, dropY);
+      const reorderResponse = await reorderResponsePromise;
+      expect(reorderResponse.ok()).toBe(true);
+
+      await expect
+        .poll(() => taskTitlesInOrder(page, titles), { timeout: 15000 })
+        .toEqual([initialOrder[1], initialOrder[0]]);
+      await expect(otherList).not.toBeVisible();
       expect(updateRequestCount).toBe(0);
-
-      const secondHandleBox = await handle.boundingBox();
-      if (!secondHandleBox) {
-        throw new Error("再試行するタッチ操作対象の境界ボックスを取得できない");
-      }
-      const secondStartX = secondHandleBox.x + secondHandleBox.width / 2;
-      const secondStartY = secondHandleBox.y + secondHandleBox.height / 2;
-      await handle.dispatchEvent("pointerdown", {
-        bubbles: true,
-        pointerId: 2,
-        pointerType: "touch",
-        clientX: secondStartX,
-        clientY: secondStartY,
-      });
-      await dispatchPointerEvent(
-        page,
-        "pointermove",
-        2,
-        secondStartX + 20,
-        secondStartY + 20,
-      );
-      await expect(targetList).toBeVisible({ timeout: 5000 });
-
-      const targetButton = targetList.getByTestId("list-select-btn");
-      await targetButton.scrollIntoViewIfNeeded();
-      const targetBox = await targetButton.boundingBox();
-      if (!targetBox) {
-        throw new Error("タッチ操作の移動先境界ボックスを取得できない");
-      }
-      const updateResponsePromise = page.waitForResponse((response) =>
-        response.url().includes("/api/trpc/tasks.update"),
-      );
-      await dispatchPointerEvent(
-        page,
-        "pointermove",
-        2,
-        targetBox.x + targetBox.width / 2,
-        targetBox.y + targetBox.height / 2,
-      );
-      await dispatchPointerEvent(
-        page,
-        "pointerup",
-        2,
-        targetBox.x + targetBox.width / 2,
-        targetBox.y + targetBox.height / 2,
-      );
-      const updateResponse = await updateResponsePromise;
-      expect(updateResponse.ok()).toBe(true);
-      await expect(taskRow).toHaveCount(0, { timeout: 15000 });
-
-      await page
-        .getByRole("button", { name: "リスト一覧に戻る", exact: true })
-        .click();
-      await expect(targetButton).toBeVisible({ timeout: 5000 });
-      await targetButton.click();
-      await expect(page.getByTestId("task-item").first()).toContainText(
-        taskTitle,
-        { timeout: 15000 },
-      );
     } finally {
       page.off("request", onRequest);
     }

@@ -54,7 +54,6 @@
     let addTaskText = $state("");
     let openMenuId = $state<number | null>(null);
     let dragOverListId = $state<number | null>(null);
-    let isTaskDragging = $state(false);
     let hasHash = $state(false);
     let searchQuery = $state("");
     let debouncedQuery = $state("");
@@ -1126,7 +1125,6 @@
         {mobileView}
         {openMenuId}
         {dragOverListId}
-        {isTaskDragging}
         bind:addListTitle
         onSelect={selectList}
         onToggleMenu={(listId) => {
@@ -1144,8 +1142,8 @@
     <!-- メインコンテンツ: 選択リストのタスク or 検索結果 -->
     <main
         class="flex-1 flex-col bg-white sm:flex dark:bg-gray-800"
-        class:flex={mobileView === "tasks" && !isTaskDragging}
-        class:hidden={mobileView !== "tasks" || isTaskDragging}
+        class:flex={mobileView === "tasks"}
+        class:hidden={mobileView !== "tasks"}
         class:min-h-0={!isSearching}
         class:overflow-hidden={!isSearching}
         class:overflow-y-auto={isSearching}
@@ -1182,8 +1180,6 @@
                 onReorder={handleReorderTasks}
                 onTaskDragOver={(listId) => (dragOverListId = listId)}
                 onTaskDrop={handleTaskDropToList}
-                onDragStateChange={(isDragging) =>
-                    (isTaskDragging = isDragging)}
                 {updatedTaskIds}
             />
         {:else}

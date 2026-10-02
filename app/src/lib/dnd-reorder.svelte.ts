@@ -48,8 +48,6 @@ export interface DragReorderOptions {
   onExternalDropTargetChange?: (targetId: number | null) => void;
   /** 外部ドロップを確定したときに呼ぶコールバック。 */
   onExternalDrop?: (draggedId: number, targetId: number) => void;
-  /** 閾値超過後の実ドラッグ状態が変化したときに呼ぶコールバック。 */
-  onDragStateChange?: (isActive: boolean) => void;
 }
 
 /**
@@ -275,11 +273,9 @@ export function createDragReorder<T extends Orderable>(
     updateExternalDropTarget(null);
   }
 
-  /** 実ドラッグ状態を更新し、表示側へ通知する。 */
+  /** 実ドラッグ状態を更新する。 */
   function updateDragState(nextIsActive: boolean) {
-    if (isActive === nextIsActive) return;
     isActive = nextIsActive;
-    options?.onDragStateChange?.(nextIsActive);
   }
 
   /** 外部ドロップ先候補を更新し、表示側へ通知する。 */

@@ -14,7 +14,6 @@
         openMenuId: number | null;
         addListTitle: string;
         dragOverListId?: number | null;
-        isTaskDragging?: boolean;
         onSelect: (listId: number) => void;
         onToggleMenu: (listId: number) => void;
         onRename: (listId: number, currentTitle: string) => void;
@@ -34,7 +33,6 @@
         openMenuId,
         addListTitle = $bindable(),
         dragOverListId = null,
-        isTaskDragging = false,
         onSelect,
         onToggleMenu,
         onRename,
@@ -57,9 +55,9 @@
 
 <aside
     class="flex-col border-r border-gray-200 bg-white sm:flex sm:w-56 sm:shrink-0 dark:border-gray-700 dark:bg-gray-800"
-    class:flex={mobileView === "lists" || isTaskDragging}
-    class:w-full={mobileView === "lists" || isTaskDragging}
-    class:hidden={mobileView !== "lists" && !isTaskDragging}
+    class:flex={mobileView === "lists"}
+    class:w-full={mobileView === "lists"}
+    class:hidden={mobileView !== "lists"}
 >
     <div class="flex-1 overflow-y-auto">
         {#each lists as list (list.id)}

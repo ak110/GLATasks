@@ -17,7 +17,6 @@
         onReorder?: (taskIds: number[]) => void;
         onTaskDragOver?: (listId: number | null) => void;
         onTaskDrop?: (taskId: number, targetListId: number) => void;
-        onDragStateChange?: (isDragging: boolean) => void;
         updatedTaskIds?: Set<number>;
     };
 
@@ -29,7 +28,6 @@
         onReorder,
         onTaskDragOver,
         onTaskDrop,
-        onDragStateChange,
         updatedTaskIds,
     }: Props = $props();
 
@@ -40,6 +38,9 @@
     }
 
     // D&D 状態管理（並び替えまたは別リストへの移動が渡された場合のみ有効化）
+    // 別リストへの移動はサイドバーと並べて表示する2ペイン表示に限る。
+    // 1ペイン表示ではサイドバーが非表示のため外部ドロップ先へ到達せず、
+    // 意図しない別リストへの移動を防ぐためドラッグ中もサイドバーへ切り替えない。
     const dnd = createDragReorder(
         () => tasks,
         (ids) => onReorder?.(ids),
@@ -49,7 +50,6 @@
             onExternalDropTargetChange: (listId) => onTaskDragOver?.(listId),
             onExternalDrop: (taskId, targetListId) =>
                 onTaskDrop?.(taskId, targetListId),
-            onDragStateChange: (isDragging) => onDragStateChange?.(isDragging),
         },
     );
 </script>
