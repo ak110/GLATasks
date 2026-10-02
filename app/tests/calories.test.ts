@@ -711,7 +711,7 @@ test.describe("calories achievement", () => {
     }
   });
 
-  test("平均が下がると先週比を表示する", async ({ browser }) => {
+  test("今日の摂取可能量が記録と目標変更に追随する", async ({ browser }) => {
     const { context, page } = await openCaloriesAsNewUser(browser);
     try {
       await addItem(page, "前の週", "1500");
@@ -719,9 +719,47 @@ test.describe("calories achievement", () => {
       await bulkCreate(page, "前の週", 14, 8);
       await bulkCreate(page, "直近の週", 7, 1);
 
-      await expect(
-        page.getByTestId("calorie-achievement-weekly-change"),
-      ).toHaveText("先週より −500 kcal/日");
+      const remaining = page.getByTestId("calorie-achievement-remaining");
+      // 7×1615から過去6日の6000を引く。7日前とそれ以前の記録は含めない
+      await expect(remaining).toHaveText("今日あと 5,305 kcal");
+      await expect(page.getByText(/先週より/)).toHaveCount(0);
+      await page.locator("#calorie-record-quantity").fill("2");
+      await addRecordNow(page, "直近の週");
+      await expect(remaining).toHaveText("今日あと 3,305 kcal");
+
+      await page.locator("#calorie-goal").fill("1000");
+      const goalResponse = waitForSuccessfulMutationResponse(
+        page,
+        "users.updatePreferences",
+      );
+      await page
+        .locator("#calorie-goal")
+        .locator("..")
+        .getByRole("button", { name: "保存" })
+        .click();
+      await goalResponse;
+      await expect(remaining).toHaveText("今日 1,000 kcal 超過");
+      await page.reload();
+      await expect(remaining).toHaveText("今日 1,000 kcal 超過");
+
+      // 目標を1500へ上げた後、残り2500を一時項目で記録するとちょうど0になる
+      await page.locator("#calorie-goal").fill("1500");
+      const secondGoalResponse = waitForSuccessfulMutationResponse(
+        page,
+        "users.updatePreferences",
+      );
+      await page
+        .locator("#calorie-goal")
+        .locator("..")
+        .getByRole("button", { name: "保存" })
+        .click();
+      await secondGoalResponse;
+      await expect(remaining).toHaveText("今日あと 2,500 kcal");
+      await page.locator("#calorie-record-quantity").fill("2500");
+      await addRecordNow(page, "一時の食事");
+      await expect(remaining).toHaveText("今日あと 0 kcal");
+      await page.setViewportSize({ width: 320, height: 800 });
+      await expect(remaining).toBeInViewport();
     } finally {
       await context.close();
     }

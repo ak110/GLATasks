@@ -729,6 +729,8 @@ export type CalorieAchievement = {
   latest_average_kcal: number | null;
   /** 昨日の7日平均から7日前の7日平均を引いた値。いずれかが判定対象外ならnull */
   weekly_change_kcal: number | null;
+  /** 今日までの7日平均を目標内に収めるための残量。7日の履歴が不足する場合はnull */
+  today_remaining_kcal: number | null;
 };
 
 /** 指定時刻を含む確定日の開始時刻をUTCで返す */
@@ -765,7 +767,7 @@ function calculateAchievement(
     firstRecordAt === undefined
       ? undefined
       : dayStartOf(firstRecordAt, offsetMinutes).getTime();
-  // totals[n]は当日からn日前の確定日の合計（n=0は当日で使わない）
+  // totals[n]は当日からn日前の合計（n=0は当日の摂取済み量）
   const totals = Array.from(
     { length: ACHIEVEMENT_DAYS + ACHIEVEMENT_AVERAGE_DAYS },
     () => 0,
@@ -774,7 +776,7 @@ function calculateAchievement(
     const daysAgo = Math.ceil(
       (todayStart - row.consumed_at.getTime()) / DAY_MS,
     );
-    if (daysAgo >= 1 && daysAgo < totals.length) {
+    if (daysAgo >= 0 && daysAgo < totals.length) {
       totals[daysAgo] += row.total_kcal;
     }
   }
@@ -812,6 +814,7 @@ function calculateAchievement(
   const missedIndex = newestFirst.findIndex((day) => day.status !== "achieved");
   const latest = averageOf(1);
   const previous = averageOf(1 + ACHIEVEMENT_AVERAGE_DAYS);
+  const todayAverage = averageOf(0);
   return {
     days: [...newestFirst].reverse(),
     streak_days: missedIndex === -1 ? ACHIEVEMENT_DAYS : missedIndex,
@@ -820,6 +823,13 @@ function calculateAchievement(
       latest === undefined || previous === undefined
         ? null
         : Math.round(latest - previous),
+    today_remaining_kcal:
+      todayAverage === undefined
+        ? null
+        : goal * ACHIEVEMENT_AVERAGE_DAYS -
+          totals
+            .slice(0, ACHIEVEMENT_AVERAGE_DAYS)
+            .reduce((sum, value) => sum + value, 0),
   };
 }
 

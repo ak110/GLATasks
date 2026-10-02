@@ -16,6 +16,7 @@ function makeAchievement(
     streak_days?: number;
     latest_average_kcal?: number | null;
     weekly_change_kcal?: number | null;
+    today_remaining_kcal?: number | null;
   } = {},
 ) {
   const statuses: Status[] = [
@@ -34,6 +35,7 @@ function makeAchievement(
     streak_days: 0,
     latest_average_kcal: 1500,
     weekly_change_kcal: null,
+    today_remaining_kcal: null,
     ...overrides,
   };
 }
@@ -113,20 +115,26 @@ describe("CalorieAchievement", () => {
   });
 
   it.each([
-    [-120, true],
-    [0, false],
-    [80, false],
-    [null, false],
-  ] as const)("先週比 %s は減った場合だけ表示する", (change, shown) => {
+    [120, "今日あと 120 kcal"],
+    [0, "今日あと 0 kcal"],
+    [-80, "今日 80 kcal 超過"],
+    [null, undefined],
+  ] as const)("今日の残量 %s を表示する", (remaining, text) => {
     const { queryByTestId } = render(CalorieAchievement, {
-      achievement: makeAchievement(["missed"], { weekly_change_kcal: change }),
+      achievement: makeAchievement(["missed"], {
+        today_remaining_kcal: remaining,
+        weekly_change_kcal: -120,
+      }),
     });
 
-    const element = queryByTestId("calorie-achievement-weekly-change");
-    if (shown) {
-      expect(element).toHaveTextContent("先週より −120 kcal/日");
+    const element = queryByTestId("calorie-achievement-remaining");
+    if (text !== undefined) {
+      expect(element).toHaveTextContent(text);
     } else {
       expect(element).not.toBeInTheDocument();
     }
+    expect(
+      queryByTestId("calorie-achievement-weekly-change"),
+    ).not.toBeInTheDocument();
   });
 });

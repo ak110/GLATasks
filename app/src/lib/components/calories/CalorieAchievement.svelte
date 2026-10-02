@@ -43,7 +43,7 @@
     }
 </script>
 
-<!-- 横幅が足りる場合は見出し・連続日数・先週比・点を1行へ並べ、足りない場合は折り返す -->
+<!-- 横幅が足りる場合は見出し・連続日数・今日の残量・点を1行へ並べ、足りない場合は折り返す -->
 <section
     aria-labelledby="calorie-achievement-title"
     class={`mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 rounded border p-4 ${
@@ -67,10 +67,25 @@
             記録が7日分たまると判定を始めます
         </p>
     {/if}
-    {#if achievement.weekly_change_kcal !== null && achievement.weekly_change_kcal < 0}
-        <p class="text-sm" data-testid="calorie-achievement-weekly-change">
-            先週より −{formatKcal(Math.abs(achievement.weekly_change_kcal))} kcal/日
-        </p>
+    {#if achievement.today_remaining_kcal !== null}
+        <div>
+            <p class="text-base" data-testid="calorie-achievement-remaining">
+                {#if achievement.today_remaining_kcal >= 0}
+                    今日あと <span class="text-xl font-bold tabular-nums"
+                        >{formatKcal(achievement.today_remaining_kcal)}</span
+                    > kcal
+                {:else}
+                    今日 <span class="text-xl font-bold tabular-nums"
+                        >{formatKcal(
+                            Math.abs(achievement.today_remaining_kcal),
+                        )}</span
+                    > kcal 超過
+                {/if}
+            </p>
+            <p class="text-xs text-gray-600 dark:text-gray-300">
+                翌朝4時まで・7日平均の目標に基づく
+            </p>
+        </div>
     {/if}
     <div class="ml-auto max-w-full min-w-0">
         <p

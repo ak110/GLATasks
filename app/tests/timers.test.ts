@@ -65,6 +65,7 @@ test.describe("timers", () => {
     await expect(card.locator('[data-testid="timer-display"]')).toHaveText(
       "00:05:00",
     );
+    await expect(card.locator('[data-testid="timer-start-btn"]')).toBeVisible();
 
     // 後片付け
     await deleteTimerCard(page, card);
@@ -421,8 +422,7 @@ test.describe("timers", () => {
       .filter({ hasText: timerName });
     await expect(card).toBeVisible({ timeout: 10000 });
 
-    // タイマー開始 → 残り 0 秒到達を待つ
-    await card.locator('[data-testid="timer-start-btn"]').click();
+    // 追加直後から自動で動き、開始操作なしで残り0秒へ到達する
     await expect(card.locator('[data-testid="timer-display"]')).toHaveText(
       "00:00:00",
       { timeout: 10000 },
@@ -602,7 +602,11 @@ test.describe("timers", () => {
       .filter({ hasText: timerName });
     await expect(card).toBeVisible({ timeout: 10000 });
 
-    // 開始せずに削除 → ConfirmDialog が表示されることを検証
+    await expect(card.getByTestId("timer-pause-btn")).toBeVisible();
+    await page.reload();
+    await expect(card.getByTestId("timer-pause-btn")).toBeVisible();
+
+    // 動作中で未満了の削除は確認ダイアログを表示する
     await card.locator('[data-testid="timer-delete-btn"]').click();
     const confirmDialog = page.locator('[role="dialog"]', {
       hasText: "削除",

@@ -231,6 +231,45 @@ describe("達成状況", () => {
     expect(jst.achievement.days[27].date).toBe("2026/08/31");
   });
 
+  it("今日の残量は4時区切りの7日合計から算出する", async () => {
+    const rows = [
+      ...daysRows(1, 6, 1000),
+      dayRow(7, 9000),
+      {
+        consumed_at: new Date("2026-08-25T20:00:00.000Z"),
+        quantity: 1,
+        item_kcal: 100,
+        temporary_name: null,
+      },
+      {
+        consumed_at: new Date("2026-09-01T03:59:00.000Z"),
+        quantity: 1,
+        item_kcal: 200,
+        temporary_name: null,
+      },
+      {
+        consumed_at: new Date("2026-09-01T04:00:00.000Z"),
+        quantity: 300,
+        item_kcal: null,
+        temporary_name: "朝食",
+      },
+    ];
+    const utc = await summarizeRows(rows, 1000, { firstRecordAt: LONG_AGO });
+    const jst = await summarizeRows(rows, 1000, {
+      firstRecordAt: LONG_AGO,
+      tzOffsetMinutes: 540,
+    });
+    // 7日前の9000kcalは外れ、直近6日の6000と深夜200と朝食300を数える
+    expect(utc.achievement.today_remaining_kcal).toBe(500);
+    // 日本時間では7日の窓がUTCより9時間早く始まり、8月25日20時の100も入る
+    expect(jst.achievement.today_remaining_kcal).toBe(400);
+
+    const insufficient = await summarizeRows(daysRows(1, 5, 1000), 1000);
+    expect(insufficient.achievement.today_remaining_kcal).toBeNull();
+    const seventhDay = await summarizeRows(daysRows(1, 6, 1000), 1000);
+    expect(seventhDay.achievement.today_remaining_kcal).toBe(1000);
+  });
+
   it("7日平均が目標と等しい日を達成とし、超えた日で連続日数が止まる", async () => {
     // 昨日の窓（1〜7日前）は平均1000、一昨日の窓（2〜8日前）は平均1001
     const rows = [...daysRows(1, 7, 1000), dayRow(8, 1007)];

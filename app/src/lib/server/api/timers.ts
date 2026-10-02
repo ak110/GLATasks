@@ -164,6 +164,7 @@ export async function createTimer(params: {
     ringSeconds = TIMER_DEFAULT_RING_SECONDS,
   } = params;
   const isAlarm = mode === "alarm";
+  const startsImmediately = isAlarm || ephemeral;
   const remainingSeconds = isAlarm
     ? calcAlarmSecondsOrThrow(targetMinutes, tzOffsetMinutes)
     : baseSeconds;
@@ -183,10 +184,10 @@ export async function createTimer(params: {
     adjust_minutes: adjustMinutes,
     remaining_seconds: remainingSeconds,
     target_minutes: targetMinutes,
-    running: isAlarm ? 1 : 0,
+    running: startsImmediately ? 1 : 0,
     ephemeral: ephemeral ? 1 : 0,
     ring_seconds: ringSeconds,
-    started_at: isAlarm ? now : null,
+    started_at: startsImmediately ? now : null,
     sort_order: sortOrder,
     created: now,
     updated: now,
