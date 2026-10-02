@@ -1,9 +1,9 @@
 /**
- * @fileoverview カロリー記録フォームの日時検証・一覧表示・取消操作、行操作メニューおよび検索語による表示のテスト
+ * @fileoverview カロリー記録フォームの日時検証・日時の自動更新・一覧表示・取消操作、行操作メニューおよび検索語による表示のテスト
  */
 
 import { fireEvent, render, screen } from "@testing-library/svelte";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import CalorieRecordTable from "./CalorieRecordTable.svelte";
 
@@ -53,6 +53,34 @@ describe("CalorieRecordTable", () => {
       "[0-9]{4}/[0-9]{2}/[0-9]{2} [0-9]{2}:[0-9]{2}",
     );
     expect(input.validity.patternMismatch).toBe(false);
+  });
+
+  describe("追加欄の日時の自動更新", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("分が変わると現在時刻へ更新し、手で修正した後は取消まで更新しない", async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date(2026, 9, 2, 12, 0, 30));
+      renderTable();
+      const datetime = screen.getByLabelText("日時") as HTMLInputElement;
+      expect(datetime.value).toBe("2026/10/02 12:00");
+
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(datetime.value).toBe("2026/10/02 12:01");
+
+      await fireEvent.input(datetime, {
+        target: { value: "2026/10/01 08:00" },
+      });
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(datetime.value).toBe("2026/10/01 08:00");
+
+      await fireEvent.click(screen.getByRole("button", { name: "取消" }));
+      expect(datetime.value).toBe("2026/10/02 12:02");
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(datetime.value).toBe("2026/10/02 12:03");
+    });
   });
 
   it("一覧の日時はモバイルで年を省略して日付と時刻を2行に分け、広い画面で年を表示する", () => {

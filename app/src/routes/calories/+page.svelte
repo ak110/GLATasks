@@ -20,6 +20,7 @@
     import CalorieRecordTable from "$lib/components/calories/CalorieRecordTable.svelte";
     import CalorieSummary from "$lib/components/calories/CalorieSummary.svelte";
     import ConfirmDialog from "$lib/components/dialogs/ConfirmDialog.svelte";
+    import { startMinuteTicker } from "$lib/minute-ticker";
     import type {
         BulkCreateCalorieRecordsInput,
         BulkDeleteCalorieRecordsInput,
@@ -117,14 +118,14 @@
         },
     });
 
-    onMount(() => {
-        const timer = setInterval(() => {
+    // 集計は現在時刻を基準に変わるため、記録の日時欄と同じ分の切り替わりで取り直す
+    onMount(() =>
+        startMinuteTicker(() => {
             void queryClient.invalidateQueries({
                 queryKey: ["calories", "summary"],
             });
-        }, 60_000);
-        return () => clearInterval(timer);
-    });
+        }),
+    );
 
     const createItemMutation = createMutation(() => ({
         mutationFn: (input: { name: string; kcal: number; note: string }) =>

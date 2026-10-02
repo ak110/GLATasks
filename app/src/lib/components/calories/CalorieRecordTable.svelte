@@ -1,5 +1,8 @@
 <script lang="ts">
+    import { onMount } from "svelte";
+
     import ConfirmDialog from "$lib/components/dialogs/ConfirmDialog.svelte";
+    import { startMinuteTicker } from "$lib/minute-ticker";
     import CalorieEditDialog from "./CalorieEditDialog.svelte";
     import CalorieFilterStatus from "./CalorieFilterStatus.svelte";
 
@@ -52,6 +55,8 @@
     let editingId = $state<number | undefined>();
     let openMenuId = $state<number | undefined>();
     let consumedAt = $state(formatLocalMinute(new Date()));
+    // 追加欄の日時は現在時刻へ追従させ、手で修正した後は追加か取消までその値を保つ
+    let consumedAtEdited = $state(false);
     // 編集ダイアログの品目欄は追加フォームと別に持ち、編集中の名前を検索語にしない
     let editItemName = $state("");
     const itemName = $derived(
@@ -81,6 +86,13 @@
     );
     const convertible = $derived(!keepTemporary && matchedItem !== undefined);
     const quantityLabel = $derived(temporary ? "kcal" : "数量");
+
+    onMount(() =>
+        startMinuteTicker(() => {
+            if (editingId === undefined && !consumedAtEdited)
+                consumedAt = formatLocalMinute(new Date());
+        }),
+    );
 
     // 操作メニュー外クリック/Escapeで閉じる
     $effect(() => {
@@ -119,6 +131,7 @@
     function resetForm() {
         editingId = undefined;
         consumedAt = formatLocalMinute(new Date());
+        consumedAtEdited = false;
         addItemName = "";
         editItemName = "";
         quantity = "1";
@@ -241,6 +254,7 @@
         <input
             id="calorie-record-datetime"
             bind:value={consumedAt}
+            oninput={() => (consumedAtEdited = true)}
             required
             pattern={"[0-9]{4}/[0-9]{2}/[0-9]{2} [0-9]{2}:[0-9]{2}"}
             placeholder="yyyy/MM/dd HH:mm"
