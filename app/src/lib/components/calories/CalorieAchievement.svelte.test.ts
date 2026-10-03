@@ -115,9 +115,9 @@ describe("CalorieAchievement", () => {
   });
 
   it.each([
-    [120, "今日あと 120 kcal"],
-    [0, "今日あと 0 kcal"],
-    [-80, "今日 80 kcal 超過"],
+    [120, "あと 120 kcal"],
+    [0, "あと 0 kcal"],
+    [-80, "あと -80 kcal"],
     [null, undefined],
   ] as const)("今日の残量 %s を表示する", (remaining, text) => {
     const { queryByTestId } = render(CalorieAchievement, {

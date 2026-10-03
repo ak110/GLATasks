@@ -70,17 +70,9 @@
     {#if achievement.today_remaining_kcal !== null}
         <div>
             <p class="text-base" data-testid="calorie-achievement-remaining">
-                {#if achievement.today_remaining_kcal >= 0}
-                    今日あと <span class="text-xl font-bold tabular-nums"
-                        >{formatKcal(achievement.today_remaining_kcal)}</span
-                    > kcal
-                {:else}
-                    今日 <span class="text-xl font-bold tabular-nums"
-                        >{formatKcal(
-                            Math.abs(achievement.today_remaining_kcal),
-                        )}</span
-                    > kcal 超過
-                {/if}
+                あと <span class="text-xl font-bold tabular-nums"
+                    >{formatKcal(achievement.today_remaining_kcal)}</span
+                > kcal
             </p>
             <p class="text-xs text-gray-600 dark:text-gray-300">
                 翌朝4時まで・7日平均の目標に基づく
