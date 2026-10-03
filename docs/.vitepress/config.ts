@@ -26,6 +26,7 @@ export default defineConfig({
         items: [
           { text: 'アーキテクチャ', link: '/development/architecture' },
           { text: '開発手順', link: '/development/development' },
+          { text: '観測記録', link: '/development/audit-records' },
         ],
       },
     ],
