@@ -10,7 +10,6 @@ H2見出しは索引元の条文が指す文字列と一致させる。
 2026-10-03、Playwright 1.63.0の`lib/runner/index.js`の開始処理を読んだ。
 `createGlobalSetupTasks`が呼ぶ`createRemoveOutputDirsTask`は、通常の開始時に選択されたprojectのoutputDirを削除する。
 一時ディレクトリへ同じ`createRemoveOutputDirsTask`と`removeFolders`を適用した対照では、通常設定で指定ディレクトリが消え、出力先の外へ置いた複製は残った。
-`preserveOutputDir: true`では元のファイルが残った。
 同日のE2E失敗の調査では、初回の実行が1件失敗して`test-results`配下へスクリーンショット・`error-context.md`・`trace.zip`を出力した。
 同じ出力先での再実行後には`.last-run.json`だけが残った。
 同日、`make test-e2e`の1回目の後に`test-results`へ目印のファイルを置いて外側へ`cp -a`で複製し、2回目を実行すると、元の目印は消えて複製側には残った。
