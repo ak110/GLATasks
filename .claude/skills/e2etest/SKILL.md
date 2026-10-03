@@ -135,7 +135,12 @@ e2eテストでは共通ヘルパー（`app/tests/helpers/common.ts`）を利用
 
 - `BASE_URL`はテスト対象のベースURL（環境変数`BASE_URL`優先、既定値`https://localhost:38180`）
 - `STORAGE_STATE_PATH`は認証状態ファイルの絶対パス（`import.meta.dirname`基準）
+- `isMutationResponse(response, procedure)`は指定したprocedureを含むtRPC応答かどうかを判定する
+- `waitForMutationResponse(page, procedure)`は操作前に登録し、指定procedureのmutation応答を待つ
+- `waitForSuccessfulMutationResponse(page, procedure)`は指定procedureのmutationがHTTP成功で完了するまで待つ
+- `waitForTaskUpdateResponse(page)`はタスク更新mutationの応答を待つ
 - `waitForPersistedTask(taskRow)`は楽観追加されたタスクが実IDへ置き換わるまで待つ
+- `toggleTaskAndWaitForUpdate(page, checkbox)`はタスク状態を1段階進め、成功応答と画面状態の反映後に返る
 - `setupTestList(browser, listName)`は`beforeAll`からテスト用リストを作成する
 - `setupTestLists(browser, listNames)`は1つのブラウザーコンテキストで複数のテスト用リストを作成する
 - `cleanupTestList(browser, listName)`は`afterAll`からテスト用リストを削除する
