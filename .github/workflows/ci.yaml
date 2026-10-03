@@ -87,6 +87,10 @@ jobs:
       - name: Start stack (production profile)
         run: docker compose --profile=production up -d --wait
 
+      # 公開している疎通確認コマンド自体がproductionイメージで成立することを確かめる
+      - name: Run healthcheck
+        run: make healthcheck
+
       - name: Run backup test
         run: make test-backup
 

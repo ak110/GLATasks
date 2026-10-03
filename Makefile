@@ -80,13 +80,15 @@ logs:
 ps:
 	docker compose ps
 
+# 本番のappイメージ（slim）はcurlを持たないため、コンテナ内の確認は稼働に必須のNodeのfetchで行う。
+# signalは応答本文の受信までを2秒の上限の対象にする。
 healthcheck:
 	@attempt=1; \
 	while [ "$$attempt" -le 30 ]; do \
 		if curl --fail --silent --show-error --max-time 2 http://localhost:3000/healthcheck 2>/dev/null; then \
 			exit 0; \
 		fi; \
-		if docker compose exec -T app curl --fail --silent --show-error --max-time 2 http://localhost:3000/healthcheck; then \
+		if docker compose exec -T app node --input-type=module --eval="const res = await fetch('http://localhost:3000/healthcheck', {signal: AbortSignal.timeout(2000)}); const body = await res.text(); if (!res.ok) { console.error('HTTP ' + res.status); process.exit(1); } console.log(body);"; then \
 			exit 0; \
 		fi; \
 		if [ "$$attempt" -lt 30 ]; then sleep 2; fi; \
