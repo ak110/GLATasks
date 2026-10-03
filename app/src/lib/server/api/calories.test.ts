@@ -231,7 +231,7 @@ describe("達成状況", () => {
     expect(jst.achievement.days[27].date).toBe("2026/08/31");
   });
 
-  it("今日の残量は4時区切りの7日合計から算出する", async () => {
+  it("今日の残量は朝4時以降の摂取量だけを1日目標から引き、過去の余裕や超過を含めない", async () => {
     const rows = [
       ...daysRows(1, 6, 1000),
       dayRow(7, 9000),
@@ -259,15 +259,19 @@ describe("達成状況", () => {
       firstRecordAt: LONG_AGO,
       tzOffsetMinutes: 540,
     });
-    // 7日前の9000kcalは外れ、直近6日の6000と深夜200と朝食300を数える
-    expect(utc.achievement.today_remaining_kcal).toBe(500);
-    // 日本時間では7日の窓がUTCより9時間早く始まり、8月25日20時の100も入る
-    expect(jst.achievement.today_remaining_kcal).toBe(400);
+    // 時差0では3:59の200kcalは前日、4:00の300kcalだけが今日に入る
+    expect(utc.achievement.today_remaining_kcal).toBe(700);
+    // 日本時間では2件とも今日の4時以降なので、合計500kcalを引く
+    expect(jst.achievement.today_remaining_kcal).toBe(500);
 
     const insufficient = await summarizeRows(daysRows(1, 5, 1000), 1000);
-    expect(insufficient.achievement.today_remaining_kcal).toBeNull();
+    expect(insufficient.achievement.today_remaining_kcal).toBe(1000);
     const seventhDay = await summarizeRows(daysRows(1, 6, 1000), 1000);
     expect(seventhDay.achievement.today_remaining_kcal).toBe(1000);
+    const noRecords = await summarizeRows([], 1750);
+    expect(noRecords.achievement.today_remaining_kcal).toBe(1750);
+    const firstDay = await summarizeRows([dayRow(0, 300)], 1750);
+    expect(firstDay.achievement.today_remaining_kcal).toBe(1450);
   });
 
   it("7日平均が目標と等しい日を達成とし、超えた日で連続日数が止まる", async () => {

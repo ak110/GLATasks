@@ -729,7 +729,7 @@ export type CalorieAchievement = {
   latest_average_kcal: number | null;
   /** 昨日の7日平均から7日前の7日平均を引いた値。いずれかが判定対象外ならnull */
   weekly_change_kcal: number | null;
-  /** 今日までの7日平均を目標内に収めるための残量。7日の履歴が不足する場合はnull */
+  /** 1日目標から今日（現地の朝4時以降）の摂取量を引いた残量 */
   today_remaining_kcal: number | null;
 };
 
@@ -814,7 +814,6 @@ function calculateAchievement(
   const missedIndex = newestFirst.findIndex((day) => day.status !== "achieved");
   const latest = averageOf(1);
   const previous = averageOf(1 + ACHIEVEMENT_AVERAGE_DAYS);
-  const todayAverage = averageOf(0);
   return {
     days: [...newestFirst].reverse(),
     streak_days: missedIndex === -1 ? ACHIEVEMENT_DAYS : missedIndex,
@@ -823,13 +822,7 @@ function calculateAchievement(
       latest === undefined || previous === undefined
         ? null
         : Math.round(latest - previous),
-    today_remaining_kcal:
-      todayAverage === undefined
-        ? null
-        : goal * ACHIEVEMENT_AVERAGE_DAYS -
-          totals
-            .slice(0, ACHIEVEMENT_AVERAGE_DAYS)
-            .reduce((sum, value) => sum + value, 0),
+    today_remaining_kcal: goal - totals[0],
   };
 }
 
