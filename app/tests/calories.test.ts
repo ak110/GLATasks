@@ -723,6 +723,9 @@ test.describe("calories achievement", () => {
       // 7×1615から過去6日の6000を引く。7日前とそれ以前の記録は含めない
       await expect(remaining).toHaveText("あと 5,305 kcal");
       await expect(page.getByText(/先週より/)).toHaveCount(0);
+      await expect(
+        page.getByText("翌朝4時まで・7日平均の目標に基づく"),
+      ).toHaveCount(0);
       await page.locator("#calorie-record-quantity").fill("2");
       await addRecordNow(page, "直近の週");
       await expect(remaining).toHaveText("あと 3,305 kcal");
