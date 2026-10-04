@@ -122,6 +122,10 @@ Svelteはkey値の変化でコンポーネントインスタンスを再生成�
 
 ## サーバー・クライアント共有モジュール
 
+`#lib/*`はルートの`package.json`の`imports`で定義し、そのファイルへのリンクである`app/package.json`から`app/src/lib`を参照する。
+静的import、動的import、Vitestのmock指定には実体の拡張子を含める（`#lib/text-split.ts`、`#lib/toast-store.svelte.ts`、`#lib/components/ui/Toast.svelte`など）。
+`$app/*`はSvelteKitが提供するモジュールであり、`#lib/*`とは別に扱う。
+
 サーバー・クライアント両方から参照する純粋関数は`#lib`直下に置く。
 サーバー固有モジュール（`#lib/server/api/common.ts`等）からはre-exportのみとし、
 片側に再実装するとロジックが乖離する原因になる。

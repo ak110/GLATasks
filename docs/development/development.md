@@ -51,7 +51,13 @@ e2eテスト（`make test-e2e`）は開発環境（`make deploy`）が起動し�
 SvelteKitの設定は`app/vite.config.ts`の`sveltekit(...)`へ渡す。
 アプリ内の共通モジュールは、`package.json`の`imports`で定義した`#lib/*`を拡張子付きで参照する。
 `app/tsconfig.json`は`$app/tsconfig`を継承し、ルートの`tsconfig.json`がそれを継承する。
-`svelte-kit sync`でルート型などを生成する。
+リポジトリルートから`pnpm run check`または`pnpm run test:unit`を実行すると、`app`で`svelte-kit sync`を実行してから型チェックまたは単体テストを開始する。
+`make update`も依存更新の後に同じ場所でsyncを実行する。
+型生成だけを手動で行う場合は、リポジトリルートから次を実行する。
+
+```bash
+cd app && ../node_modules/.bin/svelte-kit sync
+```
 
 `make update`は`pnpm update --latest`により`package.json`の指定範囲を超えて更新する。
 稼働中の開発サーバーが更新前のモジュールを保持したままだとE2Eが失敗するため、`make update`は依存更新後に`app`を再起動し、疎通を確認してから検証する。

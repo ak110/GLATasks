@@ -92,6 +92,8 @@ description: >-
 
 ### 7. テスト追加
 
+静的import・動的import・Vitestのmock指定は、`sveltekit`スキル「サーバー・クライアント共有モジュール」節に従い、実体の拡張子を含む`#lib`参照を使う。
+
 - ユニットテスト: `app/src/**/*.test.ts` に追加（近傍の既存テストを雛形にする）
   - 非決定値（現在時刻・乱数）は固定値を注入する
   - 市民時刻を扱うprocedureは固定 `tz_offset_minutes` でケースを書く
