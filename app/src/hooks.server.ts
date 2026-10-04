@@ -1,7 +1,7 @@
-import type { Handle, ServerInit } from "@sveltejs/kit";
-import { building } from "$app/environment";
-import { verifySessionToken } from "$lib/server/session";
-import { startScheduler } from "$lib/server/scheduler";
+import type { Handle, ServerInit } from "@sveltejs/kit/hooks";
+import { building } from "$app/env";
+import { verifySessionToken } from "#lib/server/session.ts";
+import { startScheduler } from "#lib/server/scheduler.ts";
 
 /**
  * サーバー起動時に定期処理スケジューラー（定期TODOとカロリー自動記録）を起動する。

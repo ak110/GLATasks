@@ -11,8 +11,8 @@
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
 import crypto from "node:crypto";
-import { createMcpServer } from "$lib/server/mcp/server";
-import { verifyAccessToken } from "$lib/server/mcp/oauth";
+import { createMcpServer } from "#lib/server/mcp/server.ts";
+import { verifyAccessToken } from "#lib/server/mcp/oauth.ts";
 import type { RequestHandler } from "./$types";
 
 /**

@@ -7,7 +7,7 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { SSE_EVENTS } from "$lib/sse-events";
+import { SSE_EVENTS } from "#lib/sse-events.ts";
 
 let preferences: Record<string, unknown> = {};
 

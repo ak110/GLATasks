@@ -4,8 +4,8 @@
 
 import { and, eq } from "drizzle-orm";
 
-import { TAG_COLOR_KEYS } from "$lib/types";
-import type { TagColorKey, TagInfo } from "$lib/types";
+import { TAG_COLOR_KEYS } from "#lib/types.ts";
+import type { TagColorKey, TagInfo } from "#lib/types.ts";
 import { compareTagName } from "../../tag-sort";
 import { getDb } from "../db";
 import { lists } from "../schema";
@@ -72,9 +72,9 @@ export function serializeTags(value: TagInfo[]): string {
 
 // ── タスクの title/notes 分割 ──
 
-// SSOTは $lib/text-split.ts。サーバー・クライアント両方から参照されるため
+// SSOTは #lib/text-split.ts。サーバー・クライアント両方から参照されるため
 // このファイルでは re-export のみとし、片側で再実装しない。
-export { splitTitle, splitNotes } from "$lib/text-split";
+export { splitTitle, splitNotes } from "#lib/text-split.ts";
 
 // ── DB 更新ヘルパー ──
 

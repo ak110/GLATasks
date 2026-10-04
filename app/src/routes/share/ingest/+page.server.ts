@@ -3,9 +3,9 @@
  */
 
 import { fail, redirect } from "@sveltejs/kit";
-import * as api from "$lib/server/api";
-import { sendEvent } from "$lib/server/sse";
-import { SSE_EVENTS } from "$lib/sse-events";
+import * as api from "#lib/server/api.ts";
+import { sendEvent } from "#lib/server/sse.ts";
+import { SSE_EVENTS } from "#lib/sse-events.ts";
 import type { Actions, PageServerLoad } from "./$types";
 
 export const load: PageServerLoad = async ({ locals, url }) => {

@@ -4,8 +4,8 @@
 
 import { eq } from "drizzle-orm";
 
-import type { UserPreferences } from "$lib/schemas";
-import { UserPreferencesSchema } from "$lib/schemas";
+import type { UserPreferences } from "#lib/schemas.ts";
+import { UserPreferencesSchema } from "#lib/schemas.ts";
 import { getDb } from "../db";
 import { users } from "../schema";
 

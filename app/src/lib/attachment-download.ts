@@ -5,8 +5,8 @@
  * Blob化してブラウザネイティブのダウンロード動作を発火する。
  */
 
-import { base64ToBytes } from "$lib/base64";
-import { trpc } from "$lib/trpc";
+import { base64ToBytes } from "#lib/base64.ts";
+import { trpc } from "#lib/trpc.ts";
 
 /** 添付ファイルをダウンロードする */
 export async function downloadAttachment(attachmentId: number): Promise<void> {

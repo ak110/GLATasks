@@ -2,7 +2,7 @@
  * @fileoverview 添付ファイルのデータ変換・アップロード共通処理
  */
 
-import { trpc } from "$lib/trpc";
+import { trpc } from "#lib/trpc.ts";
 
 /** ファイルドロップ中のハイライト表示に使うTailwindクラス（タスク追加フォーム・編集ダイアログ共通） */
 export const FILE_DROP_HIGHLIGHT_CLASSES =

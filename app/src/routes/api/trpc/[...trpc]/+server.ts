@@ -4,8 +4,8 @@
 
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import type { RequestHandler } from "@sveltejs/kit";
-import { appRouter } from "$lib/server/trpc";
-import { getEncryptKey } from "$lib/server/env";
+import { appRouter } from "#lib/server/trpc.ts";
+import { getEncryptKey } from "#lib/server/env.ts";
 
 export const GET: RequestHandler = async (event) => {
   return fetchRequestHandler({

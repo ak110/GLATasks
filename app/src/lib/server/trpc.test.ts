@@ -1,17 +1,17 @@
 /**
  * @fileoverview attachmentsルーターのSSE通知を検証する単体テスト
  *
- * DB接続を排除するため、API関数（`$lib/server/api`）とSSE送信（`$lib/server/sse`）を
+ * DB接続を排除するため、API関数（`#lib/server/api.ts`）とSSE送信（`#lib/server/sse.ts`）を
  * モック化し、`createCaller`で組み立てた呼び出し元から `attachments.create`・
  * `attachments.delete` を呼び出して `sendEvent` の呼び出し引数を確認する。
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { RequestEvent } from "@sveltejs/kit";
 
-import { SSE_EVENTS } from "$lib/sse-events";
+import { SSE_EVENTS } from "#lib/sse-events.ts";
 
-vi.mock("$lib/server/api", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("$lib/server/api")>();
+vi.mock("#lib/server/api.ts", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("#lib/server/api.ts")>();
   return {
     ...actual,
     createAttachment: vi.fn().mockResolvedValue({ attachmentId: 1 }),
@@ -28,15 +28,15 @@ vi.mock("$lib/server/api", async (importOriginal) => {
   };
 });
 
-vi.mock("$lib/server/sse", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("$lib/server/sse")>();
+vi.mock("#lib/server/sse.ts", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("#lib/server/sse.ts")>();
   return {
     ...actual,
     sendEvent: vi.fn(),
   };
 });
 
-vi.mock("$lib/server/crypto", () => ({
+vi.mock("#lib/server/crypto.ts", () => ({
   encryptObject: vi
     .fn()
     .mockImplementation(async (data: unknown) => JSON.stringify(data)),
@@ -44,10 +44,11 @@ vi.mock("$lib/server/crypto", () => ({
 }));
 
 const { appRouter } = await import("./trpc");
-const { createAttachment, deleteAttachment } = await import("$lib/server/api");
+const { createAttachment, deleteAttachment } =
+  await import("#lib/server/api.ts");
 const { createCalorieItem, getCalorieRecords, getCalorieSummary } =
-  await import("$lib/server/api");
-const { sendEvent } = await import("$lib/server/sse");
+  await import("#lib/server/api.ts");
+const { sendEvent } = await import("#lib/server/sse.ts");
 
 /** 認証済み利用者を模したtRPCコンテキストを組み立てる */
 function makeCtx(userId: number, tabId: string | null) {

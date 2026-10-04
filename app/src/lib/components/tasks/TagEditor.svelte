@@ -5,8 +5,8 @@
      * タスク追加フォームと編集ダイアログで共通利用する。
      */
 
-    import type { TagInfo, TagColorKey } from "$lib/types";
-    import { getTagColorClass, resolveTagColor } from "$lib/tag-palette";
+    import type { TagInfo, TagColorKey } from "#lib/types.ts";
+    import { getTagColorClass, resolveTagColor } from "#lib/tag-palette.ts";
 
     type Props = {
         /** 現在設定中のタグ配列（双方向バインド） */

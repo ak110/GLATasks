@@ -8,7 +8,7 @@
 import { render, screen } from "@testing-library/svelte";
 import { describe, expect, it, vi } from "vitest";
 
-import type { TimerInfo } from "$lib/types";
+import type { TimerInfo } from "#lib/types.ts";
 import TimerCard from "./TimerCard.svelte";
 
 /** テスト用タイマーデータのデフォルト値 */

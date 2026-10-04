@@ -3,21 +3,21 @@
      * @fileoverview タスク編集ダイアログ（内容編集・区分切替・タグ設定・リスト移動・完了状態変更）
      */
 
-    import type { AttachmentMeta, TagInfo } from "$lib/types";
-    import { trpc } from "$lib/trpc";
-    import { showErrorToast } from "$lib/toast-store.svelte";
-    import { extractErrorMessage } from "$lib/extract-error-message";
+    import type { AttachmentMeta, TagInfo } from "#lib/types.ts";
+    import { trpc } from "#lib/trpc.ts";
+    import { showErrorToast } from "#lib/toast-store.svelte.ts";
+    import { extractErrorMessage } from "#lib/extract-error-message.ts";
     import {
         uploadAttachment,
         FILE_DROP_HIGHLIGHT_CLASSES,
         extractImageFilesFromClipboard,
         isImageAttachment,
-    } from "$lib/attachment-utils";
-    import { createThumbnailManager } from "$lib/image-attachment-utils.svelte";
-    import ImageLightbox from "$lib/components/dialogs/ImageLightbox.svelte";
+    } from "#lib/attachment-utils.ts";
+    import { createThumbnailManager } from "#lib/image-attachment-utils.svelte.ts";
+    import ImageLightbox from "#lib/components/dialogs/ImageLightbox.svelte";
     import TagEditor from "./TagEditor.svelte";
     import AttachmentPicker from "./AttachmentPicker.svelte";
-    import ConfirmDialog from "$lib/components/dialogs/ConfirmDialog.svelte";
+    import ConfirmDialog from "#lib/components/dialogs/ConfirmDialog.svelte";
 
     // role="dialog"のaria-labelledby参照先として<h2>を識別する
     const titleId = crypto.randomUUID();

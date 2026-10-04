@@ -6,7 +6,7 @@
      * TimerAlarmMonitor のトースト（top-14）と重ならないよう bottom-4 に配置。
      */
 
-    import { getToasts, dismissToast } from "$lib/toast-store.svelte";
+    import { getToasts, dismissToast } from "#lib/toast-store.svelte.ts";
 
     const toasts = $derived(getToasts());
 </script>

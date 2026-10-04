@@ -3,7 +3,7 @@
      * @fileoverview リスト統合ダイアログ（統合元リストの全タスクを統合先に移動）
      */
 
-    import type { ListInfo } from "$lib/types";
+    import type { ListInfo } from "#lib/types.ts";
 
     type Props = {
         open: boolean;

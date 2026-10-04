@@ -7,7 +7,7 @@
 - LinuxまたはmacOS
 - Docker / Docker Compose
 - uv
-- Node.js
+- Node.js 22.17以上
 
 ### セットアップ手順
 
@@ -47,6 +47,11 @@
 e2eテスト（`make test-e2e`）は開発環境（`make deploy`）が起動している必要がある。
 
 ### 依存更新後の追随作業
+
+SvelteKitの設定は`app/vite.config.ts`の`sveltekit(...)`へ渡す。
+アプリ内の共通モジュールは、`package.json`の`imports`で定義した`#lib/*`を拡張子付きで参照する。
+`app/tsconfig.json`は`$app/tsconfig`を継承し、ルートの`tsconfig.json`がそれを継承する。
+`svelte-kit sync`でルート型などを生成する。
 
 `make update`は`pnpm update --latest`により`package.json`の指定範囲を超えて更新する。
 稼働中の開発サーバーが更新前のモジュールを保持したままだとE2Eが失敗するため、`make update`は依存更新後に`app`を再起動し、疎通を確認してから検証する。

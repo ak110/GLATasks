@@ -1,5 +1,5 @@
 <script lang="ts">
-    import ConfirmDialog from "$lib/components/dialogs/ConfirmDialog.svelte";
+    import ConfirmDialog from "#lib/components/dialogs/ConfirmDialog.svelte";
     import CalorieEditDialog from "./CalorieEditDialog.svelte";
     import CalorieFilterStatus from "./CalorieFilterStatus.svelte";
 

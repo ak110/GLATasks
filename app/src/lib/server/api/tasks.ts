@@ -5,7 +5,7 @@
 import { and, asc, eq, gte, inArray, like, min, ne } from "drizzle-orm";
 import type { z } from "zod";
 
-import type { ShowType, UpdateTaskSchema } from "$lib/schemas";
+import type { ShowType, UpdateTaskSchema } from "#lib/schemas.ts";
 import type {
   TagInfo,
   TaskInfo,
@@ -14,7 +14,7 @@ import type {
   SearchTaskResult,
   GetTasksResult,
   GetActiveTasksResult,
-} from "$lib/types";
+} from "#lib/types.ts";
 import { getDb } from "../db";
 import { lists, tasks } from "../schema";
 import { listAttachmentsForTasks } from "./attachments";

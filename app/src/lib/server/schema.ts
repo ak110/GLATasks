@@ -16,7 +16,7 @@ import {
 import {
   TIMER_DEFAULT_ADJUST_MINUTES,
   TIMER_DEFAULT_RING_SECONDS,
-} from "$lib/schemas";
+} from "#lib/schemas.ts";
 
 /** user テーブル */
 export const users = mysqlTable("user", {

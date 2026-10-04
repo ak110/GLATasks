@@ -5,7 +5,7 @@
 
     import { getContext } from "svelte";
     import { resolve } from "$app/paths";
-    import type { Theme } from "$lib/theme";
+    import type { Theme } from "#lib/theme.ts";
 
     const themeCtx = getContext<{
         readonly theme: Theme;

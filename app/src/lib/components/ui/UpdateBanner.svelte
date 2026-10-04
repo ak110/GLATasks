@@ -2,7 +2,7 @@
     /**
      * @fileoverview 新バージョン検知バナー
      *
-     * SvelteKit の kit.version.pollInterval で新デプロイが検知されると
+     * SvelteKitのversion.pollIntervalで新デプロイが検知されると
      * $app/state の updated.current が true になる。本コンポーネントは
      * その状態を購読し、画面上部固定で再読み込みを促すバナーを表示する。
      *

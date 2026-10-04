@@ -11,7 +11,7 @@ import {
   parseTargetTime,
   calcSecondsUntilTarget,
 } from "./timer-utils";
-import type { TimerInfo } from "$lib/types";
+import type { TimerInfo } from "#lib/types.ts";
 
 /** テスト用のタイマー情報を生成する */
 function makeTimer(overrides: Partial<TimerInfo> = {}): TimerInfo {

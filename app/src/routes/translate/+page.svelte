@@ -4,9 +4,9 @@
      */
 
     import { onDestroy, onMount } from "svelte";
-    import Header from "$lib/components/layout/Header.svelte";
-    import PageScrollArea from "$lib/components/layout/PageScrollArea.svelte";
-    import { extractErrorMessage } from "$lib/extract-error-message";
+    import Header from "#lib/components/layout/Header.svelte";
+    import PageScrollArea from "#lib/components/layout/PageScrollArea.svelte";
+    import { extractErrorMessage } from "#lib/extract-error-message.ts";
     import {
         getStoredTranslateSettings,
         buildPromptLanguageOptions,
@@ -15,7 +15,7 @@
         PROMPT_LANGUAGE_TAGS,
         TRANSLATE_DEFAULTS,
         type TranslateEngine,
-    } from "$lib/translate";
+    } from "#lib/translate.ts";
     import {
         abandonEngineCreations,
         describePreparationDirection,
@@ -25,7 +25,7 @@
         runTranslation,
         type TranslationDirectionChoice,
         type TranslationPreparationTarget,
-    } from "$lib/translate-client";
+    } from "#lib/translate-client.ts";
 
     type TranslationRequest = {
         sourceText: string;

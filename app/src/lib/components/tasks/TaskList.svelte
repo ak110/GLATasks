@@ -3,10 +3,10 @@
      * @fileoverview タスク一覧表示コンポーネント
      */
 
-    import type { TaskStatus } from "$lib/schemas";
-    import type { TaskListItem } from "$lib/types";
-    import { createDragReorder } from "$lib/dnd-reorder.svelte";
-    import { isTempTaskId } from "$lib/task-cache";
+    import type { TaskStatus } from "#lib/schemas.ts";
+    import type { TaskListItem } from "#lib/types.ts";
+    import { createDragReorder } from "#lib/dnd-reorder.svelte.ts";
+    import { isTempTaskId } from "#lib/task-cache.ts";
     import TaskItem from "./TaskItem.svelte";
 
     type Props = {

@@ -4,9 +4,12 @@
         exportCalorieRecordsCsv,
         parseCalorieItemsCsv,
         parseCalorieRecordsCsv,
-    } from "$lib/calorie-csv";
-    import type { CalorieItemCsvRow, CalorieRecordCsvRow } from "$lib/schemas";
-    import ConfirmDialog from "$lib/components/dialogs/ConfirmDialog.svelte";
+    } from "#lib/calorie-csv.ts";
+    import type {
+        CalorieItemCsvRow,
+        CalorieRecordCsvRow,
+    } from "#lib/schemas.ts";
+    import ConfirmDialog from "#lib/components/dialogs/ConfirmDialog.svelte";
 
     type Item = { name: string; kcal: number; note: string };
     type RecordRow = {

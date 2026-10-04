@@ -5,9 +5,9 @@
 import { and, eq, max } from "drizzle-orm";
 import type { z } from "zod";
 
-import { TIMER_DEFAULT_RING_SECONDS } from "$lib/schemas";
-import type { UpdateTimerSchema } from "$lib/schemas";
-import type { TimerInfo } from "$lib/types";
+import { TIMER_DEFAULT_RING_SECONDS } from "#lib/schemas.ts";
+import type { UpdateTimerSchema } from "#lib/schemas.ts";
+import type { TimerInfo } from "#lib/types.ts";
 import { getDb } from "../db";
 import { timers } from "../schema";
 import { toUtcIso } from "./common";

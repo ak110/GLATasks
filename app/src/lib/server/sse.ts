@@ -21,8 +21,8 @@
  * 独立タイマーは持たない。
  */
 
-import type { SseEventName } from "$lib/sse-events";
-import { SSE_EVENTS } from "$lib/sse-events";
+import type { SseEventName } from "#lib/sse-events.ts";
+import { SSE_EVENTS } from "#lib/sse-events.ts";
 
 export type { SseEventName };
 

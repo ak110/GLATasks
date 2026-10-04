@@ -8,7 +8,7 @@
 import { json, error } from "@sveltejs/kit";
 import crypto from "node:crypto";
 import { z } from "zod";
-import { registerClient } from "$lib/server/mcp/store";
+import { registerClient } from "#lib/server/mcp/store.ts";
 import type { RequestHandler } from "./$types";
 
 const RegisterRequestSchema = z.object({

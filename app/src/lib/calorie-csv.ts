@@ -10,7 +10,7 @@ import {
   MAX_CALORIE_CSV_ROWS,
   type CalorieItemCsvRow,
   type CalorieRecordCsvRow,
-} from "$lib/schemas";
+} from "#lib/schemas.ts";
 
 const ITEM_HEADERS = ["品目", "kcal", "備考"] as const;
 const RECORD_HEADERS = ["日時", "品目", "数量", "一時項目"] as const;

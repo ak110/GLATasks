@@ -9,7 +9,7 @@ import {
   resolveLanguageTag,
   type PromptLanguageOptions,
   type TranslateEngine,
-} from "$lib/translate";
+} from "#lib/translate.ts";
 
 export type TranslationDirectionChoice =
   "native-to-foreign" | "foreign-to-native";

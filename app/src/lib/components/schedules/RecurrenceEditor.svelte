@@ -8,7 +8,7 @@
 
     import { RRule, rrulestr, datetime } from "rrule";
     import type { Weekday } from "rrule";
-    import type { ScheduleInfo } from "$lib/types";
+    import type { ScheduleInfo } from "#lib/types.ts";
 
     type Props = {
         value: ScheduleInfo | null;

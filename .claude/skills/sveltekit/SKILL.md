@@ -122,14 +122,14 @@ Svelteはkey値の変化でコンポーネントインスタンスを再生成�
 
 ## サーバー・クライアント共有モジュール
 
-サーバー・クライアント両方から参照する純粋関数は`$lib`直下に置く。
-サーバー固有モジュール（`$lib/server/api/common.ts`等）からはre-exportのみとし、
+サーバー・クライアント両方から参照する純粋関数は`#lib`直下に置く。
+サーバー固有モジュール（`#lib/server/api/common.ts`等）からはre-exportのみとし、
 片側に再実装するとロジックが乖離する原因になる。
 サーバー・クライアント両方参照の対象外は次の実装群とする。
 クライアント側専用（`.svelte.ts`のrune状態管理等）と、サーバー側が異なる実装を持つもの（`base64.ts`の`Buffer.from`版等）。
 
-代表例: タスクテキスト分割の`splitTitle` / `splitNotes`は`$lib/text-split.ts`がSSOT。
-`$lib/server/api/common.ts`はre-exportのみ。
+代表例: タスクテキスト分割の`splitTitle` / `splitNotes`は`#lib/text-split.ts`がSSOT。
+`#lib/server/api/common.ts`はre-exportのみ。
 
 ## tRPC 実装規約
 
@@ -195,15 +195,15 @@ rune（`$state`・`$effect`等）を使うユーティリティは`.svelte.ts`�
 プレーンな`.ts`ではSvelteコンパイラがrune構文を解釈しない。
 既存例は次のとおり。
 
-- `$lib/dnd-reorder.svelte.ts`
-- `$lib/toast-store.svelte.ts`
-- `$lib/connection-recovery.svelte.ts`
-- `$lib/image-attachment-utils.svelte.ts`
+- `#lib/dnd-reorder.svelte.ts`
+- `#lib/toast-store.svelte.ts`
+- `#lib/connection-recovery.svelte.ts`
+- `#lib/image-attachment-utils.svelte.ts`
 
 ## D&D 並び替えユーティリティ
 
-並び替え可能なリストには共通D&Dユーティリティ（`$lib/dnd-reorder.svelte.ts`）を利用する。
-状態・操作関数の仕様は`$lib/dnd-reorder.svelte.ts`のexportを参照し、各コンポーネントで再実装しない。
+並び替え可能なリストには共通D&Dユーティリティ（`#lib/dnd-reorder.svelte.ts`）を利用する。
+状態・操作関数の仕様は`#lib/dnd-reorder.svelte.ts`のexportを参照し、各コンポーネントで再実装しない。
 Pointer Events APIへ統一することで、マウス・タッチ・ペンの全入力をブラウザ標準の単一APIで扱える。
 
 ## Vitest テスト環境

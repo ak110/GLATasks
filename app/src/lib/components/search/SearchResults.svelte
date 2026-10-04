@@ -7,9 +7,9 @@
      */
 
     import { SvelteSet } from "svelte/reactivity";
-    import type { SearchTaskResult } from "$lib/types";
-    import { clampDetector } from "$lib/actions/clamp";
-    import { linkify } from "$lib/linkify";
+    import type { SearchTaskResult } from "#lib/types.ts";
+    import { clampDetector } from "#lib/actions/clamp.ts";
+    import { linkify } from "#lib/linkify.ts";
 
     type Props = {
         /** 現在の検索クエリ（見出し表示用） */

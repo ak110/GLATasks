@@ -6,14 +6,14 @@
     import {
         TIMER_DEFAULT_ADJUST_MINUTES,
         TIMER_DEFAULT_RING_SECONDS,
-    } from "$lib/schemas";
-    import type { TimerMode, UserPreferences } from "$lib/schemas";
+    } from "#lib/schemas.ts";
+    import type { TimerMode, UserPreferences } from "#lib/schemas.ts";
     import {
         formatTime,
         parseTimeInput,
         formatTargetTime,
         parseTargetTime,
-    } from "$lib/timer-utils";
+    } from "#lib/timer-utils.ts";
 
     type Props = {
         open: boolean;

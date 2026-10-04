@@ -16,7 +16,7 @@ const { createMutateMock, deleteMutateMock } = vi.hoisted(() => ({
   deleteMutateMock: vi.fn().mockResolvedValue({ success: true }),
 }));
 
-vi.mock("$lib/trpc", () => ({
+vi.mock("#lib/trpc.ts", () => ({
   trpc: {
     attachments: {
       create: { mutate: createMutateMock },

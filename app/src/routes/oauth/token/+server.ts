@@ -6,14 +6,14 @@
  */
 
 import { json } from "@sveltejs/kit";
-import { consumeAuthorizationCode, getClient } from "$lib/server/mcp/store";
+import { consumeAuthorizationCode, getClient } from "#lib/server/mcp/store.ts";
 import {
   createAccessToken,
   createRefreshToken,
   verifyPkce,
   verifyRefreshToken,
   ACCESS_TOKEN_TTL_SECONDS,
-} from "$lib/server/mcp/oauth";
+} from "#lib/server/mcp/oauth.ts";
 import type { RequestHandler } from "./$types";
 
 function errorResponse(

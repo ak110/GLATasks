@@ -28,7 +28,7 @@ import {
   type UpdateCalorieAutoRecordInput,
   type UpdateCalorieItemInput,
   type UpdateCalorieRecordInput,
-} from "$lib/schemas";
+} from "#lib/schemas.ts";
 import { getDb } from "../db";
 import { calorieAutoRecords, calorieItems, calorieRecords } from "../schema";
 import { getUserPreferences } from "./users";

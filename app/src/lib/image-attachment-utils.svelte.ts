@@ -13,7 +13,7 @@
 import {
   createBlobUrlCache,
   type BlobUrlCache,
-} from "$lib/image-attachment-utils";
+} from "#lib/image-attachment-utils.ts";
 
 export interface ThumbnailManager {
   /** 現在Lightbox表示中の画像Blob URL（$state） */

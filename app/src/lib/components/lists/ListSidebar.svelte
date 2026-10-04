@@ -3,7 +3,7 @@
      * @fileoverview リストサイドバー（リスト一覧表示 + リスト追加フォーム）
      */
 
-    import type { ListInfo } from "$lib/types";
+    import type { ListInfo } from "#lib/types.ts";
     import ListItem from "./ListItem.svelte";
 
     type Props = {

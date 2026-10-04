@@ -3,8 +3,8 @@
      * @fileoverview タイマーカードコンポーネント
      */
 
-    import type { TimerInfo } from "$lib/types";
-    import { getServerOffset } from "$lib/sse-client";
+    import type { TimerInfo } from "#lib/types.ts";
+    import { getServerOffset } from "#lib/sse-client.ts";
     import {
         calcTimerRemainingMs,
         formatTime,
@@ -12,7 +12,7 @@
         formatTargetTime,
         parseTargetTime,
         calcSecondsUntilTarget,
-    } from "$lib/timer-utils";
+    } from "#lib/timer-utils.ts";
 
     type Props = {
         timer: TimerInfo;

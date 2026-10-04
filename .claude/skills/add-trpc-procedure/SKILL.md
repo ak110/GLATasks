@@ -96,8 +96,8 @@ description: >-
   - 非決定値（現在時刻・乱数）は固定値を注入する
   - 市民時刻を扱うprocedureは固定 `tz_offset_minutes` でケースを書く
   - `encryptedProcedure` を `createCaller` で呼ぶルーターテストでは、
-    `vi.mock('$lib/server/crypto')`・`vi.mock('$lib/server/sse')`・
-    `vi.mock('$lib/server/api')` をセットで書く
+    `vi.mock('#lib/server/crypto.ts')`・`vi.mock('#lib/server/sse.ts')`・
+    `vi.mock('#lib/server/api.ts')` をセットで書く
     - `getEncryptKey`が`DATABASE_URL`を要求する連鎖と副作用をすべて遮断する目的
     - 雛形は `app/src/lib/server/trpc.test.ts` を参照する
 - e2eテスト: ユーザーフローに絡む場合は `app/tests/` にPlaywrightテストを追加

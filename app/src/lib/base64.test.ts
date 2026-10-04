@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { base64ToBytes } from "$lib/base64";
+import { base64ToBytes } from "#lib/base64.ts";
 
 describe("base64ToBytes", () => {
   it("空文字列を空のUint8Arrayへ変換する", () => {

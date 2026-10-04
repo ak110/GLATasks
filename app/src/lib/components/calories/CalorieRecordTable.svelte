@@ -1,8 +1,8 @@
 <script lang="ts">
     import { onMount } from "svelte";
 
-    import ConfirmDialog from "$lib/components/dialogs/ConfirmDialog.svelte";
-    import { startMinuteTicker } from "$lib/minute-ticker";
+    import ConfirmDialog from "#lib/components/dialogs/ConfirmDialog.svelte";
+    import { startMinuteTicker } from "#lib/minute-ticker.ts";
     import CalorieEditDialog from "./CalorieEditDialog.svelte";
     import CalorieFilterStatus from "./CalorieFilterStatus.svelte";
 

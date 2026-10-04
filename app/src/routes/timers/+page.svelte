@@ -8,24 +8,24 @@
         createMutation,
         useQueryClient,
     } from "@tanstack/svelte-query";
-    import { trpc, type RouterOutputs } from "$lib/trpc";
-    import { createDragReorder } from "$lib/dnd-reorder.svelte";
+    import { trpc, type RouterOutputs } from "#lib/trpc.ts";
+    import { createDragReorder } from "#lib/dnd-reorder.svelte.ts";
     import {
         TIMER_DEFAULT_BASE_MINUTES,
         TIMER_DEFAULT_ADJUST_MINUTES,
         TIMER_DEFAULT_RING_SECONDS,
-    } from "$lib/schemas";
-    import type { TimerMode, UserPreferences } from "$lib/schemas";
-    import { playStartBeep } from "$lib/beep";
-    import { setServerOffset } from "$lib/sse-client";
-    import { SSE_EVENTS } from "$lib/sse-events";
-    import { subscribeOnMount } from "$lib/sse-subscribe";
-    import type { TimerInfo, TimersResult } from "$lib/types";
-    import Header from "$lib/components/layout/Header.svelte";
-    import PageScrollArea from "$lib/components/layout/PageScrollArea.svelte";
-    import TimerCard from "$lib/components/timers/TimerCard.svelte";
-    import TimerCreateDialog from "$lib/components/timers/TimerCreateDialog.svelte";
-    import ConfirmDialog from "$lib/components/dialogs/ConfirmDialog.svelte";
+    } from "#lib/schemas.ts";
+    import type { TimerMode, UserPreferences } from "#lib/schemas.ts";
+    import { playStartBeep } from "#lib/beep.ts";
+    import { setServerOffset } from "#lib/sse-client.ts";
+    import { SSE_EVENTS } from "#lib/sse-events.ts";
+    import { subscribeOnMount } from "#lib/sse-subscribe.ts";
+    import type { TimerInfo, TimersResult } from "#lib/types.ts";
+    import Header from "#lib/components/layout/Header.svelte";
+    import PageScrollArea from "#lib/components/layout/PageScrollArea.svelte";
+    import TimerCard from "#lib/components/timers/TimerCard.svelte";
+    import TimerCreateDialog from "#lib/components/timers/TimerCreateDialog.svelte";
+    import ConfirmDialog from "#lib/components/dialogs/ConfirmDialog.svelte";
 
     const queryClient = useQueryClient();
 

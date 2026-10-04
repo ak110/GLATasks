@@ -6,7 +6,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { SSE_EVENTS } from "$lib/sse-events";
+import { SSE_EVENTS } from "#lib/sse-events.ts";
 
 type SseModule = typeof import("./sse");
 

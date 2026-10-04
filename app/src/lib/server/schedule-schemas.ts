@@ -2,16 +2,16 @@
  * @fileoverview 定期TODOスケジュール操作のZodスキーマ定義
  *
  * `rrule`（RFC5545パーサー）はCJSモジュールでありnamed exportの解決がNode実行系
- * （Vite変換を経ないPlaywright e2eテスト実行系など）に依存する。`$lib/schemas.ts`
+ * （Vite変換を経ないPlaywright e2eテスト実行系など）に依存する。`#lib/schemas.ts`
  * は `attachment.test.ts` から直接importされVite変換を経ずにNodeへ読み込まれるため、
- * `$lib/schemas.ts`へ `rrule` への依存を持ち込むと読み込みに失敗する。
+ * `#lib/schemas.ts`へ `rrule` への依存を持ち込むと読み込みに失敗する。
  * 本ファイルはサーバー側実装（`trpc.ts`・`api/schedules.ts`）専用とし、
  * Vite SSR経由でのみ読み込まれる前提を維持することでこの制約を切り分ける。
  */
 
 import { z } from "zod";
 import { rrulestr } from "rrule";
-import { TagsSchema } from "$lib/schemas";
+import { TagsSchema } from "#lib/schemas.ts";
 
 /** RFC5545構文としての妥当性を検証する（Asia/Tokyo基準で復元できるかを確認する） */
 const RruleStringSchema = z.string().refine(

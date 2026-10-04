@@ -8,21 +8,21 @@
         createMutation,
         useQueryClient,
     } from "@tanstack/svelte-query";
-    import { trpc, tabId, type RouterOutputs } from "$lib/trpc";
-    import { subscribeOnMount } from "$lib/sse-subscribe";
-    import { SSE_EVENTS } from "$lib/sse-events";
-    import { debugLog } from "$lib/debug-log";
-    import { showErrorToast } from "$lib/toast-store.svelte";
-    import { extractErrorMessage } from "$lib/extract-error-message";
-    import { uploadAttachment } from "$lib/attachment-utils";
+    import { trpc, tabId, type RouterOutputs } from "#lib/trpc.ts";
+    import { subscribeOnMount } from "#lib/sse-subscribe.ts";
+    import { SSE_EVENTS } from "#lib/sse-events.ts";
+    import { debugLog } from "#lib/debug-log.ts";
+    import { showErrorToast } from "#lib/toast-store.svelte.ts";
+    import { extractErrorMessage } from "#lib/extract-error-message.ts";
+    import { uploadAttachment } from "#lib/attachment-utils.ts";
     import { SvelteSet, SvelteMap } from "svelte/reactivity";
-    import type { TaskStatus, TaskKind } from "$lib/schemas";
+    import type { TaskStatus, TaskKind } from "#lib/schemas.ts";
     import type {
         TagInfo,
         TaskListItem,
         GetActiveTasksResult,
         GetTasksResult,
-    } from "$lib/types";
+    } from "#lib/types.ts";
     import {
         createTempTaskId,
         isTempTaskId,
@@ -30,21 +30,21 @@
         sortByListAndOrder,
         filterByList,
         type ActiveTasksCache,
-    } from "$lib/task-cache";
-    import { splitTitle, splitNotes } from "$lib/text-split";
-    import { groupSearchResultsByList } from "$lib/search-grouping";
-    import { compareTagName } from "$lib/tag-sort";
-    import Header from "$lib/components/layout/Header.svelte";
-    import ListSidebar from "$lib/components/lists/ListSidebar.svelte";
-    import TaskList from "$lib/components/tasks/TaskList.svelte";
-    import TaskAddForm from "$lib/components/tasks/TaskAddForm.svelte";
-    import TaskListHeader from "$lib/components/tasks/TaskListHeader.svelte";
-    import TaskEditDialog from "$lib/components/tasks/TaskEditDialog.svelte";
-    import MergeListDialog from "$lib/components/lists/MergeListDialog.svelte";
-    import ScheduleDialog from "$lib/components/schedules/ScheduleDialog.svelte";
-    import SearchResults from "$lib/components/search/SearchResults.svelte";
-    import ConfirmDialog from "$lib/components/dialogs/ConfirmDialog.svelte";
-    import PromptDialog from "$lib/components/dialogs/PromptDialog.svelte";
+    } from "#lib/task-cache.ts";
+    import { splitTitle, splitNotes } from "#lib/text-split.ts";
+    import { groupSearchResultsByList } from "#lib/search-grouping.ts";
+    import { compareTagName } from "#lib/tag-sort.ts";
+    import Header from "#lib/components/layout/Header.svelte";
+    import ListSidebar from "#lib/components/lists/ListSidebar.svelte";
+    import TaskList from "#lib/components/tasks/TaskList.svelte";
+    import TaskAddForm from "#lib/components/tasks/TaskAddForm.svelte";
+    import TaskListHeader from "#lib/components/tasks/TaskListHeader.svelte";
+    import TaskEditDialog from "#lib/components/tasks/TaskEditDialog.svelte";
+    import MergeListDialog from "#lib/components/lists/MergeListDialog.svelte";
+    import ScheduleDialog from "#lib/components/schedules/ScheduleDialog.svelte";
+    import SearchResults from "#lib/components/search/SearchResults.svelte";
+    import ConfirmDialog from "#lib/components/dialogs/ConfirmDialog.svelte";
+    import PromptDialog from "#lib/components/dialogs/PromptDialog.svelte";
 
     let selectedListId = $state<number | null>(null);
     let showType = $state<"active" | "archived" | "all">("active");

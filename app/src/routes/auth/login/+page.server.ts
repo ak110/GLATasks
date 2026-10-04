@@ -3,8 +3,8 @@
  */
 
 import { fail, redirect } from "@sveltejs/kit";
-import * as api from "$lib/server/api";
-import { createSessionToken, setSessionCookie } from "$lib/server/session";
+import * as api from "#lib/server/api.ts";
+import { createSessionToken, setSessionCookie } from "#lib/server/session.ts";
 import type { Actions, PageServerLoad } from "./$types";
 
 /**

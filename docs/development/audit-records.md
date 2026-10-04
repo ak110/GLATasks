@@ -8,7 +8,7 @@ H2見出しは索引元の条文が指す文字列と一致させる。
 ## `.claude/skills/e2etest/SKILL.md`：失敗時の診断成果物の保持：2026年10月3日
 
 2026-10-03、Playwright 1.63.0の`lib/runner/index.js`の開始処理を読んだ。
-`createGlobalSetupTasks`が呼ぶ`createRemoveOutputDirsTask`は、通常の開始時に選択されたprojectのoutputDirを削除する。
+`createGlobalSetupTasks`が呼ぶ`createRemoveOutputDirsTask`は通常の開始時に選択されたprojectのoutputDirを削除する。
 一時ディレクトリへ同じ`createRemoveOutputDirsTask`と`removeFolders`を適用した対照では、通常設定で指定ディレクトリが消え、出力先の外へ置いた複製は残った。
 同日のE2E失敗の調査では、初回の実行が1件失敗して`test-results`配下へスクリーンショット・`error-context.md`・`trace.zip`を出力した。
 同じ出力先での再実行後には`.last-run.json`だけが残った。

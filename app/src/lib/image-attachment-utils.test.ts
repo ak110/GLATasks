@@ -10,7 +10,7 @@ const { downloadQueryMock } = vi.hoisted(() => ({
   downloadQueryMock: vi.fn(),
 }));
 
-vi.mock("$lib/trpc", () => ({
+vi.mock("#lib/trpc.ts", () => ({
   trpc: {
     attachments: {
       download: { query: downloadQueryMock },

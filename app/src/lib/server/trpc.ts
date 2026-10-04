@@ -45,7 +45,7 @@ import {
   CalorieAutoRecordInputSchema,
   UpdateCalorieAutoRecordSchema,
   CalorieAutoRecordIdSchema,
-} from "$lib/schemas";
+} from "#lib/schemas.ts";
 import {
   CreateScheduleSchema,
   DeleteScheduleSchema,
@@ -55,8 +55,8 @@ import {
 import * as api from "./api";
 import { decryptToString, encryptObject } from "./crypto";
 import { sendEvent } from "./sse";
-import { SSE_EVENTS } from "$lib/sse-events";
-import type { SseEventName } from "$lib/sse-events";
+import { SSE_EVENTS } from "#lib/sse-events.ts";
+import type { SseEventName } from "#lib/sse-events.ts";
 
 // ── Context 型定義 ──
 

@@ -2,7 +2,7 @@
  * @fileoverview 定期TODOの繰り返しルール（RRULE文字列）から日本語の要約文を生成する
  *
  * `rrule@2.8.1` の `toText()` は英語専用のため使用しない。
- * `ScheduleList.svelte` から呼び出す共有ロジックとして `$lib` 直下に配置し、
+ * `ScheduleList.svelte` から呼び出す共有ロジックとして `#lib` 直下に配置し、
  * サーバー・クライアント双方から参照できるようにする。
  */
 

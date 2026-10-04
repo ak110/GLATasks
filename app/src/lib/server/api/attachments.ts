@@ -4,8 +4,11 @@
 
 import { and, count, eq, inArray } from "drizzle-orm";
 
-import { MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS_PER_TASK } from "$lib/schemas";
-import type { AttachmentMeta } from "$lib/types";
+import {
+  MAX_ATTACHMENT_BYTES,
+  MAX_ATTACHMENTS_PER_TASK,
+} from "#lib/schemas.ts";
+import type { AttachmentMeta } from "#lib/types.ts";
 import { getDb } from "../db";
 import { attachments, lists, tasks } from "../schema";
 import { toUtcIso } from "./common";

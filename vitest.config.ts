@@ -9,15 +9,13 @@
  * 既存のNode環境テストには影響を与えない。
  */
 import * as path from "node:path";
-import { svelte } from "@sveltejs/vite-plugin-svelte";
+import { svelte, vitePreprocess } from "@sveltejs/vite-plugin-svelte";
 import { svelteTesting } from "@testing-library/svelte/vite";
 import { defineConfig } from "vitest/config";
 
-// SvelteKit の $lib エイリアスを手動で解決するための設定。
-// dom project は @sveltejs/vite-plugin-svelte が自動解決するが、
-// node project では手動設定が必要になる。
+// ルートから起動するVitestでもapp内のsubpath importsと同じ場所を参照する。
 const libAlias = {
-  $lib: path.resolve("./app/src/lib"),
+  "#lib": path.resolve("./app/src/lib"),
 };
 
 export default defineConfig({
@@ -43,10 +41,8 @@ export default defineConfig({
       },
       {
         // DOM環境プロジェクト（Svelteコンポーネントテスト）
-        // svelte.config.js は絶対パスで明示的に指定する。
-        // 相対パスはこのprojectのroot（./app）を基準に解決され、app/app/svelte.config.js を探してしまう
         plugins: [
-          svelte({ configFile: path.resolve("./app/svelte.config.js") }),
+          svelte({ configFile: false, preprocess: vitePreprocess() }),
           svelteTesting(),
         ],
         resolve: { alias: libAlias },

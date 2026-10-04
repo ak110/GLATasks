@@ -8,7 +8,10 @@
 import { eq, inArray } from "drizzle-orm";
 import { afterAll, describe, expect, it } from "vitest";
 
-import { MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS_PER_TASK } from "$lib/schemas";
+import {
+  MAX_ATTACHMENT_BYTES,
+  MAX_ATTACHMENTS_PER_TASK,
+} from "#lib/schemas.ts";
 import { getDb } from "../db";
 import { attachments, lists, tasks, users } from "../schema";
 import {

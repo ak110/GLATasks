@@ -12,7 +12,7 @@ import type {
   CreateScheduleSchema,
   UpdateScheduleSchema,
 } from "../schedule-schemas";
-import type { ScheduleInfo } from "$lib/types";
+import type { ScheduleInfo } from "#lib/types.ts";
 import { getDb } from "../db";
 import { lists, schedules } from "../schema";
 import { parseTags, serializeTags, toUtcIso, getOwnedList } from "./common";

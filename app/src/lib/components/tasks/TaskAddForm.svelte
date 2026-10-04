@@ -3,11 +3,11 @@
      * @fileoverview タスク追加フォーム（テキストエリア + タグ設定 + 追加ボタン）
      */
 
-    import type { TagInfo } from "$lib/types";
+    import type { TagInfo } from "#lib/types.ts";
     import {
         FILE_DROP_HIGHLIGHT_CLASSES,
         extractImageFilesFromClipboard,
-    } from "$lib/attachment-utils";
+    } from "#lib/attachment-utils.ts";
     import TagEditor from "./TagEditor.svelte";
     import AttachmentPicker from "./AttachmentPicker.svelte";
 

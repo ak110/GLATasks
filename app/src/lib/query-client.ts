@@ -2,11 +2,11 @@
  * @fileoverview Tanstack Query クライアント設定
  */
 
-import { browser } from "$app/environment";
+import { browser } from "$app/env";
 import { QueryClient, QueryCache, MutationCache } from "@tanstack/svelte-query";
-import { showErrorToast } from "$lib/toast-store.svelte";
-import { checkConnectivity } from "$lib/connection-recovery.svelte";
-import { extractErrorMessage } from "$lib/extract-error-message";
+import { showErrorToast } from "#lib/toast-store.svelte.ts";
+import { checkConnectivity } from "#lib/connection-recovery.svelte.ts";
+import { extractErrorMessage } from "#lib/extract-error-message.ts";
 
 export const queryClient = new QueryClient({
   // 個別 onError は既定の onError を上書きするが、Cache のグローバル onError は

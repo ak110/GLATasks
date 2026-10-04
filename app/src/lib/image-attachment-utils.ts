@@ -5,8 +5,8 @@
  * Blob URLの寿命管理（作成・キャッシュ・破棄）を一箇所へ集約する。
  */
 
-import { trpc } from "$lib/trpc";
-import { base64ToBytes } from "$lib/base64";
+import { trpc } from "#lib/trpc.ts";
+import { base64ToBytes } from "#lib/base64.ts";
 
 export interface BlobUrlCache {
   ensure(attachmentId: number): Promise<string>;

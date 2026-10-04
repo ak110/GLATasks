@@ -8,17 +8,17 @@
      */
 
     import { createQuery, useQueryClient } from "@tanstack/svelte-query";
-    import { trpc, type RouterOutputs } from "$lib/trpc";
+    import { trpc, type RouterOutputs } from "#lib/trpc.ts";
     import {
         getServerOffset,
         setServerOffset,
         onOffsetChange,
-    } from "$lib/sse-client";
-    import { SSE_EVENTS } from "$lib/sse-events";
-    import { subscribeOnMount } from "$lib/sse-subscribe";
-    import type { TimerInfo } from "$lib/types";
-    import { calcTimerRemainingMs } from "$lib/timer-utils";
-    import { TIMER_DEFAULT_RING_SECONDS } from "$lib/schemas";
+    } from "#lib/sse-client.ts";
+    import { SSE_EVENTS } from "#lib/sse-events.ts";
+    import { subscribeOnMount } from "#lib/sse-subscribe.ts";
+    import type { TimerInfo } from "#lib/types.ts";
+    import { calcTimerRemainingMs } from "#lib/timer-utils.ts";
+    import { TIMER_DEFAULT_RING_SECONDS } from "#lib/schemas.ts";
     import { onMount } from "svelte";
     import { resolve } from "$app/paths";
 
@@ -141,7 +141,7 @@
 
     /** ループビープが回っていれば停止する（動的 import で SSR 安全） */
     function stopLoopBeepFor(timerId: number) {
-        import("$lib/beep").then((m) => m.stopLoopBeep(timerId));
+        import("#lib/beep.ts").then((m) => m.stopLoopBeep(timerId));
     }
 
     /** トースト通知を閉じる（ループビープも合わせて停止） */
@@ -241,7 +241,7 @@
         const ringSeconds = timer?.ring_seconds ?? TIMER_DEFAULT_RING_SECONDS;
 
         // ビープ音 + ブラウザ通知 + トースト
-        import("$lib/beep").then((m) => {
+        import("#lib/beep.ts").then((m) => {
             m.startLoopBeep(timerId, ringSeconds);
         });
         showNotification(timerName);

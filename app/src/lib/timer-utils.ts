@@ -4,7 +4,7 @@
  * TimerCard と TimerAlarmMonitor の両方で使われる残り時間計算ロジックを共通化する。
  */
 
-import type { TimerInfo } from "$lib/types";
+import type { TimerInfo } from "#lib/types.ts";
 
 /**
  * タイマーの残りミリ秒を計算する。

@@ -4,7 +4,7 @@
      */
 
     import type { ActionData } from "./$types";
-    import AuthCard from "$lib/components/layout/AuthCard.svelte";
+    import AuthCard from "#lib/components/layout/AuthCard.svelte";
     import { resolve } from "$app/paths";
 
     const { form }: { form: ActionData } = $props();

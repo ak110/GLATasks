@@ -12,12 +12,12 @@
         createMutation,
         useQueryClient,
     } from "@tanstack/svelte-query";
-    import { trpc, type RouterOutputs } from "$lib/trpc";
-    import type { TagInfo, ScheduleInfo } from "$lib/types";
-    import { showErrorToast } from "$lib/toast-store.svelte";
-    import { extractErrorMessage } from "$lib/extract-error-message";
-    import TagEditor from "$lib/components/tasks/TagEditor.svelte";
-    import ConfirmDialog from "$lib/components/dialogs/ConfirmDialog.svelte";
+    import { trpc, type RouterOutputs } from "#lib/trpc.ts";
+    import type { TagInfo, ScheduleInfo } from "#lib/types.ts";
+    import { showErrorToast } from "#lib/toast-store.svelte.ts";
+    import { extractErrorMessage } from "#lib/extract-error-message.ts";
+    import TagEditor from "#lib/components/tasks/TagEditor.svelte";
+    import ConfirmDialog from "#lib/components/dialogs/ConfirmDialog.svelte";
     import RecurrenceEditor from "./RecurrenceEditor.svelte";
     import ScheduleList from "./ScheduleList.svelte";
 

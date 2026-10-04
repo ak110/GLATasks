@@ -3,7 +3,7 @@
      * @fileoverview リストアイテム（選択ボタン + 操作メニュー）
      */
 
-    import type { ListInfo } from "$lib/types";
+    import type { ListInfo } from "#lib/types.ts";
 
     type Props = {
         list: ListInfo;

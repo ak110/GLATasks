@@ -11,7 +11,7 @@ import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
 import { z } from "zod";
 import * as api from "../api";
 import { sendEvent } from "../sse";
-import { SSE_EVENTS } from "$lib/sse-events";
+import { SSE_EVENTS } from "#lib/sse-events.ts";
 import {
   CreateListSchema,
   CreateTaskSchema,
@@ -35,7 +35,7 @@ import {
   UserPreferencesSchema,
   CalorieSummaryInputSchema,
   ListCalorieRecordsSchema,
-} from "$lib/schemas";
+} from "#lib/schemas.ts";
 
 /** AuthInfo.extra からアプリ内ユーザーIDを取り出す */
 function getUserId(authInfo: AuthInfo | undefined): number {

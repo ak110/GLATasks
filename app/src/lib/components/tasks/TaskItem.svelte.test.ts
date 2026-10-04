@@ -8,7 +8,7 @@
 import { fireEvent, render, screen } from "@testing-library/svelte";
 import { describe, expect, it, vi } from "vitest";
 
-import type { TaskListItem } from "$lib/types";
+import type { TaskListItem } from "#lib/types.ts";
 import TaskItem from "./TaskItem.svelte";
 
 /** テスト用タスクデータのデフォルト値 */

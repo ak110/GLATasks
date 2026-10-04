@@ -10,17 +10,17 @@
         useQueryClient,
     } from "@tanstack/svelte-query";
 
-    import Header from "$lib/components/layout/Header.svelte";
-    import PageScrollArea from "$lib/components/layout/PageScrollArea.svelte";
-    import CalorieAchievement from "$lib/components/calories/CalorieAchievement.svelte";
-    import CalorieAutoRecordPanel from "$lib/components/calories/CalorieAutoRecordPanel.svelte";
-    import CalorieBulkControls from "$lib/components/calories/CalorieBulkControls.svelte";
-    import CalorieCsvControls from "$lib/components/calories/CalorieCsvControls.svelte";
-    import CalorieItemTable from "$lib/components/calories/CalorieItemTable.svelte";
-    import CalorieRecordTable from "$lib/components/calories/CalorieRecordTable.svelte";
-    import CalorieSummary from "$lib/components/calories/CalorieSummary.svelte";
-    import ConfirmDialog from "$lib/components/dialogs/ConfirmDialog.svelte";
-    import { startMinuteTicker } from "$lib/minute-ticker";
+    import Header from "#lib/components/layout/Header.svelte";
+    import PageScrollArea from "#lib/components/layout/PageScrollArea.svelte";
+    import CalorieAchievement from "#lib/components/calories/CalorieAchievement.svelte";
+    import CalorieAutoRecordPanel from "#lib/components/calories/CalorieAutoRecordPanel.svelte";
+    import CalorieBulkControls from "#lib/components/calories/CalorieBulkControls.svelte";
+    import CalorieCsvControls from "#lib/components/calories/CalorieCsvControls.svelte";
+    import CalorieItemTable from "#lib/components/calories/CalorieItemTable.svelte";
+    import CalorieRecordTable from "#lib/components/calories/CalorieRecordTable.svelte";
+    import CalorieSummary from "#lib/components/calories/CalorieSummary.svelte";
+    import ConfirmDialog from "#lib/components/dialogs/ConfirmDialog.svelte";
+    import { startMinuteTicker } from "#lib/minute-ticker.ts";
     import type {
         BulkCreateCalorieRecordsInput,
         BulkDeleteCalorieRecordsInput,
@@ -30,10 +30,10 @@
         CalorieRecordInput,
         UpdateCalorieAutoRecordInput,
         UpdateCalorieRecordInput,
-    } from "$lib/schemas";
-    import { SSE_EVENTS } from "$lib/sse-events";
-    import { subscribeOnMount } from "$lib/sse-subscribe";
-    import { trpc, type RouterOutputs } from "$lib/trpc";
+    } from "#lib/schemas.ts";
+    import { SSE_EVENTS } from "#lib/sse-events.ts";
+    import { subscribeOnMount } from "#lib/sse-subscribe.ts";
+    import { trpc, type RouterOutputs } from "#lib/trpc.ts";
 
     type RecordRow = RouterOutputs["calories"]["records"]["records"][number];
 

@@ -20,7 +20,7 @@ import { processCalorieAutoRecords } from "./api/calories";
 import { parseTags } from "./api/common";
 import { postTask } from "./api/tasks";
 import { sendEvent } from "./sse";
-import { SSE_EVENTS } from "$lib/sse-events";
+import { SSE_EVENTS } from "#lib/sse-events.ts";
 
 /** ポーリング間隔（ミリ秒） */
 const POLL_INTERVAL_MS = 60 * 1000;

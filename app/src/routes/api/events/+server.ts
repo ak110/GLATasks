@@ -11,7 +11,11 @@
  */
 
 import type { RequestHandler } from "./$types";
-import { addConnection, removeConnection, replayEvents } from "$lib/server/sse";
+import {
+  addConnection,
+  removeConnection,
+  replayEvents,
+} from "#lib/server/sse.ts";
 
 export const GET: RequestHandler = async ({ locals, request, url }) => {
   const userId = locals.user_id;

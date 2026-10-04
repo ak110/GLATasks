@@ -6,8 +6,8 @@
      * 委譲する。tRPC呼び出しは持たない。
      */
 
-    import type { ScheduleInfo } from "$lib/types";
-    import { describeSchedule } from "$lib/schedule-utils";
+    import type { ScheduleInfo } from "#lib/types.ts";
+    import { describeSchedule } from "#lib/schedule-utils.ts";
 
     type Props = {
         schedules: ScheduleInfo[];

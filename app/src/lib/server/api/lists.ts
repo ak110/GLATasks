@@ -4,7 +4,7 @@
 
 import { and, asc, count, eq, inArray, min } from "drizzle-orm";
 
-import type { ListInfo } from "$lib/types";
+import type { ListInfo } from "#lib/types.ts";
 import { adjustUpdatedTimestamps, mergeByTimestamp } from "../merge-utils";
 import { getDb } from "../db";
 import { attachments, lists, schedules, tasks } from "../schema";

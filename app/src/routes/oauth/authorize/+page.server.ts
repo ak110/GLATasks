@@ -7,7 +7,7 @@
 
 import { fail, redirect } from "@sveltejs/kit";
 import { z } from "zod";
-import { getClient, issueAuthorizationCode } from "$lib/server/mcp/store";
+import { getClient, issueAuthorizationCode } from "#lib/server/mcp/store.ts";
 import type { Actions, PageServerLoad } from "./$types";
 
 const QuerySchema = z.object({
@@ -95,6 +95,6 @@ export const actions: Actions = {
     const redirectUrl = new URL(params.redirect_uri);
     redirectUrl.searchParams.set("code", code);
     if (params.state) redirectUrl.searchParams.set("state", params.state);
-    redirect(302, redirectUrl.toString());
+    redirect(302, redirectUrl.toString(), { external: true });
   },
 };

@@ -3,17 +3,17 @@
      * @fileoverview タスクアイテム（チェックボックス + テキスト表示 + 編集・コピーボタン）
      */
 
-    import type { TaskStatus } from "$lib/schemas";
-    import type { TaskListItem } from "$lib/types";
-    import { nextTaskStatus } from "$lib/task-status";
-    import { linkify } from "$lib/linkify";
-    import { getTagColorClass } from "$lib/tag-palette";
-    import { downloadAttachment } from "$lib/attachment-download";
-    import { isImageAttachment } from "$lib/attachment-utils";
-    import { createThumbnailManager } from "$lib/image-attachment-utils.svelte";
-    import ImageLightbox from "$lib/components/dialogs/ImageLightbox.svelte";
-    import { showErrorToast } from "$lib/toast-store.svelte";
-    import { extractErrorMessage } from "$lib/extract-error-message";
+    import type { TaskStatus } from "#lib/schemas.ts";
+    import type { TaskListItem } from "#lib/types.ts";
+    import { nextTaskStatus } from "#lib/task-status.ts";
+    import { linkify } from "#lib/linkify.ts";
+    import { getTagColorClass } from "#lib/tag-palette.ts";
+    import { downloadAttachment } from "#lib/attachment-download.ts";
+    import { isImageAttachment } from "#lib/attachment-utils.ts";
+    import { createThumbnailManager } from "#lib/image-attachment-utils.svelte.ts";
+    import ImageLightbox from "#lib/components/dialogs/ImageLightbox.svelte";
+    import { showErrorToast } from "#lib/toast-store.svelte.ts";
+    import { extractErrorMessage } from "#lib/extract-error-message.ts";
 
     type Props = {
         task: TaskListItem;

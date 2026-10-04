@@ -3,7 +3,7 @@
      * @fileoverview 期間を指定したカロリー記録の一括追加と一括削除
      */
 
-    import ConfirmDialog from "$lib/components/dialogs/ConfirmDialog.svelte";
+    import ConfirmDialog from "#lib/components/dialogs/ConfirmDialog.svelte";
 
     type Item = { id: number; name: string };
     type BulkCreateInput = {

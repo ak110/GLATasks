@@ -9,7 +9,7 @@
      * `pendingReload` が偽へ戻った時点で自動的に消える。
      */
 
-    import { connectivityState } from "$lib/connection-recovery.svelte";
+    import { connectivityState } from "#lib/connection-recovery.svelte.ts";
 
     function reload() {
         location.reload();
