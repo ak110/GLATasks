@@ -6,16 +6,17 @@ import { and, eq, max } from "drizzle-orm";
 import type { z } from "zod";
 
 import { TIMER_DEFAULT_RING_SECONDS } from "#lib/schemas.ts";
-import type { UpdateTimerSchema } from "#lib/schemas.ts";
-import type { TimerInfo } from "#lib/types.ts";
+import type { CreateTimerSchema, UpdateTimerSchema } from "#lib/schemas.ts";
 import { getDb } from "../db";
 import { timers } from "../schema";
 import { toUtcIso } from "./common";
 
-export type { TimerInfo };
-
-/** updateTimer の data 引数型（UpdateTimerSchema から timerId を除いた型） */
-type UpdateTimerData = Omit<z.infer<typeof UpdateTimerSchema>, "timerId">;
+export type TimerInfo = ReturnType<typeof toTimerInfo>;
+type CreateTimerParams = z.infer<typeof CreateTimerSchema> & { userId: number };
+type UpdateTimerParams = Omit<z.infer<typeof UpdateTimerSchema>, "timerId">;
+type TimerConnection =
+  | ReturnType<typeof getDb>
+  | Parameters<Parameters<ReturnType<typeof getDb>["transaction"]>[0]>[0];
 
 // ── 内部ヘルパー ──
 
@@ -37,13 +38,12 @@ async function getOwnedTimer(timerId: number, userId: number) {
  */
 async function autoStopIfExpired(
   timer: typeof timers.$inferSelect,
+  db: TimerConnection,
 ): Promise<typeof timers.$inferSelect> {
   if (!timer.running || !timer.started_at) return timer;
-  const elapsed = Math.floor((Date.now() - timer.started_at.getTime()) / 1000);
-  const remaining = timer.remaining_seconds - elapsed;
+  const remaining = calculateRemainingSeconds(timer);
   if (remaining > 0) return timer;
   // 期限切れ → 自動停止
-  const db = getDb();
   await db
     .update(timers)
     .set({
@@ -64,22 +64,34 @@ async function autoStopIfExpired(
 }
 
 /** DB の timer 行を TimerInfo に変換する */
-function toTimerInfo(row: typeof timers.$inferSelect): TimerInfo {
+function toTimerInfo(row: typeof timers.$inferSelect) {
   return {
     id: row.id,
     name: row.name,
-    mode: row.mode as "countdown" | "alarm",
-    target_minutes: row.target_minutes,
-    base_seconds: row.base_seconds,
-    adjust_minutes: row.adjust_minutes,
+    mode: row.mode,
+    targetMinutes: row.target_minutes,
+    baseSeconds: row.base_seconds,
+    adjustMinutes: row.adjust_minutes,
     running: row.running === 1,
     expired: row.expired === 1,
     ephemeral: row.ephemeral === 1,
-    ring_seconds: row.ring_seconds,
-    remaining_seconds: row.remaining_seconds,
-    started_at: row.started_at ? toUtcIso(row.started_at) : null,
-    sort_order: row.sort_order,
+    ringSeconds: row.ring_seconds,
+    remainingSeconds: row.remaining_seconds,
+    startedAt: row.started_at ? toUtcIso(row.started_at) : null,
+    sortOrder: row.sort_order,
   };
+}
+
+/** 延長時には期限超過分も差し引くため、負の残秒数を保つ。 */
+function calculateRemainingSeconds(
+  timer: Pick<
+    typeof timers.$inferSelect,
+    "running" | "started_at" | "remaining_seconds"
+  >,
+): number {
+  if (!timer.running || !timer.started_at) return timer.remaining_seconds;
+  const elapsed = Math.floor((Date.now() - timer.started_at.getTime()) / 1000);
+  return timer.remaining_seconds - elapsed;
 }
 
 // テスト目的でexport。本来はモジュール内部関数。api.ts バレルからのre-exportは行わない。
@@ -123,35 +135,29 @@ export function calcAlarmSecondsOrThrow(
 // ── 公開API ──
 
 /** タイマー一覧取得 + サーバー時刻返却 */
-export async function getTimers(
+export async function listTimers(
   userId: number,
-): Promise<{ timers: TimerInfo[]; server_time: string }> {
-  const db = getDb();
-  const rows = await db
-    .select()
-    .from(timers)
-    .where(eq(timers.user_id, userId))
-    .orderBy(timers.sort_order, timers.created);
-  // 期限切れタイマーを自動停止
-  const processed = await Promise.all(rows.map(autoStopIfExpired));
-  return {
-    timers: processed.map(toTimerInfo),
-    server_time: new Date().toISOString(),
-  };
+): Promise<{ timers: TimerInfo[]; serverTime: string }> {
+  return getDb().transaction(async (db) => {
+    const rows = await db
+      .select()
+      .from(timers)
+      .where(eq(timers.user_id, userId))
+      .orderBy(timers.sort_order, timers.created)
+      .for("update");
+    // 期限切れタイマーを自動停止
+    const processed = await Promise.all(
+      rows.map((timer) => autoStopIfExpired(timer, db)),
+    );
+    return {
+      timers: processed.map(toTimerInfo),
+      serverTime: new Date().toISOString(),
+    };
+  });
 }
 
 /** タイマーを作成する（sort_order は既存の最大値 + 1000 で末尾追加） */
-export async function createTimer(params: {
-  userId: number;
-  name: string;
-  baseSeconds: number;
-  adjustMinutes: number;
-  mode?: string;
-  targetMinutes?: number | null;
-  tzOffsetMinutes?: number | null;
-  ephemeral?: boolean;
-  ringSeconds?: number;
-}): Promise<void> {
+export async function createTimer(params: CreateTimerParams): Promise<void> {
   const {
     userId,
     name,
@@ -166,7 +172,7 @@ export async function createTimer(params: {
   const isAlarm = mode === "alarm";
   const startsImmediately = isAlarm || ephemeral;
   const remainingSeconds = isAlarm
-    ? calcAlarmSecondsOrThrow(targetMinutes, tzOffsetMinutes)
+    ? calcAlarmRemainingSeconds(targetMinutes!, tzOffsetMinutes!)
     : baseSeconds;
   const db = getDb();
   const now = new Date();
@@ -198,15 +204,15 @@ export async function createTimer(params: {
 export async function updateTimer(
   userId: number,
   timerId: number,
-  data: UpdateTimerData,
+  data: UpdateTimerParams,
 ): Promise<void> {
   const timer = await getOwnedTimer(timerId, userId);
   const db = getDb();
   const updates: Partial<typeof timers.$inferInsert> = { updated: new Date() };
   if (data.name !== undefined) updates.name = data.name;
-  if (data.adjust_minutes !== undefined)
-    updates.adjust_minutes = data.adjust_minutes;
-  if (data.ring_seconds !== undefined) updates.ring_seconds = data.ring_seconds;
+  if (data.adjustMinutes !== undefined)
+    updates.adjust_minutes = data.adjustMinutes;
+  if (data.ringSeconds !== undefined) updates.ring_seconds = data.ringSeconds;
 
   // モード変更処理
   if (data.mode !== undefined && data.mode !== timer.mode) {
@@ -214,34 +220,33 @@ export async function updateTimer(
     updates.mode = data.mode;
     updates.expired = 0;
     if (data.mode === "alarm") {
-      updates.target_minutes = data.target_minutes;
+      updates.target_minutes = data.targetMinutes;
       updates.base_seconds = 0;
-      updates.remaining_seconds = calcAlarmSecondsOrThrow(
-        data.target_minutes,
-        data.tz_offset_minutes,
+      updates.remaining_seconds = calcAlarmRemainingSeconds(
+        data.targetMinutes!,
+        data.tzOffsetMinutes!,
       );
     } else {
       // alarm → countdown
-      if (data.base_seconds === undefined)
+      if (data.baseSeconds === undefined)
         throw new Error("countdown_missing_base_seconds");
-      updates.base_seconds = data.base_seconds;
+      updates.base_seconds = data.baseSeconds;
       updates.target_minutes = null;
-      updates.remaining_seconds = data.base_seconds;
+      updates.remaining_seconds = data.baseSeconds;
     }
   } else {
     // モード変更なしの場合
-    if (data.base_seconds !== undefined)
-      updates.base_seconds = data.base_seconds;
-    if (data.target_minutes !== undefined) {
-      updates.target_minutes = data.target_minutes;
+    if (data.baseSeconds !== undefined) updates.base_seconds = data.baseSeconds;
+    if (data.targetMinutes !== undefined) {
+      updates.target_minutes = data.targetMinutes;
       // アラームモードで target_minutes を変更した場合は remaining_seconds も再計算
       if (
         (data.mode ?? timer.mode) === "alarm" &&
-        data.tz_offset_minutes !== undefined
+        data.tzOffsetMinutes !== undefined
       ) {
         updates.remaining_seconds = calcAlarmRemainingSeconds(
-          data.target_minutes,
-          data.tz_offset_minutes,
+          data.targetMinutes,
+          data.tzOffsetMinutes,
         );
       }
     }
@@ -255,9 +260,7 @@ export async function deleteTimer(
   userId: number,
   timerId: number,
 ): Promise<void> {
-  // 冪等な削除: 対象が無い・他ユーザーのものは no-op (NOT_FOUND を返さない)。
-  // 別端末で先に削除されていた場合のレース時に、こちらの削除がエラーにならず
-  // クライアントの状態を確実に整合させるため。
+  // 削除の規約は .claude/skills/add-trpc-procedure/SKILL.md「DB層の実装」を参照。
   const db = getDb();
   await db
     .delete(timers)
@@ -307,8 +310,7 @@ export async function pauseTimer(
 ): Promise<void> {
   const timer = await getOwnedTimer(timerId, userId);
   if (!timer.running || !timer.started_at) return;
-  const elapsed = Math.floor((Date.now() - timer.started_at.getTime()) / 1000);
-  const remaining = Math.max(0, timer.remaining_seconds - elapsed);
+  const remaining = Math.max(0, calculateRemainingSeconds(timer));
   const db = getDb();
   await db
     .update(timers)
@@ -341,13 +343,7 @@ export async function resetTimer(
       tzOffsetMinutes,
     );
   } else {
-    let currentRemaining = timer.remaining_seconds;
-    if (timer.running && timer.started_at) {
-      const elapsed = Math.floor(
-        (Date.now() - timer.started_at.getTime()) / 1000,
-      );
-      currentRemaining = Math.max(0, timer.remaining_seconds - elapsed);
-    }
+    const currentRemaining = Math.max(0, calculateRemainingSeconds(timer));
     // トグルロジック: base_seconds と一致 → 0、それ以外 → base_seconds
     newRemaining =
       !timer.running && currentRemaining === timer.base_seconds
@@ -375,14 +371,7 @@ export async function adjustTimer(
   minutes: number,
 ): Promise<void> {
   const timer = await getOwnedTimer(timerId, userId);
-  let currentRemaining = timer.remaining_seconds;
-  // running 中は経過時間を考慮
-  if (timer.running && timer.started_at) {
-    const elapsed = Math.floor(
-      (Date.now() - timer.started_at.getTime()) / 1000,
-    );
-    currentRemaining -= elapsed;
-  }
+  const currentRemaining = calculateRemainingSeconds(timer);
   const newRemaining = Math.max(0, currentRemaining + minutes * 60);
   // アラームモード: target_minutes も連動して更新
   const targetMinutesUpdate =
@@ -482,27 +471,29 @@ export async function reorderTimers(
   userId: number,
   timerIds: number[],
 ): Promise<void> {
-  const db = getDb();
-  // ユーザーの全タイマーIDを取得して全件一致を検証
-  const owned = await db
-    .select({ id: timers.id })
-    .from(timers)
-    .where(eq(timers.user_id, userId));
-  const ownedIds = new Set(owned.map((r) => r.id));
-  if (
-    timerIds.length !== ownedIds.size ||
-    !timerIds.every((id) => ownedIds.has(id))
-  ) {
-    throw new Error("invalid_timer_ids");
-  }
-  // timerIds の順に sort_order を 0, 1000, 2000... で再割当
-  // 依存関係のないタイマーを並列更新し、直列実行による RTT の線形増大を回避する
-  await Promise.all(
-    timerIds.map((id, i) =>
-      db
-        .update(timers)
-        .set({ sort_order: i * 1000 })
-        .where(and(eq(timers.id, id), eq(timers.user_id, userId))),
-    ),
-  );
+  await getDb().transaction(async (db) => {
+    // ユーザーの全タイマーIDを取得して全件一致を検証
+    const owned = await db
+      .select({ id: timers.id })
+      .from(timers)
+      .where(eq(timers.user_id, userId))
+      .for("update");
+    const ownedIds = new Set(owned.map((r) => r.id));
+    if (
+      timerIds.length !== ownedIds.size ||
+      !timerIds.every((id) => ownedIds.has(id))
+    ) {
+      throw new Error("invalid_timer_ids");
+    }
+    // timerIds の順に sort_order を 0, 1000, 2000... で再割当
+    // 依存関係のないタイマーを並列更新し、直列実行による RTT の線形増大を回避する
+    await Promise.all(
+      timerIds.map((id, i) =>
+        db
+          .update(timers)
+          .set({ sort_order: i * 1000 })
+          .where(and(eq(timers.id, id), eq(timers.user_id, userId))),
+      ),
+    );
+  });
 }
