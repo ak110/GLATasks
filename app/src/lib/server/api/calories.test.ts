@@ -3,8 +3,9 @@
  */
 
 import { eq } from "drizzle-orm";
-import { afterAll, describe, expect, it, vi } from "vitest";
+import { afterAll, expect, it } from "vitest";
 
+import { processCalorieAutoRecords } from "../calorie-scheduler";
 import { getDb } from "../db";
 import { calorieRecords } from "../schema";
 import {
@@ -14,6 +15,7 @@ import {
   createCalorieItem,
   createCalorieRecord,
   deleteCalorieAutoRecord,
+  deleteCalorieRecord,
   deleteCalorieItem,
   getAllCalorieRecords,
   getCalorieAutoRecords,
@@ -21,7 +23,6 @@ import {
   getCalorieRecords,
   getCalorieSummary,
   importCalorieRecords,
-  processCalorieAutoRecords,
   updateCalorieAutoRecord,
   updateCalorieItem,
   updateCalorieRecord,
@@ -32,337 +33,6 @@ import {
   cleanupFixtures,
   describeDb,
 } from "../db-test-helpers";
-
-const BASE_TIME_MS = new Date("2026-09-01T12:00:00.000Z").getTime();
-const HOUR_MS = 60 * 60 * 1000;
-
-/** 集計が取得する記録1件（品目の記録。一時項目の集計はDBを使うテストで確かめる） */
-type SummaryRow = {
-  consumed_at: Date;
-  quantity: number;
-  item_kcal: number | null;
-  temporary_name: string | null;
-};
-
-/**
- * 与えた記録だけを対象に集計する（DBと利用者設定はモックする）
- *
- * 最初の記録日時は省略時に与えた記録の最も古い日時とする。
- */
-async function summarizeRows(
-  rows: SummaryRow[],
-  goalKcal = 1615,
-  options: { tzOffsetMinutes?: number; firstRecordAt?: Date } = {},
-) {
-  const firstRecordAt =
-    options.firstRecordAt ??
-    [...rows.map((row) => row.consumed_at)].sort(
-      (a, b) => a.getTime() - b.getTime(),
-    )[0];
-  vi.resetModules();
-  vi.doMock("../db", () => ({
-    getDb: () => ({
-      select: () => ({
-        from: () => ({
-          leftJoin: () => ({ where: () => Promise.resolve(rows) }),
-          where: () => ({
-            orderBy: () => ({
-              limit: () =>
-                Promise.resolve(
-                  firstRecordAt ? [{ consumed_at: firstRecordAt }] : [],
-                ),
-            }),
-          }),
-        }),
-      }),
-    }),
-  }));
-  vi.doMock("./users", () => ({
-    getUserPreferences: () => Promise.resolve({ calorie_goal_kcal: goalKcal }),
-  }));
-
-  try {
-    const { getCalorieSummary: getSummary } = await import("./calories");
-    return await getSummary(
-      1,
-      options.tzOffsetMinutes ?? 0,
-      new Date(BASE_TIME_MS),
-    );
-  } finally {
-    vi.doUnmock("../db");
-    vi.doUnmock("./users");
-    vi.resetModules();
-  }
-}
-
-/** 経過時間とkcalで指定した記録1件を返す */
-function makeRow(elapsedHours: number, kcal = 100): SummaryRow {
-  return {
-    consumed_at: new Date(BASE_TIME_MS - elapsedHours * HOUR_MS),
-    quantity: 1,
-    item_kcal: kcal,
-    temporary_name: null,
-  };
-}
-
-/** 1日1500kcalを8時間間隔で3等分し、28日間続けた状態の記録 */
-function steadyRows(): SummaryRow[] {
-  return Array.from({ length: 84 }, (_, index) => makeRow(4 + index * 8, 500));
-}
-
-it("ペースは経過時間に応じた重みで数え、平均は期間の合計を日数で割る", async () => {
-  const summary = await summarizeRows([0, 24, 48].map((h) => makeRow(h)));
-
-  // ペースは重み1・e^-1・e^-2の合計150kcal、平均は3件の合計300kcalを日数で割った値
-  expect(summary.periods).toEqual([
-    { days: 1, daily_kcal: 150, percentage: 9.3 },
-    { days: 7, daily_kcal: 43, percentage: 2.7 },
-    { days: 28, daily_kcal: 11, percentage: 0.7 },
-  ]);
-});
-
-it("7日間平均と28日間平均は期間の内側の記録だけを数える", async () => {
-  const summary = await summarizeRows(
-    [7 * 24 - 1, 7 * 24 + 1].map((h) => makeRow(h)),
-  );
-
-  // 7日間平均は7日以内の1件だけ、28日間平均は2件とも数える
-  expect(summary.periods.map((period) => period.daily_kcal)).toEqual([
-    0, 14, 7,
-  ]);
-});
-
-it("目標どおりに食べ続けるとペースも平均も目標値と一致する", async () => {
-  const summary = await summarizeRows(steadyRows(), 1500);
-
-  // ペースは等比級数の和500×e^(-1/6)÷(1-e^(-1/3))=1493kcal
-  expect(summary.periods).toEqual([
-    { days: 1, daily_kcal: 1493, percentage: 99.5 },
-    { days: 7, daily_kcal: 1500, percentage: 100 },
-    { days: 28, daily_kcal: 1500, percentage: 100 },
-  ]);
-});
-
-it("摂取した分だけペースが増える", async () => {
-  const rows = steadyRows();
-
-  const before = await summarizeRows(rows, 1500);
-  const after = await summarizeRows([makeRow(0, 500), ...rows], 1500);
-
-  expect(after.periods[0].daily_kcal - before.periods[0].daily_kcal).toBe(500);
-});
-
-it("一定の速さで摂取し続けるとペースが1日当たり摂取量へ収束する", async () => {
-  const intervalMinutes = 6;
-  const kcalPerRecord = 100;
-  const rows = Array.from(
-    { length: (14 * 24 * 60) / intervalMinutes },
-    (_, index) => makeRow((index * intervalMinutes) / 60, kcalPerRecord),
-  );
-
-  const summary = await summarizeRows(rows);
-
-  const hourlyKcal = (kcalPerRecord * 60) / intervalMinutes;
-  const expected = hourlyKcal * 24;
-  const actual = summary.periods[0].daily_kcal;
-  expect(Math.abs(actual - expected) / expected).toBeLessThanOrEqual(0.005);
-});
-
-describe("達成状況", () => {
-  // 時差0では2026-09-01T04:00Zが当日の開始で、それより前が確定日となる
-  const TODAY_START_MS = new Date("2026-09-01T04:00:00.000Z").getTime();
-  const LONG_AGO = new Date(TODAY_START_MS - 60 * 24 * HOUR_MS);
-
-  /** 指定した日数前の確定日の正午（UTC）に摂取した記録を返す */
-  function dayRow(daysAgo: number, kcal: number): SummaryRow {
-    return {
-      consumed_at: new Date(
-        TODAY_START_MS - daysAgo * 24 * HOUR_MS + 8 * HOUR_MS,
-      ),
-      quantity: 1,
-      item_kcal: kcal,
-      temporary_name: null,
-    };
-  }
-
-  function daysRows(from: number, to: number, kcal: number): SummaryRow[] {
-    return Array.from({ length: to - from + 1 }, (_, index) =>
-      dayRow(from + index, kcal),
-    );
-  }
-
-  it("直近28確定日を古い順に並べ、当日を含めない", async () => {
-    const { achievement } = await summarizeRows([], 1615, {
-      firstRecordAt: LONG_AGO,
-    });
-
-    expect(achievement.days).toHaveLength(28);
-    expect(achievement.days[0].date).toBe("2026/08/04");
-    expect(achievement.days[27].date).toBe("2026/08/31");
-  });
-
-  it("早朝4時の区切りと端末の時差で記録の日を分ける", async () => {
-    const rows: SummaryRow[] = [
-      // 時差0では前日の3:59、時差+9時間では当日の12:59
-      {
-        consumed_at: new Date("2026-09-01T03:59:00.000Z"),
-        quantity: 1,
-        item_kcal: 700,
-        temporary_name: null,
-      },
-      // 時差0では当日の4:00
-      {
-        consumed_at: new Date("2026-09-01T04:00:00.000Z"),
-        quantity: 1,
-        item_kcal: 7000,
-        temporary_name: null,
-      },
-    ];
-
-    const utc = await summarizeRows(rows, 1615, { firstRecordAt: LONG_AGO });
-    const jst = await summarizeRows(rows, 1615, {
-      firstRecordAt: LONG_AGO,
-      tzOffsetMinutes: 540,
-    });
-
-    expect(utc.achievement.latest_average_kcal).toBe(100);
-    expect(jst.achievement.latest_average_kcal).toBe(0);
-    expect(jst.achievement.days[27].date).toBe("2026/08/31");
-  });
-
-  it("今日の残量は朝4時以降の摂取量だけを1日目標から引き、過去の余裕や超過を含めない", async () => {
-    const rows = [
-      ...daysRows(1, 6, 1000),
-      dayRow(7, 9000),
-      {
-        consumed_at: new Date("2026-08-25T20:00:00.000Z"),
-        quantity: 1,
-        item_kcal: 100,
-        temporary_name: null,
-      },
-      {
-        consumed_at: new Date("2026-09-01T03:59:00.000Z"),
-        quantity: 1,
-        item_kcal: 200,
-        temporary_name: null,
-      },
-      {
-        consumed_at: new Date("2026-09-01T04:00:00.000Z"),
-        quantity: 300,
-        item_kcal: null,
-        temporary_name: "朝食",
-      },
-    ];
-    const utc = await summarizeRows(rows, 1000, { firstRecordAt: LONG_AGO });
-    const jst = await summarizeRows(rows, 1000, {
-      firstRecordAt: LONG_AGO,
-      tzOffsetMinutes: 540,
-    });
-    // 時差0では3:59の200kcalは前日、4:00の300kcalだけが今日に入る
-    expect(utc.achievement.today_remaining_kcal).toBe(700);
-    // 日本時間では2件とも今日の4時以降なので、合計500kcalを引く
-    expect(jst.achievement.today_remaining_kcal).toBe(500);
-
-    const insufficient = await summarizeRows(daysRows(1, 5, 1000), 1000);
-    expect(insufficient.achievement.today_remaining_kcal).toBe(1000);
-    const seventhDay = await summarizeRows(daysRows(1, 6, 1000), 1000);
-    expect(seventhDay.achievement.today_remaining_kcal).toBe(1000);
-    const noRecords = await summarizeRows([], 1750);
-    expect(noRecords.achievement.today_remaining_kcal).toBe(1750);
-    const firstDay = await summarizeRows([dayRow(0, 300)], 1750);
-    expect(firstDay.achievement.today_remaining_kcal).toBe(1450);
-  });
-
-  it("7日平均が目標と等しい日を達成とし、超えた日で連続日数が止まる", async () => {
-    // 昨日の窓（1〜7日前）は平均1000、一昨日の窓（2〜8日前）は平均1001
-    const rows = [...daysRows(1, 7, 1000), dayRow(8, 1007)];
-
-    const { achievement } = await summarizeRows(rows, 1000, {
-      firstRecordAt: LONG_AGO,
-    });
-
-    expect(achievement.days[27]).toEqual({
-      date: "2026/08/31",
-      average_kcal: 1000,
-      status: "achieved",
-    });
-    expect(achievement.days[26].status).toBe("missed");
-    expect(achievement.streak_days).toBe(1);
-  });
-
-  it("最初の記録の日より前へかかる窓は判定対象外とする", async () => {
-    const rows = daysRows(1, 8, 100);
-
-    const { achievement } = await summarizeRows(rows);
-
-    // 8日前が最初の記録の日なので、1日前と2日前の窓だけが判定できる
-    expect(achievement.days.slice(-2).map((day) => day.status)).toEqual([
-      "achieved",
-      "achieved",
-    ]);
-    expect(achievement.days[25]).toEqual({
-      date: "2026/08/29",
-      average_kcal: null,
-      status: "unrated",
-    });
-    expect(achievement.streak_days).toBe(2);
-  });
-
-  it("記録が無い利用者はすべて判定対象外とする", async () => {
-    const { achievement } = await summarizeRows([]);
-
-    expect(achievement.days.every((day) => day.status === "unrated")).toBe(
-      true,
-    );
-    expect(achievement.streak_days).toBe(0);
-    expect(achievement.latest_average_kcal).toBeNull();
-    expect(achievement.weekly_change_kcal).toBeNull();
-  });
-
-  it("記録の無い日を0kcalとして平均へ含める", async () => {
-    // 30日前の記録だけがあり、以降の日は記録が無い
-    const { achievement } = await summarizeRows([dayRow(30, 700)]);
-
-    // 24日前の窓（24〜30日前）は平均100、それより新しい窓は平均0で、いずれも達成
-    expect(achievement.days[4]).toEqual({
-      date: "2026/08/08",
-      average_kcal: 100,
-      status: "achieved",
-    });
-    expect(achievement.days[3].status).toBe("unrated");
-    expect(achievement.latest_average_kcal).toBe(0);
-    expect(achievement.streak_days).toBe(24);
-  });
-
-  it("28確定日すべてが達成なら連続日数は28となる", async () => {
-    const { achievement } = await summarizeRows([], 1615, {
-      firstRecordAt: LONG_AGO,
-    });
-
-    expect(achievement.streak_days).toBe(28);
-  });
-
-  it("先週比は昨日の7日平均から7日前の7日平均を引いた値とする", async () => {
-    const rows = [...daysRows(1, 7, 1000), ...daysRows(8, 14, 1500)];
-
-    const decreased = await summarizeRows(rows);
-    const increased = await summarizeRows([
-      ...daysRows(1, 7, 1500),
-      ...daysRows(8, 14, 1000),
-    ]);
-
-    expect(decreased.achievement.latest_average_kcal).toBe(1000);
-    expect(decreased.achievement.weekly_change_kcal).toBe(-500);
-    expect(increased.achievement.weekly_change_kcal).toBe(500);
-  });
-
-  it("7日前の窓が判定対象外なら先週比を算出しない", async () => {
-    const { achievement } = await summarizeRows(daysRows(1, 10, 1000));
-
-    expect(achievement.latest_average_kcal).toBe(1000);
-    expect(achievement.weekly_change_kcal).toBeNull();
-  });
-});
 
 /** 品目を1件作成し、作成した品目を返す */
 async function createFixtureItem(userId: number, name: string) {
@@ -387,10 +57,10 @@ describeDb("カロリー計算API", () => {
     await createCalorieItem(userId, { name: "旧名称", kcal: 100, note: "" });
     const [item] = await getCalorieItems(userId);
     await createCalorieRecord(userId, {
-      consumed_at: "2026/09/01 12:00",
-      item_id: item.id,
+      consumedAt: "2026/09/01 12:00",
+      itemId: item.id,
       quantity: 2,
-      tz_offset_minutes: 0,
+      tzOffsetMinutes: 0,
     });
 
     await updateCalorieItem(userId, {
@@ -401,7 +71,7 @@ describeDb("カロリー計算API", () => {
     });
 
     expect(await getAllCalorieRecords(userId)).toMatchObject([
-      { item_id: item.id, item_name: "新名称", total_kcal: 250 },
+      { itemId: item.id, itemName: "新名称", totalKcal: 250 },
     ]);
   });
 
@@ -409,32 +79,32 @@ describeDb("カロリー計算API", () => {
     const userId = await createFixtureUser();
     userIds.push(userId);
     await createCalorieRecord(userId, {
-      consumed_at: "2026/08/31 12:00",
-      temporary_name: "外食",
+      consumedAt: "2026/08/31 12:00",
+      temporaryName: "外食",
       quantity: 850,
-      tz_offset_minutes: 0,
+      tzOffsetMinutes: 0,
     });
     const item = await createFixtureItem(userId, "外食");
     await createCalorieRecord(userId, {
-      consumed_at: "2026/08/31 18:00",
-      item_id: item.id,
+      consumedAt: "2026/08/31 18:00",
+      itemId: item.id,
       quantity: 2,
-      tz_offset_minutes: 0,
+      tzOffsetMinutes: 0,
     });
 
     expect(await getAllCalorieRecords(userId)).toMatchObject([
       {
-        item_id: item.id,
-        item_name: "外食",
-        total_kcal: 200,
+        itemId: item.id,
+        itemName: "外食",
+        totalKcal: 200,
         temporary: false,
       },
       {
-        item_id: null,
-        item_name: "外食",
-        item_kcal: null,
+        itemId: null,
+        itemName: "外食",
+        itemKcal: null,
         quantity: 850,
-        total_kcal: 850,
+        totalKcal: 850,
         temporary: true,
       },
     ]);
@@ -444,17 +114,17 @@ describeDb("カロリー計算API", () => {
       new Date("2026-09-01T12:00:00.000Z"),
     );
     // ペースは850×e^-1+200×e^-0.75、7日間平均は1050kcalを7日、28日間平均は28日で割った値
-    expect(summary.periods.map((period) => period.daily_kcal)).toEqual([
+    expect(summary.periods.map((period) => period.dailyKcal)).toEqual([
       407, 150, 38,
     ]);
 
     const [converted] = await getAllCalorieRecords(userId);
     await updateCalorieRecord(userId, {
       recordId: converted.id,
-      consumed_at: "2026/08/31 18:00",
-      temporary_name: "外食",
+      consumedAt: "2026/08/31 18:00",
+      temporaryName: "外食",
       quantity: 200,
-      tz_offset_minutes: 0,
+      tzOffsetMinutes: 0,
     });
     await importCalorieRecords(
       userId,
@@ -469,9 +139,9 @@ describeDb("カロリー計算API", () => {
       0,
     );
     expect(await getAllCalorieRecords(userId)).toMatchObject([
-      { item_id: null, total_kcal: 200, temporary: true },
-      { item_id: null, total_kcal: 850, temporary: true },
-      { item_name: "未登録の間食", total_kcal: 300, temporary: true },
+      { itemId: null, totalKcal: 200, temporary: true },
+      { itemId: null, totalKcal: 850, temporary: true },
+      { itemName: "未登録の間食", totalKcal: 300, temporary: true },
     ]);
   });
 
@@ -499,34 +169,34 @@ describeDb("カロリー計算API", () => {
     userIds.push(userId);
     await createCalorieItem(userId, { name: "食品", kcal: 10, note: "" });
     const [item] = await getCalorieItems(userId);
-    for (const consumed_at of [
+    for (const consumedAt of [
       "2026/09/01 00:00",
       "2026/08/03 00:00",
       "2026/08/02 23:59",
     ]) {
       await createCalorieRecord(userId, {
-        consumed_at,
-        item_id: item.id,
+        consumedAt,
+        itemId: item.id,
         quantity: 1,
-        tz_offset_minutes: 0,
+        tzOffsetMinutes: 0,
       });
     }
 
     const first = await getCalorieRecords(
       userId,
-      { window_offset: 0, tz_offset_minutes: 0 },
+      { windowOffset: 0, tzOffsetMinutes: 0 },
       new Date("2026-09-01T12:00:00.000Z"),
     );
     const previous = await getCalorieRecords(
       userId,
-      { window_offset: 1, tz_offset_minutes: 0 },
+      { windowOffset: 1, tzOffsetMinutes: 0 },
       new Date("2026-09-01T12:00:00.000Z"),
     );
-    expect(first.records.map((record) => record.consumed_at)).toEqual([
+    expect(first.records.map((record) => record.consumedAt)).toEqual([
       "2026-09-01T00:00:00.000Z",
       "2026-08-03T00:00:00.000Z",
     ]);
-    expect(previous.records.map((record) => record.consumed_at)).toEqual([
+    expect(previous.records.map((record) => record.consumedAt)).toEqual([
       "2026-08-02T23:59:00.000Z",
     ]);
     expect(await getAllCalorieRecords(userId)).toHaveLength(3);
@@ -537,16 +207,16 @@ describeDb("カロリー計算API", () => {
     userIds.push(userId);
     await createCalorieItem(userId, { name: "食品", kcal: 100, note: "" });
     const [item] = await getCalorieItems(userId);
-    for (const consumed_at of [
+    for (const consumedAt of [
       "2026/08/31 12:00",
       "2026/08/25 12:00",
       "2026/08/04 12:00",
     ]) {
       await createCalorieRecord(userId, {
-        consumed_at,
-        item_id: item.id,
+        consumedAt,
+        itemId: item.id,
         quantity: 1,
-        tz_offset_minutes: 0,
+        tzOffsetMinutes: 0,
       });
     }
 
@@ -555,9 +225,9 @@ describeDb("カロリー計算API", () => {
       0,
       new Date("2026-09-01T12:00:00.000Z"),
     );
-    expect(summary.goal_kcal).toBe(1615);
+    expect(summary.goalKcal).toBe(1615);
     // ペースは1日前の記録がe^-1、7日前と28日前の記録がそれぞれの期間の境界に入る
-    expect(summary.periods.map((period) => period.daily_kcal)).toEqual([
+    expect(summary.periods.map((period) => period.dailyKcal)).toEqual([
       37, 29, 11,
     ]);
   });
@@ -601,12 +271,12 @@ describeDb("カロリー計算API", () => {
     userIds.push(userId);
     const item = await createFixtureItem(userId, "朝食");
     const input = {
-      start_date: "2026/09/01",
-      end_date: "2026/09/03",
-      time_of_day: "07:30",
-      item_id: item.id,
+      startDate: "2026/09/01",
+      endDate: "2026/09/03",
+      timeOfDay: "07:30",
+      itemId: item.id,
       quantity: 2,
-      tz_offset_minutes: 540,
+      tzOffsetMinutes: 540,
     };
 
     expect(await bulkCreateCalorieRecords(userId, input)).toEqual({
@@ -614,7 +284,7 @@ describeDb("カロリー計算API", () => {
     });
     expect(
       (await getAllCalorieRecords(userId)).map((record) => [
-        record.consumed_at,
+        record.consumedAt,
         record.quantity,
       ]),
     ).toEqual([
@@ -627,8 +297,8 @@ describeDb("カロリー計算API", () => {
     expect(
       await bulkCreateCalorieRecords(userId, {
         ...input,
-        start_date: "2026/09/03",
-        end_date: "2026/09/02",
+        startDate: "2026/09/03",
+        endDate: "2026/09/02",
       }),
     ).toEqual({ added: 0 });
     expect(await getAllCalorieRecords(userId)).toHaveLength(3);
@@ -641,19 +311,19 @@ describeDb("カロリー計算API", () => {
     const target = await createFixtureItem(userId, "対象");
     const other = await createFixtureItem(userId, "別品目");
     const otherUsersItem = await createFixtureItem(otherUserId, "対象");
-    const record = (item_id: number, consumed_at: string) => ({
-      consumed_at,
-      item_id,
+    const record = (itemId: number, consumedAt: string) => ({
+      consumedAt,
+      itemId,
       quantity: 1,
-      tz_offset_minutes: 540,
+      tzOffsetMinutes: 540,
     });
-    for (const consumed_at of [
+    for (const consumedAt of [
       "2026/08/31 23:59",
       "2026/09/01 00:00",
       "2026/09/03 23:59",
       "2026/09/04 00:00",
     ]) {
-      await createCalorieRecord(userId, record(target.id, consumed_at));
+      await createCalorieRecord(userId, record(target.id, consumedAt));
     }
     await createCalorieRecord(userId, record(other.id, "2026/09/02 12:00"));
     await createCalorieRecord(
@@ -663,16 +333,16 @@ describeDb("カロリー計算API", () => {
 
     expect(
       await bulkDeleteCalorieRecords(userId, {
-        start_date: "2026/09/01",
-        end_date: "2026/09/03",
-        item_id: target.id,
-        tz_offset_minutes: 540,
+        startDate: "2026/09/01",
+        endDate: "2026/09/03",
+        itemId: target.id,
+        tzOffsetMinutes: 540,
       }),
     ).toEqual({ deleted: 2 });
     expect(
       (await getAllCalorieRecords(userId)).map((row) => [
-        row.item_name,
-        row.consumed_at,
+        row.itemName,
+        row.consumedAt,
       ]),
     ).toEqual([
       ["対象", "2026-09-03T15:00:00.000Z"],
@@ -690,23 +360,23 @@ describeDb("カロリー計算API", () => {
     await createCalorieAutoRecord(
       userId,
       {
-        time_of_day: "08:00",
-        item_id: item.id,
+        timeOfDay: "08:00",
+        itemId: item.id,
         quantity: 2,
         enabled: true,
-        tz_offset_minutes: 540,
+        tzOffsetMinutes: 540,
       },
       new Date("2026-08-01T00:00:00.000Z"),
     );
     const [autoRecord] = await getCalorieAutoRecords(userId);
     expect(autoRecord).toMatchObject({
-      time_of_day: "08:00",
-      item_name: "牛乳",
+      timeOfDay: "08:00",
+      itemName: "牛乳",
       quantity: 2,
       enabled: true,
     });
     const consumedAts = async () =>
-      (await getAllCalorieRecords(userId)).map((row) => row.consumed_at).sort();
+      (await getAllCalorieRecords(userId)).map((row) => row.consumedAt).sort();
 
     await processCalorieAutoRecords(new Date("2026-08-01T22:59:00.000Z"));
     expect(await consumedAts()).toEqual([]);
@@ -731,11 +401,11 @@ describeDb("カロリー計算API", () => {
         userId,
         {
           autoRecordId: autoRecord.id,
-          time_of_day: "08:00",
-          item_id: item.id,
+          timeOfDay: "08:00",
+          itemId: item.id,
           quantity: 2,
           enabled,
-          tz_offset_minutes: 540,
+          tzOffsetMinutes: 540,
         },
         new Date(now),
       );
@@ -762,17 +432,17 @@ describeDb("カロリー計算API", () => {
     const usedByAutoRecord = await createFixtureItem(userId, "自動記録で使用");
     const otherUsersItem = await createFixtureItem(otherUserId, "他人の品目");
     await createCalorieRecord(userId, {
-      consumed_at: "2026/09/01 12:00",
-      item_id: usedByRecord.id,
+      consumedAt: "2026/09/01 12:00",
+      itemId: usedByRecord.id,
       quantity: 1,
-      tz_offset_minutes: 540,
+      tzOffsetMinutes: 540,
     });
     await createCalorieAutoRecord(userId, {
-      time_of_day: "08:00",
-      item_id: usedByAutoRecord.id,
+      timeOfDay: "08:00",
+      itemId: usedByAutoRecord.id,
       quantity: 1,
       enabled: true,
-      tz_offset_minutes: 540,
+      tzOffsetMinutes: 540,
     });
 
     await deleteCalorieItem(userId, unused.id);
@@ -797,21 +467,21 @@ describeDb("カロリー計算API", () => {
     userIds.push(userId, otherUserId);
     const otherUsersItem = await createFixtureItem(otherUserId, "他人の品目");
     const input = {
-      time_of_day: "08:00",
-      item_id: otherUsersItem.id,
+      timeOfDay: "08:00",
+      itemId: otherUsersItem.id,
       quantity: 1,
       enabled: true,
-      tz_offset_minutes: 540,
+      tzOffsetMinutes: 540,
     };
     await expect(createCalorieAutoRecord(userId, input)).rejects.toThrow(
       "calorie_item_not_found",
     );
     await expect(
       bulkDeleteCalorieRecords(userId, {
-        start_date: "2026/09/01",
-        end_date: "2026/09/01",
-        item_id: otherUsersItem.id,
-        tz_offset_minutes: 540,
+        startDate: "2026/09/01",
+        endDate: "2026/09/01",
+        itemId: otherUsersItem.id,
+        tzOffsetMinutes: 540,
       }),
     ).rejects.toThrow("calorie_item_not_found");
 
@@ -821,13 +491,66 @@ describeDb("カロリー計算API", () => {
     await expect(
       updateCalorieAutoRecord(userId, {
         ...input,
-        item_id: ownItem.id,
+        itemId: ownItem.id,
         autoRecordId: otherUsersRule.id,
       }),
     ).rejects.toThrow("calorie_auto_record_not_found");
-    await expect(
-      deleteCalorieAutoRecord(userId, otherUsersRule.id),
-    ).rejects.toThrow("calorie_auto_record_not_found");
+    await deleteCalorieAutoRecord(userId, otherUsersRule.id);
     expect(await getCalorieAutoRecords(otherUserId)).toHaveLength(1);
+  });
+
+  it("品目の件数は全期間の記録と無効な自動記録も数え、他人の削除要求は何も変えない", async () => {
+    const userId = await createFixtureUser();
+    const otherUserId = await createFixtureUser();
+    userIds.push(userId, otherUserId);
+    const used = await createFixtureItem(userId, "使用品目");
+    const unused = await createFixtureItem(userId, "未使用品目");
+    for (const consumedAt of ["2025/01/01 12:00", "2026/09/01 12:00"]) {
+      await createCalorieRecord(userId, {
+        consumedAt,
+        itemId: used.id,
+        quantity: 1,
+        tzOffsetMinutes: 0,
+      });
+    }
+    await createCalorieRecord(userId, {
+      consumedAt: "2026/09/01 13:00",
+      temporaryName: "使用品目",
+      quantity: 100,
+      tzOffsetMinutes: 0,
+    });
+    await createCalorieAutoRecord(userId, {
+      itemId: used.id,
+      timeOfDay: "08:00",
+      quantity: 1,
+      enabled: false,
+      tzOffsetMinutes: 0,
+    });
+    const counts = () => getCalorieItems(userId);
+    expect(await counts()).toEqual(
+      expect.arrayContaining([
+        { ...used, recordCount: 2, autoRecordCount: 1 },
+        { ...unused, recordCount: 0, autoRecordCount: 0 },
+      ]),
+    );
+    const records = await getAllCalorieRecords(userId);
+    const [rule] = await getCalorieAutoRecords(userId);
+    await deleteCalorieRecord(otherUserId, records[0].id);
+    await deleteCalorieAutoRecord(otherUserId, rule.id);
+    for (const missingId of [-1, 0]) {
+      await deleteCalorieRecord(userId, missingId);
+      await deleteCalorieAutoRecord(userId, missingId);
+    }
+    expect(await getAllCalorieRecords(userId)).toEqual(records);
+    expect(await getCalorieAutoRecords(userId)).toEqual([rule]);
+    const regular = records.find((row) => !row.temporary)!;
+    await deleteCalorieRecord(userId, regular.id);
+    await deleteCalorieRecord(userId, regular.id);
+    await deleteCalorieAutoRecord(userId, rule.id);
+    await deleteCalorieAutoRecord(userId, rule.id);
+    expect((await counts()).find((item) => item.id === used.id)).toMatchObject({
+      recordCount: 1,
+      autoRecordCount: 0,
+    });
   });
 });
