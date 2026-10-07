@@ -14,7 +14,7 @@ description: >-
 - テストファイルは`app/tests/`に配置する
 - セレクタは`data-testid`属性を使用する（CSSクラスに依存しない）
 - テストデータは`beforeAll` / `afterAll`で作成・削除し、
-  テスト名に`Date.now()`を含めて一意にする
+  共通ヘルパーでテスト用の名前を一意にする
 
 ## 失敗時の診断成果物の保持
 
@@ -50,19 +50,17 @@ await Promise.all([
 ## 複数ブラウザ・マルチタブ
 
 Playwright Testの`browser.newContext()`では、呼び出しで指定しなかったキーへ`playwright.config.ts`の`use`（`storageState`・`baseURL`・`ignoreHTTPSErrors`を含む）が既定値として入る。
-このため、オプションを省略したコンテキストは共通テスト利用者でログイン済みになる。
-未ログインのコンテキストや、テスト内で新しい利用者を登録するコンテキストでは`storageState: { cookies: [], origins: [] }`を明示する。
+このため、オプションを省略したコンテキストは共通テストユーザーでログイン済みになる。
+未ログインのコンテキストや、テスト内で新しいユーザーを登録するコンテキストでは`storageState: { cookies: [], origins: [] }`を明示する。
 省略すると`/auth/regist_user`などの認証画面がトップページへリダイレクトされる。
-新規利用者を登録する記述例は`app/tests/calories.test.ts`の`openCaloriesAsNewUser`にある。
+認証状態を変える場合も、共通のコンテキストオプションを基に必要な項目だけ上書きする。
 
 複数ブラウザ（多端末同期）のテスト:
 
 ```typescript
-const ctx = await browser.newContext({
-  storageState: "app/tests/.auth/user.json",
-  ignoreHTTPSErrors: true,
-  baseURL: process.env.BASE_URL ?? "https://localhost:38180",
-});
+import { makeContextOptions } from "./helpers/common.ts";
+
+const ctx = await browser.newContext(makeContextOptions());
 ```
 
 上記`ctx`を2つ生成し、終了時は`finally`で`ctx.close()`する。
@@ -82,17 +80,19 @@ SSEイベントを受信しない状態を再現する場合は、
 
 ### ダイアログ操作の規約
 
-確認・入力ダイアログは共通コンポーネント（`ConfirmDialog` / `PromptDialog`）に統一されている。
+確認・入力ダイアログは`ConfirmDialog`と`PromptDialog`を使い、共通のDialogがHTMLの`dialog`要素を開く。
 ネイティブの`window.confirm` / `window.prompt`は発火しない。
 そのため、e2eテストではPlaywrightの`dialog`イベント経由（`page.once("dialog", ...)`）ではなく、
 ダイアログ内のボタンを直接押下する。
 
-- 確認（削除等）は`[role="dialog"]`スコープの`button:has-text("削除")`を`.last()`でclickする
-- 入力（名前変更等）は`[role="dialog"]`スコープの`input[type="text"]`に`fill`してから、
+- 確認（削除等）は`getByRole("dialog")`スコープの削除ボタンを押す
+- 入力（名前変更等）は`getByRole("dialog")`スコープの`input[type="text"]`に`fill`してから、
   同スコープの`button:has-text("変更")`をclickして確定する
 
-ネスト時に外側ダイアログのボタンを誤選択しないよう、`role="dialog"`スコープでlocatorを構築する。
+ネスト時に外側ダイアログのボタンを誤選択しないよう、アクセシブル名を含む`getByRole("dialog")`でlocatorを構築する。
 複数候補がある場合は`.last()`で最前面のダイアログを取り出す。
+TabとShift+Tabの循環、閉じた後のフォーカス復帰、Escapeで最前面だけが閉じることを実ブラウザーで検証する。
+固定の`waitForTimeout`ではなく、操作成功の応答と画面状態を待つ。
 
 ### クリップボード操作
 
@@ -121,7 +121,7 @@ expect(copied).toBe(`${title}\n\n${notes}`);
 
 ## 状態依存テストのリセット
 
-ユーザー既定値（`users.preferences`等のサーバー側状態）に依存するテストは、
+ユーザー設定（`users.preferences`等のサーバー側状態）に依存するテストは、
 前回テスト失敗時の状態が残ると正しく動作しない。
 本題の検証に入る前に冒頭で必ず初期状態へリセットしてから進める。
 `afterEach`でのリセットだけではテスト失敗時に巻き戻らないため、冒頭での明示的リセットを優先する。
@@ -133,7 +133,13 @@ e2eテストでは共通ヘルパー（`app/tests/helpers/common.ts`）を利用
 
 公開シンボル一覧:
 
-- `BASE_URL`はテスト対象のベースURL（環境変数`BASE_URL`優先、既定値`https://localhost:38180`）
+- `BASE_URL`はテスト対象のベースURL（環境変数`BASE_URL`優先、指定が無ければ`https://localhost:38180`）
+- `makeContextOptions(overrides?)`は認証状態、接続先、HTTPSと画面サイズの共通オプションを返す
+- `uniqueTestName(prefix)`はテスト用の名前を一意にする
+- `requireBoundingBox(locator)`は要素の位置と寸法を取得し、取得できなければ失敗する
+- `createListFromPage(page, listName, select = true)`は画面からリストを作成し、必要に応じて選択する
+- `addTask(page, text, { todo?, openEdit? })`はタスクを追加し、その行のLocatorを返す
+- `isTrpcUrl(url, procedure)`は指定手続きへのtRPC通信か判定する
 - `STORAGE_STATE_PATH`は認証状態ファイルの絶対パス（`import.meta.dirname`基準）
 - `isMutationResponse(response, procedure)`は指定したprocedureを含むtRPC応答かどうかを判定する
 - `waitForMutationResponse(page, procedure)`は操作前に登録し、指定procedureのmutation応答を待つ

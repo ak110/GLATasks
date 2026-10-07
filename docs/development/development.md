@@ -35,6 +35,16 @@
    make deploy
    ```
 
+### workspaceと型生成
+
+`app`はアプリの依存、スクリプト、`#lib/*`のimportsを持つ正式なpnpm workspaceパッケージである。
+ルートは開発ツールとアプリのスクリプトへの転送を持つ。
+SvelteKitの設定は`app/vite.config.ts`に置く。
+`app/tsconfig.json`はSvelteKitの生成した型を継承し、ルートのtsconfigは検証対象へ合わせて参照する。
+新しいworktreeでは依存を導入し、`pnpm --dir app exec svelte-kit sync`で型を生成する。
+ルートの`pnpm run check`と`pnpm run test:unit`はアプリでsyncを実行してから検証する。
+静的import、動的import、mock指定は拡張子を含む`#lib`参照を使う。
+
 ## 開発コマンド
 
 | コマンド | 内容 |
@@ -48,21 +58,12 @@ e2eテスト（`make test-e2e`）は開発環境（`make deploy`）が起動し�
 
 ### 依存更新後の追随作業
 
-SvelteKitの設定は`app/vite.config.ts`の`sveltekit(...)`へ渡す。
-アプリ内の共通モジュールは、`package.json`の`imports`で定義した`#lib/*`を拡張子付きで参照する。
-`app/tsconfig.json`は`$app/tsconfig`を継承し、ルートの`tsconfig.json`がそれを継承する。
-リポジトリルートから`pnpm run check`または`pnpm run test:unit`を実行すると、`app`で`svelte-kit sync`を実行してから型チェックまたは単体テストを開始する。
-`make update`も依存更新の後に同じ場所でsyncを実行する。
-型生成だけを手動で行う場合は、リポジトリルートから次を実行する。
-
-```bash
-cd app && ../node_modules/.bin/svelte-kit sync
-```
-
 `make update`は`pnpm update --latest`により`package.json`の指定範囲を超えて更新する。
 稼働中の開発サーバーが更新前のモジュールを保持したままだとE2Eが失敗するため、`make update`は依存更新後に`app`を再起動し、疎通を確認してから検証する。
 `RUN_NODE`相当のコンテナーで`pnpm add`などを実行して手動で依存を入れ替えた場合も、E2Eの前に`make restart-app`、`make healthcheck`の順に実行する。
 実行後は次の3点を確認する。
+
+#### TypeScriptの版
 
 TypeScriptの版を6系に留める。
 `typescript-eslint`がTypeScript 7を未サポートであり、
@@ -74,11 +75,15 @@ TypeScriptの版を6系に留める。
 - `typescript-eslint`: 対応issue（<https://github.com/typescript-eslint/typescript-eslint/issues/10940>）がcloseされていること
 - `svelte-check`: `node_modules/svelte-check/bin/ts-version-check.js`がTypeScript 7の単独構成で例外を送出しないこと
 
+#### Playwrightのイメージ版
+
 Playwrightのイメージ版を揃える。
 `@playwright/test`が更新された場合は、`compose.yaml`の`playwright`サービスが指す
 `mcr.microsoft.com/playwright`のタグを同じ版へ更新する。
 イメージ同梱のブラウザバイナリはパッケージの版ごとに配置が変わるため、
 一致しないと`make test-e2e`がブラウザ起動時に失敗する。
+
+#### pnpmの警告
 
 `pnpm`の警告を確認する。
 `make update`は終了コード0で終わる場合も、非推奨の推移依存とpeer dependencyの不整合を警告として報告する。
@@ -111,10 +116,23 @@ Dependabotのアップデーターが本リポジトリのpnpmロックファイ
 安全なバージョンへ引き上げられず、自動修正の試行が繰り返し`security_update_not_possible`で
 失敗していたためである。
 
+## ドキュメントサイト運用
+
+```bash
+make docs
+```
+
+静的サイトをビルドし、内部リンクも確認する。
+Dockerを使わずにビルドする場合は`pnpm --dir docs build`を実行する。
+プレビューには`make docs-dev`を使い、`http://localhost:5173/GLATasks/`を開く。
+
 ## Docker構成
 
 サービス構成・環境変数は`compose.yaml` / `.env`を参照。
-プロファイルは`production`（既定推奨）と`development`の2種類がある。
+プロファイルは`production`、`staging`、`development`から選ぶ。
+`staging`はproductionのサービス構成を共有し、`COMPOSE_PROFILE`の名前を保持する。
+DBの接続資格情報はComposeとMakeの設定を使い、各テストとスクリプトで再定義しない。
+本文の容量上限とnginxの一時バッファ設定を同じ運用設定で管理する。
 
 ## DBマイグレーション運用
 
@@ -122,6 +140,12 @@ Dependabotのアップデーターが本リポジトリのpnpmロックファイ
 
 `make deploy`（`docker compose up`）の起動時にマイグレーションが自動適用される。
 稼働中のappを止めずに即座にマイグレーションを反映したい場合は`make migrate`を実行する。
+Composeのmigrate、migrate-devとMakeは同じマイグレーションスクリプトを使う。
+そのスクリプトは本番イメージへも含める。
+
+中核5テーブルの外部キーと削除順は[DB設計方針](./architecture.md#db-設計方針)に従う。
+既存環境を統一するマイグレーションは、親が存在しない子の行を深い順に削除してから制約を追加する。
+同じ移行で利用者設定の旧キーをcamelCaseへ変換し、新旧のキーが共存する場合は新キーの値を保持する。
 
 ### マイグレーションファイルの追加
 
@@ -152,16 +176,10 @@ DBが半端な状態になった場合は`make sql`から`__drizzle_migrations`�
 masterへのpushおよびPR時に`ci.yaml`が自動実行される（`.github/workflows/ci.yaml`参照）。
 masterへのpushで`docs/`配下に変更があれば`docs.yaml`ワークフローが自動実行され、
 GitHub Pagesへデプロイされる。
+`release.yaml`はリリースを作成し、`deploy.yaml`を起動してアプリをデプロイする。
+integration jobはproduction環境でMakeのDB・E2E検証を呼び出す。
 依存の脆弱性監査は`audit.yaml`が毎日06:00 UTC（JST 15:00）に定期実行し、
 検出結果をGitHub Code Scanningへアップロードする（`.github/workflows/audit.yaml`参照）。
-
-## ドキュメントサイト運用
-
-```bash
-make docs
-```
-
-`http://localhost:5173/GLATasks/`でプレビューできる。
 
 ## バックアップとリストア
 

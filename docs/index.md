@@ -14,13 +14,30 @@ hero:
 
 features:
   - title: タスク管理
-    details: 複数リストでのタスク管理とドラッグ&ドロップによる並び替え。広い画面ではリスト間移動にも対応。
-  - title: カウントダウンタイマー
-    details: タスクに紐付くカウントダウンタイマー。
+    details: リストとタスクを管理する。
+    link: /guide/tasks
+  - title: タイマーとアラーム
+    details: カウントダウンと指定時刻のアラームを使う。
+    link: /guide/timers
+  - title: 翻訳
+    details: ブラウザー内蔵AIで翻訳する。
+    link: /guide/translate
+  - title: 添付ファイル
+    details: タスクへ画像やファイルを添付する。
+    link: /guide/tasks#ファイルの添付
+  - title: 定期TODO
+    details: 繰り返し予定からTODOを生成する。
+    link: /guide/schedules
   - title: リアルタイム同期
-    details: SSEによる複数端末・タブ間のリアルタイム同期。
+    details: 他の端末やタブへ変更を反映する。
+    link: /guide/tasks
   - title: マルチプラットフォーム
-    details: PWA対応、Chrome拡張・Android共有からのタスク追加。
-  - title: カロリー計算
-    details: 品目別カロリーの記録と1日当たりペース・7日間平均・28日間平均を目標値と比較し、目標内に収めた日を達成状況として表示。
+    details: Chrome拡張とAndroid共有から登録する。
+    link: /guide/chrome-extension
+  - title: MCP連携
+    details: MCPクライアントから操作する。
+    link: /guide/mcp
+  - title: カロリー
+    details: 摂取記録と目標への達成状況を確認する。
+    link: /guide/calories
 ---

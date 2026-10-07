@@ -1,140 +1,90 @@
 ---
-# 編集者向け同期手順: 本スキル本文にschemas.tsの命名規約
-# （`*Schema`・`*InputSchema`等の総称パターン・代表例列挙・命名慣行など）を一般化して
-# 記述または改訂する場合は、事前に
-# `grep -oE 'export const [A-Za-z]+Schema' app/src/lib/schemas.ts` 等でexport実態を確認し、
-# 実際の命名分布と一致した表現に整える。
 name: add-trpc-procedure
 description: >-
-  GLATasks に新しい tRPC procedure を追加するとき、
-  または既存ドメインのスキーマへフィールドを追加するとき、
-  もしくは既存 tRPC procedure を新規箇所（新規UIコンポーネント・新規ライブラリ関数など）から呼び出すときの定型チェックリスト。
-  画面状態（表示範囲・表示種別など）の意味論を変更するときも対象とする。
-  Zod スキーマ → ルーター登録 → 難読化ミドルウェア → SSE 通知 → クライアント側 invalidate → テスト、
-  および既存 procedure 呼び出し時の入力スキーマ引数キー整合の漏れを防ぐ。
-  ユーザーが "tRPC procedure 追加" や "/add-trpc-procedure" を実行したとき、
-  もしくは新しい router エントリを書く前・既存スキーマを拡張する前・既存 procedure を新規箇所から呼び出す前・
-  画面状態（表示範囲・表示種別など）の意味論を変更する前に呼び出す。
+  GLATasksのtRPC手続きを追加するとき、入力スキーマを拡張するとき、
+  既存手続きを新しい箇所から呼び出すとき、表示範囲や表示種別の意味を変更するときに呼び出す。
 ---
 
-# tRPC Procedure 追加手順 (GLATasks)
+# tRPC手続きの追加手順
 
-新しいtRPC procedureを追加するときは、以下のチェックリストをTaskCreateに展開してから着手する。
-項目を1つでも実施しないと、応答が難読化されないことやSSE通知が送られないこと、クライアントが再取得しないことや型が一致しないことなどの致命的なバグを招きやすい。
+入力からDB操作、通知、画面の再取得までの契約をつなぐ手順を提供する。
+最初に読込表の資料を読み、変更する手続きとその消費側を確認する。
+画面のスタイルは`sveltekit`、E2Eの実装と診断は`e2etest`が担当する。
+
+## 読込表
+
+条件が成立したら、その操作の前に対応する資料を全文読む。
+
+| 時点または条件                               | 全文読む資料                                                  |
+| -------------------------------------------- | ------------------------------------------------------------- |
+| 起動時                                       | [tRPCの実装規約](../sveltekit/references/trpc.md)             |
+| クライアントまたは共有モジュールを編集する前 | [画面状態と共有モジュール](../sveltekit/references/client.md) |
+| Vitestのテスト環境を変更する前               | [Vitestのテスト環境](../sveltekit/references/testing.md)      |
 
 ## チェックリスト
 
 ### 1. 入出力スキーマの設計
 
-- `app/src/lib/schemas.ts` にZodスキーマを追加する。既存スキーマ (`UpdateListSchema.pick(...)` 等) で再利用できる場合は優先する
-- 数値パラメータは `z.coerce.number()` か、呼び出し側で `Number()` 変換するかの方針を明示する（文字列混入を防ぐため）
-- 市民時刻を扱う場合は `tz_offset_minutes: z.number()` を必ず含める（既存のタイマー系スキーマを参照）
-- 型推論用の型エクスポート (`export type FooInput = z.infer<typeof FooSchema>`) は必要な場合のみ追加する
-- 取得系procedureが画面状態（表示範囲・表示種別など）を入力に取る場合、同種データを返す既存の全取得手段（tRPC・MCP）へ
-  画面状態の入力が伝播しているか確認する
+`app/src/lib/schemas.ts`の既存スキーマを確認し、再利用または追加する。
+MCPの定義と既存の呼び出し側も、同じ項目と意味を持つか確認する。
+数値の変換をどこで行うか明示し、共有の値スキーマを使う。
+クライアントの型を推論できないキャストやmock内の呼び出しでも、引数キーをスキーマの定義と比べる。
+表示種別を入力に取る場合は、同種の全取得手段へその入力を伝える。
 
-### 2. DB 層の実装
+### 2. DB層とoperationsの実装
 
-- `app/src/lib/server/api/{ドメイン}.ts`（`lists.ts`・`tasks.ts`・`timers.ts`・`users.ts`等）に
-  DB操作関数を追加する。Drizzle ORMを使用する
-- `app/src/lib/server/schema.ts`のテーブル定義と整合すること
-- `app/src/lib/server/schema.ts`のテーブル定義を変更した場合はマイグレーションファイルを生成する。
-  手順は`docs/development/development.md`「DBマイグレーション運用」節を参照する
-- 日時はUTCで保存、`sort_order`は1000刻み
-- エラーは`api/{ドメイン}.ts`内で機械可読な識別子を送出し、`trpc.ts`の`API_ERRORS`側でUI文言へ変換する
-- create系mutationでサーバー生成IDをクライアントへ返す場合は
-  `db.insert(...).values(...).$returningId()`を使う（drizzle-orm/mysql慣用パターン）
-- api層関数のシグネチャ規約:
-  - 新規関数は原則`userId`を第1位置引数に取る
-  - 例外: `attachments`は全関数、`timers`は`createTimer`のみオブジェクト引数パターン
+`app/src/lib/server/api/`のドメイン関数へDB操作を置き、ドメインのoperationsから呼び出す。
+所有権確認、transaction、削除の扱い、日時、エラー、命名は共通のtRPC実装規約に従う。
+複数の書き込みは1つのtransactionで実行し、途中の失敗で変更を残さない。
+削除は冪等にし、対象不在や他の利用者の対象では成功するがDBを変更しない。
+サーバー生成IDを返す場合は`$returningId()`を使い、operationsから返す。
+IDを画面の取得順やタイトル順から推測しない。
+DB定義を変更する場合は[DBマイグレーション運用](../../../docs/development/development.md#dbマイグレーション運用)に従い、既存行の移行も含める。
 
-### 3. tRPC ルーター登録
+### 3. tRPCルーター登録
 
-`app/src/lib/server/trpc.ts` の `appRouter` にprocedureを追加する:
-
-- procedure種別選択（`encryptedProcedure`・`publicProcedure`使い分け）・
-  `eventMutationHandler`共通builder使用方針は`sveltekit`スキルのtRPC実装規約節をSSOTとする
-- SSEイベント種別一覧は`docs/development/architecture.md`の`## リアルタイム同期（SSE）`節を参照する
-- 影響ドメインが複数なら複数のSSEイベントを送る（`lists.merge`を参照）
-- 新しい機械可読エラー識別子を導入した場合は`API_ERRORS`にマッピング追加
-- ミドルウェアを追加または改修する場合、下流のprocedureが送出した例外を捕捉するには、
-  `try/catch` ではなく `await next()` の戻り値の `result.ok` を判定する
-  （tRPC v11の `next()` は例外を再送出せず `{ok: false, error}` で返すため）
-  - 詳細は `docs/development/architecture.md` の「tRPCミドルウェア設計」節を参照する
-- 認証コンテキストと所有権確認:
-  - resolverで`ctx.userId`を取得し、api層関数へ渡す
-  - リソースIDに対する所有権は所有権の確認関数で検証する。
-    既存の`getOwnedList(listId, userId)`等は`(<リソースID>, userId)`順の既存パターンで、
-    `### 2. DB 層の実装`のシグネチャ規約（`userId`第1位置）とは別カテゴリとして扱う
+`app/src/lib/server/trpc.ts`の`appRouter`へ入力スキーマとoperationsの呼び出しを登録する。
+ルーターへDB操作、戻り値の変換、通知の実装を追加しない。
+操作が触る全ドメインについてoperationsの通知集合を確認する。
+認証済みのユーザーIDと送出元タブIDを操作コンテキストへ渡す。
+新しいエラーを導入する場合はコードの型と対応表を更新する。
+ミドルウェアのエラー捕捉は共通規約と既存実装に従う。
 
 ### 4. クライアント側の反映
 
-- 新しいprocedureは `trpc.<domain>.<name>.mutate(...) / .query(...)` として呼び出す。
-  呼び出し箇所は `app/src/routes/**/*.svelte` や `app/src/lib/components/**/*.svelte` に置く
-- `$layout.svelte` / SSEハンドラで更新対象のイベント種別を購読しており、TanStack Queryの `invalidateQueries` が動くかを確認する
-- 新ドメインを増やす場合はSSEイベント一覧とハンドラを更新する
-- 難読化はtRPCクライアントが自動で行うため、呼び出し側の明示的な暗号化処理は不要
+`tRPC`クライアントの`trpc.<domain>.<name>.mutate(...)`または`.query(...)`を使う。
+キーと取得オプションは共通クエリー定義へ置く。
+SSEの購読を所有する画面とcontrollerを確認し、新しいイベントの再取得対象へ変更が反映されることを確かめる。
+操作成功後の再取得と楽観的更新の戻し方も確認する。
+難読化は共通クライアントが行うため、呼び出し側へ暗号化を重ねない。
 
-### 5. MCP tool定義への波及
+### 5. MCPへの反映
 
-- 既存ドメインに新規フィールドを追加した場合、
-  `app/src/lib/server/mcp/server.ts`の同ドメイン`registerTool`ハンドラーが
-  新規フィールドを転送しているかを確認する
-- 現状MCP tool定義があるドメイン: `lists`・`tasks`・`timers`・`users`・`calories`（参照のみ）
+`app/src/lib/server/mcp/server.ts`の該当ツールのスキーマとハンドラーを確認する。
+同じoperationsへ入力を渡し、tRPCと入力項目、戻り値、通知の集合を合わせる。
+ツールを公開するドメインは[提供ツール](../../../docs/guide/mcp.md#提供ツール)を参照。
 
 ### 6. 公開ドキュメント追従
 
-- 利用者向け機能を追加する場合は`README.md`「## 特徴」節と
-  `docs/guide/getting-started.md`「## 主な機能」節への追記を計画対象へ含める
-- 新規SSEイベント種別・新規DBテーブル・DB設計方針の例外を導入する場合は
-  `docs/development/architecture.md`の該当節に追記する。
-  対象節は`## リアルタイム同期（SSE）`・`## DB 設計方針`などが該当する
+機能を追加する場合は`README.md`の「特徴」と、機能に対応する`docs/guide/`のページを更新する。
+新しいガイドを案内する場合は`docs/index.md`の短い紹介とサイドバーも更新する。
+MCPの接続や提供ツールは`docs/guide/mcp.md`へ書く。
+SSEイベント、DBの関連、日時などの設計判断が変わる場合は`docs/development/architecture.md`を更新する。
 
 ### 7. テスト追加
 
-静的import・動的import・Vitestのmock指定は、`sveltekit`スキル「サーバー・クライアント共有モジュール」節に従い、実体の拡張子を含む`#lib`参照を使う。
+操作の成功、入力エラー、所有権、対象不在、複数書き込みの失敗を公開契約に合わせて検証する。
+日時や乱数は注入して固定し、市民時刻は固定の`tzOffsetMinutes`を渡す。
+DBを使うテストは共通の`describeDb`とfixtureを使う。
+ルーターテストのmockは現行の`trpc.test.ts`を確認し、operationsと暗号化・通知の副作用を遮断する。
 
-- ユニットテスト: `app/src/**/*.test.ts` に追加（近傍の既存テストを雛形にする）
-  - 非決定値（現在時刻・乱数）は固定値を注入する
-  - 市民時刻を扱うprocedureは固定 `tz_offset_minutes` でケースを書く
-  - `encryptedProcedure` を `createCaller` で呼ぶルーターテストでは、
-    `vi.mock('#lib/server/crypto.ts')`・`vi.mock('#lib/server/sse.ts')`・
-    `vi.mock('#lib/server/api.ts')` をセットで書く
-    - `getEncryptKey`が`DATABASE_URL`を要求する連鎖と副作用をすべて遮断する目的
-    - 雛形は `app/src/lib/server/trpc.test.ts` を参照する
-- e2eテスト: ユーザーフローに絡む場合は `app/tests/` にPlaywrightテストを追加
-  - `page.goto` + `waitForResponse(res => res.url().includes("/api/trpc"))` パターンを使う（development.md参照）
-  - `main button:has-text("...")` のようにセレクタをスコープする
+ユーザーフローの検証は`app/tests/`へ追加し、`e2etest`を起動する。
+hydrationの待機は同スキルの「基本パターン」、操作の待機は共通ヘルパーを使う。
+静的import、動的import、Vitestのmock指定は拡張子を含む`#lib`参照を使う。
 
-### 8. 検証
+### 8. 検証とレビュー
 
-- `uvx --exclude-newer-package pyfltr=false pyfltr run` をルートから実行
-- 開発環境で `make healthcheck` が通ることを確認
-- `trpc-zod-contract-reviewer` エージェントに差分レビューを依頼する (`.claude/agents/trpc-zod-contract-reviewer.md`)
-
-## 既存procedure呼び出し時の確認
-
-既存procedureを新規箇所から呼び出す場合、入力スキーマの引数キー名を
-`app/src/lib/schemas.ts`の対応するスキーマ定義で必ず参照する。
-schemas.tsの命名規約は`<Verb><Domain>Schema`を基本とする（例: `CreateTaskSchema`・`StartTimerSchema`）。
-一部に`InputSchema`接尾辞を用いる（例: `DownloadAttachmentInputSchema`）。
-既存呼び出し例（`app/src/lib/attachment-download.ts`の
-`trpc.attachments.download.query({ attachmentId })`等）と一致確認する。
-
-型迂回箇所（`as any`・`@ts-ignore`、および`vi.mock()`のモックファクトリで
-戻り値の型情報を失った状態の呼び出し等）では、引数キーの不整合をTypeScriptの型チェックでは
-自動で検出できない。
-型の制約が働かない呼び出しでは`app/src/lib/schemas.ts`の対応するスキーマ定義と引数キーが一致しているかを目視確認する。
-
-## 参考ファイル
-
-- `app/src/lib/server/trpc.ts`（ルーター本体・ミドルウェア）
-- `app/src/lib/schemas.ts`（Zodスキーマ定義）
-- `app/src/lib/server/schema.ts`（Drizzleテーブル定義）
-- `app/src/lib/server/api/{ドメイン}.ts`（DB操作関数。`api.ts`は呼び出し側向けの再エクスポートバレル）
-- `app/src/lib/server/sse.ts`（SSE送信）
-- `app/src/lib/trpc.ts`（クライアント側tRPCクライアント）
-- `docs/development/architecture.md`（SSE・時刻同期・認証・tRPCミドルウェア・DB設計）
-- `docs/development/development.md`（テスト・開発環境の注意点）
-- `.claude/skills/sveltekit/SKILL.md`（tRPC実装規約とアーキテクチャ前提）
-- `.claude/skills/e2etest/SKILL.md`（Playwrightテスト実装の注意点）
+変更範囲へ`pyfltr`を実行し、DBアクセスを変えた場合は`make test-db`も実行する。
+画面の動作に影響する場合は対応するE2Eを実行する。
+Dockerと`make`は`AGENTS.md`の作業ツリー制約を守る。
+変更したファイルと意図を渡して`trpc-zod-contract-reviewer`へレビューを依頼する。

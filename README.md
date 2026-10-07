@@ -1,5 +1,7 @@
 # GLATasks
 
+タスク管理・カウントダウンタイマー・アラームを統合したWeb/PWAアプリ。
+
 [![CI][ci-badge]][ci-url]
 [![Deploy][deploy-badge]][deploy-url]
 
@@ -8,12 +10,10 @@
 [deploy-badge]: https://github.com/ak110/GLATasks/actions/workflows/deploy.yaml/badge.svg
 [deploy-url]: https://github.com/ak110/GLATasks/actions/workflows/deploy.yaml
 
-タスク管理・カウントダウンタイマー・アラームを統合したWeb/PWAアプリ。
-
 ## 特徴
 
 - 複数リストでのタスク管理とドラッグ&ドロップによる並び替え（リスト間移動はリスト一覧と並べて表示できる画面幅のみ）
-- タスクに紐付くカウントダウンタイマー（一時タイマーは追加直後に開始）
+- カウントダウン・アラームの2モードのタイマー（一時タイマーは追加直後に開始）
 - ブラウザ内蔵AIによる翻訳ページ（入力停止後に自動翻訳。Chrome 138以降のデスクトップ版とブラウザ内蔵モデルが必要）
 - タスクへのファイル添付（画像はサムネイル表示・クリックで原寸ポップアップ・クリップボード貼付に対応、
   非画像は📎アイコン表示・クリックでダウンロード）
@@ -22,6 +22,7 @@
 - 定期TODOスケジュール
 - SSEによる複数端末・タブ間のリアルタイム同期
 - PWA対応（オフライン画面から接続回復時に自動復帰）、Chrome拡張・Android共有からのタスク追加
+- MCPクライアントからのリモート操作（OAuth認証）
 - 品目別カロリーの記録（品目に登録しない一時項目も可）と1日当たりペース・7日間平均・28日間平均の表示（1日当たりの目標値との比較、目標内に収めた日の達成状況と今日の摂取可能量、毎日の自動記録、期間を指定した一括記録・一括削除、CSVインポート・エクスポート）
 
 ## 前提条件
@@ -29,37 +30,37 @@
 本アプリはセルフホスト型であり、Docker Composeが動作する環境が必要となる。
 セットアップ手順やシステム要件の詳細は[はじめに](https://ak110.github.io/GLATasks/guide/getting-started)を参照。
 
-## MCPサーバー
+## インストール
 
-LLMクライアント（Claude Desktop・Claude Code・MCP Inspector等）から
-GLATasksをリモート操作するためのModel Context Protocolサーバーを内蔵する。
-Streamable HTTPトランスポートとOAuth 2.1認証で動作する。
+```bash
+git clone https://github.com/ak110/GLATasks.git
+cd GLATasks
+cp .env-example .env
+```
 
-接続情報:
+## 設定
 
-- エンドポイント: `https://<デプロイ先ホスト>/mcp`
-- 認可サーバー: 同一オリジン（`/.well-known/oauth-authorization-server` で公開）
-- Dynamic Client Registration（RFC 7591）に対応するため、対応クライアントは
-  上記URLを設定するだけで利用できる
+`.env`の`DATA_DIR`をデータ保存先の絶対パスへ設定し、`COMPOSE_PROFILE`に`production`を指定する。
+HTTPS公開の手順は[はじめに](https://ak110.github.io/GLATasks/guide/getting-started)を参照。
 
-利用手順:
+## 使い方
 
-1. MCPクライアントの設定で「リモートMCPサーバー」として `/mcp` のURLを登録する
-2. クライアントが自動でOAuth認可フローを開始し、ブラウザでGLATasksのログイン画面が開く
-3. GLATasksにログインし「許可」を押す
-4. クライアントがアクセストークンを取得し、以降のMCPリクエストで利用する
+```bash
+make deploy
+```
 
-提供ツール（30件）:
+公開したURLをブラウザーで開き、ユーザー登録してログインする。
+機能ごとの操作は次のガイドを参照。
 
-- `lists.*`: list / create / rename / delete / archive / unarchive / clear / merge
-- `tasks.*`: list / listActive / create / update / search / reorder
-- `timers.*`: list / create / update / delete / start / pause / reset / adjust / setTime / stop / reorder
-- `calories.*`: summary / listRecords / listItems（参照のみ）
-- `users.*`: getPreferences / updatePreferences
-
-各ツールの入力スキーマはMCPクライアント側で自動取得できる。
+- [タスクとリスト](docs/guide/tasks.md)
+- [タイマーとアラーム](docs/guide/timers.md)
+- [定期TODO](docs/guide/schedules.md)
+- [翻訳](docs/guide/translate.md)
+- [カロリー](docs/guide/calories.md)
+- [MCP連携](docs/guide/mcp.md)
 
 ## ドキュメント
 
-- <https://ak110.github.io/GLATasks/guide/getting-started> — はじめに（セルフホスト手順）
-- [docs/development/development.md](docs/development/development.md) — 開発者向け情報
+- [はじめに](https://ak110.github.io/GLATasks/guide/getting-started)（セルフホスト手順）
+- [開発手順](docs/development/development.md)
+- [アーキテクチャ](docs/development/architecture.md)

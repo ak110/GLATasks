@@ -14,53 +14,27 @@ flowchart TB
     SK -- "Drizzle ORM" --> DB
 ```
 
-## 外部リバースプロキシ設定
+AES-GCMが保護する範囲は[通信の難読化](#通信の難読化)を参照。
 
-Docker Composeの前段にLet's Encrypt証明書でHTTPS終端する外部nginxを配置する場合の設定要点。
+## サーバーと画面の責務
 
-```mermaid
-flowchart LR
-    Browser["ブラウザ"]
-    ExtNginx["外部 nginx\n（Let's Encrypt）"]
-    IntNginx["内部 nginx\n（自己署名 HTTPS, :38180）"]
-    SK["SvelteKit"]
+`app/src/lib/server/trpc.ts`、MCPのツール、共有フォームは入力と認証を扱い、ドメインのoperationsへ処理を渡す。
+operationsはapi層のDB操作、戻り値、更新通知をまとめる。
+スケジューラーによる変更もoperationsを通して通知する。
+これによりtRPC、MCP、フォーム、定期処理の通知が一致する。
+api層はDB操作と所有権の確認を担当する。
+複数の書き込みで成立する操作は、同じトランザクション内で実行する。
 
-    Browser -- "HTTPS" --> ExtNginx
-    ExtNginx -- "HTTPS（proxy_ssl_*）" --> IntNginx
-    IntNginx --> SK
-```
+APIの入力と戻り値はcamelCaseを使う。
+DB列名とCSV列名は保存形式として個別に扱う。
+入力スキーマは`schemas.ts`へ集める。
+値だけで判断できる制約は、入力スキーマを使って検証する。
+所有権、関連行の存在、保存済み値と組み合わせる制約はapi層で検証する。
+クライアントはtRPCの`RouterInputs`と`RouterOutputs`から型を推論する。
 
-設定上の制約:
-
-- 内部nginxは自己署名HTTPSのため、`/api/events`と`/`の両方に
- `proxy_ssl_certificate` / `proxy_ssl_certificate_key`を指定する
-- SSE用の`/api/events`には`proxy_buffering off`に加え`proxy_read_timeout 86400`・
- `proxy_http_version 1.1`・`Connection ''`を指定する。
-  さらに`X-Accel-Buffering: no`ヘッダーでレスポンスバッファも無効化する
-（SSEがバッファされると配信遅延が発生するため）
-
-最小サンプル（要点のみ）:
-
-```nginx
-location /api/events {
-    proxy_pass https://app_backend;
-    proxy_http_version 1.1;
-    proxy_set_header Connection '';
-    proxy_ssl_certificate     /path/to/glatasks/web/ssl/server.crt;
-    proxy_ssl_certificate_key /path/to/glatasks/web/ssl/server.key;
-    proxy_buffering off;
-    proxy_read_timeout 86400;
-    add_header X-Accel-Buffering no;
-}
-
-location / {
-    proxy_pass https://app_backend;
-    proxy_ssl_certificate     /path/to/glatasks/web/ssl/server.crt;
-    proxy_ssl_certificate_key /path/to/glatasks/web/ssl/server.key;
-}
-```
-
-`Host` / `X-Forwarded-For` / `X-Forwarded-Proto`等の標準ヘッダーは通常通り設定する。
+画面の共通クエリー定義はキーと取得処理をまとめ、SSEのイベント別に再取得対象を決める。
+メイン画面はクエリー、操作、同期、URLとローカル保存、キーボード、ダイアログの状態を分ける。
+翻訳画面は状態をcontrollerで管理し、ブラウザー内蔵AIの共有インスタンスの準備・取得・破棄はクライアントモジュールが担当する。
 
 ## リアルタイム同期（SSE）
 
@@ -75,16 +49,19 @@ sequenceDiagram
     A->>S: tRPC mutation（タスク更新）
     S->>S: DB 更新
     S-->>A: SSE: tasks:updated
+    Note over A: 自分のタブIDの通知は無視
     S-->>B: SSE: tasks:updated
-    A->>S: invalidateQueries → 再取得
     B->>S: invalidateQueries → 再取得
+    S-->>A: mutation成功応答
+    A->>S: 操作成功後の再取得
 ```
 
 - エンドポイント: `GET /api/events`（Cookie認証）
-- データは含めずイベント種別のみ送信
+- 利用者データは含めずイベント種別と送出元のタブIDを送信
  （`lists:updated` / `tasks:updated` / `timers:updated` / `schedules:updated` /
   `users:preferences:updated` / `calories:updated` / `reset`）
 - クライアントはイベント受信時にTanStack Queryの `invalidateQueries` で該当データを再取得
+- サーバーは送出元タブにも通知する。受信側がイベントのdataにあるタブIDを自分のIDと比較し、同じタブの操作による重複した再取得を避ける
 - 品目、記録または自動記録設定を変更した場合は`calories:updated`を通知し、受信側はカロリーページの全データを再取得する。
   目標値を変更した場合は既存の`users:preferences:updated`を通知し、カロリーページは目標値と期間集計を再取得する
 - 接続の健全性はクライアント側で監視する。`EventSource`の自動再接続に加え、
@@ -197,7 +174,7 @@ sequenceDiagram
   `rrule`の`between()`が返す`Date`はAsia/Tokyoのローカル時刻をUTCとしてマークした値であるため、
   市民時刻の時・分の取り出しには`getHours()`ではなく`getUTCHours()`等のUTC系アクセサを使う
 
-同じポーリングでカロリーの自動記録も処理する（`processCalorieAutoRecords`、`app/src/lib/server/api/calories.ts`）。
+同じポーリングでカロリーの自動記録も処理する。
 
 - 各設定は次に記録する時刻を`calorie_auto_record.next_run_at`（UTC）に持つ。
   ONの設定のうち`next_run_at`が現在時刻以前のものは、そこから1日刻みで現在時刻以前の時刻ごとに記録を追加し、
@@ -217,12 +194,28 @@ CookieベースのJWT/HS256セッション。実装詳細は `hooks.server.ts` /
 多層防御を採用している。
 
 - SvelteKit組み込み機能でform actionを保護
-- カスタムリクエストヘッダーのオリジンチェックでtRPCエンドポイント（`/api/*`）のクロスサイトミューテーションをブロック
+- `hooks.server.ts`で`sec-fetch-site`が`cross-site`の`/api/*`への更新要求を拒否する（Fetch Metadataによる判定）
 - ログアウトをPOSTに限定（GETリクエストによるCSRFを防止するため）
 
 Chrome拡張のポップアップ内iframeからのアクセスを許可する必要があるため、
 Cookieに `sameSite: "none"` + `secure: true` を設定している。
-この設定はCSRF対策を弱めるため、上記のオリジンチェックで補完している。
+この設定に伴うクロスサイト要求は、上記のFetch Metadata判定で制限する。
+
+認証の必要な画面とAPIは`hooks.server.ts`で保護し、未認証の場合は画面のログイン誘導とAPIの認証エラーを使い分ける。
+認証画面、OAuthの公開エンドポイント、ヘルスチェックなどは公開ルートの定義に従う。
+tRPCはユーザーデータを扱う全手続きを`encryptedProcedure`で定義する。
+MCPはBearerトークンで認証し、不明なセッションIDへのPOSTは404とする。
+MCPセッションは24時間使われなければ破棄する。
+OAuthのクライアント秘密値は共通の認証処理で比較する。
+認可の許可、拒否、エラーのリダイレクトは、登録済みクライアントとリダイレクト先を確認してから組み立てる。
+
+## 通信の難読化
+
+HTTPSを通信の保護に使い、AES-GCMはtRPCの本文を追加で難読化する。
+対象はmutationの要求本文と、`encryptedProcedure`の全手続きの応答である。
+クエリーの入力はGETのURLに含まれるため、検索語などは平文となる。
+クライアント側の暗号化に失敗した場合は平文の入力で送信し、サーバーもその入力を受け付ける。
+暗号化処理の失敗だけで操作不能になることを避けるための扱いであり、アクセス制御はセッションと所有権の確認が担当する。
 
 ## tRPCミドルウェア設計
 
@@ -232,7 +225,9 @@ tRPC v11の `next()` は例外を再送出せず `{ok: false, error}` で返す�
 `try/catch` 側は到達しない。
 
 実例は `app/src/lib/server/trpc.ts` の `withApiErrors` にある。
-同ミドルウェアは機械可読な識別子をUI文言へ変換する。
+同ミドルウェアは型付きの`ApiError`を共通の対応表から日本語の文言とエラー分類へ変換する。
+未知の例外はログへ記録し、応答には内部の例外詳細を含めない。
+Zodの入力エラーはerrorFormatterが構造化して返し、クライアントがmessage文字列のJSONを解析する処理に依存しない。
 要点を簡略化すると次の形になる。
 
 ```ts
@@ -255,16 +250,15 @@ const withApiErrors = t.middleware(async ({ next }) => {
 - `task.status`は`active`・`running`・`completed`・`archived`の4値を取り得る。
   `running`は未完了としてTODOバッジへ計上し、`lists.clear`（完了済みタスクの非表示）の対象外とする
 
-- 日時カラムはすべてTIMESTAMP型でUTC保存。タイムゾーン変換はクライアント側で行い、
-  サーバー・DB層ではタイムゾーンを意識しない設計。
-  例外として、定期TODOスケジュール（`schedules.rrule`）はRRULE文字列自体に
-  `DTSTART;TZID=Asia/Tokyo`形式でタイムゾーンを持たせる`rrule`ライブラリの
-  タイムゾーン扱いを採用する
+- 日時カラムはTIMESTAMP型でUTC保存し、APIではISO8601文字列で返す
+- カロリー入力の現地時刻と日付は`tzOffsetMinutes`でサーバーがUTCへ変換する。日ごとの達成状況と今日の残量は現地の早朝4時を日境界とする
+- 定期TODOは`Asia/Tokyo`を使用し、RRULE文字列に`DTSTART;TZID=Asia/Tokyo`形式で保持する
 - 並び順は `sort_order` INTカラム（昇順、1000刻み）。刻み幅を大きくすることで、挿入時に周囲のレコードを更新せずに済む。
-  ドメインごとの挿入位置: タスク（`tasks.create`）は `sort_order = 既存最小値 - 1000` で先頭挿入、
+  ドメインごとの挿入位置: リスト（`lists.create`）とタスク（`tasks.create`）は `sort_order = 既存最小値 - 1000` で先頭挿入、
   タイマー（`timers.create`）は `sort_order = 既存最大値 + 1000` で末尾追加
-- タイマーの残り時間はサーバー側で計算せず、`remaining_seconds` と `started_at` をクライアントに渡して
-  ブラウザ側で計算する。これにより秒単位のリアルタイム表示をポーリングなしで実現する
+- タイマー一覧の取得ではサーバーが残り秒数を計算し、期限切れを停止する。
+  クライアントは`remainingSeconds`、`startedAt`、`serverTime`から表示中の残り時間を計算する。
+  秒単位の表示更新にはポーリングを使わない
 - タイマーの `ephemeral` カラムは1回限り使用するタイマーを識別するフラグ。
   作成時のみ設定でき、`adjust` / `reset` / `setTime` などの操作で変更されない。
   クライアント側では満了到達時に削除ボタンを強調し、確認ダイアログを省略して削除できる体験に用いる
@@ -275,9 +269,16 @@ const withApiErrors = t.middleware(async ({ next }) => {
   MariaDBは`ON UPDATE CASCADE`の外部キー列をCHECK制約に使えないため、この不変条件は書き込み側で守る。
   記録の一覧と集計は品目を外部結合し、品目を参照しない一時項目の行も結果へ含める
   kcal、数量および1日当たり目標値は整数で保持する。
-  利用者ごとの1日当たり目標値は`users.preferences.calorie_goal_kcal`へ保持する
+  利用者ごとの1日当たり目標値は`users.preferences.calorieGoalKcal`へ保持する
 - カロリーの自動記録設定（`calorie_auto_record`）は現地の時刻`time_of_day`と登録時の`tz_offset_minutes`を組で保持する。
   他のカロリー入力と同じく固定の時差で解釈するため、夏時間の切り替えには追随しない
+
+list、task、timer、attachment、scheduleの親列は索引と`ON DELETE RESTRICT`・`ON UPDATE RESTRICT`の外部キーで関連を保つ。
+親を削除する処理は子を先に削除する。
+削除対象が無い場合や他のユーザーの行の場合は変更せず成功する。
+更新や取得で必要な行が無い場合のエラーとは区別する。
+status、kind、modeはvarcharの列へ保存し、TypeScriptの列型と入力スキーマの列挙値を合わせる。
+既存環境の外部キー名と索引名の違いはマイグレーションで解消し、定義とsnapshotと実DBを合わせる。
 
 ### バイナリ保存と `max_allowed_packet`
 

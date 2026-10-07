@@ -17,6 +17,12 @@ export default defineConfig({
         text: 'ガイド',
         items: [
           { text: 'はじめに', link: '/guide/getting-started' },
+          { text: 'タスクとリスト', link: '/guide/tasks' },
+          { text: 'タイマーとアラーム', link: '/guide/timers' },
+          { text: '定期TODO', link: '/guide/schedules' },
+          { text: '翻訳', link: '/guide/translate' },
+          { text: 'カロリー', link: '/guide/calories' },
+          { text: 'MCP連携', link: '/guide/mcp' },
           { text: 'Chrome拡張機能', link: '/guide/chrome-extension' },
           { text: 'Android共有', link: '/guide/android-share' },
         ],
@@ -26,7 +32,6 @@ export default defineConfig({
         items: [
           { text: 'アーキテクチャ', link: '/development/architecture' },
           { text: '開発手順', link: '/development/development' },
-          { text: '観測記録', link: '/development/audit-records' },
         ],
       },
     ],

@@ -1,0 +1,82 @@
+# 画面のスタイルとダークモード
+
+## Tailwind CSS の規約
+
+- ボーダー色は `border-gray-200` を基本とする（デフォルトの `border` は黒が強すぎるため）
+- e2eテストのセレクタにはCSSクラスではなく `data-testid` 属性を使用する
+- クリック可能な要素（`<label>`、`<button>`、`<a>`、`<input type="checkbox">` など）には `cursor-pointer` を付与する
+- テキスト・絵文字ボタンには `rounded` + パディング + `hover:bg-*` を付与する
+  - 通常背景: `rounded p-1 hover:bg-gray-100`（アイコン）/ `rounded px-3 py-1.5 hover:bg-*`（テキスト付き）
+  - ダークヘッダー内: `hover:bg-gray-700`
+- ヘッダー: `z-10 h-12 shrink-0 bg-gray-800` 固定。共通コンポーネント `Header.svelte` を使用する
+  - ナビリンク: `cursor-pointer rounded text-sm text-gray-300 hover:bg-gray-700 hover:text-white`
+  - アクティブナビ: `text-sm font-semibold text-gray-200`（リンクなし）
+- 画面全体をスクロールさせない
+  - ルートレイアウト（`+layout.svelte`）は`flex h-screen flex-col`とし、ヘッダーとページ本体を縦に並べる
+  - ページ本体の最上位要素には共通コンポーネント`PageScrollArea.svelte`を使い、ヘッダーの下だけをスクロールさせる
+    - 同コンポーネントは`relative min-h-0 flex-1 overflow-y-auto`を持ち、`data-testid="page-scroll-area"`を付与する
+    - `relative`は絶対配置の子孫の含有ブロックをスクロール領域へ固定する。
+      位置指定の祖先が無い絶対配置の要素は初期包含ブロックを基準に配置されるため、
+      `sr-only`のような要素がスクロール領域の外側へ出て文書ルートの高さが増える
+  - 中央寄せと最大幅の指定はスクロール領域の内側の要素へ置き、スクロールバーを画面の右端へ表示する
+  - ページ全体がスクロールすると、スクロールバーの有無でヘッダー右側の操作の位置が横へずれる
+- コンテンツ領域のアクションボタン: `cursor-pointer rounded bg-gray-100 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-200`
+- ダイアログの共通パターン: ヘッダーにタイトル+✕閉じるボタン、キャンセルボタンは使わない
+  - 確認・入力ダイアログはこのルールの適用除外（[ダイアログの規約](dialogs.md)を参照）
+- タグバッジの色は`app/src/lib/tag-palette.ts`に集約し、Tailwindクラスを直接ハードコードしない
+  - 色覚バリアフリー配色（Okabe-Ito系）を淡色化した8色パレットから`getTagColorClass()`経由で取得する
+- `th`など標準の文字装飾を持つ要素の中へフォームコントロールを置く場合は、`font-normal`などで字体を明示する
+  - Preflightが`input`・`button`・`select`・`textarea`へ`font: inherit`を適用するため、これらは祖先の字体を継承する
+  - `th`はHTML標準の初期スタイルが`font-weight: bold`のため、`thead`へ置いた検索欄は入力文字とplaceholderが太字になる
+  - 継承した字体はhappy-domを使うVitestのコンポーネントテストでは観測できない。`app/tests/`配下のPlaywrightテストで算出スタイルを検証する
+
+## ダークモードの色マッピング
+
+Tailwind CSS v4の `@custom-variant dark` を使用。`<html>` に `.dark` クラスを付与して切り替え。
+
+### 設計原則
+
+- 背景色: ライト/ダーク双方で4段階の階層（ヘッダー→ページ→カード→ボタン）を保つ
+- テキスト・ボーダー: grayスケールを反転しつつWCAG AA基準4.5:1のコントラスト比を維持する
+- アクセントカラー（blue/red系）: ダークモードでは900に透明度を掛けて強調度を段階制御する
+
+### 背景色
+
+| ライトモード  | ダークモード          | 用途                                   |
+| ------------- | --------------------- | -------------------------------------- |
+| `bg-gray-800` | `dark:bg-gray-950`    | ヘッダー（最も手前のレイヤー）         |
+| `bg-gray-50`  | `dark:bg-gray-900`    | ページ全体の背景（最も奥のレイヤー）   |
+| `bg-white`    | `dark:bg-gray-800`    | カード・ダイアログ・サイドバーの背景   |
+| `bg-gray-100` | `dark:bg-gray-700`    | ボタン背景・入力フォーム背景           |
+| `bg-blue-50`  | `dark:bg-blue-900/30` | 選択状態・ハイライト（リスト選択など） |
+| `bg-blue-100` | `dark:bg-blue-900/40` | 強調ボタン背景（タスク追加など）       |
+
+### テキスト色
+
+| ライトモード    | ダークモード         | 用途                                         |
+| --------------- | -------------------- | -------------------------------------------- |
+| `text-gray-800` | `dark:text-gray-100` | メインテキスト（見出し・タスク本文）         |
+| `text-gray-700` | `dark:text-gray-200` | フォームラベル・準主要テキスト               |
+| `text-gray-600` | `dark:text-gray-300` | ボタンテキスト・補助説明文                   |
+| `text-gray-500` | `dark:text-gray-400` | アイコンボタン・メモ・プレースホルダー       |
+| `text-gray-400` | `dark:text-gray-500` | ドラッグハンドル・「読み込み中」等の淡い要素 |
+| `text-blue-600` | `dark:text-blue-400` | リンク・アクション強調テキスト               |
+| `text-red-600`  | `dark:text-red-400`  | 削除・危険アクション                         |
+
+### ボーダー色
+
+| ライトモード      | ダークモード           | 用途                             |
+| ----------------- | ---------------------- | -------------------------------- |
+| `border-gray-200` | `dark:border-gray-700` | 標準の区切り線・カード枠         |
+| `border-gray-300` | `dark:border-gray-600` | 入力フォーム・ドロップダウン枠線 |
+
+### ホバー色
+
+| ライトモード        | ダークモード                | 用途                                   |
+| ------------------- | --------------------------- | -------------------------------------- |
+| `hover:bg-gray-50`  | `dark:hover:bg-gray-700`    | タスク行のホバー                       |
+| `hover:bg-gray-100` | `dark:hover:bg-gray-700`    | アイコンボタン・メニュー項目のホバー   |
+| `hover:bg-gray-200` | `dark:hover:bg-gray-600`    | 強調ホバー（ドロップダウン項目など）   |
+| `hover:bg-blue-100` | `dark:hover:bg-blue-900/50` | 青系ボタンのホバー                     |
+| `hover:bg-blue-200` | `dark:hover:bg-blue-900/60` | 強調青系ボタンのホバー（タスク追加等） |
+| `hover:bg-red-50`   | `dark:hover:bg-red-900/30`  | 削除ボタンのホバー                     |
