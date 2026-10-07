@@ -4,11 +4,15 @@
 
 import { and, eq } from "drizzle-orm";
 
-import { TAG_COLOR_KEYS } from "#lib/types.ts";
-import type { TagColorKey, TagInfo } from "#lib/types.ts";
+import { TAG_COLOR_KEYS } from "#lib/schemas.ts";
+import type { TagColorKey, TagInfo } from "#lib/schemas.ts";
 import { compareTagName } from "../../tag-sort";
 import { getDb } from "../db";
 import { lists } from "../schema";
+
+type Database = ReturnType<typeof getDb>;
+export type DbConnection =
+  Database | Parameters<Parameters<Database["transaction"]>[0]>[0];
 
 // ── 日時変換ヘルパー ──
 
@@ -79,8 +83,10 @@ export { splitTitle, splitNotes } from "#lib/text-split.ts";
 // ── DB 更新ヘルパー ──
 
 /** リストの last_updated を現在時刻に更新する */
-export async function touchListUpdated(listId: number): Promise<void> {
-  const db = getDb();
+export async function touchListUpdated(
+  listId: number,
+  db: DbConnection = getDb(),
+): Promise<void> {
   await db
     .update(lists)
     .set({ last_updated: new Date() })
@@ -89,8 +95,11 @@ export async function touchListUpdated(listId: number): Promise<void> {
 
 // ── 所有権チェック ──
 
-export async function getOwnedList(listId: number, userId: number) {
-  const db = getDb();
+export async function getOwnedList(
+  listId: number,
+  userId: number,
+  db: DbConnection = getDb(),
+) {
   const rows = await db
     .select()
     .from(lists)

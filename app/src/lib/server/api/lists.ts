@@ -4,19 +4,21 @@
 
 import { and, asc, count, eq, inArray, min } from "drizzle-orm";
 
-import type { ListInfo } from "#lib/types.ts";
+import type { ListStatus, ShowType } from "#lib/schemas.ts";
+import { matchesShowType } from "#lib/show-type.ts";
+import { getHeadSortOrder } from "#lib/task-order.ts";
 import { adjustUpdatedTimestamps, mergeByTimestamp } from "../merge-utils";
 import { getDb } from "../db";
 import { attachments, lists, schedules, tasks } from "../schema";
 import { toUtcIso, touchListUpdated, getOwnedList } from "./common";
 
-export type { ListInfo };
+export type ListInfo = Awaited<ReturnType<typeof listLists>>[number];
 
 /**
  * ユーザーの全リストについて、未完了（status="active"または"running"）かつ kind="todo" の
  * タスク件数を list_id ごとに集計する。
  *
- * `getLists` の既存クエリ（lists 単独取得 + JS側フィルタ）とは別クエリとして扱う。
+ * `listLists` のクエリ（lists 単独取得 + JS側フィルタ）とは別クエリとして扱う。
  * 1クエリのJOIN + GROUP BYへ統合せず2クエリ構成とすることで、
  * MySQLのGROUP BY厳格モードの影響を避ける。
  */
@@ -40,10 +42,7 @@ async function countTodoTasksByList(
 }
 
 /** リスト一覧を取得する。タイトル昇順で返す。 */
-export async function getLists(
-  userId: number,
-  showType: string,
-): Promise<ListInfo[]> {
+export async function listLists(userId: number, showType: ShowType) {
   const db = getDb();
   const rows = await db
     .select()
@@ -52,50 +51,52 @@ export async function getLists(
     .orderBy(asc(lists.title));
   const todoCounts = await countTodoTasksByList(userId);
   return rows
-    .filter((r) => {
-      if (showType === "active") return r.status === "active";
-      // "archived" と "all" では全リストを表示
-      // （アーカイブ表示でアクティブなリスト内のアーカイブ済みタスクも確認できるようにする）
-      return true;
-    })
+    .filter((r) => matchesShowType(r.status, showType, "list"))
     .map((r) => ({
       id: r.id,
       title: r.title,
-      sort_order: r.sort_order,
-      last_updated: toUtcIso(r.last_updated),
-      status: r.status,
-      todo_count: todoCounts.get(r.id) ?? 0,
+      sortOrder: r.sort_order,
+      lastUpdated: toUtcIso(r.last_updated),
+      status: r.status as ListStatus,
+      todoCount: todoCounts.get(r.id) ?? 0,
     }));
 }
 
 /** リストを作成する。sort_order は既存の最小値 - 1000（先頭追加）。 */
-export async function postList(userId: number, title: string): Promise<void> {
-  if (title.length === 0) throw new Error("タイトルは必須です。");
+export async function createList(
+  userId: number,
+  title: string,
+): Promise<number> {
   const db = getDb();
   // 現在の最小 sort_order を取得
   const [{ minOrder }] = await db
     .select({ minOrder: min(lists.sort_order) })
     .from(lists)
     .where(eq(lists.user_id, userId));
-  const sortOrder = (minOrder ?? 1000) - 1000;
-  await db.insert(lists).values({
-    title,
-    user_id: userId,
-    status: "active",
-    sort_order: sortOrder,
-    last_updated: new Date(),
-  });
+  const sortOrder = getHeadSortOrder(minOrder === null ? [] : [minOrder]);
+  const result = await db
+    .insert(lists)
+    .values({
+      title,
+      user_id: userId,
+      status: "active",
+      sort_order: sortOrder,
+      last_updated: new Date(),
+    })
+    .$returningId();
+  return result[0].id;
 }
 
 /** 完了済みタスクを archived にする。 */
 export async function clearList(userId: number, listId: number): Promise<void> {
-  await getOwnedList(listId, userId);
-  const db = getDb();
-  await db
-    .update(tasks)
-    .set({ status: "archived", updated: new Date() })
-    .where(and(eq(tasks.list_id, listId), eq(tasks.status, "completed")));
-  await touchListUpdated(listId);
+  await getDb().transaction(async (db) => {
+    await getOwnedList(listId, userId, db);
+    await db
+      .update(tasks)
+      .set({ status: "archived", updated: new Date() })
+      .where(and(eq(tasks.list_id, listId), eq(tasks.status, "completed")));
+    await touchListUpdated(listId, db);
+  });
 }
 
 /** リスト名を変更する。 */
@@ -104,11 +105,11 @@ export async function renameList(
   listId: number,
   title: string,
 ): Promise<void> {
-  if (title.length === 0) throw new Error("タイトルは必須です。");
-  await getOwnedList(listId, userId);
-  const db = getDb();
-  await db.update(lists).set({ title }).where(eq(lists.id, listId));
-  await touchListUpdated(listId);
+  await getDb().transaction(async (db) => {
+    await getOwnedList(listId, userId, db);
+    await db.update(lists).set({ title }).where(eq(lists.id, listId));
+    await touchListUpdated(listId, db);
+  });
 }
 
 /** リストとその全タスク・添付・スケジュールを削除する。 */
@@ -116,10 +117,8 @@ export async function deleteList(
   userId: number,
   listId: number,
 ): Promise<void> {
-  // 冪等な削除: 対象が無い・他ユーザーのものは no-op (NOT_FOUND を返さない)。
-  // 別端末で先に削除されていた場合のレース時に、こちらの削除がエラーにならず
-  // クライアントの状態を確実に整合させるため。
-  // schema.ts に ON DELETE CASCADE が無いため、子テーブル (attachment・task・schedule) を明示削除する。
+  // 削除の冪等性は .claude/skills/add-trpc-procedure/SKILL.md「DB層の実装」に従う。
+  // 外部キーの RESTRICT に合わせ、子テーブルを先に削除する。
   const db = getDb();
   await db.transaction(async (tx) => {
     const owned = await tx
@@ -175,65 +174,66 @@ export async function mergeLists(
   if (sourceListId === targetListId) {
     throw new Error("same_list");
   }
-  const sourceList = await getOwnedList(sourceListId, userId);
-  const targetList = await getOwnedList(targetListId, userId);
-  if (sourceList.status !== "active" || targetList.status !== "active") {
-    throw new Error("list_not_active");
-  }
+  await getDb().transaction(async (db) => {
+    const sourceList = await getOwnedList(sourceListId, userId, db);
+    const targetList = await getOwnedList(targetListId, userId, db);
+    if (sourceList.status !== "active" || targetList.status !== "active") {
+      throw new Error("list_not_active");
+    }
 
-  const db = getDb();
-  // 両リストの全タスクを sort_order 昇順で取得
-  const [sourceTasks, targetTasks] = await Promise.all([
-    db
-      .select()
-      .from(tasks)
-      .where(eq(tasks.list_id, sourceListId))
-      .orderBy(asc(tasks.sort_order)),
-    db
-      .select()
-      .from(tasks)
-      .where(eq(tasks.list_id, targetListId))
-      .orderBy(asc(tasks.sort_order)),
-  ]);
+    // 両リストの全タスクを sort_order 昇順で取得
+    const [sourceTasks, targetTasks] = await Promise.all([
+      db
+        .select()
+        .from(tasks)
+        .where(eq(tasks.list_id, sourceListId))
+        .orderBy(asc(tasks.sort_order)),
+      db
+        .select()
+        .from(tasks)
+        .where(eq(tasks.list_id, targetListId))
+        .orderBy(asc(tasks.sort_order)),
+    ]);
 
-  // 各リストの updated を sort_order と整合するよう線形補間で補正
-  const sourceAdjusted = adjustUpdatedTimestamps(sourceTasks);
-  const targetAdjusted = adjustUpdatedTimestamps(targetTasks);
+    // 各リストの updated を sort_order と整合するよう線形補間で補正
+    const sourceAdjusted = adjustUpdatedTimestamps(sourceTasks);
+    const targetAdjusted = adjustUpdatedTimestamps(targetTasks);
 
-  // マージソートのマージステップで統合（adjusted 降順）
-  const merged = mergeByTimestamp(
-    targetTasks.map((t, i) => ({ task: t, adjusted: targetAdjusted[i]! })),
-    sourceTasks.map((t, i) => ({ task: t, adjusted: sourceAdjusted[i]! })),
-  );
+    // マージソートのマージステップで統合（adjusted 降順）
+    const merged = mergeByTimestamp(
+      targetTasks.map((t, i) => ({ task: t, adjusted: targetAdjusted[i]! })),
+      sourceTasks.map((t, i) => ({ task: t, adjusted: sourceAdjusted[i]! })),
+    );
 
-  // sort_order を 0, 1000, 2000... で再割り当てし、依存関係のないタスクを並列更新
-  await Promise.all(
-    merged.map(({ task, adjusted }, i) => {
-      const newSortOrder = i * 1000;
-      return db
-        .update(tasks)
-        .set({
-          list_id: targetListId,
-          sort_order: newSortOrder,
-          // 補正された updated のみ DB に反映
-          ...(adjusted !== task.updated.getTime() && {
-            updated: new Date(adjusted),
-          }),
-        })
-        .where(eq(tasks.id, task.id));
-    }),
-  );
+    // sort_order を 0, 1000, 2000... で再割り当てし、依存関係のないタスクを並列更新
+    await Promise.all(
+      merged.map(({ task, adjusted }, i) => {
+        const newSortOrder = i * 1000;
+        return db
+          .update(tasks)
+          .set({
+            list_id: targetListId,
+            sort_order: newSortOrder,
+            // 補正された updated のみ DB に反映
+            ...(adjusted !== task.updated.getTime() && {
+              updated: new Date(adjusted),
+            }),
+          })
+          .where(eq(tasks.id, task.id));
+      }),
+    );
 
-  // source リストに紐づく schedule を target リストへ移動
-  await db
-    .update(schedules)
-    .set({ list_id: targetListId })
-    .where(eq(schedules.list_id, sourceListId));
+    // source リストに紐づく schedule を target リストへ移動
+    await db
+      .update(schedules)
+      .set({ list_id: targetListId })
+      .where(eq(schedules.list_id, sourceListId));
 
-  // source リストを削除
-  await db.delete(lists).where(eq(lists.id, sourceListId));
-  // target の last_updated を更新
-  await touchListUpdated(targetListId);
+    // source リストを削除
+    await db.delete(lists).where(eq(lists.id, sourceListId));
+    // target の last_updated を更新
+    await touchListUpdated(targetListId, db);
+  });
 }
 
 /** リストを active に戻す。 */
