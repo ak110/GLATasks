@@ -1,4 +1,6 @@
 <script lang="ts">
+    import { dialogInputClass } from "#lib/components/ui/styles.ts";
+    import Dialog from "#lib/components/dialogs/Dialog.svelte";
     /**
      * @fileoverview リスト統合ダイアログ（統合元リストの全タスクを統合先に移動）
      */
@@ -34,86 +36,46 @@
         }
     });
 
-    // Escape キーでダイアログを閉じる
-    $effect(() => {
-        if (!open) return;
-        const handler = (e: KeyboardEvent) => {
-            if (e.key === "Escape") onClose();
-        };
-        window.addEventListener("keydown", handler);
-        return () => window.removeEventListener("keydown", handler);
-    });
-
     function handleSubmit() {
         if (selectedTargetId) {
             onSubmit(Number(selectedTargetId));
         }
     }
-
-    const titleId = crypto.randomUUID();
 </script>
 
-{#if open}
-    <div
-        class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 sm:p-0"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        tabindex="-1"
-    >
-        <div
-            class="w-full max-w-md rounded-lg bg-white shadow-xl dark:bg-gray-800"
-        >
-            <div class="flex items-center justify-between px-6 py-4">
-                <h2
-                    id={titleId}
-                    class="text-lg font-semibold text-gray-800 dark:text-gray-100"
-                >
-                    リストの統合
-                </h2>
-                <button
-                    onclick={onClose}
-                    class="cursor-pointer rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300"
-                    aria-label="閉じる"
-                    title="閉じる"
-                >
-                    ✕
-                </button>
-            </div>
-            <div class="p-6">
-                <p class="mb-4 text-gray-700 dark:text-gray-200">
-                    「{sourceList.title}」の{taskCount}件のタスクを別のリストに移動し、このリストを削除します。
-                </p>
+<Dialog {open} title="リストの統合" widthClass="max-w-md" {onClose}>
+    <div class="p-6">
+        <p class="mb-4 text-gray-700 dark:text-gray-200">
+            「{sourceList.title}」の{taskCount}件のタスクを別のリストに移動し、このリストを削除します。
+        </p>
 
-                <div class="mb-4">
-                    <label
-                        class="mb-1 block cursor-pointer font-medium text-gray-700 dark:text-gray-200"
-                        for="merge-target">統合先リスト</label
-                    >
-                    <select
-                        id="merge-target"
-                        bind:value={selectedTargetId}
-                        class="w-full cursor-pointer rounded border border-gray-200 px-3 py-2 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
-                    >
-                        {#each targetCandidates as l (l.id)}
-                            <option value={String(l.id)}>{l.title}</option>
-                        {/each}
-                    </select>
-                </div>
+        <div class="mb-4">
+            <label
+                class="mb-1 block cursor-pointer font-medium text-gray-700 dark:text-gray-200"
+                for="merge-target">統合先リスト</label
+            >
+            <select
+                id="merge-target"
+                bind:value={selectedTargetId}
+                class="w-full cursor-pointer {dialogInputClass}"
+            >
+                {#each targetCandidates as l (l.id)}
+                    <option value={String(l.id)}>{l.title}</option>
+                {/each}
+            </select>
+        </div>
 
-                <p class="mb-6 text-sm text-red-600 dark:text-red-400">
-                    この操作は元に戻せません。
-                </p>
+        <p class="mb-6 text-sm text-red-600 dark:text-red-400">
+            この操作は元に戻せません。
+        </p>
 
-                <div class="flex justify-end">
-                    <button
-                        onclick={handleSubmit}
-                        disabled={!selectedTargetId}
-                        class="cursor-pointer rounded bg-red-600 px-6 py-2 text-white hover:bg-red-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
-                        >統合</button
-                    >
-                </div>
-            </div>
+        <div class="flex justify-end">
+            <button
+                onclick={handleSubmit}
+                disabled={!selectedTargetId}
+                class="cursor-pointer rounded bg-red-600 px-6 py-2 text-white hover:bg-red-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+                >統合</button
+            >
         </div>
     </div>
-{/if}
+</Dialog>

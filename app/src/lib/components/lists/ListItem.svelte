@@ -1,4 +1,10 @@
 <script lang="ts">
+    import { menuBehavior } from "#lib/actions/menu.ts";
+    import {
+        menuFrameClass,
+        menuItemClass,
+        menuDangerItemClass,
+    } from "#lib/components/ui/styles.ts";
     /**
      * @fileoverview リストアイテム（選択ボタン + 操作メニュー）
      */
@@ -63,7 +69,13 @@
         {/if}
     </button>
     <!-- ⋮ メニュー -->
-    <div class="relative flex-shrink-0">
+    <div
+        class="relative flex-shrink-0"
+        use:menuBehavior={{
+            open: openMenuId === list.id,
+            onClose: () => onToggleMenu(list.id),
+        }}
+    >
         <button
             class="cursor-pointer rounded px-2 py-2.5 text-sm text-gray-400 hover:bg-gray-100 hover:text-gray-700 sm:opacity-0 sm:group-hover:opacity-100 dark:text-gray-500 dark:hover:bg-gray-700 dark:hover:text-gray-200"
             onclick={(e) => {
@@ -77,11 +89,9 @@
             ⋮
         </button>
         {#if openMenuId === list.id}
-            <div
-                class="absolute top-full right-0 z-20 min-w-max rounded border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-600 dark:bg-gray-800"
-            >
+            <div class={menuFrameClass} data-menu-frame>
                 <button
-                    class="block w-full cursor-pointer px-4 py-1.5 text-left hover:bg-gray-100 dark:text-gray-100 dark:hover:bg-gray-700"
+                    class={menuItemClass}
                     onclick={() => {
                         onRename(list.id, list.title);
                         onToggleMenu(list.id);
@@ -91,7 +101,7 @@
                 </button>
                 {#if list.status === "archived"}
                     <button
-                        class="block w-full cursor-pointer px-4 py-1.5 text-left hover:bg-gray-100 dark:text-gray-100 dark:hover:bg-gray-700"
+                        class={menuItemClass}
                         onclick={() => {
                             onUnarchive(list.id);
                             onToggleMenu(list.id);
@@ -101,7 +111,7 @@
                     </button>
                 {:else}
                     <button
-                        class="block w-full cursor-pointer px-4 py-1.5 text-left hover:bg-gray-100 dark:text-gray-100 dark:hover:bg-gray-700"
+                        class={menuItemClass}
                         onclick={() => {
                             onArchive(list.id);
                             onToggleMenu(list.id);
@@ -112,7 +122,7 @@
                 {/if}
                 {#if list.status === "active"}
                     <button
-                        class="block w-full cursor-pointer px-4 py-1.5 text-left hover:bg-gray-100 dark:text-gray-100 dark:hover:bg-gray-700"
+                        class={menuItemClass}
                         onclick={() => {
                             onMerge(list.id);
                             onToggleMenu(list.id);
@@ -122,7 +132,7 @@
                     </button>
                 {/if}
                 <button
-                    class="block w-full cursor-pointer px-4 py-1.5 text-left hover:bg-gray-100 dark:text-gray-100 dark:hover:bg-gray-700"
+                    class={menuItemClass}
                     data-testid="list-schedules-btn"
                     onclick={() => {
                         onOpenSchedules(list.id);
@@ -133,7 +143,7 @@
                 </button>
                 <hr class="my-1 border-gray-200 dark:border-gray-600" />
                 <button
-                    class="block w-full cursor-pointer px-4 py-1.5 text-left text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/30"
+                    class={menuDangerItemClass}
                     data-testid="list-delete-btn"
                     onclick={() => {
                         onDelete(list.id);

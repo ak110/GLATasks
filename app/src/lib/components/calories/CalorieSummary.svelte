@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { grayButtonClass } from "#lib/components/ui/styles.ts";
     type Period = {
         days: 1 | 7 | 28;
         daily_kcal: number;
@@ -100,11 +101,7 @@
                 class="w-28 rounded border border-gray-300 bg-white px-2 py-1 text-right text-sm text-gray-800 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
             />
             <span class="text-sm text-gray-600 dark:text-gray-300">kcal</span>
-            <button
-                type="submit"
-                class="cursor-pointer rounded bg-gray-100 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
-                >保存</button
-            >
+            <button type="submit" class={grayButtonClass}>保存</button>
         </form>
     </div>
 

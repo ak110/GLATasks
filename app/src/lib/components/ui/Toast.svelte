@@ -6,13 +6,22 @@
      * TimerAlarmMonitor のトースト（top-14）と重ならないよう bottom-4 に配置。
      */
 
-    import { getToasts, dismissToast } from "#lib/toast-store.svelte.ts";
+    import {
+        getToasts,
+        dismissToast,
+    } from "#lib/client/ui/toast-store.svelte.ts";
+    import { UI_LAYERS } from "#lib/components/ui/styles.ts";
+    import { notificationLayer } from "#lib/client/ui/notification-layer.ts";
 
     const toasts = $derived(getToasts());
 </script>
 
 {#if toasts.length > 0}
-    <div class="fixed right-4 bottom-4 z-50 flex flex-col gap-2">
+    <div
+        popover="manual"
+        {@attach notificationLayer}
+        class="fixed inset-auto right-4 bottom-4 m-0 flex flex-col gap-2 overflow-visible border-0 bg-transparent p-0 {UI_LAYERS.notification}"
+    >
         {#each toasts as toast (toast.id)}
             <div
                 class="flex items-center gap-2 rounded-lg bg-red-100 text-red-800 shadow-lg dark:bg-red-900/40 dark:text-red-400"

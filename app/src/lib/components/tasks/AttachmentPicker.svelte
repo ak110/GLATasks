@@ -8,14 +8,12 @@
         attachments?: File[];
         onAdd: (files: File[]) => void;
         onRemove?: (index: number) => void;
-        disabled?: boolean;
     };
 
     let {
         attachments = undefined,
         onAdd,
         onRemove = undefined,
-        disabled = false,
     }: Props = $props();
 
     function handleFileChange(e: Event) {
@@ -54,7 +52,6 @@
 <input
     type="file"
     multiple
-    {disabled}
     onchange={handleFileChange}
     class="block w-full text-sm text-gray-700 file:mr-3 file:cursor-pointer file:rounded file:border-0 file:bg-gray-100 file:px-3 file:py-1.5 file:text-gray-700 hover:file:bg-gray-200 dark:text-gray-200 dark:file:bg-gray-700 dark:file:text-gray-200 dark:hover:file:bg-gray-600"
 />

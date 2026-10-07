@@ -5,7 +5,7 @@
 
     import { getContext } from "svelte";
     import { resolve } from "$app/paths";
-    import type { Theme } from "#lib/theme.ts";
+    import type { Theme } from "#lib/client/ui/theme.ts";
 
     const themeCtx = getContext<{
         readonly theme: Theme;
@@ -21,7 +21,7 @@
     );
 
     type Props = {
-        page: "tasks" | "timers" | "translate" | "calories";
+        page: (typeof navigationItems)[number]["key"];
         isLoading: boolean;
         showType?: "active" | "archived" | "all";
         onChangeShowType?: (type: "active" | "archived" | "all") => void;

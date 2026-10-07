@@ -1,4 +1,8 @@
 <script lang="ts">
+    import { invalidateEventQueries } from "#lib/client/query-sync.ts";
+    import { UI_LAYERS } from "#lib/components/ui/styles.ts";
+    import { notificationLayer } from "#lib/client/ui/notification-layer.ts";
+    import { timersOptions, queryKeys } from "#lib/client/query-options.ts";
     /**
      * @fileoverview グローバルタイマー完了監視コンポーネント
      *
@@ -8,14 +12,13 @@
      */
 
     import { createQuery, useQueryClient } from "@tanstack/svelte-query";
-    import { trpc, type RouterOutputs } from "#lib/trpc.ts";
+    import { trpc, type RouterOutputs } from "#lib/client/trpc.ts";
     import {
         getServerOffset,
-        setServerOffset,
         onOffsetChange,
-    } from "#lib/sse-client.ts";
+    } from "#lib/client/timers/time-sync.ts";
     import { SSE_EVENTS } from "#lib/sse-events.ts";
-    import { subscribeOnMount } from "#lib/sse-subscribe.ts";
+    import { subscribeOnMount } from "#lib/client/sse/sse-subscribe.ts";
     import type { TimerInfo } from "#lib/types.ts";
     import { calcTimerRemainingMs } from "#lib/timer-utils.ts";
     import { TIMER_DEFAULT_RING_SECONDS } from "#lib/schemas.ts";
@@ -60,9 +63,9 @@
     });
     // SSE: タイマー更新通知でデータを再取得
     // （/timers ページ以外でもトースト消去・favicon 復元が即座に反映されるように）
-    // 全ページに常駐するため、/timers 以外の画面でもフォールバック経由で ["timers"] が同期される
+    // 全ページに常駐するため、/timers 以外の画面でもフォールバック経由で queryKeys.timers が同期される
     const invalidateTimers = () =>
-        queryClient.invalidateQueries({ queryKey: ["timers"] });
+        invalidateEventQueries(queryClient, SSE_EVENTS.timersUpdated);
     subscribeOnMount({
         [SSE_EVENTS.timersUpdated]: {
             handler: invalidateTimers,
@@ -141,7 +144,9 @@
 
     /** ループビープが回っていれば停止する（動的 import で SSR 安全） */
     function stopLoopBeepFor(timerId: number) {
-        import("#lib/beep.ts").then((m) => m.stopLoopBeep(timerId));
+        import("#lib/client/timers/beep.ts").then((m) =>
+            m.stopLoopBeep(timerId),
+        );
     }
 
     /** トースト通知を閉じる（ループビープも合わせて停止） */
@@ -151,17 +156,8 @@
     }
 
     // タイマー一覧取得（/timers ページとキャッシュ共有）
-    const timersQuery = createQuery<RouterOutputs["timers"]["list"]>(() => ({
-        queryKey: ["timers"] as const,
-        queryFn: async (): Promise<RouterOutputs["timers"]["list"]> => {
-            // RTT/2 補正付きオフセット計算
-            const t0 = Date.now();
-            const result = await trpc.timers.list.query();
-            const t1 = Date.now();
-            const serverMs = new Date(result.server_time).getTime();
-            setServerOffset(serverMs - (t0 + t1) / 2);
-            return result;
-        },
+    const timersQuery = createQuery(() => ({
+        ...timersOptions(),
         refetchInterval: 60 * 1000,
     }));
 
@@ -185,7 +181,7 @@
         });
         notification.onclick = () => {
             window.focus();
-            window.location.href = "/timers";
+            window.location.href = resolve("/timers");
             notification.close();
         };
     }
@@ -203,7 +199,7 @@
         // サーバーから最新状態を取得
         try {
             await queryClient.refetchQueries(
-                { queryKey: ["timers"] },
+                { queryKey: queryKeys.timers },
                 { throwOnError: true },
             );
         } catch {
@@ -241,7 +237,7 @@
         const ringSeconds = timer?.ring_seconds ?? TIMER_DEFAULT_RING_SECONDS;
 
         // ビープ音 + ブラウザ通知 + トースト
-        import("#lib/beep.ts").then((m) => {
+        import("#lib/client/timers/beep.ts").then((m) => {
             m.startLoopBeep(timerId, ringSeconds);
         });
         showNotification(timerName);
@@ -250,7 +246,9 @@
         // サーバーに停止報告（started_at でリセット/再開されていないことを確認）
         trpc.timers.stop
             .mutate({ timerId, started_at: startedAt })
-            .then(() => queryClient.invalidateQueries({ queryKey: ["timers"] }))
+            .then(() =>
+                queryClient.invalidateQueries({ queryKey: queryKeys.timers }),
+            )
             .catch(() => {
                 alarmedIds = new Set(
                     [...alarmedIds].filter((id) => id !== timerId),
@@ -310,7 +308,11 @@
 
 <!-- タイマー完了トースト通知 -->
 {#if alarms.length > 0}
-    <div class="fixed top-14 right-4 z-50 flex flex-col gap-2">
+    <div
+        popover="manual"
+        {@attach notificationLayer}
+        class="fixed inset-auto top-14 right-4 m-0 flex flex-col gap-2 overflow-visible border-0 bg-transparent p-0 {UI_LAYERS.notification}"
+    >
         {#each alarms as alarm (alarm.timerId)}
             <div
                 class="flex items-center gap-2 rounded-lg bg-red-500 text-white shadow-lg"

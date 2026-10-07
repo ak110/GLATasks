@@ -9,28 +9,12 @@
      * `pendingReload` が偽へ戻った時点で自動的に消える。
      */
 
-    import { connectivityState } from "#lib/connection-recovery.svelte.ts";
-
-    function reload() {
-        location.reload();
-    }
+    import { connectivityState } from "#lib/client/sse/connection-recovery.svelte.ts";
+    import ReloadBanner from "./ReloadBanner.svelte";
 </script>
 
 {#if connectivityState.pendingReload}
-    <div
-        class="fixed top-0 right-0 left-0 z-50 flex items-center justify-center gap-3 bg-blue-600 px-4 py-2 text-sm text-white shadow-md dark:bg-blue-700"
-        role="status"
-        data-testid="connectivity-recovery-banner"
+    <ReloadBanner testId="connectivity-recovery-banner"
+        >サーバーに接続できていません。接続が回復するまで保存できない場合があります。</ReloadBanner
     >
-        <span
-            >サーバーに接続できていません。接続が回復するまで保存できない場合があります。</span
-        >
-        <button
-            type="button"
-            class="cursor-pointer rounded bg-white px-3 py-1 font-semibold text-blue-700 hover:bg-blue-50 dark:bg-blue-100 dark:hover:bg-white"
-            onclick={reload}
-        >
-            再読み込み
-        </button>
-    </div>
 {/if}

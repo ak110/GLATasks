@@ -1,15 +1,26 @@
 <script lang="ts">
+    import { inputClass } from "#lib/components/ui/styles.ts";
+    import { menuBehavior } from "#lib/actions/menu.ts";
+    import {
+        menuFrameClass,
+        menuBlueItemClass,
+        menuDangerItemClass,
+    } from "#lib/components/ui/styles.ts";
     import ConfirmDialog from "#lib/components/dialogs/ConfirmDialog.svelte";
-    import CalorieEditDialog from "./CalorieEditDialog.svelte";
+    import Dialog from "#lib/components/dialogs/Dialog.svelte";
     import CalorieFilterStatus from "./CalorieFilterStatus.svelte";
 
-    type Item = { id: number; name: string; kcal: number; note: string };
+    type Item = {
+        id: number;
+        name: string;
+        kcal: number;
+        note: string;
+        recordCount: number;
+        autoRecordCount: number;
+    };
     type ItemInput = { name: string; kcal: number; note: string };
-    /** 品目を使っている記録と自動記録の件数 */
-    type ItemUsage = { records: number; autoRecords: number };
     type Props = {
         items: Item[];
-        usage: Map<number, ItemUsage>;
         onCreate: (input: ItemInput) => unknown;
         onUpdate: (input: ItemInput & { itemId: number }) => unknown;
         onDelete: (itemId: number) => unknown;
@@ -22,7 +33,6 @@
 
     let {
         items,
-        usage,
         onCreate,
         onUpdate,
         onDelete,
@@ -49,27 +59,12 @@
         }),
     );
 
-    // 操作メニュー外クリック/Escapeで閉じる
-    $effect(() => {
-        if (openMenuId === undefined) return;
-        const onClick = (event: MouseEvent) => {
-            const target = event.target as HTMLElement | null;
-            if (!target?.closest("[data-item-menu]")) openMenuId = undefined;
-        };
-        const onKey = (event: KeyboardEvent) => {
-            if (event.key === "Escape") openMenuId = undefined;
-        };
-        document.addEventListener("mousedown", onClick);
-        document.addEventListener("keydown", onKey);
-        return () => {
-            document.removeEventListener("mousedown", onClick);
-            document.removeEventListener("keydown", onKey);
-        };
-    });
-
     /** 使用中の品目は削除できないため、削除の代わりに使用件数を示す文言を返す */
     function usageText(item: Item): string | undefined {
-        const counts = usage.get(item.id);
+        const counts = {
+            records: item.recordCount,
+            autoRecords: item.autoRecordCount,
+        };
         if (!counts || (counts.records === 0 && counts.autoRecords === 0))
             return undefined;
         const parts = [
@@ -140,7 +135,7 @@
             required
             maxlength="255"
             placeholder="品目名"
-            class="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-800 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+            class={inputClass}
         />
     {/snippet}
     {#snippet kcalInput()}
@@ -152,7 +147,7 @@
             min="1"
             step="1"
             placeholder="kcal"
-            class="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-800 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+            class={inputClass}
         />
     {/snippet}
     {#snippet noteInput()}
@@ -161,7 +156,7 @@
             bind:value={note}
             maxlength="10000"
             placeholder="備考"
-            class="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-800 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+            class={inputClass}
         />
     {/snippet}
 
@@ -186,7 +181,7 @@
             </div>
         </form>
     {:else}
-        <CalorieEditDialog title="品目の編集" onClose={clearForm}>
+        <Dialog contentClass="p-6 pt-0" title="品目の編集" onClose={clearForm}>
             <!-- ダイアログの幅が足りればラベルを左・入力欄を右に並べ、狭ければラベルの下に入力欄を置く -->
             <form class="@container" onsubmit={submit}>
                 <div
@@ -225,7 +220,7 @@
                     >
                 </div>
             </form>
-        </CalorieEditDialog>
+        </Dialog>
     {/if}
 
     <!-- 横スクロールの要素で囲むと、最後の行の「⋯」メニューが表の下端で切り取られるため囲まない -->
@@ -257,7 +252,14 @@
                         title={item.note}>{item.note}</td
                     >
                     <td class="p-2 text-right">
-                        <div class="relative" data-item-menu>
+                        <div
+                            class="relative"
+                            data-item-menu
+                            use:menuBehavior={{
+                                open: openMenuId === item.id,
+                                onClose: () => (openMenuId = undefined),
+                            }}
+                        >
                             <button
                                 type="button"
                                 onclick={() =>
@@ -268,21 +270,20 @@
                                 class="cursor-pointer rounded px-1 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
                                 data-testid="calorie-item-menu-btn"
                                 aria-label="品目の操作"
-                                aria-haspopup="menu"
-                                aria-expanded={openMenuId === item.id}
                                 title="操作">⋯</button
                             >
                             {#if openMenuId === item.id}
                                 {@const inUse = usageText(item)}
                                 <div
-                                    class="absolute top-full right-0 z-20 min-w-max rounded border border-gray-200 bg-white py-1 text-left shadow-lg dark:border-gray-600 dark:bg-gray-800"
+                                    class={menuFrameClass}
+                                    data-menu-frame
                                     role="menu"
                                     data-testid="calorie-item-menu"
                                 >
                                     <button
                                         type="button"
                                         onclick={() => edit(item)}
-                                        class="block w-full cursor-pointer px-4 py-1.5 text-left text-blue-600 hover:bg-gray-100 dark:text-blue-400 dark:hover:bg-gray-700"
+                                        class={menuBlueItemClass}
                                         role="menuitem">編集</button
                                     >
                                     <!-- 使用中の品目を削除すると記録の品目名とkcalが失われるため、削除を無効にして理由を示す -->
@@ -293,7 +294,7 @@
                                             openMenuId = undefined;
                                             deleteTarget = item;
                                         }}
-                                        class="block w-full cursor-pointer px-4 py-1.5 text-left text-red-600 hover:bg-red-50 disabled:cursor-default disabled:text-gray-400 disabled:hover:bg-transparent dark:text-red-400 dark:hover:bg-red-900/30 dark:disabled:text-gray-500"
+                                        class={menuDangerItemClass}
                                         role="menuitem"
                                         >削除{#if inUse}<span
                                                 class="block text-xs"

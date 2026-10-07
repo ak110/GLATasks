@@ -1,4 +1,8 @@
 <script lang="ts">
+    import { queryKeys } from "#lib/client/query-options.ts";
+    import { schedulesOptions } from "#lib/client/query-options.ts";
+    import { dialogInputClass } from "#lib/components/ui/styles.ts";
+    import Dialog from "#lib/components/dialogs/Dialog.svelte";
     /**
      * @fileoverview 定期TODOスケジュール管理ダイアログ
      *
@@ -12,10 +16,10 @@
         createMutation,
         useQueryClient,
     } from "@tanstack/svelte-query";
-    import { trpc, type RouterOutputs } from "#lib/trpc.ts";
+    import { trpc } from "#lib/client/trpc.ts";
     import type { TagInfo, ScheduleInfo } from "#lib/types.ts";
-    import { showErrorToast } from "#lib/toast-store.svelte.ts";
-    import { extractErrorMessage } from "#lib/extract-error-message.ts";
+    import { showErrorToast } from "#lib/client/ui/toast-store.svelte.ts";
+    import { extractErrorMessage } from "#lib/client/ui/extract-error-message.ts";
     import TagEditor from "#lib/components/tasks/TagEditor.svelte";
     import ConfirmDialog from "#lib/components/dialogs/ConfirmDialog.svelte";
     import RecurrenceEditor from "./RecurrenceEditor.svelte";
@@ -31,13 +35,7 @@
 
     const queryClient = useQueryClient();
 
-    const schedulesQuery = createQuery<RouterOutputs["schedules"]["list"]>(
-        () => ({
-            queryKey: ["schedules", listId] as const,
-            queryFn: () => trpc.schedules.list.query({ listId: listId! }),
-            enabled: listId !== null,
-        }),
-    );
+    const schedulesQuery = createQuery(() => schedulesOptions(listId));
 
     const schedules = $derived(schedulesQuery.data ?? []);
 
@@ -49,7 +47,9 @@
     let confirmDeleteTarget = $state<ScheduleInfo | null>(null);
 
     function invalidate() {
-        queryClient.invalidateQueries({ queryKey: ["schedules", listId] });
+        queryClient.invalidateQueries({
+            queryKey: queryKeys.listSchedules(listId),
+        });
     }
 
     const createMut = createMutation(() => ({
@@ -145,18 +145,6 @@
             showErrorToast(extractErrorMessage(error));
         }
     }
-
-    const titleId = crypto.randomUUID();
-
-    // Escape キーでダイアログを閉じる（ネストする ConfirmDialog 表示中は抑止する）
-    $effect(() => {
-        if (!open) return;
-        const handler = (e: KeyboardEvent) => {
-            if (e.key === "Escape" && confirmDeleteTarget === null) onClose();
-        };
-        window.addEventListener("keydown", handler);
-        return () => window.removeEventListener("keydown", handler);
-    });
 </script>
 
 <ConfirmDialog
@@ -169,77 +157,54 @@
     onCancel={() => (confirmDeleteTarget = null)}
 />
 
-{#if open}
-    <div
-        class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 sm:p-0"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        tabindex="-1"
-    >
-        <div
-            class="w-full max-w-lg rounded-lg bg-white shadow-xl dark:bg-gray-800"
-            data-testid="schedule-dialog"
-        >
-            <div class="flex items-center justify-between px-6 py-4">
-                <h2
-                    id={titleId}
-                    class="text-lg font-semibold text-gray-800 dark:text-gray-100"
+<Dialog
+    {open}
+    title="定期TODO"
+    widthClass="max-w-lg"
+    {onClose}
+    testId="schedule-dialog"
+>
+    <div class="max-h-[70vh] overflow-y-auto p-6">
+        {#if formTarget !== null}
+            <div class="mb-4">
+                <label
+                    class="mb-1 block cursor-pointer font-medium text-gray-700 dark:text-gray-200"
+                    for="schedule-title">タイトル</label
                 >
-                    定期TODO
-                </h2>
-                <button
-                    onclick={onClose}
-                    class="cursor-pointer rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300"
-                    aria-label="閉じる"
-                    title="閉じる"
+                <input
+                    id="schedule-title"
+                    type="text"
+                    bind:value={formTitle}
+                    class="w-full {dialogInputClass}"
+                    data-testid="schedule-title-input"
+                />
+            </div>
+            <div class="mb-4">
+                <span
+                    class="mb-1 block font-medium text-gray-700 dark:text-gray-200"
+                    >タグ</span
                 >
-                    ✕
-                </button>
+                <TagEditor bind:tags={formTags} candidates={[]} />
             </div>
-            <div class="max-h-[70vh] overflow-y-auto p-6">
-                {#if formTarget !== null}
-                    <div class="mb-4">
-                        <label
-                            class="mb-1 block cursor-pointer font-medium text-gray-700 dark:text-gray-200"
-                            for="schedule-title">タイトル</label
-                        >
-                        <input
-                            id="schedule-title"
-                            type="text"
-                            bind:value={formTitle}
-                            class="w-full rounded border border-gray-200 px-3 py-2 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
-                            data-testid="schedule-title-input"
-                        />
-                    </div>
-                    <div class="mb-4">
-                        <span
-                            class="mb-1 block font-medium text-gray-700 dark:text-gray-200"
-                            >タグ</span
-                        >
-                        <TagEditor bind:tags={formTags} candidates={[]} />
-                    </div>
-                    <RecurrenceEditor
-                        value={formTarget === "new" ? null : formTarget}
-                        onSubmit={handleRecurrenceSubmit}
-                        onCancel={closeForm}
-                    />
-                {:else}
-                    <ScheduleList
-                        {schedules}
-                        onEdit={openEditForm}
-                        onToggle={handleToggle}
-                        onDelete={requestDelete}
-                    />
-                    <button
-                        onclick={openNewForm}
-                        class="mt-4 w-full cursor-pointer rounded bg-blue-100 px-4 py-2 text-blue-600 hover:bg-blue-200 dark:bg-blue-900/40 dark:text-blue-400 dark:hover:bg-blue-900/60"
-                        data-testid="schedule-add-btn"
-                    >
-                        定期TODOを追加
-                    </button>
-                {/if}
-            </div>
-        </div>
+            <RecurrenceEditor
+                value={formTarget === "new" ? null : formTarget}
+                onSubmit={handleRecurrenceSubmit}
+                onCancel={closeForm}
+            />
+        {:else}
+            <ScheduleList
+                {schedules}
+                onEdit={openEditForm}
+                onToggle={handleToggle}
+                onDelete={requestDelete}
+            />
+            <button
+                onclick={openNewForm}
+                class="mt-4 w-full cursor-pointer rounded bg-blue-100 px-4 py-2 text-blue-600 hover:bg-blue-200 dark:bg-blue-900/40 dark:text-blue-400 dark:hover:bg-blue-900/60"
+                data-testid="schedule-add-btn"
+            >
+                定期TODOを追加
+            </button>
+        {/if}
     </div>
-{/if}
+</Dialog>

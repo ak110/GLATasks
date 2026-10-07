@@ -1,4 +1,6 @@
 <script lang="ts">
+    import { taskTextColor } from "#lib/task-colors.ts";
+    import NotesExpandButton from "#lib/components/tasks/NotesExpandButton.svelte";
     /**
      * @fileoverview 検索結果表示コンポーネント
      *
@@ -9,7 +11,7 @@
     import { SvelteSet } from "svelte/reactivity";
     import type { SearchTaskResult } from "#lib/types.ts";
     import { clampDetector } from "#lib/actions/clamp.ts";
-    import { linkify } from "#lib/linkify.ts";
+    import { linkify } from "#lib/client/search/linkify.ts";
 
     type Props = {
         /** 現在の検索クエリ（見出し表示用） */
@@ -83,10 +85,9 @@
                     {#if !task.title && task.notes}
                         <!-- タイトルなし: notes を主表示として折りたたみ -->
                         <button
-                            class="cursor-pointer text-left leading-tight {task.status ===
-                                'completed' || task.status === 'running'
-                                ? 'text-gray-400 dark:text-gray-500'
-                                : 'dark:text-gray-100'} hover:text-blue-600 dark:hover:text-blue-400"
+                            class="cursor-pointer text-left leading-tight {taskTextColor(
+                                task.status,
+                            )} hover:text-blue-600 dark:hover:text-blue-400"
                             class:line-through={task.status === "completed"}
                             class:line-clamp-5={!expandedNotes.has(task.id)}
                             onclick={() => onGoToResult(listId)}
@@ -97,10 +98,9 @@
                         </button>
                     {:else}
                         <button
-                            class="cursor-pointer text-left leading-tight {task.status ===
-                                'completed' || task.status === 'running'
-                                ? 'text-gray-400 dark:text-gray-500'
-                                : 'dark:text-gray-100'} hover:text-blue-600 dark:hover:text-blue-400"
+                            class="cursor-pointer text-left leading-tight {taskTextColor(
+                                task.status,
+                            )} hover:text-blue-600 dark:hover:text-blue-400"
                             class:line-through={task.status === "completed"}
                             onclick={() => onGoToResult(listId)}
                         >
@@ -109,7 +109,10 @@
                         </button>
                         {#if task.notes}
                             <p
-                                class="mt-0.5 whitespace-pre-wrap text-gray-500 dark:text-gray-400"
+                                class="mt-0.5 whitespace-pre-wrap {taskTextColor(
+                                    task.status,
+                                    true,
+                                )}"
                                 class:line-clamp-5={!expandedNotes.has(task.id)}
                                 use:clampDetector={makeClampCallback(task.id)}
                             >
@@ -120,18 +123,10 @@
                     {/if}
                 </div>
                 {#if clampedNotes.has(task.id) || expandedNotes.has(task.id)}
-                    <button
+                    <NotesExpandButton
+                        expanded={expandedNotes.has(task.id)}
                         onclick={() => toggleExpand(task.id)}
-                        class="shrink-0 cursor-pointer rounded p-1 text-xs text-gray-400 hover:bg-gray-100 hover:text-gray-500 dark:text-gray-500 dark:hover:bg-gray-700 dark:hover:text-gray-400"
-                        aria-label={expandedNotes.has(task.id)
-                            ? "notesを折りたたむ"
-                            : "notesを展開"}
-                        title={expandedNotes.has(task.id)
-                            ? "折りたたむ"
-                            : "展開"}
-                    >
-                        {expandedNotes.has(task.id) ? "▲" : "▼"}
-                    </button>
+                    />
                 {/if}
             </div>
         {/each}

@@ -2,9 +2,9 @@
     import "../app.css";
     import type { Snippet } from "svelte";
     import { QueryClientProvider } from "@tanstack/svelte-query";
-    import { queryClient } from "#lib/query-client.ts";
+    import { queryClient } from "#lib/client/query-client.ts";
     import { onMount } from "svelte";
-    import { setEncryptKey } from "#lib/trpc.ts";
+    import { setEncryptKey } from "#lib/client/trpc.ts";
     import { setContext } from "svelte";
     import {
         getStoredTheme,
@@ -12,16 +12,21 @@
         applyTheme,
         cycleTheme,
         type Theme,
-    } from "#lib/theme.ts";
-    import { connect, disconnect, checkConnection } from "#lib/sse-client.ts";
+    } from "#lib/client/ui/theme.ts";
+    import {
+        connect,
+        disconnect,
+        checkConnection,
+    } from "#lib/client/sse/sse-client.ts";
     import {
         startConnectivityWatch,
         stopConnectivityWatch,
-    } from "#lib/connection-recovery.svelte.ts";
+    } from "#lib/client/sse/connection-recovery.svelte.ts";
     import TimerAlarmMonitor from "#lib/components/timers/TimerAlarmMonitor.svelte";
     import Toast from "#lib/components/ui/Toast.svelte";
     import UpdateBanner from "#lib/components/ui/UpdateBanner.svelte";
     import ConnectivityRecoveryBanner from "#lib/components/ui/ConnectivityRecoveryBanner.svelte";
+    import { UI_LAYERS } from "#lib/components/ui/styles.ts";
     import { beforeNavigate } from "$app/navigation";
     import { updated } from "$app/state";
     import type { LayoutData } from "./$types";
@@ -119,8 +124,10 @@
 </script>
 
 <QueryClientProvider client={queryClient}>
-    <UpdateBanner />
-    <ConnectivityRecoveryBanner />
+    <div class="fixed top-0 right-0 left-0 {UI_LAYERS.banner}">
+        <UpdateBanner />
+        <ConnectivityRecoveryBanner />
+    </div>
     <Toast />
     {#if data.logged_in}
         <TimerAlarmMonitor />

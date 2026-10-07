@@ -1,13 +1,11 @@
 <script lang="ts">
+    import { createAttachmentInput } from "#lib/client/attachments/task-attachments.svelte.ts";
     /**
      * @fileoverview タスク追加フォーム（テキストエリア + タグ設定 + 追加ボタン）
      */
 
     import type { TagInfo } from "#lib/types.ts";
-    import {
-        FILE_DROP_HIGHLIGHT_CLASSES,
-        extractImageFilesFromClipboard,
-    } from "#lib/attachment-utils.ts";
+    import { FILE_DROP_HIGHLIGHT_CLASSES } from "#lib/client/attachments/attachment-utils.ts";
     import TagEditor from "./TagEditor.svelte";
     import AttachmentPicker from "./AttachmentPicker.svelte";
 
@@ -28,7 +26,7 @@
     let selectedAttachments = $state<File[]>([]);
     let isTodo = $state(false);
     // フォームルート要素へのファイルドラッグアンドドロップ中かどうか
-    let isDragOver = $state(false);
+    const attachmentInput = createAttachmentInput(addAttachments);
 
     // タグ削除などでフォーカスを失っても、入力中のテキストやタグ・添付があれば展開を維持する
     const expanded = $derived(
@@ -86,45 +84,18 @@
     function removeAttachment(index: number) {
         selectedAttachments = selectedAttachments.filter((_, i) => i !== index);
     }
-
-    function handleFormDragOver(e: DragEvent) {
-        if (e.dataTransfer?.types.includes("Files")) {
-            e.preventDefault();
-            isDragOver = true;
-        }
-    }
-
-    function handleFormDragLeave() {
-        isDragOver = false;
-    }
-
-    function handleFormDrop(e: DragEvent) {
-        e.preventDefault();
-        isDragOver = false;
-        const files = e.dataTransfer?.files;
-        if (files && files.length > 0) {
-            addAttachments(Array.from(files));
-        }
-    }
-
-    function handleTextareaPaste(event: ClipboardEvent) {
-        const images = extractImageFilesFromClipboard(event);
-        if (images.length === 0) return;
-        event.preventDefault();
-        addAttachments(images);
-    }
 </script>
 
 <div
-    class="max-h-[calc(100%-16rem)] shrink-0 overflow-y-auto border-b border-gray-200 px-3 py-2 sm:px-4 dark:border-gray-700 {isDragOver
+    class="max-h-[calc(100%-16rem)] shrink-0 overflow-y-auto border-b border-gray-200 px-3 py-2 sm:px-4 dark:border-gray-700 {attachmentInput.isDragOver
         ? FILE_DROP_HIGHLIGHT_CLASSES
         : 'bg-white dark:bg-gray-800'}"
     data-testid="task-add-form"
     role="group"
     aria-label="タスク追加フォーム（ファイルドロップ対応）"
-    ondragover={handleFormDragOver}
-    ondragleave={handleFormDragLeave}
-    ondrop={handleFormDrop}
+    ondragover={attachmentInput.ondragover}
+    ondragleave={attachmentInput.ondragleave}
+    ondrop={attachmentInput.ondrop}
 >
     <form onsubmit={handleSubmit} class="flex flex-col gap-2">
         <div class="flex items-start gap-2">
@@ -135,7 +106,7 @@
                 onfocus={() => (formFocused = true)}
                 onblur={handleBlur}
                 onkeydown={handleKeydown}
-                onpaste={handleTextareaPaste}
+                onpaste={attachmentInput.onpaste}
                 class="flex-1 resize-none rounded border border-gray-200 px-3 py-1.5 text-sm focus:border-blue-400 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
             ></textarea>
             {#if expanded}

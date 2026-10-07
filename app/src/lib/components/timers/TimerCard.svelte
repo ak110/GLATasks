@@ -1,10 +1,12 @@
 <script lang="ts">
+    import { grayButtonClass } from "#lib/components/ui/styles.ts";
+    import { getTimezoneOffsetMinutes } from "#lib/date-time.ts";
     /**
      * @fileoverview タイマーカードコンポーネント
      */
 
     import type { TimerInfo } from "#lib/types.ts";
-    import { getServerOffset } from "#lib/sse-client.ts";
+    import { getServerOffset } from "#lib/client/timers/time-sync.ts";
     import {
         calcTimerRemainingMs,
         formatTime,
@@ -48,7 +50,6 @@
     }: Props = $props();
 
     let displaySeconds = $state(0);
-    let intervalId = $state<ReturnType<typeof setInterval> | null>(null);
 
     // 時刻編集状態
     let editing = $state(false);
@@ -84,13 +85,7 @@
             const id = setInterval(() => {
                 displaySeconds = calcRemaining();
             }, 1000);
-            intervalId = id;
             return () => clearInterval(id);
-        } else {
-            if (intervalId) {
-                clearInterval(intervalId);
-                intervalId = null;
-            }
         }
     });
 
@@ -122,7 +117,7 @@
         if (timer.mode === "alarm") {
             const target = parseTargetTime(editValue);
             if (target !== null && target !== timer.target_minutes) {
-                const tzOffset = -new Date().getTimezoneOffset();
+                const tzOffset = getTimezoneOffsetMinutes();
                 onSetTime(timer.id, 0, target, tzOffset);
             }
         } else {
@@ -294,7 +289,7 @@
             {/if}
             <button
                 onclick={() => onReset(timer.id)}
-                class="cursor-pointer rounded bg-gray-100 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                class={grayButtonClass}
                 data-testid="timer-reset-btn">🔄 リセット</button
             >
         </div>

@@ -1,38 +1,29 @@
 <script lang="ts">
+    import { handleMainKeyboard } from "#lib/client/tasks/main-keyboard.svelte.ts";
+    import { queryKeys } from "#lib/client/query-options.ts";
+    import { createMainNavigation } from "#lib/client/tasks/main-navigation.svelte.ts";
+    import { subscribeMainSync } from "#lib/client/tasks/main-sync.svelte.ts";
+    import { createMainMutations } from "#lib/client/tasks/main-mutations.svelte.ts";
+    import { createMainQueries } from "#lib/client/tasks/main-queries.svelte.ts";
+    import { createMainState } from "#lib/client/tasks/main-state.svelte.ts";
     /**
      * @fileoverview タスクメモ管理メインページ（リスト一覧 + タスク一覧）
      */
 
-    import {
-        createQuery,
-        createMutation,
-        useQueryClient,
-    } from "@tanstack/svelte-query";
-    import { trpc, tabId, type RouterOutputs } from "#lib/trpc.ts";
-    import { subscribeOnMount } from "#lib/sse-subscribe.ts";
-    import { SSE_EVENTS } from "#lib/sse-events.ts";
-    import { debugLog } from "#lib/debug-log.ts";
-    import { showErrorToast } from "#lib/toast-store.svelte.ts";
-    import { extractErrorMessage } from "#lib/extract-error-message.ts";
-    import { uploadAttachment } from "#lib/attachment-utils.ts";
-    import { SvelteSet, SvelteMap } from "svelte/reactivity";
+    import { useQueryClient } from "@tanstack/svelte-query";
+    import { showErrorToast } from "#lib/client/ui/toast-store.svelte.ts";
+    import { extractErrorMessage } from "#lib/client/ui/extract-error-message.ts";
+    import { uploadAttachment } from "#lib/client/attachments/attachment-utils.ts";
+    import { SvelteMap } from "svelte/reactivity";
     import type { TaskStatus, TaskKind } from "#lib/schemas.ts";
-    import type {
-        TagInfo,
-        TaskListItem,
-        GetActiveTasksResult,
-        GetTasksResult,
-    } from "#lib/types.ts";
+    import type { TagInfo, TaskListItem } from "#lib/types.ts";
     import {
-        createTempTaskId,
         isTempTaskId,
-        mergeActiveTasks,
-        sortByListAndOrder,
+        sortByTaskOrder,
         filterByList,
         type ActiveTasksCache,
-    } from "#lib/task-cache.ts";
-    import { splitTitle, splitNotes } from "#lib/text-split.ts";
-    import { groupSearchResultsByList } from "#lib/search-grouping.ts";
+    } from "#lib/client/tasks/task-cache.ts";
+    import { groupSearchResultsByList } from "#lib/client/search/search-grouping.ts";
     import { compareTagName } from "#lib/tag-sort.ts";
     import Header from "#lib/components/layout/Header.svelte";
     import ListSidebar from "#lib/components/lists/ListSidebar.svelte";
@@ -46,599 +37,54 @@
     import ConfirmDialog from "#lib/components/dialogs/ConfirmDialog.svelte";
     import PromptDialog from "#lib/components/dialogs/PromptDialog.svelte";
 
-    let selectedListId = $state<number | null>(null);
-    let showType = $state<"active" | "archived" | "all">("active");
-    // 他端末で更新されたタスクのIDセット（リスト切り替えでクリア）
-    let updatedTaskIds = new SvelteSet<number>();
-    let addListTitle = $state("");
-    let addTaskText = $state("");
-    let openMenuId = $state<number | null>(null);
-    let dragOverListId = $state<number | null>(null);
-    let hasHash = $state(false);
-    let searchQuery = $state("");
-    let debouncedQuery = $state("");
-    let taskList = $state<{ scrollToTop: () => void }>();
+    const state = createMainState();
     const mobileView = $derived(
-        hasHash ? ("tasks" as const) : ("lists" as const),
+        state.hasHash ? ("tasks" as const) : ("lists" as const),
     );
-
-    // タスク編集ダイアログの状態
-    type EditDialog = {
-        open: boolean;
-        listId: number;
-        taskId: number;
-        text: string;
-        moveTo: string;
-        completed: boolean;
-        tags: TagInfo[];
-        kind: TaskKind;
-    };
-    let editDialog = $state<EditDialog>({
-        open: false,
-        listId: 0,
-        taskId: 0,
-        text: "",
-        moveTo: "",
-        completed: false,
-        tags: [],
-        kind: "normal",
-    });
-
-    // 定期TODOスケジュール管理ダイアログの対象リストID（null は非表示）
-    let schedulesDialogListId = $state<number | null>(null);
-
-    // リスト統合ダイアログの状態
-    type MergeDialog = {
-        open: boolean;
-        sourceListId: number;
-        sourceTitle: string;
-        taskCount: number;
-    };
-    let mergeDialog = $state<MergeDialog>({
-        open: false,
-        sourceListId: 0,
-        sourceTitle: "",
-        taskCount: 0,
-    });
-
-    // リスト削除確認ダイアログの状態
-    type ConfirmDeleteListDialog = {
-        open: boolean;
-        listId: number;
-    };
-    let confirmDeleteListDialog = $state<ConfirmDeleteListDialog>({
-        open: false,
-        listId: 0,
-    });
-
-    // リストアーカイブ確認ダイアログの状態
-    type ConfirmArchiveListDialog = {
-        open: boolean;
-        listId: number;
-    };
-    let confirmArchiveListDialog = $state<ConfirmArchiveListDialog>({
-        open: false,
-        listId: 0,
-    });
-
-    // リスト名変更入力ダイアログの状態
-    type RenameListDialog = {
-        open: boolean;
-        listId: number;
-        currentTitle: string;
-    };
-    let renameListDialog = $state<RenameListDialog>({
-        open: false,
-        listId: 0,
-        currentTitle: "",
-    });
 
     const queryClient = useQueryClient();
 
     // 検索クエリの debounce（300ms）
-    // searchQuery の変更ごとにタイマーをリセットし、入力停止後に検索を実行する
+    // state.searchQuery の変更ごとにタイマーをリセットし、入力停止後に検索を実行する
     $effect(() => {
-        const q = searchQuery;
-        const timer = setTimeout(() => (debouncedQuery = q), 300);
+        const q = state.searchQuery;
+        const timer = setTimeout(() => (state.debouncedQuery = q), 300);
         return () => clearTimeout(timer);
     });
 
-    // リスト一覧取得
-    const listsQuery = createQuery<RouterOutputs["lists"]["list"]>(() => ({
-        queryKey: ["lists", showType] as const,
-        queryFn: () => trpc.lists.list.query(showType),
-    }));
+    const {
+        listsQuery,
+        tasksQuery,
+        archivedTasksQuery,
+        searchResultsQuery,
+        resetActiveTasks,
+    } = createMainQueries(queryClient, state);
 
-    // 全アクティブタスク一括取得（SSE でリアルタイム差分同期）
-    // selectedListId に依存しないため、ページロード時に即実行する
-    const tasksQuery = createQuery<ActiveTasksCache>(() => ({
-        queryKey: ["activeTasks"] as const,
-        queryFn: async (): Promise<ActiveTasksCache> => {
-            const prev = queryClient.getQueryData<ActiveTasksCache>([
-                "activeTasks",
-            ]);
-            const response: GetActiveTasksResult =
-                await trpc.tasks.listActive.query({
-                    since: prev?.serverTime,
-                });
-            return mergeActiveTasks(prev, response);
-        },
-        staleTime: Infinity,
-    }));
+    subscribeMainSync(queryClient, state, resetActiveTasks);
 
-    /** アクティブタスクキャッシュを初期状態へ戻して全件再取得する。 */
-    async function resetActiveTasks(): Promise<void> {
-        await queryClient.resetQueries({
-            queryKey: ["activeTasks"],
-            exact: true,
-        });
-    }
-
-    // アーカイブタスク取得（showType="archived" のときのみ起動）
-    const archivedTasksQuery = createQuery<GetTasksResult>(() => ({
-        queryKey: ["tasks", selectedListId, "archived"] as const,
-        enabled: showType === "archived" && selectedListId !== null,
-        queryFn: () =>
-            trpc.tasks.list.query({
-                listId: selectedListId!,
-                showType: "archived",
-            }),
-    }));
-
-    // 全文検索クエリ
-    const searchResultsQuery = createQuery<RouterOutputs["tasks"]["search"]>(
-        () => ({
-            queryKey: ["search", debouncedQuery, showType] as const,
-            queryFn: () =>
-                trpc.tasks.search.query({
-                    query: debouncedQuery,
-                    showType,
-                }),
-            enabled: debouncedQuery.length > 0,
-        }),
-    );
-
-    // リスト集合の id+status に変化があった場合のみアクティブタスクキャッシュをリセットする
-    // rename はリセット不要、archive/unarchive/delete/merge はリセット要
-    async function syncLists(): Promise<void> {
-        debugLog("sync", "lists");
-        const prevLists =
-            queryClient.getQueryData<RouterOutputs["lists"]["list"]>([
-                "lists",
-                showType,
-            ]) ?? [];
-        const prevKey = JSON.stringify(
-            prevLists.map((l) => `${l.id}:${l.status}`).sort(),
-        );
-        await queryClient.invalidateQueries({ queryKey: ["lists"] });
-        const newLists =
-            queryClient.getQueryData<RouterOutputs["lists"]["list"]>([
-                "lists",
-                showType,
-            ]) ?? [];
-        const newKey = JSON.stringify(
-            newLists.map((l) => `${l.id}:${l.status}`).sort(),
-        );
-        if (prevKey !== newKey) {
-            debugLog("sync", "lists-reset-cache");
-            await resetActiveTasks();
-            // 注: 本ハンドラは async で動作するため、tasksUpdated と並走した場合
-            // updatedTaskIds の差分検知が空キャッシュを参照する可能性がある。
-            // その場合 updatedTaskIds が一時的に空になるが、後続のSSE/操作で復元されるので許容。
-        }
-    }
-
-    // タスク更新の再取得。自分のタブ発のSSEは差分同期のみ、それ以外（他タブ/他端末・
-    // フォールバック経路）はスナップショット比較で変更タスクIDを `updatedTaskIds` へ反映する。
-    async function syncTasks(fromOwnTab: boolean): Promise<void> {
-        debugLog("sync", "tasks", { fromOwnTab });
-        // アーカイブモード時は archived 用クエリも無効化する
-        if (showType === "archived") {
-            await queryClient.invalidateQueries({
-                queryKey: ["tasks", selectedListId, "archived"],
-            });
-        }
-        // TODO件数バッジはリスト一覧クエリ由来のため、タスクの完了/未完了切替や
-        // kind変更の都度、リスト一覧も再取得して反映する
-        await queryClient.invalidateQueries({ queryKey: ["lists"] });
-        if (fromOwnTab) {
-            await queryClient.invalidateQueries({ queryKey: ["activeTasks"] });
-            return;
-        }
-        const oldCache = queryClient.getQueryData<ActiveTasksCache>([
-            "activeTasks",
-        ]);
-        const oldMap = new Map(
-            (oldCache?.tasks ?? []).map((t) => [
-                t.id,
-                `${t.title}\0${t.notes}\0${t.status}`,
-            ]),
-        );
-        await queryClient.invalidateQueries({ queryKey: ["activeTasks"] });
-        const newCache = queryClient.getQueryData<ActiveTasksCache>([
-            "activeTasks",
-        ]);
-        for (const task of newCache?.tasks ?? []) {
-            const oldKey = oldMap.get(task.id);
-            const newKey = `${task.title}\0${task.notes}\0${task.status}`;
-            if (oldKey === undefined || oldKey !== newKey) {
-                updatedTaskIds.add(task.id);
-            }
-        }
-    }
-
-    // 定期TODOスケジュール一覧の再取得
-    async function syncSchedules(): Promise<void> {
-        debugLog("sync", "schedules");
-        await queryClient.invalidateQueries({ queryKey: ["schedules"] });
-    }
-
-    // SSE: サーバーからの通知でクエリを再取得（フォールバックはSSE不健全時のポーリング経路）
-    subscribeOnMount({
-        [SSE_EVENTS.listsUpdated]: {
-            handler: () => {
-                void syncLists();
-            },
-            fallback: syncLists,
-        },
-        [SSE_EVENTS.tasksUpdated]: {
-            handler: (e) => {
-                const fromOwnTab = e.data === tabId;
-                debugLog("sync", "tasks-received", {
-                    fromOwnTab,
-                    sourceTabId: e.data,
-                });
-                void syncTasks(fromOwnTab);
-            },
-            // フォールバック経路は発信元タブを判別できないため、常に他端末扱いで差分検出する
-            fallback: () => syncTasks(false),
-        },
-        [SSE_EVENTS.schedulesUpdated]: {
-            handler: () => {
-                void syncSchedules();
-            },
-            fallback: syncSchedules,
-        },
-    });
-    // リスト作成
-    const createListMutation = createMutation(() => ({
-        mutationFn: (title: string) => trpc.lists.create.mutate({ title }),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ["lists"] });
-            addListTitle = "";
-        },
-    }));
-
-    // タスク作成
-    const createTaskMutation = createMutation(() => ({
-        mutationFn: ({
-            listId,
-            text,
-            tags,
-            kind,
-        }: {
-            listId: number;
-            text: string;
-            tags?: TagInfo[];
-            kind?: TaskKind;
-        }) => trpc.tasks.create.mutate({ listId, text, tags, kind }),
-        onMutate: async ({
-            listId,
-            text,
-            tags,
-            kind,
-        }: {
-            listId: number;
-            text: string;
-            tags?: TagInfo[];
-            kind?: TaskKind;
-        }) => {
-            await queryClient.cancelQueries({ queryKey: ["activeTasks"] });
-            const tempId = createTempTaskId();
-            queryClient.setQueryData<ActiveTasksCache>(
-                ["activeTasks"],
-                (old) => {
-                    // キャッシュ未初期化の場合は楽観タスクを追加せず、
-                    // サーバー応答後の差分 sync に委ねる
-                    if (!old) return undefined;
-                    const minOrder =
-                        old.tasks.length > 0
-                            ? Math.min(...old.tasks.map((t) => t.sort_order))
-                            : 0;
-                    const optimisticTask: TaskListItem = {
-                        _key: tempId,
-                        id: tempId,
-                        listId,
-                        title: splitTitle(text),
-                        notes: splitNotes(text),
-                        status: "active",
-                        kind: kind ?? "normal",
-                        tags: tags ?? [],
-                        sort_order: minOrder - 1000,
-                        updated: new Date().toISOString(),
-                        attachments: [],
-                    };
-                    return { ...old, tasks: [...old.tasks, optimisticTask] };
-                },
-            );
-            return { tempId };
-        },
-        onError: (_err, _vars, context) => {
-            const tempId = context?.tempId;
-            if (tempId === undefined) return;
-            // 失敗時は作成操作が追加した仮IDのタスクだけを取り消し、並行操作の結果を保持する。
-            queryClient.setQueryData<ActiveTasksCache>(
-                ["activeTasks"],
-                (old) =>
-                    old
-                        ? {
-                              ...old,
-                              tasks: old.tasks.filter((t) => t.id !== tempId),
-                          }
-                        : old,
-            );
-        },
-        onSuccess: (data, _vars, context) => {
-            // 仮IDタスクを実IDで置き換える。DOMの連続性を保ちつつ正しいIDになる。
-            const tempId = context?.tempId;
-            if (tempId !== undefined) {
-                queryClient.setQueryData<ActiveTasksCache>(
-                    ["activeTasks"],
-                    (old) =>
-                        old
-                            ? {
-                                  ...old,
-                                  tasks: old.tasks.map((t) =>
-                                      t.id === tempId
-                                          ? { ...t, id: data.taskId }
-                                          : t,
-                                  ),
-                              }
-                            : old,
-                );
-            }
-            queryClient.invalidateQueries({ queryKey: ["activeTasks"] });
-            // TODO区分で作成された場合の通知バッジ反映のため、リスト一覧も再取得する
-            queryClient.invalidateQueries({ queryKey: ["lists"] });
-            addTaskText = "";
-        },
-    }));
-
-    // タスク更新
-    const updateTaskMutation = createMutation(() => ({
-        mutationFn: (input: {
-            listId: number;
-            taskId: number;
-            text?: string;
-            status?: TaskStatus;
-            completed?: string | null;
-            move_to?: number;
-            keep_order?: boolean;
-            tags?: TagInfo[];
-            kind?: TaskKind;
-        }) => trpc.tasks.update.mutate(input),
-        onMutate: async (variables: {
-            listId: number;
-            taskId: number;
-            text?: string;
-            status?: TaskStatus;
-            completed?: string | null;
-            move_to?: number;
-            keep_order?: boolean;
-            tags?: TagInfo[];
-            kind?: TaskKind;
-        }) => {
-            await queryClient.cancelQueries({ queryKey: ["activeTasks"] });
-            const previousUpdated = queryClient
-                .getQueryData<ActiveTasksCache>(["activeTasks"])
-                ?.tasks.find((t) => t.id === variables.taskId)?.updated;
-            // text変更かつkeep_order=falseなら先頭移動（サーバーロジック踏襲）
-            let optimisticSortOrder: number | undefined;
-            if (variables.text !== undefined && variables.keep_order !== true) {
-                const prev2 = queryClient.getQueryData<ActiveTasksCache>([
-                    "activeTasks",
-                ]);
-                const targetListId = variables.move_to ?? variables.listId;
-                const sameListTasks = (prev2?.tasks ?? []).filter(
-                    (t) => t.listId === targetListId,
-                );
-                const minOrder =
-                    sameListTasks.length > 0
-                        ? Math.min(...sameListTasks.map((t) => t.sort_order))
-                        : 1000;
-                optimisticSortOrder = minOrder - 1000;
-            } else if (variables.move_to !== undefined) {
-                // move_to のみの場合も移動先リストの先頭に楽観配置
-                const prev2 = queryClient.getQueryData<ActiveTasksCache>([
-                    "activeTasks",
-                ]);
-                const sameListTasks = (prev2?.tasks ?? []).filter(
-                    (t) => t.listId === variables.move_to,
-                );
-                const minOrder =
-                    sameListTasks.length > 0
-                        ? Math.min(...sameListTasks.map((t) => t.sort_order))
-                        : 1000;
-                optimisticSortOrder = minOrder - 1000;
-            }
-            queryClient.setQueryData<ActiveTasksCache>(
-                ["activeTasks"],
-                (old) => {
-                    if (!old) return old;
-                    return {
-                        ...old,
-                        tasks: old.tasks.map((t) => {
-                            if (t.id !== variables.taskId) return t;
-                            return {
-                                ...t,
-                                ...(variables.text !== undefined
-                                    ? {
-                                          title: splitTitle(variables.text),
-                                          notes: splitNotes(variables.text),
-                                      }
-                                    : {}),
-                                ...(variables.status !== undefined
-                                    ? { status: variables.status }
-                                    : {}),
-                                ...(variables.tags !== undefined
-                                    ? { tags: variables.tags }
-                                    : {}),
-                                ...(variables.kind !== undefined
-                                    ? { kind: variables.kind }
-                                    : {}),
-                                ...(variables.move_to !== undefined
-                                    ? { listId: variables.move_to }
-                                    : {}),
-                                ...(optimisticSortOrder !== undefined
-                                    ? { sort_order: optimisticSortOrder }
-                                    : {}),
-                                updated: new Date().toISOString(),
-                            };
-                        }),
-                    };
-                },
-            );
-            return { previousUpdated };
-        },
-        onError: (_error, _variables, context) => {
-            // 差分取得はサーバー側で updated が変わっていないタスクを応答へ含めない。
-            // 変更前の updated を起点に取り直し、失敗した楽観値を確定値で上書きする。
-            const previousUpdated = context?.previousUpdated;
-            if (previousUpdated !== undefined) {
-                queryClient.setQueryData<ActiveTasksCache>(
-                    ["activeTasks"],
-                    (old) =>
-                        old ? { ...old, serverTime: previousUpdated } : old,
-                );
-            }
-            queryClient.invalidateQueries({ queryKey: ["activeTasks"] });
-        },
-        onSuccess: (_data, variables) => {
-            queryClient.invalidateQueries({ queryKey: ["activeTasks"] });
-            // タスクが別リストへ移動された場合、または TODO 件数バッジに影響する
-            // kind・status の変更を伴う場合はリスト一覧も更新する
-            if (
-                (variables.move_to !== undefined &&
-                    variables.move_to !== variables.listId) ||
-                variables.kind !== undefined ||
-                variables.status !== undefined
-            ) {
-                queryClient.invalidateQueries({ queryKey: ["lists"] });
-            }
-        },
-    }));
-
-    // リスト削除
-    const deleteListMutation = createMutation(() => ({
-        mutationFn: (listId: number) => trpc.lists.delete.mutate({ listId }),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ["lists"] });
-        },
-    }));
-
-    // リスト名変更
-    const renameListMutation = createMutation(() => ({
-        mutationFn: ({ listId, title }: { listId: number; title: string }) =>
-            trpc.lists.rename.mutate({ listId, title }),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ["lists"] });
-        },
-    }));
-
-    // リストをアーカイブ
-    const archiveListMutation = createMutation(() => ({
-        mutationFn: (listId: number) => trpc.lists.archive.mutate({ listId }),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ["lists"] });
-        },
-    }));
-
-    // リストをアーカイブ解除
-    const unarchiveListMutation = createMutation(() => ({
-        mutationFn: (listId: number) => trpc.lists.unarchive.mutate({ listId }),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ["lists"] });
-        },
-    }));
-
-    // 完了済みタスククリア
-    const clearListMutation = createMutation(() => ({
-        mutationFn: (listId: number) => trpc.lists.clear.mutate({ listId }),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ["activeTasks"] });
-        },
-    }));
-
-    // リスト統合
-    const mergeListMutation = createMutation(() => ({
-        mutationFn: (input: { sourceListId: number; targetListId: number }) =>
-            trpc.lists.merge.mutate(input),
-        onSuccess: async () => {
-            queryClient.invalidateQueries({ queryKey: ["lists"] });
-            queryClient.invalidateQueries({ queryKey: ["schedules"] });
-            await resetActiveTasks();
-        },
-    }));
-
-    // タスク並び替え
-    const reorderTasksMutation = createMutation(() => ({
-        mutationFn: (input: { listId: number; taskIds: number[] }) =>
-            trpc.tasks.reorder.mutate(input),
-        onMutate: async (input: { listId: number; taskIds: number[] }) => {
-            await queryClient.cancelQueries({ queryKey: ["activeTasks"] });
-            const previousUpdated: string[] = [];
-            const now = new Date().toISOString();
-            const idxMap = new Map(input.taskIds.map((id, i) => [id, i]));
-            queryClient.setQueryData<ActiveTasksCache>(
-                ["activeTasks"],
-                (old) => {
-                    if (!old) return old;
-                    return {
-                        ...old,
-                        tasks: old.tasks.map((task) => {
-                            const newOrder = idxMap.get(task.id);
-                            if (newOrder === undefined) return task;
-                            previousUpdated.push(task.updated);
-                            return {
-                                ...task,
-                                sort_order: newOrder,
-                                updated: now,
-                            };
-                        }),
-                    };
-                },
-            );
-            return { previousUpdated };
-        },
-        onError: (_error, _input, context) => {
-            const oldestUpdated = context?.previousUpdated.reduce<
-                string | undefined
-            >(
-                (oldest, updated) =>
-                    oldest === undefined || updated < oldest ? updated : oldest,
-                undefined,
-            );
-            if (oldestUpdated === undefined) return;
-            queryClient.setQueryData<ActiveTasksCache>(
-                ["activeTasks"],
-                (old) => (old ? { ...old, serverTime: oldestUpdated } : old),
-            );
-        },
-        onSettled: async () => {
-            await queryClient.invalidateQueries({ queryKey: ["activeTasks"] });
-        },
-    }));
+    const {
+        createListMutation,
+        createTaskMutation,
+        updateTaskMutation,
+        deleteListMutation,
+        renameListMutation,
+        archiveListMutation,
+        unarchiveListMutation,
+        clearListMutation,
+        mergeListMutation,
+        reorderTasksMutation,
+    } = createMainMutations(queryClient, state, resetActiveTasks);
 
     // 派生状態
     const lists = $derived(listsQuery.data ?? []);
     const tasks = $derived.by((): TaskListItem[] => {
-        if (showType === "archived") {
+        if (state.showType === "archived") {
             const data = archivedTasksQuery.data;
             if (!data || !("data" in data)) return [];
             return data.data.map((t) => ({
                 _key: t.id,
                 id: t.id,
-                listId: selectedListId!,
+                listId: state.selectedListId!,
                 title: t.title,
                 notes: t.notes,
                 status: t.status,
@@ -650,14 +96,15 @@
             }));
         }
         const cache = tasksQuery.data;
-        if (!cache || selectedListId === null) return [];
-        return sortByListAndOrder(
-            filterByList(cache.tasks, selectedListId, showType),
+        if (!cache || state.selectedListId === null) return [];
+        return sortByTaskOrder(
+            filterByList(cache.tasks, state.selectedListId, state.showType),
         );
     });
     // 編集ダイアログ対象タスクの添付一覧。tasksキャッシュから常に最新値を導出する
     const editDialogAttachments = $derived(
-        tasks.find((t) => t.id === editDialog.taskId)?.attachments ?? [],
+        tasks.find((t) => t.id === state.dialogs.editDialog.taskId)
+            ?.attachments ?? [],
     );
     // 同一リスト内で既に使われているタグ候補（名前ユニーク、同名は最初の色を採用）
     const listTagCandidates = $derived.by(() => {
@@ -672,120 +119,27 @@
     const isLoading = $derived(
         listsQuery.isLoading ||
             tasksQuery.isLoading ||
-            (showType === "archived" && archivedTasksQuery.isLoading),
+            (state.showType === "archived" && archivedTasksQuery.isLoading),
     );
-    const isSearching = $derived(debouncedQuery.length > 0);
+    const isSearching = $derived(state.debouncedQuery.length > 0);
     const searchResults = $derived(searchResultsQuery.data ?? []);
     // 検索結果をリスト名でグループ化
     const searchResultsByList = $derived.by(() => {
-        return groupSearchResultsByList(searchResults, selectedListId);
+        return groupSearchResultsByList(searchResults, state.selectedListId);
     });
 
-    // URLハッシュからリストIDを解析
-    function parseHashListId(): number | null {
-        const hash = window.location.hash;
-        if (!hash || hash === "#") return null;
-        const id = parseInt(hash.substring(1));
-        return isNaN(id) ? null : id;
-    }
-
-    // hashchange イベントで URL ハッシュと状態を同期
-    // ブラウザのバック/フォワード操作やモバイルのリスト⇔タスク画面遷移を検知する
-    $effect(() => {
-        function onHashChange() {
-            const hashId = parseHashListId();
-            hasHash = hashId !== null;
-            if (hashId !== null) {
-                selectedListId = hashId;
-                localStorage.setItem("selectedList", String(hashId));
-            }
-        }
-        window.addEventListener("hashchange", onHashChange);
-        return () => window.removeEventListener("hashchange", onHashChange);
-    });
-
-    // リストデータ到着時に選択状態を復元（初回のみ）
-    // URLハッシュ > URL パラメータ `list` > localStorage の優先順
-    // SSR ではなく $effect で行う理由: window/localStorage/location はブラウザ専用 API のため
-    $effect(() => {
-        if (lists.length > 0 && selectedListId === null) {
-            // URLハッシュ（ブックマーク・直接アクセス等）
-            const hashId = parseHashListId();
-            if (hashId && lists.some((l) => l.id === hashId)) {
-                selectedListId = hashId;
-                hasHash = true;
-                localStorage.setItem("selectedList", String(hashId));
-                return;
-            }
-
-            // URL パラメータ（share/ingest からのリダイレクト等、互換性のため残す）
-            const urlListId = Number(
-                new URLSearchParams(window.location.search).get("list"),
-            );
-            if (urlListId && lists.some((l) => l.id === urlListId)) {
-                selectedListId = urlListId;
-                localStorage.setItem("selectedList", String(urlListId));
-                // ?list= をハッシュに置換
-                history.replaceState(
-                    {},
-                    "",
-                    window.location.pathname + "#" + urlListId,
-                );
-                hasHash = true;
-                return;
-            }
-
-            // localStorage フォールバック（ハッシュは付けない → モバイルではリスト一覧から）
-            const saved = localStorage.getItem("selectedList");
-            const savedId = saved ? parseInt(saved) : null;
-            const initial = lists.find((l) => l.id === savedId) ?? lists[0];
-            if (initial) {
-                selectedListId = initial.id;
-                localStorage.setItem("selectedList", String(initial.id));
-            }
-        }
-
-        // 無効なハッシュ対策: リストデータにハッシュのIDが存在しなければハッシュを除去
-        if (lists.length > 0 && hasHash) {
-            const hashId = parseHashListId();
-            if (hashId && !lists.some((l) => l.id === hashId)) {
-                hasHash = false;
-                history.replaceState(
-                    {},
-                    "",
-                    window.location.pathname + window.location.search,
-                );
-            }
-        }
-    });
-
-    function selectList(listId: number) {
-        selectedListId = listId;
-        addTaskText = "";
-        updatedTaskIds.clear();
-        // ハッシュ更新 → hashchange イベントで hasHash と localStorage が同期される
-        location.hash = "#" + listId;
-    }
-
-    async function changeShowType(type: "active" | "archived" | "all") {
-        showType = type;
-        updatedTaskIds.clear();
-        await queryClient.invalidateQueries({ queryKey: ["lists"] });
-        if (!lists.some((l) => l.id === selectedListId)) {
-            const first = lists[0];
-            if (first) selectList(first.id);
-            else selectedListId = null;
-        }
-    }
+    const { selectList, changeShowType } = createMainNavigation(
+        queryClient,
+        state,
+        () => lists,
+    );
 
     async function addList() {
-        const title = addListTitle.trim();
+        const title = state.addListTitle.trim();
         if (!title) return;
         try {
-            await createListMutation.mutateAsync(title);
-            const newLists = lists;
-            const newList = newLists[newLists.length - 1];
-            if (newList) selectList(newList.id);
+            const result = await createListMutation.mutateAsync(title);
+            selectList(result.listId);
         } catch {
             // グローバルエラーハンドラがトースト表示を担当
         }
@@ -797,10 +151,10 @@
         attachments: File[];
         kind: TaskKind;
     }): Promise<boolean> {
-        if (!selectedListId) return false;
+        if (!state.selectedListId) return false;
         const text = data.text.trimEnd();
         if (!text) return false;
-        const listId = selectedListId;
+        const listId = state.selectedListId;
         try {
             const result = await createTaskMutation.mutateAsync({
                 listId,
@@ -809,8 +163,11 @@
                 kind: data.kind,
             });
             await uploadTaskAttachments(result.taskId, data.attachments);
-            if (selectedListId === listId && showType !== "archived") {
-                taskList?.scrollToTop();
+            if (
+                state.selectedListId === listId &&
+                state.showType !== "archived"
+            ) {
+                state.taskList?.scrollToTop();
             }
             return true;
         } catch {
@@ -832,14 +189,14 @@
     }
 
     async function toggleTask(taskId: number, nextStatus: TaskStatus) {
-        if (!selectedListId) return;
+        if (!state.selectedListId) return;
         const taskData =
             nextStatus === "completed"
                 ? { status: "completed" as const }
                 : { status: nextStatus, completed: null };
         try {
             await updateTaskMutation.mutateAsync({
-                listId: selectedListId,
+                listId: state.selectedListId,
                 taskId,
                 ...taskData,
             });
@@ -850,20 +207,20 @@
 
     // 添付ファイル追加・削除完了後の呼び出し。SSE経由の反映を待たず同一タブへ即時反映する
     function handleAttachmentChange() {
-        queryClient.invalidateQueries({ queryKey: ["activeTasks"] });
+        queryClient.invalidateQueries({ queryKey: queryKeys.activeTasks });
         queryClient.invalidateQueries({
-            queryKey: ["tasks", selectedListId, "archived"],
+            queryKey: queryKeys.archivedTasks(state.selectedListId),
         });
     }
 
     function openEditDialog(task: TaskListItem) {
         const text = task.notes ? `${task.title}\n\n${task.notes}` : task.title;
-        editDialog = {
+        state.dialogs.editDialog = {
             open: true,
-            listId: selectedListId!,
+            listId: state.selectedListId!,
             taskId: task.id,
             text,
-            moveTo: String(selectedListId!),
+            moveTo: String(state.selectedListId!),
             completed: task.status === "completed",
             tags: task.tags,
             kind: task.kind,
@@ -878,7 +235,11 @@
         kind: TaskKind;
         closeAfter: boolean;
     }) {
-        const { listId, taskId, completed: wasCompleted } = editDialog;
+        const {
+            listId,
+            taskId,
+            completed: wasCompleted,
+        } = state.dialogs.editDialog;
 
         // 完了状態の変更（toggleTask と同じロジック）
         const statusChange =
@@ -905,20 +266,20 @@
             });
 
             if (data.closeAfter) {
-                editDialog.open = false;
+                state.dialogs.editDialog.open = false;
             } else {
                 // 保存後もダイアログを開いたままにする経路では、後続保存時の statusChange 判定や
                 // 対象リスト判定が古い値で行われないよう、保持値を保存後の値へ同期する
-                editDialog.listId = Number(data.moveTo);
-                editDialog.completed = data.completed;
-                editDialog.text = data.text;
-                editDialog.moveTo = data.moveTo;
-                editDialog.tags = data.tags;
-                editDialog.kind = data.kind;
+                state.dialogs.editDialog.listId = Number(data.moveTo);
+                state.dialogs.editDialog.completed = data.completed;
+                state.dialogs.editDialog.text = data.text;
+                state.dialogs.editDialog.moveTo = data.moveTo;
+                state.dialogs.editDialog.tags = data.tags;
+                state.dialogs.editDialog.kind = data.kind;
             }
 
             if (Number(data.moveTo) !== listId) {
-                queryClient.invalidateQueries({ queryKey: ["lists"] });
+                queryClient.invalidateQueries({ queryKey: queryKeys.lists });
             }
         } catch {
             // グローバルエラーハンドラがトースト表示を担当
@@ -926,12 +287,12 @@
     }
 
     function renameList(listId: number, currentTitle: string) {
-        renameListDialog = { open: true, listId, currentTitle };
+        state.dialogs.renameListDialog = { open: true, listId, currentTitle };
     }
 
     async function submitRenameList(newTitle: string) {
-        const { listId, currentTitle } = renameListDialog;
-        renameListDialog.open = false;
+        const { listId, currentTitle } = state.dialogs.renameListDialog;
+        state.dialogs.renameListDialog.open = false;
         if (!newTitle || newTitle === currentTitle) return;
         try {
             await renameListMutation.mutateAsync({ listId, title: newTitle });
@@ -941,18 +302,18 @@
     }
 
     function deleteList(listId: number) {
-        confirmDeleteListDialog = { open: true, listId };
+        state.dialogs.confirmDeleteListDialog = { open: true, listId };
     }
 
     async function submitDeleteList() {
-        const { listId } = confirmDeleteListDialog;
-        confirmDeleteListDialog.open = false;
+        const { listId } = state.dialogs.confirmDeleteListDialog;
+        state.dialogs.confirmDeleteListDialog.open = false;
         try {
             await deleteListMutation.mutateAsync(listId);
-            if (selectedListId === listId) {
+            if (state.selectedListId === listId) {
                 const first = lists[0];
                 if (first) selectList(first.id);
-                else selectedListId = null;
+                else state.selectedListId = null;
             }
         } catch {
             // グローバルエラーハンドラがトースト表示を担当
@@ -960,18 +321,18 @@
     }
 
     function archiveList(listId: number) {
-        confirmArchiveListDialog = { open: true, listId };
+        state.dialogs.confirmArchiveListDialog = { open: true, listId };
     }
 
     async function submitArchiveList() {
-        const { listId } = confirmArchiveListDialog;
-        confirmArchiveListDialog.open = false;
+        const { listId } = state.dialogs.confirmArchiveListDialog;
+        state.dialogs.confirmArchiveListDialog.open = false;
         try {
             await archiveListMutation.mutateAsync(listId);
-            if (selectedListId === listId) {
+            if (state.selectedListId === listId) {
                 const first = lists[0];
                 if (first) selectList(first.id);
-                else selectedListId = null;
+                else state.selectedListId = null;
             }
         } catch {
             // グローバルエラーハンドラがトースト表示を担当
@@ -990,12 +351,12 @@
     function openMergeDialog(listId: number) {
         const list = lists.find((l) => l.id === listId);
         if (!list) return;
-        const cache = queryClient.getQueryData<ActiveTasksCache>([
-            "activeTasks",
-        ]);
+        const cache = queryClient.getQueryData<ActiveTasksCache>(
+            queryKeys.activeTasks,
+        );
         const count =
             cache?.tasks.filter((t) => t.listId === listId).length ?? 0;
-        mergeDialog = {
+        state.dialogs.mergeDialog = {
             open: true,
             sourceListId: listId,
             sourceTitle: list.title,
@@ -1006,10 +367,10 @@
     async function submitMerge(targetListId: number) {
         try {
             await mergeListMutation.mutateAsync({
-                sourceListId: mergeDialog.sourceListId,
+                sourceListId: state.dialogs.mergeDialog.sourceListId,
                 targetListId,
             });
-            mergeDialog.open = false;
+            state.dialogs.mergeDialog.open = false;
             // 統合先リストを自動選択
             selectList(targetListId);
         } catch {
@@ -1027,26 +388,27 @@
 
     /** タスクの並び替え（楽観的更新 + API呼出） */
     function handleReorderTasks(taskIds: number[]) {
-        if (!selectedListId) return;
+        if (!state.selectedListId) return;
         // 仮IDはサーバー入力の正整数制約に反するため、送信配列と楽観更新の双方から除く
         const persistedTaskIds = taskIds.filter(
             (taskId) => !isTempTaskId(taskId),
         );
         reorderTasksMutation.mutate({
-            listId: selectedListId,
+            listId: state.selectedListId,
             taskIds: persistedTaskIds,
         });
     }
 
     /** サイドバーのリストへのタスクD&D移動（楽観的更新 + 失敗時ロールバック） */
     async function handleTaskDropToList(taskId: number, targetListId: number) {
-        if (!selectedListId || targetListId === selectedListId) return;
-        dragOverListId = null;
+        if (!state.selectedListId || targetListId === state.selectedListId)
+            return;
+        state.dragOverListId = null;
 
         try {
             // updateTaskMutation の onMutate で楽観的更新を実施する
             await updateTaskMutation.mutateAsync({
-                listId: selectedListId,
+                listId: state.selectedListId,
                 taskId,
                 move_to: targetListId,
                 keep_order: false,
@@ -1058,8 +420,8 @@
 
     /** 検索結果のタスクをクリックしてリストに遷移 */
     function goToSearchResult(listId: number) {
-        searchQuery = "";
-        debouncedQuery = "";
+        state.searchQuery = "";
+        state.debouncedQuery = "";
         selectList(listId);
     }
 
@@ -1068,48 +430,19 @@
         // history.back() だと直接 /#ID にアクセスした場合にサイト外へ遷移するため pushState を使う
         history.pushState(null, "", window.location.pathname);
         // pushState は hashchange を発火しないため手動で同期
-        hasHash = false;
+        state.hasHash = false;
     }
 </script>
 
-<svelte:window
-    onclick={() => (openMenuId = null)}
-    onkeydown={(e) => {
-        // input/textarea/select にフォーカス中、またはダイアログ表示中はスキップ
-        const tag = (e.target as HTMLElement)?.tagName;
-        if (
-            tag === "INPUT" ||
-            tag === "TEXTAREA" ||
-            tag === "SELECT" ||
-            editDialog.open ||
-            mergeDialog.open
-        )
-            return;
-        if (e.key === "n") {
-            e.preventDefault();
-            const textarea = document.querySelector<HTMLTextAreaElement>(
-                '[data-testid="task-add-form"] textarea',
-            );
-            textarea?.focus();
-        } else if (e.key === "/") {
-            e.preventDefault();
-            const input = document.querySelector<HTMLInputElement>(
-                '[data-testid="search-input"]',
-            );
-            input?.focus();
-        } else if (e.key === "Escape") {
-            (document.activeElement as HTMLElement)?.blur();
-        }
-    }}
-/>
+<svelte:window onkeydown={handleMainKeyboard} />
 
 <Header
     page="tasks"
-    {showType}
+    showType={state.showType}
     {isLoading}
     onChangeShowType={changeShowType}
-    {searchQuery}
-    onSearchChange={(q) => (searchQuery = q)}
+    searchQuery={state.searchQuery}
+    onSearchChange={(q) => (state.searchQuery = q)}
 />
 
 <!-- ボディ: サイドバー + メインコンテンツ -->
@@ -1120,22 +453,23 @@
 <div class="mx-auto flex min-h-0 w-full flex-1 xl:max-w-285">
     <ListSidebar
         {lists}
-        {selectedListId}
+        selectedListId={state.selectedListId}
         {isLoading}
         {mobileView}
-        {openMenuId}
-        {dragOverListId}
-        bind:addListTitle
+        openMenuId={state.openMenuId}
+        dragOverListId={state.dragOverListId}
+        bind:addListTitle={state.addListTitle}
         onSelect={selectList}
         onToggleMenu={(listId) => {
-            openMenuId = openMenuId === listId ? null : listId;
+            state.openMenuId = state.openMenuId === listId ? null : listId;
         }}
         onRename={renameList}
         onArchive={archiveList}
         onUnarchive={unarchiveList}
         onMerge={openMergeDialog}
         onDelete={deleteList}
-        onOpenSchedules={(listId) => (schedulesDialogListId = listId)}
+        onOpenSchedules={(listId) =>
+            (state.dialogs.schedulesDialogListId = listId)}
         onAddList={addList}
     />
 
@@ -1150,37 +484,39 @@
     >
         {#if isSearching}
             <SearchResults
-                query={debouncedQuery}
+                query={state.debouncedQuery}
                 {searchResultsByList}
                 isLoading={searchResultsQuery.isLoading}
                 onGoToResult={goToSearchResult}
             />
-        {:else if selectedListId !== null}
-            {@const selectedList = lists.find((l) => l.id === selectedListId)}
+        {:else if state.selectedListId !== null}
+            {@const selectedList = lists.find(
+                (l) => l.id === state.selectedListId,
+            )}
             {#if selectedList}
                 <TaskListHeader
                     title={selectedList.title}
                     onBack={backToLists}
-                    onClear={() => clearList(selectedListId!)}
+                    onClear={() => clearList(state.selectedListId!)}
                 />
             {/if}
 
             <TaskAddForm
-                bind:value={addTaskText}
+                bind:value={state.addTaskText}
                 {listTagCandidates}
                 onSubmit={addTask}
             />
 
             <TaskList
-                bind:this={taskList}
+                bind:this={state.taskList}
                 {tasks}
                 isLoading={tasksQuery.isLoading}
                 onToggle={toggleTask}
                 onEdit={openEditDialog}
                 onReorder={handleReorderTasks}
-                onTaskDragOver={(listId) => (dragOverListId = listId)}
+                onTaskDragOver={(listId) => (state.dragOverListId = listId)}
                 onTaskDrop={handleTaskDropToList}
-                {updatedTaskIds}
+                updatedTaskIds={state.updatedTaskIds}
             />
         {:else}
             <div class="flex flex-1 items-center justify-center">
@@ -1194,63 +530,63 @@
 
 <TaskEditDialog
     {lists}
-    open={editDialog.open}
-    text={editDialog.text}
-    moveTo={editDialog.moveTo}
-    completed={editDialog.completed}
-    tags={editDialog.tags}
-    kind={editDialog.kind}
+    open={state.dialogs.editDialog.open}
+    text={state.dialogs.editDialog.text}
+    moveTo={state.dialogs.editDialog.moveTo}
+    completed={state.dialogs.editDialog.completed}
+    tags={state.dialogs.editDialog.tags}
+    kind={state.dialogs.editDialog.kind}
     {listTagCandidates}
-    taskId={editDialog.taskId}
+    taskId={state.dialogs.editDialog.taskId}
     attachments={editDialogAttachments}
     onAttachmentChange={handleAttachmentChange}
     onSubmit={submitTaskEdit}
-    onClose={() => (editDialog.open = false)}
+    onClose={() => (state.dialogs.editDialog.open = false)}
 />
 
 <ScheduleDialog
-    open={schedulesDialogListId !== null}
-    listId={schedulesDialogListId}
-    onClose={() => (schedulesDialogListId = null)}
+    open={state.dialogs.schedulesDialogListId !== null}
+    listId={state.dialogs.schedulesDialogListId}
+    onClose={() => (state.dialogs.schedulesDialogListId = null)}
 />
 
 <MergeListDialog
-    open={mergeDialog.open}
+    open={state.dialogs.mergeDialog.open}
     sourceList={{
-        id: mergeDialog.sourceListId,
-        title: mergeDialog.sourceTitle,
+        id: state.dialogs.mergeDialog.sourceListId,
+        title: state.dialogs.mergeDialog.sourceTitle,
     }}
     allLists={lists}
-    taskCount={mergeDialog.taskCount}
+    taskCount={state.dialogs.mergeDialog.taskCount}
     onSubmit={submitMerge}
-    onClose={() => (mergeDialog.open = false)}
+    onClose={() => (state.dialogs.mergeDialog.open = false)}
 />
 
 <ConfirmDialog
-    open={confirmDeleteListDialog.open}
+    open={state.dialogs.confirmDeleteListDialog.open}
     title="リストの削除"
     message="このリストと全てのタスクを削除しますか?"
     confirmLabel="削除"
     variant="danger"
     onConfirm={submitDeleteList}
-    onCancel={() => (confirmDeleteListDialog.open = false)}
+    onCancel={() => (state.dialogs.confirmDeleteListDialog.open = false)}
 />
 
 <ConfirmDialog
-    open={confirmArchiveListDialog.open}
+    open={state.dialogs.confirmArchiveListDialog.open}
     title="リストのアーカイブ"
     message="このリストをアーカイブしますか？"
     confirmLabel="アーカイブ"
     onConfirm={submitArchiveList}
-    onCancel={() => (confirmArchiveListDialog.open = false)}
+    onCancel={() => (state.dialogs.confirmArchiveListDialog.open = false)}
 />
 
 <PromptDialog
-    open={renameListDialog.open}
+    open={state.dialogs.renameListDialog.open}
     title="リスト名の変更"
     message="新しいリスト名を入力してください"
-    defaultValue={renameListDialog.currentTitle}
+    defaultValue={state.dialogs.renameListDialog.currentTitle}
     submitLabel="変更"
     onSubmit={submitRenameList}
-    onCancel={() => (renameListDialog.open = false)}
+    onCancel={() => (state.dialogs.renameListDialog.open = false)}
 />

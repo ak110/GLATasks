@@ -1,4 +1,6 @@
 <script lang="ts">
+    import { grayButtonClass } from "#lib/components/ui/styles.ts";
+    import { formatLocalMinute } from "#lib/date-time.ts";
     import {
         exportCalorieItemsCsv,
         exportCalorieRecordsCsv,
@@ -20,7 +22,7 @@
     };
     type Props = {
         items: Item[];
-        allRecords: RecordRow[];
+        onExportRecords: () => Promise<RecordRow[]>;
         onImportItems: (
             rows: CalorieItemCsvRow[],
         ) => Promise<{ added: number; updated: number }>;
@@ -29,22 +31,14 @@
         ) => Promise<{ added: number }>;
     };
 
-    let { items, allRecords, onImportItems, onImportRecords }: Props = $props();
+    let { items, onExportRecords, onImportItems, onImportRecords }: Props =
+        $props();
     let pendingRecords = $state<CalorieRecordCsvRow[] | undefined>();
     let resultMessage = $state("");
 
     function showError(error: unknown) {
         resultMessage =
             error instanceof Error ? error.message : "CSVを解析できません";
-    }
-
-    function pad(value: number): string {
-        return String(value).padStart(2, "0");
-    }
-
-    function formatLocalMinute(value: string): string {
-        const date = new Date(value);
-        return `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
     }
 
     function download(csv: string, filename: string) {
@@ -96,6 +90,25 @@
         pendingRecords = undefined;
         resultMessage = `記録を${result.added}件追加しました。`;
     }
+    async function exportRecords() {
+        try {
+            const records = await onExportRecords();
+            download(
+                exportCalorieRecordsCsv(
+                    records.map((record) => ({
+                        ...record,
+                        consumed_at: formatLocalMinute(record.consumed_at),
+                    })),
+                ),
+                "calorie-records.csv",
+            );
+        } catch (error) {
+            resultMessage =
+                error instanceof Error
+                    ? error.message
+                    : "CSVの取得に失敗しました";
+        }
+    }
 </script>
 
 <section
@@ -116,27 +129,12 @@
             type="button"
             onclick={() =>
                 download(exportCalorieItemsCsv(items), "カロリー品目.csv")}
-            class="cursor-pointer rounded bg-gray-100 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
-            >品目をエクスポート</button
+            class={grayButtonClass}>品目をエクスポート</button
         >
-        <button
-            type="button"
-            onclick={() =>
-                download(
-                    exportCalorieRecordsCsv(
-                        allRecords.map((record) => ({
-                            ...record,
-                            consumed_at: formatLocalMinute(record.consumed_at),
-                        })),
-                    ),
-                    "カロリー記録.csv",
-                )}
-            class="cursor-pointer rounded bg-gray-100 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+        <button type="button" onclick={exportRecords} class={grayButtonClass}
             >記録をエクスポート</button
         >
-        <label
-            class="cursor-pointer rounded bg-gray-100 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
-        >
+        <label class={grayButtonClass}>
             品目をインポート
             <input
                 type="file"
@@ -146,9 +144,7 @@
                 data-testid="calorie-items-import"
             />
         </label>
-        <label
-            class="cursor-pointer rounded bg-gray-100 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
-        >
+        <label class={grayButtonClass}>
             記録をインポート
             <input
                 type="file"

@@ -1,4 +1,16 @@
 <script lang="ts">
+    import { queryKeys } from "#lib/client/query-options.ts";
+    import {
+        calorieItemsOptions,
+        calorieRecordsOptions,
+        calorieAutoRecordsOptions,
+        calorieSummaryOptions,
+    } from "#lib/client/query-options.ts";
+    import {
+        invalidateEventQueries,
+        subscribeQueryEvents,
+    } from "#lib/client/query-sync.ts";
+    import { getTimezoneOffsetMinutes } from "#lib/date-time.ts";
     /**
      * @fileoverview カロリー計算ページ
      */
@@ -20,7 +32,7 @@
     import CalorieRecordTable from "#lib/components/calories/CalorieRecordTable.svelte";
     import CalorieSummary from "#lib/components/calories/CalorieSummary.svelte";
     import ConfirmDialog from "#lib/components/dialogs/ConfirmDialog.svelte";
-    import { startMinuteTicker } from "#lib/minute-ticker.ts";
+    import { startMinuteTicker } from "#lib/client/minute-ticker.ts";
     import type {
         BulkCreateCalorieRecordsInput,
         BulkDeleteCalorieRecordsInput,
@@ -32,8 +44,7 @@
         UpdateCalorieRecordInput,
     } from "#lib/schemas.ts";
     import { SSE_EVENTS } from "#lib/sse-events.ts";
-    import { subscribeOnMount } from "#lib/sse-subscribe.ts";
-    import { trpc, type RouterOutputs } from "#lib/trpc.ts";
+    import { trpc, type RouterOutputs } from "#lib/client/trpc.ts";
 
     type RecordRow = RouterOutputs["calories"]["records"]["records"][number];
 
@@ -53,76 +64,31 @@
         recordAddItemName = "";
         itemAddName = "";
     }
-    const tzOffsetMinutes = -new Date().getTimezoneOffset();
+    const tzOffsetMinutes = getTimezoneOffsetMinutes();
 
-    const itemsQuery = createQuery<RouterOutputs["calories"]["items"]>(() => ({
-        queryKey: ["calories", "items"] as const,
-        queryFn: () => trpc.calories.items.query(),
-    }));
-    const recordsQuery = createQuery<RouterOutputs["calories"]["records"]>(
-        () => ({
-            queryKey: [
-                "calories",
-                "records",
-                windowOffset,
-                tzOffsetMinutes,
-            ] as const,
-            queryFn: () =>
-                trpc.calories.records.query({
-                    window_offset: windowOffset,
-                    tz_offset_minutes: tzOffsetMinutes,
-                }),
-        }),
+    const itemsQuery = createQuery(() => calorieItemsOptions());
+    const recordsQuery = createQuery(() =>
+        calorieRecordsOptions(windowOffset, tzOffsetMinutes),
     );
-    const allRecordsQuery = createQuery<
-        RouterOutputs["calories"]["allRecords"]
-    >(() => ({
-        queryKey: ["calories", "all-records"] as const,
-        queryFn: () => trpc.calories.allRecords.query(),
-    }));
-    const autoRecordsQuery = createQuery<
-        RouterOutputs["calories"]["autoRecords"]
-    >(() => ({
-        queryKey: ["calories", "auto-records"] as const,
-        queryFn: () => trpc.calories.autoRecords.query(),
-    }));
-    const summaryQuery = createQuery<RouterOutputs["calories"]["summary"]>(
-        () => ({
-            queryKey: ["calories", "summary", tzOffsetMinutes] as const,
-            queryFn: () =>
-                trpc.calories.summary.query({
-                    tz_offset_minutes: tzOffsetMinutes,
-                }),
-        }),
+    const autoRecordsQuery = createQuery(() => calorieAutoRecordsOptions());
+    const summaryQuery = createQuery(() =>
+        calorieSummaryOptions(tzOffsetMinutes),
     );
 
     const invalidateCalories = () =>
-        queryClient.invalidateQueries({ queryKey: ["calories"] });
-    const invalidatePreferences = async (): Promise<void> => {
-        await Promise.all([
-            queryClient.invalidateQueries({ queryKey: ["user-preferences"] }),
-            queryClient.invalidateQueries({
-                queryKey: ["calories", "summary"],
-            }),
-        ]);
-    };
-
-    subscribeOnMount({
-        [SSE_EVENTS.caloriesUpdated]: {
-            handler: invalidateCalories,
-            fallback: invalidateCalories,
-        },
-        [SSE_EVENTS.usersPreferencesUpdated]: {
-            handler: invalidatePreferences,
-            fallback: invalidatePreferences,
-        },
-    });
+        invalidateEventQueries(queryClient, SSE_EVENTS.caloriesUpdated);
+    const invalidatePreferences = () =>
+        invalidateEventQueries(queryClient, SSE_EVENTS.usersPreferencesUpdated);
+    subscribeQueryEvents(queryClient, [
+        SSE_EVENTS.caloriesUpdated,
+        SSE_EVENTS.usersPreferencesUpdated,
+    ]);
 
     // 集計は現在時刻を基準に変わるため、記録の日時欄と同じ分の切り替わりで取り直す
     onMount(() =>
         startMinuteTicker(() => {
             void queryClient.invalidateQueries({
-                queryKey: ["calories", "summary"],
+                queryKey: queryKeys.calorieSummary,
             });
         }),
     );
@@ -209,30 +175,6 @@
     const items = $derived(itemsQuery.data ?? []);
     const autoRecords = $derived(autoRecordsQuery.data ?? []);
     const records = $derived(recordsQuery.data?.records ?? []);
-    const allRecords = $derived(allRecordsQuery.data ?? []);
-    // 品目ごとの使用件数。使用中の品目は削除できないため、品目表で理由として示す
-    const itemUsage = $derived.by(() => {
-        const recordCounts: Record<number, number> = {};
-        for (const record of allRecords) {
-            if (record.item_id === null) continue;
-            recordCounts[record.item_id] =
-                (recordCounts[record.item_id] ?? 0) + 1;
-        }
-        const autoRecordCounts: Record<number, number> = {};
-        for (const autoRecord of autoRecords) {
-            autoRecordCounts[autoRecord.item_id] =
-                (autoRecordCounts[autoRecord.item_id] ?? 0) + 1;
-        }
-        return new Map(
-            items.map((item) => [
-                item.id,
-                {
-                    records: recordCounts[item.id] ?? 0,
-                    autoRecords: autoRecordCounts[item.id] ?? 0,
-                },
-            ]),
-        );
-    });
     const isLoading = $derived(
         itemsQuery.isLoading ||
             recordsQuery.isLoading ||
@@ -276,7 +218,6 @@
             />
             <CalorieItemTable
                 {items}
-                usage={itemUsage}
                 onCreate={(input) => createItemMutation.mutateAsync(input)}
                 onUpdate={(input) => updateItemMutation.mutateAsync(input)}
                 onDelete={(itemId) => deleteItemMutation.mutateAsync(itemId)}
@@ -305,7 +246,7 @@
         <div class="mt-5">
             <CalorieCsvControls
                 {items}
-                {allRecords}
+                onExportRecords={() => trpc.calories.allRecords.query()}
                 onImportItems={(rows) => importItemsMutation.mutateAsync(rows)}
                 onImportRecords={(rows) =>
                     importRecordsMutation.mutateAsync(rows)}

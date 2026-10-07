@@ -1,9 +1,17 @@
 <script lang="ts">
+    import { inputClass } from "#lib/components/ui/styles.ts";
+    import { menuBehavior } from "#lib/actions/menu.ts";
+    import {
+        menuFrameClass,
+        menuBlueItemClass,
+        menuDangerItemClass,
+    } from "#lib/components/ui/styles.ts";
+    import { getTimezoneOffsetMinutes } from "#lib/date-time.ts";
     /**
      * @fileoverview カロリーの自動記録設定（毎日指定時刻に記録を追加する）の一覧と編集
      */
 
-    import CalorieEditDialog from "./CalorieEditDialog.svelte";
+    import Dialog from "#lib/components/dialogs/Dialog.svelte";
     import ConfirmDialog from "#lib/components/dialogs/ConfirmDialog.svelte";
 
     type Item = { id: number; name: string };
@@ -40,27 +48,8 @@
     let itemName = $state("");
     let quantity = $state("1");
 
-    // 操作メニュー外クリック/Escapeで閉じる
-    $effect(() => {
-        if (openMenuId === undefined) return;
-        const onClick = (event: MouseEvent) => {
-            const target = event.target as HTMLElement | null;
-            if (!target?.closest("[data-auto-record-menu]"))
-                openMenuId = undefined;
-        };
-        const onKey = (event: KeyboardEvent) => {
-            if (event.key === "Escape") openMenuId = undefined;
-        };
-        document.addEventListener("mousedown", onClick);
-        document.addEventListener("keydown", onKey);
-        return () => {
-            document.removeEventListener("mousedown", onClick);
-            document.removeEventListener("keydown", onKey);
-        };
-    });
-
     function tzOffsetMinutes(): number {
-        return -new Date().getTimezoneOffset();
+        return getTimezoneOffsetMinutes();
     }
 
     function resetForm() {
@@ -141,7 +130,7 @@
                 bind:value={timeOfDay}
                 type="time"
                 required
-                class="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-800 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+                class={inputClass}
             />
             <label class="sr-only" for="calorie-auto-item">品目</label>
             <input
@@ -151,7 +140,7 @@
                 required
                 placeholder="品目"
                 autocomplete="off"
-                class="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-800 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+                class={inputClass}
             />
             <datalist id="calorie-auto-item-options">
                 {#each items as item (item.id)}<option value={item.name}
@@ -166,7 +155,7 @@
                 min="0"
                 step="1"
                 placeholder="数量"
-                class="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-800 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+                class={inputClass}
             />
             <button
                 type="submit"
@@ -176,9 +165,13 @@
         </form>
     {/snippet}
     {#if editing !== undefined}
-        <CalorieEditDialog title="自動記録の編集" onClose={resetForm}>
+        <Dialog
+            contentClass="p-6 pt-0"
+            title="自動記録の編集"
+            onClose={resetForm}
+        >
             {@render autoRecordForm()}
-        </CalorieEditDialog>
+        </Dialog>
     {:else}
         {@render autoRecordForm()}
     {/if}
@@ -222,7 +215,14 @@
                         /></td
                     >
                     <td class="p-2 text-right">
-                        <div class="relative" data-auto-record-menu>
+                        <div
+                            class="relative"
+                            data-auto-record-menu
+                            use:menuBehavior={{
+                                open: openMenuId === autoRecord.id,
+                                onClose: () => (openMenuId = undefined),
+                            }}
+                        >
                             <button
                                 type="button"
                                 onclick={() =>
@@ -233,20 +233,19 @@
                                 class="cursor-pointer rounded px-1 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
                                 data-testid="calorie-auto-record-menu-btn"
                                 aria-label="自動記録の操作"
-                                aria-haspopup="menu"
-                                aria-expanded={openMenuId === autoRecord.id}
                                 title="操作">⋯</button
                             >
                             {#if openMenuId === autoRecord.id}
                                 <div
-                                    class="absolute top-full right-0 z-20 min-w-max rounded border border-gray-200 bg-white py-1 text-left shadow-lg dark:border-gray-600 dark:bg-gray-800"
+                                    class={menuFrameClass}
+                                    data-menu-frame
                                     role="menu"
                                     data-testid="calorie-auto-record-menu"
                                 >
                                     <button
                                         type="button"
                                         onclick={() => edit(autoRecord)}
-                                        class="block w-full cursor-pointer px-4 py-1.5 text-left text-blue-600 hover:bg-gray-100 dark:text-blue-400 dark:hover:bg-gray-700"
+                                        class={menuBlueItemClass}
                                         role="menuitem">編集</button
                                     >
                                     <button
@@ -255,7 +254,7 @@
                                             openMenuId = undefined;
                                             deleteTarget = autoRecord;
                                         }}
-                                        class="block w-full cursor-pointer px-4 py-1.5 text-left text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/30"
+                                        class={menuDangerItemClass}
                                         role="menuitem">削除</button
                                     >
                                 </div>

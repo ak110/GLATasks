@@ -1,4 +1,11 @@
 <script lang="ts">
+    import { subscribeQueryEvents } from "#lib/client/query-sync.ts";
+    import {
+        timersOptions,
+        preferencesOptions,
+        queryKeys,
+    } from "#lib/client/query-options.ts";
+    import { getTimezoneOffsetMinutes } from "#lib/date-time.ts";
     /**
      * @fileoverview タイマーページ
      */
@@ -8,23 +15,21 @@
         createMutation,
         useQueryClient,
     } from "@tanstack/svelte-query";
-    import { trpc, type RouterOutputs } from "#lib/trpc.ts";
-    import { createDragReorder } from "#lib/dnd-reorder.svelte.ts";
+    import { trpc } from "#lib/client/trpc.ts";
+    import { createDragReorder } from "#lib/actions/dnd-reorder.svelte.ts";
     import {
         TIMER_DEFAULT_BASE_MINUTES,
         TIMER_DEFAULT_ADJUST_MINUTES,
         TIMER_DEFAULT_RING_SECONDS,
     } from "#lib/schemas.ts";
     import type { TimerMode, UserPreferences } from "#lib/schemas.ts";
-    import { playStartBeep } from "#lib/beep.ts";
-    import { setServerOffset } from "#lib/sse-client.ts";
+    import { playStartBeep } from "#lib/client/timers/beep.ts";
     import { SSE_EVENTS } from "#lib/sse-events.ts";
-    import { subscribeOnMount } from "#lib/sse-subscribe.ts";
     import type { TimerInfo, TimersResult } from "#lib/types.ts";
     import Header from "#lib/components/layout/Header.svelte";
     import PageScrollArea from "#lib/components/layout/PageScrollArea.svelte";
     import TimerCard from "#lib/components/timers/TimerCard.svelte";
-    import TimerCreateDialog from "#lib/components/timers/TimerCreateDialog.svelte";
+    import TimerEditDialog from "#lib/components/timers/TimerEditDialog.svelte";
     import ConfirmDialog from "#lib/components/dialogs/ConfirmDialog.svelte";
 
     const queryClient = useQueryClient();
@@ -64,56 +69,27 @@
     });
 
     // 利用者既定値（新規タイマー作成時の初期値ソース）
-    const preferencesQuery = createQuery<
-        RouterOutputs["users"]["getPreferences"]
-    >(() => ({
-        queryKey: ["user-preferences"] as const,
-        queryFn: () => trpc.users.getPreferences.query(),
-    }));
+    const preferencesQuery = createQuery(() => preferencesOptions());
 
     const updatePreferencesMutation = createMutation(() => ({
         mutationFn: (input: UserPreferences) =>
             trpc.users.updatePreferences.mutate(input),
         onSuccess: () =>
-            queryClient.invalidateQueries({ queryKey: ["user-preferences"] }),
+            queryClient.invalidateQueries({ queryKey: queryKeys.preferences }),
     }));
 
     // タイマー一覧取得（SSE でリアルタイム同期）
-    const timersQuery = createQuery<RouterOutputs["timers"]["list"]>(() => ({
-        queryKey: ["timers"] as const,
-        queryFn: async (): Promise<RouterOutputs["timers"]["list"]> => {
-            // RTT/2 補正付きオフセット計算
-            const t0 = Date.now();
-            const result = await trpc.timers.list.query();
-            const t1 = Date.now();
-            const serverMs = new Date(result.server_time).getTime();
-            setServerOffset(serverMs - (t0 + t1) / 2);
-            return result;
-        },
-    }));
+    const timersQuery = createQuery(() => ({ ...timersOptions() }));
 
-    // SSE: サーバーからの通知でクエリを再取得（フォールバックはSSE不健全時のポーリング経路）
-    const invalidateTimers = () =>
-        queryClient.invalidateQueries({ queryKey: ["timers"] });
-    const invalidatePreferences = () =>
-        queryClient.invalidateQueries({ queryKey: ["user-preferences"] });
-    subscribeOnMount({
-        [SSE_EVENTS.timersUpdated]: {
-            handler: invalidateTimers,
-            fallback: invalidateTimers,
-        },
-        [SSE_EVENTS.usersPreferencesUpdated]: {
-            handler: invalidatePreferences,
-            fallback: invalidatePreferences,
-        },
-    });
+    subscribeQueryEvents(queryClient, [
+        SSE_EVENTS.timersUpdated,
+        SSE_EVENTS.usersPreferencesUpdated,
+    ]);
 
     /** アラームモードのタイマーかどうかで tz_offset_minutes を付加するヘルパー */
     function getTzOffset(timerId: number): number | undefined {
         const timer = timersList.find((t) => t.id === timerId);
-        return timer?.mode === "alarm"
-            ? -new Date().getTimezoneOffset()
-            : undefined;
+        return timer?.mode === "alarm" ? getTimezoneOffsetMinutes() : undefined;
     }
 
     // ミューテーション群
@@ -129,7 +105,7 @@
             ring_seconds: number;
         }) => trpc.timers.create.mutate(input),
         onSuccess: () =>
-            queryClient.invalidateQueries({ queryKey: ["timers"] }),
+            queryClient.invalidateQueries({ queryKey: queryKeys.timers }),
     }));
 
     const updateTimerMutation = createMutation(() => ({
@@ -144,20 +120,20 @@
             ring_seconds?: number;
         }) => trpc.timers.update.mutate(input),
         onSuccess: () =>
-            queryClient.invalidateQueries({ queryKey: ["timers"] }),
+            queryClient.invalidateQueries({ queryKey: queryKeys.timers }),
     }));
 
     const deleteTimerMutation = createMutation(() => ({
         mutationFn: (timerId: number) => trpc.timers.delete.mutate({ timerId }),
         onSuccess: () =>
-            queryClient.invalidateQueries({ queryKey: ["timers"] }),
+            queryClient.invalidateQueries({ queryKey: queryKeys.timers }),
     }));
 
     const startTimerMutation = createMutation(() => ({
         mutationFn: (input: { timerId: number; tz_offset_minutes?: number }) =>
             trpc.timers.start.mutate(input),
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ["timers"] });
+            queryClient.invalidateQueries({ queryKey: queryKeys.timers });
             // タブミュート対策: スタート時にビープ音で気付かせる
             playStartBeep();
             // タイマー完了通知のためにブラウザ通知の許可をリクエスト
@@ -173,21 +149,21 @@
     const pauseTimerMutation = createMutation(() => ({
         mutationFn: (timerId: number) => trpc.timers.pause.mutate({ timerId }),
         onSuccess: () =>
-            queryClient.invalidateQueries({ queryKey: ["timers"] }),
+            queryClient.invalidateQueries({ queryKey: queryKeys.timers }),
     }));
 
     const resetTimerMutation = createMutation(() => ({
         mutationFn: (input: { timerId: number; tz_offset_minutes?: number }) =>
             trpc.timers.reset.mutate(input),
         onSuccess: () =>
-            queryClient.invalidateQueries({ queryKey: ["timers"] }),
+            queryClient.invalidateQueries({ queryKey: queryKeys.timers }),
     }));
 
     const adjustTimerMutation = createMutation(() => ({
         mutationFn: (input: { timerId: number; minutes: number }) =>
             trpc.timers.adjust.mutate(input),
         onSuccess: () =>
-            queryClient.invalidateQueries({ queryKey: ["timers"] }),
+            queryClient.invalidateQueries({ queryKey: queryKeys.timers }),
     }));
 
     const setTimerTimeMutation = createMutation(() => ({
@@ -198,14 +174,14 @@
             tz_offset_minutes?: number;
         }) => trpc.timers.setTime.mutate(input),
         onSuccess: () =>
-            queryClient.invalidateQueries({ queryKey: ["timers"] }),
+            queryClient.invalidateQueries({ queryKey: queryKeys.timers }),
     }));
 
     const reorderTimersMutation = createMutation(() => ({
         mutationFn: (input: { timerIds: number[] }) =>
             trpc.timers.reorder.mutate(input),
         onSettled: () =>
-            queryClient.invalidateQueries({ queryKey: ["timers"] }),
+            queryClient.invalidateQueries({ queryKey: queryKeys.timers }),
     }));
 
     // D&D 状態管理（createDragReorder は派生状態 timersList を参照するためゲッター関数で渡す）
@@ -215,7 +191,7 @@
     function handleReorderTimers(timerIds: number[]) {
         // 楽観的更新: キャッシュ内のタイマー配列を即座に並び替え
         queryClient.setQueryData(
-            ["timers"],
+            queryKeys.timers,
             (old: TimersResult | undefined) => {
                 if (!old) return old;
                 const timerMap = new Map(old.timers.map((t) => [t.id, t]));
@@ -406,7 +382,7 @@
     </div>
 </PageScrollArea>
 
-<TimerCreateDialog
+<TimerEditDialog
     open={dialog.open}
     mode={dialog.mode}
     ephemeral={dialog.ephemeral}

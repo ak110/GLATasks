@@ -1,4 +1,12 @@
 <script lang="ts">
+    import { menuBehavior } from "#lib/actions/menu.ts";
+    import {
+        menuFrameClass,
+        menuItemClass,
+    } from "#lib/components/ui/styles.ts";
+    import { clampDetector } from "#lib/actions/clamp.ts";
+    import { taskTextColor } from "#lib/task-colors.ts";
+    import NotesExpandButton from "./NotesExpandButton.svelte";
     /**
      * @fileoverview タスクアイテム（チェックボックス + テキスト表示 + 編集・コピーボタン）
      */
@@ -6,14 +14,14 @@
     import type { TaskStatus } from "#lib/schemas.ts";
     import type { TaskListItem } from "#lib/types.ts";
     import { nextTaskStatus } from "#lib/task-status.ts";
-    import { linkify } from "#lib/linkify.ts";
+    import { linkify } from "#lib/client/search/linkify.ts";
     import { getTagColorClass } from "#lib/tag-palette.ts";
-    import { downloadAttachment } from "#lib/attachment-download.ts";
-    import { isImageAttachment } from "#lib/attachment-utils.ts";
-    import { createThumbnailManager } from "#lib/image-attachment-utils.svelte.ts";
+    import { downloadAttachment } from "#lib/client/attachments/attachment-download.ts";
+    import { isImageAttachment } from "#lib/client/attachments/attachment-utils.ts";
+    import { createTaskThumbnails } from "#lib/client/attachments/task-attachments.svelte.ts";
     import ImageLightbox from "#lib/components/dialogs/ImageLightbox.svelte";
-    import { showErrorToast } from "#lib/toast-store.svelte.ts";
-    import { extractErrorMessage } from "#lib/extract-error-message.ts";
+    import { showErrorToast } from "#lib/client/ui/toast-store.svelte.ts";
+    import { extractErrorMessage } from "#lib/client/ui/extract-error-message.ts";
 
     type Props = {
         task: TaskListItem;
@@ -41,55 +49,10 @@
     let copyMenuOpen = $state(false);
     let notesExpanded = $state(false);
     let notesClamped = $state(false);
-    let notesEl: HTMLParagraphElement | undefined = $state();
-    let copyMenuEl: HTMLDivElement | undefined = $state();
     const isCompleted = $derived(task.status === "completed");
     const isRunning = $derived(task.status === "running");
-    const isDimmed = $derived(isCompleted || isRunning);
-    const titleColorClass = $derived(
-        isDimmed ? "text-gray-400 dark:text-gray-500" : "dark:text-gray-100",
-    );
-    const notesColorClass = $derived(
-        isDimmed
-            ? "text-gray-400 dark:text-gray-500"
-            : "text-gray-500 dark:text-gray-400",
-    );
-    const emptyTaskColorClass = $derived(
-        isDimmed
-            ? "text-gray-400 dark:text-gray-500"
-            : "text-gray-400 dark:text-gray-500",
-    );
-
-    // notesが実際にクランプされているか検知
-    $effect(() => {
-        if (!notesEl) return;
-        const check = () => {
-            notesClamped = notesEl!.scrollHeight > notesEl!.clientHeight;
-        };
-        check();
-        const observer = new ResizeObserver(check);
-        observer.observe(notesEl);
-        return () => observer.disconnect();
-    });
-
-    // コピーメニュー外クリック/Escapeで閉じる
-    $effect(() => {
-        if (!copyMenuOpen) return;
-        const onClick = (e: MouseEvent) => {
-            if (!copyMenuEl?.contains(e.target as Node)) {
-                copyMenuOpen = false;
-            }
-        };
-        const onKey = (e: KeyboardEvent) => {
-            if (e.key === "Escape") copyMenuOpen = false;
-        };
-        document.addEventListener("mousedown", onClick);
-        document.addEventListener("keydown", onKey);
-        return () => {
-            document.removeEventListener("mousedown", onClick);
-            document.removeEventListener("keydown", onKey);
-        };
-    });
+    const titleColorClass = $derived(taskTextColor(task.status));
+    const notesColorClass = $derived(taskTextColor(task.status, true));
 
     async function copyText(value: string) {
         await navigator.clipboard.writeText(value);
@@ -124,25 +87,9 @@
         }
     }
 
-    async function handleThumbnailOpen(attachmentId: number) {
-        try {
-            await thumbnails.open(attachmentId);
-        } catch (error) {
-            showErrorToast(extractErrorMessage(error));
-        }
-    }
-
-    const thumbnails = createThumbnailManager();
-
-    $effect(() => {
-        thumbnails.sync(task.attachments.map((a) => a.id));
-    });
-
-    $effect(() => {
-        return () => {
-            thumbnails.dispose();
-        };
-    });
+    const thumbnails = createTaskThumbnails(() =>
+        task.attachments.map((attachment) => attachment.id),
+    );
 </script>
 
 <div
@@ -186,7 +133,7 @@
         {/if}
         {#if task.notes}
             <p
-                bind:this={notesEl}
+                use:clampDetector={(clamped) => (notesClamped = clamped)}
                 class="mt-0.5 whitespace-pre-wrap {notesColorClass}"
                 class:line-clamp-5={!notesExpanded}
             >
@@ -195,7 +142,9 @@
             </p>
         {/if}
         {#if !task.title && !task.notes}
-            <p class="leading-tight {emptyTaskColorClass}">（空のタスク）</p>
+            <p class="leading-tight text-gray-400 dark:text-gray-500">
+                （空のタスク）
+            </p>
         {/if}
         {#if task.attachments.length > 0 || task.tags.length > 0}
             <div class="mt-1 flex flex-wrap items-center gap-1">
@@ -204,8 +153,7 @@
                         {#await thumbnails.ensure(attachment.id) then imageUrl}
                             <button
                                 type="button"
-                                onclick={() =>
-                                    handleThumbnailOpen(attachment.id)}
+                                onclick={() => thumbnails.open(attachment.id)}
                                 class="shrink-0 cursor-pointer rounded p-0.5"
                                 data-testid="task-attachment-thumbnail"
                                 title={attachment.filename}
@@ -262,24 +210,29 @@
             disabled={isTempTask}
             title="編集">✏️</button
         >
-        <div class="relative" bind:this={copyMenuEl}>
+        <div
+            class="relative"
+            use:menuBehavior={{
+                open: copyMenuOpen,
+                onClose: () => (copyMenuOpen = false),
+            }}
+        >
             <button
                 onclick={() => (copyMenuOpen = !copyMenuOpen)}
                 class="cursor-pointer rounded p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-600 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-300"
                 data-testid="task-copy-btn"
                 aria-label="タスクをコピー"
-                aria-haspopup="menu"
-                aria-expanded={copyMenuOpen}
                 title="コピー">📋</button
             >
             {#if copyMenuOpen}
                 <div
-                    class="absolute top-full right-0 z-20 min-w-max rounded border border-gray-200 bg-white py-1 shadow-lg dark:border-gray-600 dark:bg-gray-800"
+                    class={menuFrameClass}
+                    data-menu-frame
                     role="menu"
                     data-testid="task-copy-menu"
                 >
                     <button
-                        class="block w-full cursor-pointer px-4 py-1.5 text-left hover:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-400 dark:text-gray-100 dark:hover:bg-gray-700 dark:disabled:text-gray-500"
+                        class={menuItemClass}
                         onclick={copyAll}
                         disabled={!task.title && !task.notes}
                         data-testid="task-copy-all"
@@ -288,7 +241,7 @@
                         全体をコピー
                     </button>
                     <button
-                        class="block w-full cursor-pointer px-4 py-1.5 text-left hover:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-400 dark:text-gray-100 dark:hover:bg-gray-700 dark:disabled:text-gray-500"
+                        class={menuItemClass}
                         onclick={copyTitle}
                         disabled={!task.title}
                         data-testid="task-copy-title"
@@ -297,7 +250,7 @@
                         タイトルのみ
                     </button>
                     <button
-                        class="block w-full cursor-pointer px-4 py-1.5 text-left hover:bg-gray-100 disabled:cursor-not-allowed disabled:text-gray-400 dark:text-gray-100 dark:hover:bg-gray-700 dark:disabled:text-gray-500"
+                        class={menuItemClass}
                         onclick={copyNotes}
                         disabled={!task.notes}
                         data-testid="task-copy-notes"
@@ -309,13 +262,10 @@
             {/if}
         </div>
         {#if notesClamped || notesExpanded}
-            <button
+            <NotesExpandButton
+                expanded={notesExpanded}
                 onclick={() => (notesExpanded = !notesExpanded)}
-                class="cursor-pointer rounded p-1 text-xs text-gray-400 hover:bg-gray-100 hover:text-gray-500 dark:text-gray-500 dark:hover:bg-gray-700 dark:hover:text-gray-400"
-                aria-label={notesExpanded ? "notesを折りたたむ" : "notesを展開"}
-                title={notesExpanded ? "折りたたむ" : "展開"}
-                >{notesExpanded ? "▲" : "▼"}</button
-            >
+            />
         {/if}
     </div>
     <!-- ドラッグハンドル + リモート更新マーク -->

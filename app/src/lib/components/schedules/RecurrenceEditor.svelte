@@ -1,4 +1,9 @@
 <script lang="ts">
+    import {
+        pad2,
+        SCHEDULE_TIMEZONE,
+        SCHEDULE_UTC_OFFSET_MS,
+    } from "#lib/date-time.ts";
     /**
      * @fileoverview 繰り返しルール編集フォーム（頻度・間隔・曜日/日/月・時刻・終了条件）
      *
@@ -85,7 +90,7 @@
         day: number;
     } {
         const parts = new Intl.DateTimeFormat("en-CA", {
-            timeZone: "Asia/Tokyo",
+            timeZone: SCHEDULE_TIMEZONE,
             year: "numeric",
             month: "2-digit",
             day: "2-digit",
@@ -95,12 +100,8 @@
         return { year: get("year"), month: get("month"), day: get("day") };
     }
 
-    function pad(n: number): string {
-        return String(n).padStart(2, "0");
-    }
-
     function formatDateInput(d: Date): string {
-        return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
+        return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}`;
     }
 
     /**
@@ -111,7 +112,7 @@
      * 早いUTC時刻になってしまうため、9時間分を減算してからUTC形式へ変換する。
      */
     function formatUntilUtc(d: Date): string {
-        const utcMs = d.getTime() - 9 * 3600 * 1000;
+        const utcMs = d.getTime() - SCHEDULE_UTC_OFFSET_MS;
         return new Date(utcMs)
             .toISOString()
             .replace(/[-:]/g, "")
@@ -119,7 +120,7 @@
     }
 
     function loadFromValue(v: ScheduleInfo) {
-        const rule = rrulestr(v.rrule, { tzid: "Asia/Tokyo" });
+        const rule = rrulestr(v.rrule, { tzid: SCHEDULE_TIMEZONE });
         if (!(rule instanceof RRule)) return;
         const o = rule.options;
         freq = RRULE_TO_FREQ[o.freq] ?? "WEEKLY";
@@ -133,7 +134,7 @@
         if (bymonthday.length > 0) monthDay = bymonthday[0]!;
         const bymonth = o.bymonth ?? [];
         if (bymonth.length > 0) yearMonth = bymonth[0]!;
-        timeStr = `${pad(o.dtstart.getUTCHours())}:${pad(o.dtstart.getUTCMinutes())}`;
+        timeStr = `${pad2(o.dtstart.getUTCHours())}:${pad2(o.dtstart.getUTCMinutes())}`;
         // DTSTARTの暦日を復元する。元のrrule文字列が保持するAsia/Tokyoの年月日を
         // そのまま引き継ぎ、編集のたびにDTSTARTが今日へずれてしまうことを防ぐ
         dtstartDate = {
@@ -179,7 +180,7 @@
             freq: FREQ_TO_RRULE[freq],
             interval,
             dtstart,
-            tzid: "Asia/Tokyo",
+            tzid: SCHEDULE_TIMEZONE,
         };
         if (freq === "WEEKLY" && selectedWeekdays.length > 0) {
             options.byweekday = selectedWeekdays.map(

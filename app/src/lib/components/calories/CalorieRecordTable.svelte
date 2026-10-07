@@ -1,9 +1,18 @@
 <script lang="ts">
+    import { grayButtonClass, inputClass } from "#lib/components/ui/styles.ts";
+    import { menuBehavior } from "#lib/actions/menu.ts";
+    import {
+        menuFrameClass,
+        menuBlueItemClass,
+        menuDangerItemClass,
+    } from "#lib/components/ui/styles.ts";
+    import { formatLocalMinute, pad2 } from "#lib/date-time.ts";
+    import { getTimezoneOffsetMinutes } from "#lib/date-time.ts";
     import { onMount } from "svelte";
 
     import ConfirmDialog from "#lib/components/dialogs/ConfirmDialog.svelte";
-    import { startMinuteTicker } from "#lib/minute-ticker.ts";
-    import CalorieEditDialog from "./CalorieEditDialog.svelte";
+    import { startMinuteTicker } from "#lib/client/minute-ticker.ts";
+    import Dialog from "#lib/components/dialogs/Dialog.svelte";
     import CalorieFilterStatus from "./CalorieFilterStatus.svelte";
 
     type Item = { id: number; name: string; kcal: number };
@@ -94,38 +103,12 @@
         }),
     );
 
-    // 操作メニュー外クリック/Escapeで閉じる
-    $effect(() => {
-        if (openMenuId === undefined) return;
-        const onClick = (event: MouseEvent) => {
-            const target = event.target as HTMLElement | null;
-            if (!target?.closest("[data-record-menu]")) openMenuId = undefined;
-        };
-        const onKey = (event: KeyboardEvent) => {
-            if (event.key === "Escape") openMenuId = undefined;
-        };
-        document.addEventListener("mousedown", onClick);
-        document.addEventListener("keydown", onKey);
-        return () => {
-            document.removeEventListener("mousedown", onClick);
-            document.removeEventListener("keydown", onKey);
-        };
-    });
-
-    function pad(value: number): string {
-        return String(value).padStart(2, "0");
-    }
-
-    function formatLocalMinute(date: Date): string {
-        return `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
-    }
-
     function formatLocalMonthDay(date: Date): string {
-        return `${pad(date.getMonth() + 1)}/${pad(date.getDate())}`;
+        return `${pad2(date.getMonth() + 1)}/${pad2(date.getDate())}`;
     }
 
     function formatLocalTime(date: Date): string {
-        return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+        return `${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
     }
 
     function resetForm() {
@@ -186,7 +169,7 @@
             consumed_at: consumedAt,
             ...target,
             quantity: numericQuantity,
-            tz_offset_minutes: -new Date().getTimezoneOffset(),
+            tz_offset_minutes: getTimezoneOffsetMinutes(),
         };
         if (editingId === undefined) await onCreate(input);
         else await onUpdate({ recordId: editingId, ...input });
@@ -216,7 +199,7 @@
             consumed_at: consumedAt,
             temporary_name: itemName.trim(),
             quantity: conversion.kcal,
-            tz_offset_minutes: -new Date().getTimezoneOffset(),
+            tz_offset_minutes: getTimezoneOffsetMinutes(),
         });
         resetForm();
     }
@@ -237,8 +220,7 @@
             <button
                 type="button"
                 onclick={() => onWindowChange(windowOffset + 1)}
-                class="cursor-pointer rounded bg-gray-100 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
-                >前の30日</button
+                class={grayButtonClass}>前の30日</button
             >
             <button
                 type="button"
@@ -258,7 +240,7 @@
             required
             pattern={"[0-9]{4}/[0-9]{2}/[0-9]{2} [0-9]{2}:[0-9]{2}"}
             placeholder="yyyy/MM/dd HH:mm"
-            class="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-800 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+            class={inputClass}
         />
     {/snippet}
     {#snippet itemInput()}
@@ -270,7 +252,7 @@
             maxlength="255"
             placeholder="品目"
             autocomplete="off"
-            class="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-800 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+            class={inputClass}
         />
         <datalist id="calorie-item-options">
             {#each items as item (item.id)}<option value={item.name}
@@ -286,7 +268,7 @@
             min="0"
             step="1"
             placeholder={quantityLabel}
-            class="rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-800 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+            class={inputClass}
         />
     {/snippet}
     <!-- 追加欄は数量の欄のラベルを表示しないため、kcalを入力することも案内する -->
@@ -323,8 +305,7 @@
                 <button
                     type="button"
                     onclick={resetForm}
-                    class="cursor-pointer rounded bg-gray-100 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
-                    >取消</button
+                    class={grayButtonClass}>取消</button
                 >
             </div>
             {#if temporary}
@@ -334,7 +315,7 @@
             {/if}
         </form>
     {:else}
-        <CalorieEditDialog title="記録の編集" onClose={resetForm}>
+        <Dialog contentClass="p-6 pt-0" title="記録の編集" onClose={resetForm}>
             <!-- ダイアログの幅が足りればラベルを左・入力欄を右に並べ、狭ければラベルの下に入力欄を置く -->
             <form bind:this={editForm} class="@container" onsubmit={submit}>
                 <div
@@ -373,8 +354,7 @@
                         <button
                             type="button"
                             onclick={requestConversion}
-                            class="cursor-pointer rounded bg-gray-100 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
-                            >一時項目に変換</button
+                            class={grayButtonClass}>一時項目に変換</button
                         >
                     {/if}
                     <button
@@ -396,7 +376,7 @@
                 onConfirm={confirmConversion}
                 onCancel={() => (conversion = undefined)}
             />
-        </CalorieEditDialog>
+        </Dialog>
     {/if}
 
     <CalorieFilterStatus keywords={filterKeywords} onClear={onClearFilter} />
@@ -454,7 +434,14 @@
                     >
                     <td class="p-2 text-right">{record.total_kcal}</td>
                     <td class="p-2 text-right">
-                        <div class="relative" data-record-menu>
+                        <div
+                            class="relative"
+                            data-record-menu
+                            use:menuBehavior={{
+                                open: openMenuId === record.id,
+                                onClose: () => (openMenuId = undefined),
+                            }}
+                        >
                             <button
                                 type="button"
                                 onclick={() =>
@@ -465,33 +452,32 @@
                                 class="cursor-pointer rounded px-1 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
                                 data-testid="calorie-record-menu-btn"
                                 aria-label="記録の操作"
-                                aria-haspopup="menu"
-                                aria-expanded={openMenuId === record.id}
                                 title="操作">⋯</button
                             >
                             {#if openMenuId === record.id}
                                 <div
-                                    class="absolute top-full right-0 z-20 min-w-max rounded border border-gray-200 bg-white py-1 text-left shadow-lg dark:border-gray-600 dark:bg-gray-800"
+                                    class={menuFrameClass}
+                                    data-menu-frame
                                     role="menu"
                                     data-testid="calorie-record-menu"
                                 >
                                     <button
                                         type="button"
                                         onclick={() => copy(record)}
-                                        class="block w-full cursor-pointer px-4 py-1.5 text-left text-blue-600 hover:bg-gray-100 dark:text-blue-400 dark:hover:bg-gray-700"
+                                        class={menuBlueItemClass}
                                         data-testid="calorie-record-copy"
                                         role="menuitem">コピー</button
                                     >
                                     <button
                                         type="button"
                                         onclick={() => edit(record)}
-                                        class="block w-full cursor-pointer px-4 py-1.5 text-left text-blue-600 hover:bg-gray-100 dark:text-blue-400 dark:hover:bg-gray-700"
+                                        class={menuBlueItemClass}
                                         role="menuitem">編集</button
                                     >
                                     <button
                                         type="button"
                                         onclick={() => remove(record)}
-                                        class="block w-full cursor-pointer px-4 py-1.5 text-left text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/30"
+                                        class={menuDangerItemClass}
                                         role="menuitem">削除</button
                                     >
                                 </div>

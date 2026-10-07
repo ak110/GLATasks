@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { RouterOutputs } from "#lib/trpc.ts";
+    import type { RouterOutputs } from "#lib/client/trpc.ts";
 
     type Achievement = RouterOutputs["calories"]["summary"]["achievement"];
     type Status = Achievement["days"][number]["status"];

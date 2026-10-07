@@ -18,16 +18,32 @@ function csvFile(contents: string): File {
 function renderControls() {
   const onImportItems = vi.fn();
   const onImportRecords = vi.fn();
+  const onExportRecords = vi
+    .fn()
+    .mockRejectedValue(new Error("取得に失敗しました"));
   render(CalorieCsvControls, {
     items: [],
-    allRecords: [],
+    onExportRecords,
     onImportItems,
     onImportRecords,
   });
-  return { onImportItems, onImportRecords };
+  return { onImportItems, onImportRecords, onExportRecords };
 }
 
 describe("CalorieCsvControls", () => {
+  it("全記録はCSV出力を選んだときに取得し、取得失敗を表示する", async () => {
+    const { onExportRecords } = renderControls();
+    expect(onExportRecords).not.toHaveBeenCalled();
+    await fireEvent.click(
+      screen.getByRole("button", { name: "記録をエクスポート" }),
+    );
+    await waitFor(() =>
+      expect(screen.getByRole("status")).toHaveTextContent(
+        "取得に失敗しました",
+      ),
+    );
+    expect(onExportRecords).toHaveBeenCalledOnce();
+  });
   it("品目CSVのヘッダー違いを画面内へ通知する", async () => {
     const { onImportItems } = renderControls();
 

@@ -16,7 +16,7 @@ const { createMutateMock, deleteMutateMock } = vi.hoisted(() => ({
   deleteMutateMock: vi.fn().mockResolvedValue({ success: true }),
 }));
 
-vi.mock("#lib/trpc.ts", () => ({
+vi.mock("#lib/client/trpc.ts", () => ({
   trpc: {
     attachments: {
       create: { mutate: createMutateMock },
@@ -63,8 +63,8 @@ describe("TaskEditDialog", () => {
     const dialogBody = screen.getByRole("group", {
       name: "タスク編集フォーム（ファイルドロップ対応）",
     });
-    expect(dialogBody).toHaveClass("max-w-4xl");
-    expect(dialogBody).not.toHaveClass("max-w-2xl");
+    expect(dialogBody.closest("dialog")).toHaveClass("max-w-4xl");
+    expect(dialogBody.closest("dialog")).not.toHaveClass("max-w-2xl");
   });
 
   it("open=true のときテキストエリアが表示される", () => {
@@ -112,6 +112,33 @@ describe("TaskEditDialog", () => {
       });
     });
     expect(props.onAttachmentChange).toHaveBeenCalled();
+  });
+
+  it("編集中のcancelは破棄確認を開き、確認のcancelでは編集を保つ", async () => {
+    const props = makeDefaultProps();
+    render(TaskEditDialog, { props });
+    await fireEvent.input(screen.getByRole("textbox", { name: "内容" }), {
+      target: { value: "変更後" },
+    });
+    const editor = screen.getByRole("dialog", { name: "タスクの編集" });
+    await fireEvent(
+      editor,
+      new Event("cancel", { cancelable: true, bubbles: true }),
+    );
+    const confirmation = await screen.findByRole("dialog", {
+      name: "変更を破棄",
+    });
+    expect(editor).toHaveAttribute("open");
+    expect(confirmation).toHaveAttribute("open");
+    await fireEvent(
+      confirmation,
+      new Event("cancel", { cancelable: true, bubbles: true }),
+    );
+    expect(
+      screen.queryByRole("dialog", { name: "変更を破棄" }),
+    ).not.toBeInTheDocument();
+    expect(props.onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole("textbox", { name: "内容" })).toHaveValue("変更後");
   });
 
   it("既存添付の削除ボタンでattachments.deleteのmutateが発火しonAttachmentChangeが呼ばれる", async () => {

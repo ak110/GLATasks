@@ -5,8 +5,8 @@
 
     import type { TaskStatus } from "#lib/schemas.ts";
     import type { TaskListItem } from "#lib/types.ts";
-    import { createDragReorder } from "#lib/dnd-reorder.svelte.ts";
-    import { isTempTaskId } from "#lib/task-cache.ts";
+    import { createDragReorder } from "#lib/actions/dnd-reorder.svelte.ts";
+    import { isTempTaskId } from "#lib/client/tasks/task-cache.ts";
     import TaskItem from "./TaskItem.svelte";
 
     type Props = {

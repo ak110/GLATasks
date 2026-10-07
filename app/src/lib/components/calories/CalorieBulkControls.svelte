@@ -1,4 +1,6 @@
 <script lang="ts">
+    import { inputClass } from "#lib/components/ui/styles.ts";
+    import { getTimezoneOffsetMinutes } from "#lib/date-time.ts";
     /**
      * @fileoverview 期間を指定したカロリー記録の一括追加と一括削除
      */
@@ -58,7 +60,7 @@
             time_of_day: createTime,
             item_id: item.id,
             quantity,
-            tz_offset_minutes: -new Date().getTimezoneOffset(),
+            tz_offset_minutes: getTimezoneOffsetMinutes(),
         });
         statusMessage = `${result.added}件の記録を追加しました`;
     }
@@ -71,7 +73,7 @@
             start_date: toApiDate(deleteStart),
             end_date: toApiDate(deleteEnd),
             item_id: item.id,
-            tz_offset_minutes: -new Date().getTimezoneOffset(),
+            tz_offset_minutes: getTimezoneOffsetMinutes(),
         };
     }
 
@@ -81,9 +83,6 @@
         pendingDelete = undefined;
         statusMessage = `${result.deleted}件の記録を削除しました`;
     }
-
-    const inputClass =
-        "rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-800 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100";
 </script>
 
 <section
