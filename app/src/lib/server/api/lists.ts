@@ -4,7 +4,7 @@
 
 import { and, asc, count, eq, inArray, min } from "drizzle-orm";
 
-import type { ListStatus, ShowType } from "#lib/schemas.ts";
+import type { ShowType } from "#lib/schemas.ts";
 import { matchesShowType } from "#lib/show-type.ts";
 import { getHeadSortOrder } from "#lib/task-order.ts";
 import { adjustUpdatedTimestamps, mergeByTimestamp } from "../merge-utils";
@@ -57,7 +57,7 @@ export async function listLists(userId: number, showType: ShowType) {
       title: r.title,
       sortOrder: r.sort_order,
       lastUpdated: toUtcIso(r.last_updated),
-      status: r.status as ListStatus,
+      status: r.status,
       todoCount: todoCounts.get(r.id) ?? 0,
     }));
 }

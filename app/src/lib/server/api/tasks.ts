@@ -9,7 +9,6 @@ import type {
   ShowType,
   TagInfo,
   TaskKind,
-  TaskStatusSchema,
   UpdateTaskSchema,
 } from "#lib/schemas.ts";
 import { matchesShowType } from "#lib/show-type.ts";
@@ -45,8 +44,8 @@ function toTaskInfo(
     id: task.id,
     title: splitTitle(task.text),
     notes: splitNotes(task.text),
-    status: task.status as z.infer<typeof TaskStatusSchema>,
-    kind: task.kind as TaskKind,
+    status: task.status,
+    kind: task.kind,
     tags: parseTags(task.tags),
     attachments: attachments.get(task.id) ?? [],
   };

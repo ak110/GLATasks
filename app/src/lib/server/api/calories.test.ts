@@ -2,16 +2,11 @@
  * @fileoverview カロリー計算APIの統合テスト
  */
 
-import { eq, inArray } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { afterAll, describe, expect, it, vi } from "vitest";
 
 import { getDb } from "../db";
-import {
-  calorieAutoRecords,
-  calorieItems,
-  calorieRecords,
-  users,
-} from "../schema";
+import { calorieRecords } from "../schema";
 import {
   bulkCreateCalorieRecords,
   bulkDeleteCalorieRecords,
@@ -32,7 +27,11 @@ import {
   updateCalorieRecord,
 } from "./calories";
 
-const describeDb = process.env.DATABASE_URL ? describe : describe.skip;
+import {
+  createFixtureUser,
+  cleanupFixtures,
+  describeDb,
+} from "../db-test-helpers";
 
 const BASE_TIME_MS = new Date("2026-09-01T12:00:00.000Z").getTime();
 const HOUR_MS = 60 * 60 * 1000;
@@ -365,18 +364,6 @@ describe("達成状況", () => {
   });
 });
 
-async function createFixtureUser(): Promise<number> {
-  const [{ id }] = await getDb()
-    .insert(users)
-    .values({
-      user: `cal${Math.random().toString(36).slice(2, 13)}`,
-      pass_hash: "dummy",
-      joined: new Date(),
-    })
-    .$returningId();
-  return id;
-}
-
 /** 品目を1件作成し、作成した品目を返す */
 async function createFixtureItem(userId: number, name: string) {
   await createCalorieItem(userId, { name, kcal: 100, note: "" });
@@ -391,17 +378,7 @@ describeDb("カロリー計算API", () => {
   const userIds: number[] = [];
 
   afterAll(async () => {
-    if (userIds.length === 0) return;
-    await getDb()
-      .delete(calorieAutoRecords)
-      .where(inArray(calorieAutoRecords.user_id, userIds));
-    await getDb()
-      .delete(calorieRecords)
-      .where(inArray(calorieRecords.user_id, userIds));
-    await getDb()
-      .delete(calorieItems)
-      .where(inArray(calorieItems.user_id, userIds));
-    await getDb().delete(users).where(inArray(users.id, userIds));
+    await cleanupFixtures(userIds);
   });
 
   it("品目名変更後も記録が同じ品目を参照する", async () => {

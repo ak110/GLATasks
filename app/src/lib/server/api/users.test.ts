@@ -3,33 +3,26 @@
  */
 
 import { eq } from "drizzle-orm";
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, expect, it } from "vitest";
 
+import {
+  createFixtureUser,
+  cleanupFixtures,
+  describeDb,
+} from "../db-test-helpers";
 import { getDb } from "../db";
 import { users } from "../schema";
 import { getUserPreferences, updateUserPreferences } from "./users";
-
-const describeDb = process.env.DATABASE_URL ? describe : describe.skip;
 
 describeDb("updateUserPreferences", () => {
   const userIds: number[] = [];
 
   afterAll(async () => {
-    if (userIds.length === 0) return;
-    for (const userId of userIds) {
-      await getDb().delete(users).where(eq(users.id, userId));
-    }
+    await cleanupFixtures(userIds);
   });
 
   it("タイマー設定とカロリー目標値を相互に保持する", async () => {
-    const [{ id: userId }] = await getDb()
-      .insert(users)
-      .values({
-        user: `prefs${Math.random().toString(36).slice(2, 12)}`,
-        pass_hash: "dummy",
-        joined: new Date(),
-      })
-      .$returningId();
+    const userId = await createFixtureUser();
     userIds.push(userId);
 
     await updateUserPreferences(userId, { ring_seconds: 10 });
@@ -45,5 +38,27 @@ describeDb("updateUserPreferences", () => {
       adjust_minutes: 5,
       calorie_goal_kcal: 1800,
     });
+  });
+
+  it("保存された全設定を読み取り、不正なJSONは空設定として扱う", async () => {
+    const userId = await createFixtureUser();
+    userIds.push(userId);
+    const preferences = {
+      mode: "alarm",
+      ring_seconds: 10,
+      base_seconds: 300,
+      adjust_minutes: 5,
+      calorie_goal_kcal: 1800,
+    };
+    await getDb()
+      .update(users)
+      .set({ preferences: JSON.stringify(preferences) })
+      .where(eq(users.id, userId));
+    expect(await getUserPreferences(userId)).toEqual(preferences);
+    await getDb()
+      .update(users)
+      .set({ preferences: "{invalid" })
+      .where(eq(users.id, userId));
+    expect(await getUserPreferences(userId)).toEqual({});
   });
 });

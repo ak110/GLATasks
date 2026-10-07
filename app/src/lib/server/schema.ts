@@ -16,6 +16,10 @@ import {
 import {
   TIMER_DEFAULT_ADJUST_MINUTES,
   TIMER_DEFAULT_RING_SECONDS,
+  ListStatusSchema,
+  TaskStatusSchema,
+  TaskKindSchema,
+  TimerModeSchema,
 } from "#lib/schemas.ts";
 
 /** user テーブル */
@@ -111,55 +115,107 @@ export const calorieAutoRecords = mysqlTable(
 );
 
 /** list テーブル */
-export const lists = mysqlTable("list", {
-  id: int("id").primaryKey().autoincrement(),
-  user_id: int("user_id").notNull(),
-  status: varchar("status", { length: 255 }).notNull().default("active"),
-  title: varchar("title", { length: 255 }).notNull(),
-  sort_order: int("sort_order").notNull().default(0),
-  last_updated: timestamp("last_updated").notNull(),
-});
+export const lists = mysqlTable(
+  "list",
+  {
+    id: int("id").primaryKey().autoincrement(),
+    user_id: int("user_id")
+      .notNull()
+      .references(() => users.id, {
+        onDelete: "restrict",
+        onUpdate: "restrict",
+      }),
+    status: varchar("status", {
+      length: 255,
+      enum: [ListStatusSchema.enum.active, ListStatusSchema.enum.archived],
+    })
+      .notNull()
+      .default("active"),
+    title: varchar("title", { length: 255 }).notNull(),
+    sort_order: int("sort_order").notNull().default(0),
+    last_updated: timestamp("last_updated").notNull(),
+  },
+  (t) => ({ user_id_idx: index("user_id_idx").on(t.user_id) }),
+);
 
 /** task テーブル */
-export const tasks = mysqlTable("task", {
-  id: int("id").primaryKey().autoincrement(),
-  list_id: int("list_id").notNull(),
-  status: varchar("status", { length: 255 }).notNull().default("active"),
-  // タスク区分（"normal" | "todo"）。既存タスクには "normal" が自動的に入る
-  kind: varchar("kind", { length: 255 }).notNull().default("normal"),
-  text: mediumtext("text").notNull(),
-  // タグ配列のJSON文字列（要素は { name, color }）
-  tags: mediumtext("tags").notNull().default("[]"),
-  sort_order: int("sort_order").notNull().default(0),
-  created: timestamp("created").notNull(),
-  updated: timestamp("updated").notNull(),
-  completed: timestamp("completed"),
-});
+export const tasks = mysqlTable(
+  "task",
+  {
+    id: int("id").primaryKey().autoincrement(),
+    list_id: int("list_id")
+      .notNull()
+      .references(() => lists.id, {
+        onDelete: "restrict",
+        onUpdate: "restrict",
+      }),
+    status: varchar("status", {
+      length: 255,
+      enum: [
+        TaskStatusSchema.enum.active,
+        TaskStatusSchema.enum.running,
+        TaskStatusSchema.enum.completed,
+        TaskStatusSchema.enum.archived,
+      ],
+    })
+      .notNull()
+      .default("active"),
+    // タスク区分（"normal" | "todo"）。既存タスクには "normal" が自動的に入る
+    kind: varchar("kind", {
+      length: 255,
+      enum: [TaskKindSchema.enum.normal, TaskKindSchema.enum.todo],
+    })
+      .notNull()
+      .default("normal"),
+    text: mediumtext("text").notNull(),
+    // タグ配列のJSON文字列（要素は { name, color }）
+    tags: mediumtext("tags").notNull().default("[]"),
+    sort_order: int("sort_order").notNull().default(0),
+    created: timestamp("created").notNull(),
+    updated: timestamp("updated").notNull(),
+    completed: timestamp("completed"),
+  },
+  (t) => ({ list_id_idx: index("list_id_idx").on(t.list_id) }),
+);
 
 /** timer テーブル */
-export const timers = mysqlTable("timer", {
-  id: int("id").primaryKey().autoincrement(),
-  user_id: int("user_id").notNull(),
-  name: varchar("name", { length: 255 }).notNull(),
-  mode: varchar("mode", { length: 10 }).notNull().default("countdown"),
-  target_minutes: int("target_minutes"),
-  base_seconds: int("base_seconds").notNull(),
-  adjust_minutes: int("adjust_minutes")
-    .notNull()
-    .default(TIMER_DEFAULT_ADJUST_MINUTES),
-  running: tinyint("running").notNull().default(0),
-  expired: tinyint("expired").notNull().default(0),
-  ephemeral: tinyint("ephemeral").notNull().default(0),
-  // 期限切れ後にビープを鳴らす秒数。タイマーごとに上書き可能。
-  ring_seconds: int("ring_seconds")
-    .notNull()
-    .default(TIMER_DEFAULT_RING_SECONDS),
-  remaining_seconds: int("remaining_seconds").notNull(),
-  started_at: timestamp("started_at"),
-  sort_order: int("sort_order").notNull().default(0),
-  created: timestamp("created").notNull(),
-  updated: timestamp("updated").notNull(),
-});
+export const timers = mysqlTable(
+  "timer",
+  {
+    id: int("id").primaryKey().autoincrement(),
+    user_id: int("user_id")
+      .notNull()
+      .references(() => users.id, {
+        onDelete: "restrict",
+        onUpdate: "restrict",
+      }),
+    name: varchar("name", { length: 255 }).notNull(),
+    mode: varchar("mode", {
+      length: 10,
+      enum: [TimerModeSchema.enum.countdown, TimerModeSchema.enum.alarm],
+    })
+      .notNull()
+      .default("countdown"),
+    target_minutes: int("target_minutes"),
+    base_seconds: int("base_seconds").notNull(),
+    adjust_minutes: int("adjust_minutes")
+      .notNull()
+      .default(TIMER_DEFAULT_ADJUST_MINUTES),
+    running: tinyint("running").notNull().default(0),
+    expired: tinyint("expired").notNull().default(0),
+    ephemeral: tinyint("ephemeral").notNull().default(0),
+    // 期限切れ後にビープを鳴らす秒数。タイマーごとに上書き可能。
+    ring_seconds: int("ring_seconds")
+      .notNull()
+      .default(TIMER_DEFAULT_RING_SECONDS),
+    remaining_seconds: int("remaining_seconds").notNull(),
+    started_at: timestamp("started_at"),
+    sort_order: int("sort_order").notNull().default(0),
+    created: timestamp("created").notNull(),
+    updated: timestamp("updated").notNull(),
+  },
+  (t) => ({ user_id_idx: index("user_id_idx").on(t.user_id) }),
+);
 
 // drizzle-orm 0.45.2 の mysql-core に mediumblob ビルダーが存在しないため、
 // customType で MEDIUMBLOB 型を定義する。
@@ -180,7 +236,12 @@ export const attachments = mysqlTable(
   "attachment",
   {
     id: int("id").autoincrement().primaryKey(),
-    task_id: int("task_id").notNull(),
+    task_id: int("task_id")
+      .notNull()
+      .references(() => tasks.id, {
+        onDelete: "restrict",
+        onUpdate: "restrict",
+      }),
     filename: varchar("filename", { length: 255 }).notNull(),
     mime_type: varchar("mime_type", { length: 255 }).notNull(),
     size: int("size").notNull(),
@@ -197,7 +258,12 @@ export const schedules = mysqlTable(
   "schedule",
   {
     id: int("id").primaryKey().autoincrement(),
-    list_id: int("list_id").notNull(),
+    list_id: int("list_id")
+      .notNull()
+      .references(() => lists.id, {
+        onDelete: "restrict",
+        onUpdate: "restrict",
+      }),
     title: varchar("title", { length: 255 }).notNull(),
     // タグ配列のJSON文字列（tasks.tags と同形式）
     tags: mediumtext("tags").notNull().default("[]"),

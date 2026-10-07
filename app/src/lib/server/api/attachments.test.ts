@@ -5,86 +5,26 @@
  * 開発用MariaDBへ実接続して検証する（`DATABASE_URL`が到達可能な環境で実行する）。
  */
 
-import { eq, inArray } from "drizzle-orm";
-import { afterAll, describe, expect, it } from "vitest";
+import { eq } from "drizzle-orm";
+import { afterAll, expect, it } from "vitest";
 
 import {
   MAX_ATTACHMENT_BYTES,
   MAX_ATTACHMENTS_PER_TASK,
 } from "#lib/schemas.ts";
+import {
+  createFixtureTask,
+  cleanupFixtures,
+  describeDb,
+} from "../db-test-helpers";
 import { getDb } from "../db";
-import { attachments, lists, tasks, users } from "../schema";
+import { attachments } from "../schema";
 import {
   createAttachment,
   deleteAttachment,
   downloadAttachment,
   listAttachmentsForTasks,
 } from "./attachments.js";
-
-/** テスト用ユーザー・リスト・タスクを1組作成する。 */
-async function createFixtureTask(): Promise<{
-  userId: number;
-  listId: number;
-  taskId: number;
-}> {
-  const db = getDb();
-  const now = new Date();
-  const [{ id: userId }] = await db
-    .insert(users)
-    .values({
-      user: `attach${Math.random().toString(36).slice(2, 12)}`,
-      pass_hash: "dummy",
-      joined: now,
-    })
-    .$returningId();
-  const [{ id: listId }] = await db
-    .insert(lists)
-    .values({
-      user_id: userId,
-      status: "active",
-      title: "attachment test list",
-      sort_order: 0,
-      last_updated: now,
-    })
-    .$returningId();
-  const [{ id: taskId }] = await db
-    .insert(tasks)
-    .values({
-      list_id: listId,
-      status: "active",
-      text: "attachment test task",
-      tags: "[]",
-      sort_order: 0,
-      created: now,
-      updated: now,
-    })
-    .$returningId();
-  return { userId, listId, taskId };
-}
-
-/** テストで作成した users・lists・tasks・attachments 行を削除する。 */
-async function cleanupFixtures(userIds: number[]): Promise<void> {
-  if (userIds.length === 0) return;
-  const db = getDb();
-  const listRows = await db
-    .select({ id: lists.id })
-    .from(lists)
-    .where(inArray(lists.user_id, userIds));
-  const listIds = listRows.map((l) => l.id);
-  if (listIds.length > 0) {
-    const taskRows = await db
-      .select({ id: tasks.id })
-      .from(tasks)
-      .where(inArray(tasks.list_id, listIds));
-    const taskIds = taskRows.map((t) => t.id);
-    if (taskIds.length > 0) {
-      await db.delete(attachments).where(inArray(attachments.task_id, taskIds));
-      await db.delete(tasks).where(inArray(tasks.id, taskIds));
-    }
-    await db.delete(lists).where(inArray(lists.id, listIds));
-  }
-  await db.delete(users).where(inArray(users.id, userIds));
-}
 
 /** 指定件数のダミー添付を直接INSERTする（`createAttachment`呼び出しコストを避ける）。 */
 async function seedAttachments(taskId: number, count: number): Promise<void> {
@@ -103,8 +43,6 @@ async function seedAttachments(taskId: number, count: number): Promise<void> {
       })),
     );
 }
-
-const describeDb = process.env.DATABASE_URL ? describe : describe.skip;
 
 describeDb("createAttachment", () => {
   const createdUserIds: number[] = [];

@@ -6,40 +6,17 @@
  * `now` を明示的に引数として渡し、実時刻に依存しないテストとする。
  */
 
-import { eq, inArray } from "drizzle-orm";
-import { afterAll, describe, expect, it, vi } from "vitest";
+import { eq } from "drizzle-orm";
+import { afterAll, expect, it, vi } from "vitest";
 
+import {
+  createFixtureList,
+  cleanupFixtures,
+  describeDb,
+} from "./db-test-helpers";
 import { getDb } from "./db";
-import { lists, schedules, tasks, users } from "./schema";
+import { schedules, tasks } from "./schema";
 import { processSchedules } from "./scheduler";
-
-/** テスト用ユーザー・リストを1組作成する。 */
-async function createFixtureList(): Promise<{
-  userId: number;
-  listId: number;
-}> {
-  const db = getDb();
-  const now = new Date();
-  const [{ id: userId }] = await db
-    .insert(users)
-    .values({
-      user: `sched${Math.random().toString(36).slice(2, 12)}`,
-      pass_hash: "dummy",
-      joined: now,
-    })
-    .$returningId();
-  const [{ id: listId }] = await db
-    .insert(lists)
-    .values({
-      user_id: userId,
-      status: "active",
-      title: "scheduler test list",
-      sort_order: 0,
-      last_updated: now,
-    })
-    .$returningId();
-  return { userId, listId };
-}
 
 /** テスト用スケジュールを1件作成し、idを返す。 */
 async function insertSchedule(params: {
@@ -76,25 +53,6 @@ async function countTodoTasks(listId: number): Promise<number> {
     .where(eq(tasks.list_id, listId));
   return rows.length;
 }
-
-/** テストで作成した users・lists・schedules・tasks 行を削除する。 */
-async function cleanupFixtures(userIds: number[]): Promise<void> {
-  if (userIds.length === 0) return;
-  const db = getDb();
-  const listRows = await db
-    .select({ id: lists.id })
-    .from(lists)
-    .where(inArray(lists.user_id, userIds));
-  const listIds = listRows.map((l) => l.id);
-  if (listIds.length > 0) {
-    await db.delete(schedules).where(inArray(schedules.list_id, listIds));
-    await db.delete(tasks).where(inArray(tasks.list_id, listIds));
-    await db.delete(lists).where(inArray(lists.id, listIds));
-  }
-  await db.delete(users).where(inArray(users.id, userIds));
-}
-
-const describeDb = process.env.DATABASE_URL ? describe : describe.skip;
 
 describeDb("processSchedules", () => {
   const createdUserIds: number[] = [];
