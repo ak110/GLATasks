@@ -12,6 +12,7 @@ import {
   PROMPT_LANGUAGE_TAGS,
   resolveLanguageTag,
   setStoredTranslateSettings,
+  splitTranslationUnits,
   TRANSLATE_DEFAULTS,
 } from "./translate";
 import {
@@ -168,6 +169,17 @@ describe("buildPromptLanguageOptions", () => {
     ["ja", "存在しない言語"],
   ] as const)("%s と %s はPrompt APIの設定を生成しない", (native, foreign) => {
     expect(buildPromptLanguageOptions(native, foreign)).toBeNull();
+  });
+});
+
+describe("splitTranslationUnits", () => {
+  it("空行単位で分け、段落内の改行と句読点を保持する", () => {
+    expect(
+      splitTranslationUnits(
+        "  最初の行。\r\n続き。\r\n \t\r\n\r\n 次の段落。 \r最後の行。  ",
+      ),
+    ).toEqual(["最初の行。\n続き。", "次の段落。 \n最後の行。"]);
+    expect(splitTranslationUnits(" \r\n\t\r\n ")).toEqual([]);
   });
 });
 

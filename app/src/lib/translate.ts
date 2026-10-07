@@ -234,3 +234,12 @@ export function setStoredTranslateSettings(settings: TranslateSettings): void {
   localStorage.setItem(STORAGE_KEYS.foreignLanguage, settings.foreignLanguage);
   localStorage.setItem(STORAGE_KEYS.engine, settings.engine);
 }
+
+/** 空行で区切った段落を、改行を保持した翻訳単位へ分ける */
+export function splitTranslationUnits(text: string): string[] {
+  return text
+    .replace(/\r\n?/g, "\n")
+    .split(/\n[ \t]*(?:\n[ \t]*)+/)
+    .map((unit) => unit.trim())
+    .filter((unit) => unit.length > 0);
+}

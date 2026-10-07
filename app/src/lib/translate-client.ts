@@ -3,6 +3,18 @@
  */
 
 import {
+  modelSlots,
+  createSharedModel,
+  ensurePreparationActive,
+  getModelApi,
+  getResourceGeneration,
+} from "#lib/translate-resources.ts";
+export {
+  abandonEngineCreations,
+  destroyTranslationResources,
+} from "#lib/translate-resources.ts";
+
+import {
   buildPromptLanguageOptions,
   buildTranslationPrompt,
   decideDirection,
@@ -10,6 +22,12 @@ import {
   type PromptLanguageOptions,
   type TranslateEngine,
 } from "#lib/translate.ts";
+
+export const MODEL_UNAVAILABLE = {
+  detector: "Language Detector APIを利用できません",
+  translator: "Translator APIを利用できません",
+  prompt: "Prompt APIを利用できません",
+} as const;
 
 export type TranslationDirectionChoice =
   "native-to-foreign" | "foreign-to-native";
@@ -57,118 +75,6 @@ export type PrepareEngineOptions = {
   signal?: AbortSignal;
 };
 
-type SharedCreation<T> = {
-  generation: number;
-  controller: AbortController;
-  promise: Promise<T>;
-  reject: (reason: DOMException) => void;
-};
-
-type TranslationResources = {
-  detector: LanguageDetector | undefined;
-  translator:
-    | {
-        key: string;
-        instance: Translator;
-        mode: "detected" | "explicit";
-      }
-    | undefined;
-  prompt: { key: string; instance: LanguageModel } | undefined;
-};
-
-const resources: TranslationResources = {
-  detector: undefined,
-  translator: undefined,
-  prompt: undefined,
-};
-
-let resourceGeneration = 0;
-const detectorCreations = new Map<string, SharedCreation<LanguageDetector>>();
-const translatorCreations = new Map<string, SharedCreation<Translator>>();
-const promptCreations = new Map<string, SharedCreation<LanguageModel>>();
-let translatorCreationSequence = 0;
-let promptCreationSequence = 0;
-
-function makePreparationAbortError(): DOMException {
-  return new DOMException("翻訳準備が中断されました", "AbortError");
-}
-
-function ensurePreparationActive(
-  generation: number,
-  signal?: AbortSignal,
-): void {
-  if (generation !== resourceGeneration || signal?.aborted) {
-    throw makePreparationAbortError();
-  }
-}
-
-/**
- * 外部APIの中断信号受理に依存せず、共有作成の待機と登録を所有する。
- * 放棄後に外部作成が完了した場合は、採用せず作成物を解放する。
- */
-function getOrCreateShared<T extends { destroy(): void }>(
-  creations: Map<string, SharedCreation<T>>,
-  key: string,
-  generation: number,
-  create: (signal: AbortSignal) => PromiseLike<T> | T,
-  adopt: (instance: T) => boolean,
-): Promise<T> {
-  const existing = creations.get(key);
-  if (existing?.generation === generation) return existing.promise;
-
-  const controller = new AbortController();
-  let resolveCreation!: (instance: T) => void;
-  let rejectCreation!: (reason: unknown) => void;
-  const promise = new Promise<T>((resolve, reject) => {
-    resolveCreation = resolve;
-    rejectCreation = reject;
-  });
-  const creation: SharedCreation<T> = {
-    generation,
-    controller,
-    promise,
-    reject: rejectCreation,
-  };
-  creations.set(key, creation);
-
-  try {
-    const externalCreation = create(controller.signal);
-    void Promise.resolve(externalCreation).then(
-      (instance) => {
-        if (creations.get(key) !== creation || !adopt(instance)) {
-          instance.destroy();
-          rejectCreation(makePreparationAbortError());
-          return;
-        }
-        resolveCreation(instance);
-      },
-      (error: unknown) => rejectCreation(error),
-    );
-  } catch (error) {
-    rejectCreation(error);
-  }
-  void promise.then(
-    () => {
-      if (creations.get(key) === creation) creations.delete(key);
-    },
-    () => {
-      if (creations.get(key) === creation) creations.delete(key);
-    },
-  );
-  return promise;
-}
-
-function abandonSharedCreations<T>(
-  creations: Map<string, SharedCreation<T>>,
-  reason: DOMException,
-): void {
-  for (const creation of creations.values()) {
-    creation.reject(reason);
-    creation.controller.abort(reason);
-  }
-  creations.clear();
-}
-
 function makePairKey(sourceLanguage: string, targetLanguage: string): string {
   return `${sourceLanguage}\u0000${targetLanguage}`;
 }
@@ -190,11 +96,6 @@ function makeMonitor(
   };
 }
 
-function getPreparationLabel(target: TranslationPreparationTarget): string {
-  if (target.kind === "prompt") return "翻訳モデル";
-  return `${target.sourceLanguage}→${target.targetLanguage}`;
-}
-
 function getDirectionLabel(direction: TranslationDirectionChoice): string {
   return direction === "native-to-foreign"
     ? "母語 → 相手言語"
@@ -212,9 +113,9 @@ export async function detectEngineAvailability(
   const availableEngines: TranslateEngine[] = [];
 
   if (
-    typeof globalThis.Translator !== "undefined" &&
-    typeof globalThis.LanguageDetector !== "undefined" &&
-    (await globalThis.LanguageDetector.availability()) !== "unavailable"
+    getModelApi("translator") &&
+    getModelApi("detector") &&
+    (await getModelApi("detector")!.availability()) !== "unavailable"
   ) {
     availableEngines.push("translator");
   }
@@ -224,10 +125,9 @@ export async function detectEngineAvailability(
     foreignLanguage,
   );
   if (
-    typeof globalThis.LanguageModel !== "undefined" &&
+    getModelApi("prompt") &&
     promptOptions !== null &&
-    (await globalThis.LanguageModel.availability(promptOptions)) !==
-      "unavailable"
+    (await getModelApi("prompt")!.availability(promptOptions)) !== "unavailable"
   ) {
     availableEngines.push("prompt");
   }
@@ -256,45 +156,34 @@ export async function prepareEngine({
   signal,
 }: PrepareEngineOptions): Promise<void> {
   if (preparation.length === 0) return;
-  const generation = resourceGeneration;
+  const generation = getResourceGeneration();
   ensurePreparationActive(generation, signal);
   onProgress(0);
   const monitor = makeMonitor(onProgress);
 
   for (const target of preparation) {
     ensurePreparationActive(generation, signal);
-    if (engine === "translator" && target.kind === "translator") {
-      await prepareTranslator(target, monitor, generation, signal);
-    }
-    if (engine === "prompt" && target.kind === "prompt") {
-      await preparePrompt(target, monitor, generation, signal);
+    if (engine === target.kind) {
+      await prepareTarget(target, monitor, generation, signal);
     }
   }
 }
 
 async function createDetector(
   monitor: CreateMonitorCallback,
-  generation = resourceGeneration,
+  generation = getResourceGeneration(),
   signal?: AbortSignal,
 ): Promise<LanguageDetector> {
-  ensurePreparationActive(generation, signal);
-  if (resources.detector) return resources.detector;
-  if (typeof globalThis.LanguageDetector === "undefined") {
-    throw new Error("Language Detector APIを利用できません");
-  }
-  return getOrCreateShared(
-    detectorCreations,
+  return createSharedModel(
     "detector",
-    generation,
-    (sharedSignal) =>
-      globalThis.LanguageDetector!.create({
-        monitor,
-        signal: sharedSignal,
-      }),
-    (instance) => {
-      resources.detector = instance;
-      return true;
+    "detector",
+    (sharedSignal) => {
+      const api = getModelApi("detector");
+      if (!api) throw new Error(MODEL_UNAVAILABLE.detector);
+      return api.create({ monitor, signal: sharedSignal });
     },
+    generation,
+    signal,
   );
 }
 
@@ -302,125 +191,78 @@ async function createTranslator(
   sourceLanguage: string,
   targetLanguage: string,
   monitor: CreateMonitorCallback,
-  mode: "detected" | "explicit",
-  generation = resourceGeneration,
+  generation = getResourceGeneration(),
   signal?: AbortSignal,
 ): Promise<Translator> {
-  const key = makePairKey(sourceLanguage, targetLanguage);
-  ensurePreparationActive(generation, signal);
-  if (resources.translator?.key === key) {
-    resources.translator.mode = mode;
-    return resources.translator.instance;
-  }
-  if (typeof globalThis.Translator === "undefined") {
-    throw new Error("Translator APIを利用できません");
-  }
-  const existing = translatorCreations.get(key);
-  if (existing?.generation === generation) return existing.promise;
-  const creationSequence = ++translatorCreationSequence;
-  return getOrCreateShared(
-    translatorCreations,
-    key,
-    generation,
-    (sharedSignal) =>
-      // create()は利用者操作の呼び出しスタック内で開始し、Promiseキューで遅延させない。
-      globalThis.Translator.create({
+  return createSharedModel(
+    "translator",
+    makePairKey(sourceLanguage, targetLanguage),
+    (sharedSignal) => {
+      const api = getModelApi("translator");
+      if (!api) throw new Error(MODEL_UNAVAILABLE.translator);
+      return api.create({
         sourceLanguage,
         targetLanguage,
         monitor,
         signal: sharedSignal,
-      }),
-    (instance) => {
-      if (creationSequence !== translatorCreationSequence) {
-        return false;
-      }
-      const previous = resources.translator?.instance;
-      resources.translator = { key, instance, mode };
-      if (previous !== instance) previous?.destroy();
-      return true;
+      });
     },
+    generation,
+    signal,
   );
 }
 
 async function createPrompt(
   target: Extract<TranslationPreparationTarget, { kind: "prompt" }>,
   monitor: CreateMonitorCallback,
-  generation = resourceGeneration,
+  generation = getResourceGeneration(),
   signal?: AbortSignal,
 ): Promise<LanguageModel> {
-  const key = makePromptKey(target.nativeLanguage, target.foreignLanguage);
-  ensurePreparationActive(generation, signal);
-  if (resources.prompt?.key === key) return resources.prompt.instance;
-  if (typeof globalThis.LanguageModel === "undefined") {
-    throw new Error("Prompt APIを利用できません");
-  }
-  const existing = promptCreations.get(key);
-  if (existing?.generation === generation) return existing.promise;
-  const creationSequence = ++promptCreationSequence;
-  return getOrCreateShared(
-    promptCreations,
-    key,
-    generation,
-    (sharedSignal) =>
-      // downloadableのPromptもクリックイベントの呼び出しスタック内でcreate()を開始する。
-      globalThis.LanguageModel.create({
+  return createSharedModel(
+    "prompt",
+    makePromptKey(target.nativeLanguage, target.foreignLanguage),
+    (sharedSignal) => {
+      const api = getModelApi("prompt");
+      if (!api) throw new Error(MODEL_UNAVAILABLE.prompt);
+      return api.create({
         ...target.options,
         initialPrompts: [{ role: "system", content: target.initialPrompt }],
         monitor,
         signal: sharedSignal,
-      }),
-    (instance) => {
-      if (creationSequence !== promptCreationSequence) {
-        return false;
-      }
-      const previous = resources.prompt?.instance;
-      resources.prompt = { key, instance };
-      if (previous !== instance) previous?.destroy();
-      return true;
+      });
     },
-  );
-}
-
-async function prepareTranslator(
-  target: Extract<TranslationPreparationTarget, { kind: "translator" }>,
-  monitor: CreateMonitorCallback,
-  generation: number,
-  signal?: AbortSignal,
-): Promise<void> {
-  ensurePreparationActive(generation, signal);
-  if (typeof globalThis.Translator === "undefined") {
-    throw new Error("Translator APIを利用できません");
-  }
-  if (target.availability === "unavailable") {
-    throw new Error(
-      `この言語ペア（${target.sourceLanguage}→${target.targetLanguage}）は翻訳できません`,
-    );
-  }
-  await createTranslator(
-    target.sourceLanguage,
-    target.targetLanguage,
-    monitor,
-    "explicit",
     generation,
     signal,
   );
-  ensurePreparationActive(generation, signal);
 }
 
-async function preparePrompt(
-  target: Extract<TranslationPreparationTarget, { kind: "prompt" }>,
+async function prepareTarget(
+  target: TranslationPreparationTarget,
   monitor: CreateMonitorCallback,
   generation: number,
   signal?: AbortSignal,
 ): Promise<void> {
   ensurePreparationActive(generation, signal);
-  if (typeof globalThis.LanguageModel === "undefined") {
-    throw new Error("Prompt APIを利用できません");
-  }
+  if (!getModelApi(target.kind))
+    throw new Error(MODEL_UNAVAILABLE[target.kind]);
   if (target.availability === "unavailable") {
-    throw new Error("Prompt APIを利用できません");
+    throw new Error(
+      target.kind === "prompt"
+        ? MODEL_UNAVAILABLE.prompt
+        : `この言語ペア（${target.sourceLanguage}→${target.targetLanguage}）は翻訳できません`,
+    );
   }
-  await createPrompt(target, monitor, generation, signal);
+  if (target.kind === "translator") {
+    await createTranslator(
+      target.sourceLanguage,
+      target.targetLanguage,
+      monitor,
+      generation,
+      signal,
+    );
+  } else {
+    await createPrompt(target, monitor, generation, signal);
+  }
   ensurePreparationActive(generation, signal);
 }
 
@@ -470,14 +312,14 @@ async function makeDirectionPreparations(
   foreignLanguage: string,
   nativeTag: string,
   foreignTag: string,
-  generation = resourceGeneration,
+  generation = getResourceGeneration(),
   signal?: AbortSignal,
 ): Promise<TranslationResult> {
   ensurePreparationActive(generation, signal);
-  if (typeof globalThis.Translator === "undefined") {
+  if (!getModelApi("translator")) {
     return {
       status: "unavailable",
-      message: "Translator APIを利用できません",
+      message: MODEL_UNAVAILABLE.translator,
     };
   }
   const directions = [
@@ -501,7 +343,7 @@ async function makeDirectionPreparations(
   );
   const preparations = await Promise.all(
     directions.map(async (candidate) => {
-      const availability = await globalThis.Translator!.availability({
+      const availability = await getModelApi("translator")!.availability({
         sourceLanguage: candidate.sourceLanguage,
         targetLanguage: candidate.targetLanguage,
       });
@@ -567,7 +409,7 @@ async function consumeStream(
 /**
  * 作成済みの内蔵AIインスタンスで翻訳し、必要な準備があればその対象を返す。
  * 実行ごとのAbortSignalは検出・翻訳・Prompt実行へ渡す。モデル作成は
- * resourceGenerationで共有所有し、個別要求の中断で共有作成Promiseを壊さない。
+ * getResourceGeneration()で共有所有し、個別要求の中断で共有作成Promiseを壊さない。
  * 利用者操作起点のcreate()自体は、この関数から呼び出す準備処理の呼び出し
  * スタック内で開始する。
  */
@@ -580,70 +422,17 @@ export async function runTranslation(
   onChunk: (chunk: string) => void,
   directionChoice?: TranslationDirectionChoice,
 ): Promise<TranslationResult> {
-  const generation = resourceGeneration;
+  const generation = getResourceGeneration();
   ensurePreparationActive(generation, signal);
   if (engine === "prompt") {
-    const promptOptions = buildPromptLanguageOptions(
+    return runPromptTranslation(
+      text,
       nativeLanguage,
       foreignLanguage,
+      signal,
+      onChunk,
+      generation,
     );
-    if (promptOptions === null) {
-      return {
-        status: "unavailable",
-        message:
-          "Prompt APIでは母語・相手言語を対応言語（en・ja・es・de・fr）で指定してください",
-      };
-    }
-    const promptKey = makePromptKey(nativeLanguage, foreignLanguage);
-    if (!resources.prompt || resources.prompt.key !== promptKey) {
-      if (typeof globalThis.LanguageModel === "undefined") {
-        return {
-          status: "unavailable",
-          message: "Prompt APIを利用できません",
-        };
-      }
-      const availability =
-        await globalThis.LanguageModel.availability(promptOptions);
-      ensurePreparationActive(generation, signal);
-      if (availability === "unavailable") {
-        return {
-          status: "unavailable",
-          message: "Prompt APIを利用できません",
-        };
-      }
-      const preparation = makePromptPreparation(
-        nativeLanguage,
-        foreignLanguage,
-        promptOptions,
-        availability,
-      );
-      if (availability === "downloadable") return preparation;
-      await prepareEngine({
-        engine,
-        preparation: preparation.preparation,
-        onProgress: () => undefined,
-        signal,
-      });
-    }
-
-    ensurePreparationActive(generation, signal);
-    if (!resources.prompt) {
-      return {
-        status: "unavailable",
-        message: "Prompt APIを利用できません",
-      };
-    }
-    let executionSession: LanguageModel | undefined;
-    try {
-      executionSession = await resources.prompt.instance.clone({ signal });
-      await consumeStream(
-        await executionSession.promptStreaming(text, { signal }),
-        onChunk,
-      );
-      return { status: "translated" };
-    } finally {
-      executionSession?.destroy();
-    }
   }
 
   const nativeTag = resolveLanguageTag(nativeLanguage);
@@ -655,74 +444,194 @@ export async function runTranslation(
         "母語・相手言語を解決できません。言語名または言語タグ（en・fr）を入力してください",
     };
   }
-  if (
-    typeof globalThis.Translator === "undefined" ||
-    typeof globalThis.LanguageDetector === "undefined"
-  ) {
+  if (!getModelApi("translator") || !getModelApi("detector")) {
     return {
       status: "unavailable",
       message: "このブラウザはTranslator APIに対応していません",
     };
   }
-  if (directionChoice) {
-    const direction =
-      directionChoice === "native-to-foreign"
-        ? { sourceLanguage: nativeTag, targetLanguage: foreignTag }
-        : { sourceLanguage: foreignTag, targetLanguage: nativeTag };
-    const pairKey = makePairKey(
-      direction.sourceLanguage,
-      direction.targetLanguage,
-    );
-
-    if (resources.translator?.key !== pairKey) {
-      const availability = await globalThis.Translator.availability(direction);
-      ensurePreparationActive(generation, signal);
-      if (availability === "unavailable") {
-        return {
-          status: "unavailable",
-          message: `この言語ペア（${direction.sourceLanguage}→${direction.targetLanguage}）は翻訳できません`,
-        };
-      }
-      if (availability === "downloadable") {
-        return makeTranslatorPreparation(
-          text,
-          nativeLanguage,
-          foreignLanguage,
-          direction.sourceLanguage,
-          direction.targetLanguage,
-          directionChoice,
-          availability,
-          true,
-        );
-      }
-      await createTranslator(
-        direction.sourceLanguage,
-        direction.targetLanguage,
-        () => undefined,
-        "explicit",
-        generation,
+  return directionChoice
+    ? runDirectedTranslation(
+        text,
+        nativeLanguage,
+        foreignLanguage,
         signal,
+        onChunk,
+        generation,
+        nativeTag,
+        foreignTag,
+        directionChoice,
+      )
+    : runDetectedTranslation(
+        text,
+        nativeLanguage,
+        foreignLanguage,
+        signal,
+        onChunk,
+        generation,
+        nativeTag,
+        foreignTag,
       );
-    }
+}
 
-    ensurePreparationActive(generation, signal);
-    if (!resources.translator || resources.translator.key !== pairKey) {
+async function runPromptTranslation(
+  text: string,
+  nativeLanguage: string,
+  foreignLanguage: string,
+  signal: AbortSignal,
+  onChunk: (chunk: string) => void,
+  generation: number,
+): Promise<TranslationResult> {
+  const promptOptions = buildPromptLanguageOptions(
+    nativeLanguage,
+    foreignLanguage,
+  );
+  if (promptOptions === null) {
+    return {
+      status: "unavailable",
+      message:
+        "Prompt APIでは母語・相手言語を対応言語（en・ja・es・de・fr）で指定してください",
+    };
+  }
+  const promptKey = makePromptKey(nativeLanguage, foreignLanguage);
+  if (
+    !modelSlots.prompt.resource ||
+    modelSlots.prompt.resource.key !== promptKey
+  ) {
+    if (!getModelApi("prompt")) {
       return {
         status: "unavailable",
-        message: "Translator APIを利用できません",
+        message: MODEL_UNAVAILABLE.prompt,
       };
     }
+    const availability =
+      await getModelApi("prompt")!.availability(promptOptions);
+    ensurePreparationActive(generation, signal);
+    if (availability === "unavailable") {
+      return {
+        status: "unavailable",
+        message: MODEL_UNAVAILABLE.prompt,
+      };
+    }
+    const preparation = makePromptPreparation(
+      nativeLanguage,
+      foreignLanguage,
+      promptOptions,
+      availability,
+    );
+    if (availability === "downloadable") return preparation;
+    await prepareEngine({
+      engine: "prompt",
+      preparation: preparation.preparation,
+      onProgress: () => undefined,
+      signal,
+    });
+  }
+
+  ensurePreparationActive(generation, signal);
+  if (!modelSlots.prompt.resource) {
+    return {
+      status: "unavailable",
+      message: MODEL_UNAVAILABLE.prompt,
+    };
+  }
+  let executionSession: LanguageModel | undefined;
+  try {
+    executionSession = await modelSlots.prompt.resource.instance.clone({
+      signal,
+    });
     await consumeStream(
-      await resources.translator.instance.translateStreaming(text, {
-        signal,
-      }),
+      await executionSession.promptStreaming(text, { signal }),
       onChunk,
     );
     return { status: "translated" };
+  } finally {
+    executionSession?.destroy();
+  }
+}
+
+async function runDirectedTranslation(
+  text: string,
+  nativeLanguage: string,
+  foreignLanguage: string,
+  signal: AbortSignal,
+  onChunk: (chunk: string) => void,
+  generation: number,
+  nativeTag: string,
+  foreignTag: string,
+  directionChoice: TranslationDirectionChoice,
+): Promise<TranslationResult> {
+  const direction =
+    directionChoice === "native-to-foreign"
+      ? { sourceLanguage: nativeTag, targetLanguage: foreignTag }
+      : { sourceLanguage: foreignTag, targetLanguage: nativeTag };
+  const pairKey = makePairKey(
+    direction.sourceLanguage,
+    direction.targetLanguage,
+  );
+
+  if (modelSlots.translator.resource?.key !== pairKey) {
+    const availability =
+      await getModelApi("translator")!.availability(direction);
+    ensurePreparationActive(generation, signal);
+    if (availability === "unavailable") {
+      return {
+        status: "unavailable",
+        message: `この言語ペア（${direction.sourceLanguage}→${direction.targetLanguage}）は翻訳できません`,
+      };
+    }
+    if (availability === "downloadable") {
+      return makeTranslatorPreparation(
+        text,
+        nativeLanguage,
+        foreignLanguage,
+        direction.sourceLanguage,
+        direction.targetLanguage,
+        directionChoice,
+        availability,
+        true,
+      );
+    }
+    await createTranslator(
+      direction.sourceLanguage,
+      direction.targetLanguage,
+      () => undefined,
+      generation,
+      signal,
+    );
   }
 
-  if (!resources.detector) {
-    const availability = await globalThis.LanguageDetector.availability();
+  ensurePreparationActive(generation, signal);
+  if (
+    !modelSlots.translator.resource ||
+    modelSlots.translator.resource.key !== pairKey
+  ) {
+    return {
+      status: "unavailable",
+      message: MODEL_UNAVAILABLE.translator,
+    };
+  }
+  await consumeStream(
+    await modelSlots.translator.resource.instance.translateStreaming(text, {
+      signal,
+    }),
+    onChunk,
+  );
+  return { status: "translated" };
+}
+
+async function runDetectedTranslation(
+  text: string,
+  nativeLanguage: string,
+  foreignLanguage: string,
+  signal: AbortSignal,
+  onChunk: (chunk: string) => void,
+  generation: number,
+  nativeTag: string,
+  foreignTag: string,
+): Promise<TranslationResult> {
+  if (!modelSlots.detector.resource?.instance) {
+    const availability = await getModelApi("detector")!.availability();
     ensurePreparationActive(generation, signal);
     if (availability === "unavailable") {
       return {
@@ -745,13 +654,15 @@ export async function runTranslation(
   }
 
   ensurePreparationActive(generation, signal);
-  if (!resources.detector) {
+  if (!modelSlots.detector.resource?.instance) {
     return {
       status: "unavailable",
-      message: "Language Detector APIを利用できません",
+      message: MODEL_UNAVAILABLE.detector,
     };
   }
-  const detections = await resources.detector.detect(text, { signal });
+  const detections = await modelSlots.detector.resource?.instance.detect(text, {
+    signal,
+  });
   ensurePreparationActive(generation, signal);
   const direction = decideDirection(
     getDetectedLanguage(detections),
@@ -762,8 +673,11 @@ export async function runTranslation(
     direction.sourceLanguage,
     direction.targetLanguage,
   );
-  if (!resources.translator || resources.translator.key !== pairKey) {
-    const availability = await globalThis.Translator.availability({
+  if (
+    !modelSlots.translator.resource ||
+    modelSlots.translator.resource.key !== pairKey
+  ) {
+    const availability = await getModelApi("translator")!.availability({
       sourceLanguage: direction.sourceLanguage,
       targetLanguage: direction.targetLanguage,
     });
@@ -793,59 +707,25 @@ export async function runTranslation(
       direction.sourceLanguage,
       direction.targetLanguage,
       () => undefined,
-      "detected",
       generation,
       signal,
     );
   }
 
   ensurePreparationActive(generation, signal);
-  if (!resources.translator) {
+  if (!modelSlots.translator.resource) {
     return {
       status: "unavailable",
-      message: "Translator APIを利用できません",
+      message: MODEL_UNAVAILABLE.translator,
     };
   }
   await consumeStream(
-    await resources.translator.instance.translateStreaming(text, {
+    await modelSlots.translator.resource.instance.translateStreaming(text, {
       signal,
     }),
     onChunk,
   );
   return { status: "translated" };
-}
-
-/**
- * 進行中の共有作成を同期的に放棄し、待機側を中断する。
- * 外部APIが中断信号を受理しなくても、以降の要求は新しい作成を開始できる。
- * 作成済みの資源は保持し、準備対象を変えない原文変更では呼び出さない。
- */
-export function abandonEngineCreations(): void {
-  resourceGeneration += 1;
-  translatorCreationSequence += 1;
-  promptCreationSequence += 1;
-  const reason = makePreparationAbortError();
-  abandonSharedCreations(detectorCreations, reason);
-  abandonSharedCreations(translatorCreations, reason);
-  abandonSharedCreations(promptCreations, reason);
-}
-
-/** 保持中の検出器、翻訳器、Promptセッションを解放する */
-export function destroyTranslationResources(): void {
-  abandonEngineCreations();
-  resources.detector?.destroy();
-  resources.translator?.instance.destroy();
-  resources.prompt?.instance.destroy();
-  resources.detector = undefined;
-  resources.translator = undefined;
-  resources.prompt = undefined;
-}
-
-/** 準備対象を画面表示用の日本語へ変換する */
-export function describePreparationTarget(
-  target: TranslationPreparationTarget,
-): string {
-  return getPreparationLabel(target);
 }
 
 /** 翻訳方向の選択肢を利用者向けの日本語へ変換する */
