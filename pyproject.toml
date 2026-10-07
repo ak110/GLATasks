@@ -19,6 +19,8 @@ actionlint-runner = "direct"
 # javascript ゲート経由で有効になるが、本プロジェクトでは未採用のため個別に無効化する。
 biome = false
 tsc = false
+# アプリのworkspaceで導入するVitestは、syncを含む公開スクリプトから実行する。
+vitest = false
 
 # pyfltr の除外パターン。eslint / prettier は独自の ignore 設定
 # (eslint.config.js の ignores / .prettierignore) を持つが、
@@ -26,10 +28,6 @@ tsc = false
 extend-exclude = [
     "app/.svelte-kit",
     "app/build",
-    # app/package.json はルート package.json へのシンボリックリンク。
-    # prettier は明示的に指定されたシンボリックリンクを拒否するため、
-    # pyfltr 側のファイル列挙時点で除外する。
-    "app/package.json",
     ".cache",
     "drizzle/migrations",
     "test-results",
@@ -46,6 +44,14 @@ extend-exclude = [
 type = "linter"
 path = "pnpm"
 args = ["run", "check"]
+targets = ["*.svelte", "*.ts", "*.tsx", "*.js", "*.mjs", "*.cjs"]
+pass-filenames = false
+fast = false
+
+[tool.pyfltr.custom-commands.app-unit]
+type = "tester"
+path = "pnpm"
+args = ["run", "test:unit"]
 targets = ["*.svelte", "*.ts", "*.tsx", "*.js", "*.mjs", "*.cjs"]
 pass-filenames = false
 fast = false

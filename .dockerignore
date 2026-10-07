@@ -10,3 +10,6 @@
 /web/openssl.cnf
 /web/ssl
 CLAUDE.local.md
+/app/node_modules
+/app/.svelte-kit
+/docs/node_modules

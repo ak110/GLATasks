@@ -1,6 +1,9 @@
 ---
 services:
   app:
+    extends:
+      file: compose.common.yaml
+      service: app
     image: node:lts
     restart: always
     command: >
@@ -15,10 +18,6 @@ services:
     environment:
       - HOME=${PWD}/.cache
       - COREPACK_ENABLE_DOWNLOAD_PROMPT=0
-      - DATABASE_URL=mysql://glatasks:glatasks@db/glatasks
-      - DATA_DIR
-      - PROTOCOL_HEADER=X-Forwarded-Proto
-      - BODY_SIZE_LIMIT=32M # 添付ファイル上限を許容するため
     volumes:
       - ${PWD}:${PWD}
       - ${DATA_DIR}:${DATA_DIR}
@@ -30,7 +29,3 @@ services:
         condition: service_healthy
       migrate-dev:
         condition: service_completed_successfully
-    logging:
-      options:
-        max-size: "1m"
-        max-file: "3"

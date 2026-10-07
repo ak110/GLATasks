@@ -5,7 +5,11 @@ endif
 
 # 個別ターゲットでの `--profile=$(COMPOSE_PROFILE)` 手書き重複を避けるため、
 # Docker Composeが公式に解釈する環境変数へ一括指定する。
-export COMPOSE_PROFILES = $(COMPOSE_PROFILE)
+COMPOSE_EXTRA_PROFILES ?=
+export COMPOSE_PROFILES = $(COMPOSE_PROFILE)$(if $(COMPOSE_EXTRA_PROFILES),$(comma)$(COMPOSE_EXTRA_PROFILES))
+comma := ,
+DB_CREDENTIAL ?= glatasks
+export DB_CREDENTIAL
 
 RUN_ARGS += --user=$(shell id --user):$(shell id --group) --ulimit="core=0"
 
@@ -17,6 +21,7 @@ export DOCKER_BUILDKIT=1
 RUN_NODE = docker run $(2) \
     --env=HOME=${PWD}/.cache \
 	--env=COREPACK_ENABLE_DOWNLOAD_PROMPT=0 \
+	--env=DB_CREDENTIAL \
 	--volume=${PWD}:${PWD} \
 	--workdir=${PWD} \
 	$(RUN_ARGS) \
@@ -24,7 +29,7 @@ RUN_NODE = docker run $(2) \
 	bash -xc '\
 	    mkdir -p ${PWD}/.cache/bin &&\
         corepack enable --install-directory=${PWD}/.cache/bin &&\
-        export PATH=${PWD}/.cache/bin:${PWD}/node_modules/.bin:$$PATH &&\
+        export PATH=${PWD}/.cache/bin:$$PATH &&\
 		pnpm install --frozen-lockfile &&\
 		$(1)\
 	'
@@ -104,9 +109,9 @@ logs-app:
 	docker compose logs -ft app
 
 # SQLの値に`$`や`"`を含む複雑な問い合わせは、Make・シェルの二重展開で意図しない結果になるため、
-# `docker compose exec db mariadb -uglatasks -pglatasks -Dglatasks`を直接呼び出すこと
+# `docker compose exec db mariadb`へ接続情報とSQLファイルを渡して直接呼び出すこと
 sql:  # DBへの問い合わせ（対話用途。SQL=... 指定時は非対話で1回だけ実行する）
-	docker compose exec $(if $(SQL),-T) db mariadb -uglatasks -pglatasks -Dglatasks $(if $(SQL),-e "$(SQL)")
+	docker compose exec $(if $(SQL),-T) db mariadb --user="$(DB_CREDENTIAL)" --password="$(DB_CREDENTIAL)" --database=glatasks $(if $(SQL),-e "$(SQL)")
 
 shell:
 	docker compose exec app bash
@@ -118,7 +123,7 @@ node-shell:
 # SvelteKit・Viteのメジャー更新が含まれる場合、古い生成物が新バージョンの公開モジュール群と
 # 整合せずdev SSRが500を返すため、削除してsyncで再生成する。
 update:
-	$(call RUN_NODE, corepack prepare pnpm@latest --activate && corepack use pnpm@latest && pnpm update --latest --recursive && pnpm prune && pnpm store prune && rm -rf app/.svelte-kit && cd app && svelte-kit sync, --rm)
+	$(call RUN_NODE, corepack use pnpm@latest && pnpm update --latest --recursive && pnpm store prune && rm -rf app/.svelte-kit && pnpm run sync, --rm)
 	$(MAKE) update-actions
 	$(MAKE) restart-app
 	$(MAKE) healthcheck
@@ -144,40 +149,33 @@ test-unit:  # vitestによるユニットテスト実行（node/domの両project
 	$(call RUN_NODE, pnpm run test:unit)
 
 migrate:  # DBマイグレーション実行
-	docker compose exec app node --input-type=module --eval="\
-		import { drizzle } from 'drizzle-orm/mysql2';\
-		import { migrate } from 'drizzle-orm/mysql2/migrator';\
-		import mysql from 'mysql2/promise';\
-		const conn = await mysql.createConnection(process.env.DATABASE_URL);\
-		const db = drizzle(conn);\
-		console.log('Running migrations...');\
-		await migrate(db, { migrationsFolder: './drizzle/migrations' });\
-		await conn.end();\
-		console.log('Done.');\
-	"
+	docker compose exec app node $(if $(filter development,$(COMPOSE_PROFILE)),app/)scripts/migrate.mjs
 
 db-studio:  # Drizzle Studio起動
-	$(call RUN_NODE, pnpm run db:studio, --rm --interactive --tty)
+	$(call RUN_NODE, pnpm run db:studio, --rm --interactive --tty --env=DATABASE_URL=mysql://$(DB_CREDENTIAL):$(DB_CREDENTIAL)@localhost/glatasks)
 
-PNPM_VERSION = $(shell node -e "const p=require('./package.json'); console.log((p.packageManager||'').split('@')[1]?.split('+')[0]||'latest')" 2>/dev/null || echo latest)
 
 test-backup:  # バックアップ機能の隔離復元テスト（Dockerが利用できること）
 	@bash db/test-backup.sh
 
-docs:  # ドキュメントサイトをローカルで起動
-	$(call RUN_NODE, cd docs && pnpm dev --host=0.0.0.0 --port=5173, --rm --interactive --tty -p 5173:5173)
+docs-dev:  # ドキュメントサイトをローカルで起動
+	$(call RUN_NODE, pnpm --dir docs dev --host=0.0.0.0 --port=5173, --rm --interactive --tty -p 5173:5173)
+
+docs:  # ドキュメントサイトをビルド
+	$(call RUN_NODE, pnpm --dir docs build, --rm)
 
 # playwrightサービスのコンテナー内で使うPATHと、pnpm・依存の導入手順（test-e2eとtest-dbで共有）
-PLAYWRIGHT_PATH = export PATH=${PWD}/.cache/playwright/bin:${PWD}/node_modules/.bin:$$PATH
+PLAYWRIGHT_PATH = export PATH=${PWD}/.cache/playwright/bin:$$PATH
 PLAYWRIGHT_INSTALL = mkdir -p ${PWD}/.cache/playwright/bin &&\
 	corepack enable --install-directory=${PWD}/.cache/playwright/bin &&\
-	corepack prepare pnpm@$(PNPM_VERSION) --activate &&\
 	pnpm install --frozen-lockfile
 
 # E2E_GREPの値に`$`や`"`を含む場合は`sql`ターゲットと同じ制約が生じる
 test-e2e:  # E2Eテスト（E2E_GREP=... 指定で対象限定実行）
 	docker compose run --rm \
 		--env=BASE_URL=https://web \
+		--env=DATABASE_URL=mysql://$(DB_CREDENTIAL):$(DB_CREDENTIAL)@db/glatasks \
+		--env=CI=$(CI) \
 		--env=COREPACK_ENABLE_DOWNLOAD_PROMPT=0 \
 		--env=E2E_STORAGE_STATE=$(E2E_STORAGE_STATE) \
 		--env=E2E_OUTPUT_DIR=$(E2E_OUTPUT_DIR) \
@@ -195,7 +193,8 @@ test-e2e:  # E2Eテスト（E2E_GREP=... 指定で対象限定実行）
 # node project全体を実行する。対象ファイルを列挙しないため、`describeDb`を新設したファイルも登録なしで実行される
 test-db:  # DBへ実接続する統合テスト（Docker環境が起動していること）
 	docker compose run --rm \
-		--env=DATABASE_URL=mysql://glatasks:glatasks@db/glatasks \
+		--env=DATABASE_URL=mysql://$(DB_CREDENTIAL):$(DB_CREDENTIAL)@db/glatasks \
+		--env=CI=$(CI) \
 		--env=COREPACK_ENABLE_DOWNLOAD_PROMPT=0 \
 		playwright \
 		bash -xc '\
@@ -204,4 +203,4 @@ test-db:  # DBへ実接続する統合テスト（Docker環境が起動してい
 			pnpm run test:unit --project node\
 		'
 
-.PHONY: help setup sync backup deploy build start stop restart-app logs ps healthcheck shell node-shell update update-actions format test test-unit test-backup test-db test-e2e start-app logs-app migrate db-studio sql docs
+.PHONY: help setup sync backup deploy build start stop restart-app logs ps healthcheck shell node-shell update update-actions format test test-unit test-backup test-db test-e2e start-app logs-app migrate db-studio sql docs docs-dev

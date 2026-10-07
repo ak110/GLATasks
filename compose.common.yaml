@@ -1,0 +1,36 @@
+---
+x-logging: &logging
+  options:
+    max-size: "1m"
+    max-file: "3"
+
+x-database-environment: &database-environment
+  DATABASE_URL: mysql://db/glatasks
+  DB_CREDENTIAL: &db-credential ${DB_CREDENTIAL:-glatasks}
+
+x-app-environment: &app-environment
+  <<: *database-environment
+  DATA_DIR: ${DATA_DIR}
+  PROTOCOL_HEADER: X-Forwarded-Proto
+  BODY_SIZE_LIMIT: 32M
+
+# extendsで参照する共通定義。サービスとしては起動しない。
+services:
+  logged:
+    logging: *logging
+  app:
+    environment: *app-environment
+    logging: *logging
+  db:
+    environment:
+      TZ: Asia/Tokyo
+      MARIADB_USER: *db-credential
+      MARIADB_PASSWORD: *db-credential
+      MARIADB_DATABASE: glatasks
+      MARIADB_ROOT_PASSWORD: *db-credential
+      MARIADB_AUTO_UPGRADE: "1"
+    logging: *logging
+  migrate:
+    environment: *database-environment
+  playwright:
+    environment: *database-environment

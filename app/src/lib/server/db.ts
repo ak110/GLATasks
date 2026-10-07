@@ -5,6 +5,7 @@
 import { drizzle, type MySql2Database } from "drizzle-orm/mysql2";
 import mysql from "mysql2/promise";
 
+import { getDatabaseUrl } from "../../../scripts/database-config.mjs";
 import * as schema from "./schema";
 
 let _db: MySql2Database<typeof schema> | null = null;
@@ -12,8 +13,7 @@ let _db: MySql2Database<typeof schema> | null = null;
 /** Drizzle クライアントを取得する（シングルトン） */
 export function getDb(): MySql2Database<typeof schema> {
   if (!_db) {
-    const url = process.env.DATABASE_URL;
-    if (!url) throw new Error("DATABASE_URL env var is required");
+    const url = getDatabaseUrl();
     const pool = mysql.createPool({
       uri: url,
       connectionLimit: 5,

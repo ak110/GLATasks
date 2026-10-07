@@ -3,7 +3,11 @@
   "include": ["app/src/**/*", "app/tests/**/*", "app/vite.config.ts"],
   "exclude": ["node_modules", "app/src/service-worker"],
   "compilerOptions": {
-    "typeRoots": ["./app/node_modules", "./node_modules/@types"],
+    "typeRoots": [
+      "./app/node_modules",
+      "./app/node_modules/@types",
+      "./node_modules/@types"
+    ],
     "allowJs": true,
     "checkJs": true,
     "esModuleInterop": true,

@@ -1,10 +1,14 @@
 ---
 services:
   web:
+    extends:
+      file: compose.common.yaml
+      service: logged
     image: nginx
     restart: always
     volumes:
       - ./web/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./web/security-headers.conf:/etc/nginx/security-headers.conf:ro
       - ./web/ssl:/etc/nginx/ssl:ro
     environment:
       - TZ=Asia/Tokyo
@@ -14,67 +18,45 @@ services:
       - "38180:443"
     depends_on:
       - app
-    logging:
-      options:
-        max-size: "1m"
-        max-file: "3"
 
   db:
+    extends:
+      file: compose.common.yaml
+      service: db
     image: mariadb:lts
     restart: always
     volumes:
       - ${DATA_DIR}/mariadb:/var/lib/mysql
       - ${PWD}/db/my.cnf:/etc/mysql/conf.d/my.cnf:ro
-    environment:
-      - TZ=Asia/Tokyo
-      - MARIADB_USER=glatasks
-      - MARIADB_PASSWORD=glatasks
-      - MARIADB_DATABASE=glatasks
-      - MARIADB_ROOT_PASSWORD=glatasks
-      - MARIADB_AUTO_UPGRADE=1
     healthcheck:
       test:
         - CMD-SHELL
-        - mariadb-admin ping --protocol=tcp --host=127.0.0.1 --user=root --password=glatasks | grep 'is alive'
+        - mariadb-admin ping --protocol=tcp --host=127.0.0.1 --user=root --password="$$MARIADB_ROOT_PASSWORD" | grep 'is alive'
       start_period: 30s
       start_interval: 1s
     networks:
       - network
-    logging:
-      options:
-        max-size: "1m"
-        max-file: "3"
 
   migrate:
+    extends:
+      file: compose.common.yaml
+      service: migrate
     profiles:
       - production
       - staging
     image: ghcr.io/ak110/glatasks:latest
     restart: "no"
-    environment:
-      - DATABASE_URL=mysql://glatasks:glatasks@db/glatasks
     networks:
       - network
     depends_on:
       db:
         condition: service_healthy
-    command: >
-      node --input-type=module --eval="
-        import { drizzle } from 'drizzle-orm/mysql2';
-        import { migrate } from 'drizzle-orm/mysql2/migrator';
-        import mysql from 'mysql2/promise';
-        const conn = await mysql.createConnection({
-          uri: process.env.DATABASE_URL,
-          multipleStatements: true,
-        });
-        const db = drizzle(conn);
-        console.log('🔄 Running migrations from ./drizzle/migrations...');
-        await migrate(db, { migrationsFolder: './drizzle/migrations' });
-        await conn.end();
-        console.log('✅ Migrations completed successfully!');
-      "
+    command: ["node", "scripts/migrate.mjs"]
 
   migrate-dev:
+    extends:
+      file: compose.common.yaml
+      service: migrate
     profiles:
       - development
     image: node:lts
@@ -83,7 +65,6 @@ services:
     environment:
       - HOME=${PWD}/.cache
       - COREPACK_ENABLE_DOWNLOAD_PROMPT=0
-      - DATABASE_URL=mysql://glatasks:glatasks@db/glatasks
     volumes:
       - ${PWD}:${PWD}
     working_dir: ${PWD}
@@ -98,23 +79,13 @@ services:
         corepack enable --install-directory=${PWD}/.cache/bin &&
         export PATH=${PWD}/.cache/bin:$$PATH &&
         pnpm install --frozen-lockfile &&
-        node --input-type=module --eval="
-          import { drizzle } from '\''drizzle-orm/mysql2'\'';
-          import { migrate } from '\''drizzle-orm/mysql2/migrator'\'';
-          import mysql from '\''mysql2/promise'\'';
-          const conn = await mysql.createConnection({
-            uri: process.env.DATABASE_URL,
-            multipleStatements: true,
-          });
-          const db = drizzle(conn);
-          console.log('\''🔄 Running migrations from ./drizzle/migrations...'\'');
-          await migrate(db, { migrationsFolder: '\''./drizzle/migrations'\'' });
-          await conn.end();
-          console.log('\''✅ Migrations completed successfully!'\'');
-        "
+        pnpm run db:migrate
       '
 
   playwright:
+    extends:
+      file: compose.common.yaml
+      service: playwright
     profiles:
       - development
       - ci

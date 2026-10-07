@@ -1,4 +1,5 @@
 packages:
+  - app
   - docs
 storeDir: .cache/pnpm-store
 minimumReleaseAge: 1440

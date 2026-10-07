@@ -32,8 +32,9 @@ else
         echo "DBコンテナが起動していません" >&2
         exit 1
     fi
-    docker exec -i -e MYSQL_PWD=glatasks "$db_container" \
-        mariadb-dump -uglatasks --single-transaction --routines --triggers glatasks \
+    : "${DB_CREDENTIAL:?make backupから実行するかDB_CREDENTIALを指定してください}"
+    docker exec -i -e MYSQL_PWD="$DB_CREDENTIAL" "$db_container" \
+        mariadb-dump --user="$DB_CREDENTIAL" --single-transaction --routines --triggers glatasks \
         > "$staging/glatasks.sql"
     echo "DBダンプが完了しました"
 fi
