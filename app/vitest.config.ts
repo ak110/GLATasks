@@ -40,6 +40,9 @@ export default defineConfig({
       },
       {
         // DOM環境プロジェクト（Svelteコンポーネントテスト）
+        // `$app/*` を import するコンポーネントは、このprojectが sveltekit()
+        // プラグインを使わないため解決できない。該当コンポーネントの表示と
+        // 操作は app/tests 配下のPlaywrightテストで検証する。
         plugins: [
           svelte({ configFile: false, preprocess: vitePreprocess() }),
           svelteTesting(),
@@ -59,9 +62,6 @@ export default defineConfig({
             "tests/**",
             "**/.{cache,build,svelte-kit}/**",
           ],
-          // `$app/*` を import するコンポーネントは、このprojectが sveltekit()
-          // プラグインを使わないため解決できない。該当コンポーネントの表示と
-          // 操作は app/tests 配下のPlaywrightテストで検証する。
           // @testing-library/jest-dom のカスタムマッチャーを全テストで有効化する
           setupFiles: ["src/test-setup.ts"],
         },

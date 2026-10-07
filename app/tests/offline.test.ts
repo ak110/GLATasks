@@ -1,11 +1,11 @@
+import { uniqueTestName } from "./helpers/common";
+import { test, expect } from "@playwright/test";
 /**
  * @fileoverview オフライン画面の接続回復による自動再読み込みのe2eテスト
  */
 
-import { test, expect } from "@playwright/test";
-
 test("オフライン画面は接続回復時に自動再読み込みする", async ({ page }) => {
-  const marker = `offline-marker-${Date.now()}`;
+  const marker = `offline-marker-${uniqueTestName("e2e")}`;
   await page.route("**/healthcheck", async (route) => {
     await route.abort();
   });

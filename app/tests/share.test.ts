@@ -1,16 +1,15 @@
+import {
+  uniqueTestName,
+  makeContextOptions,
+  setupTestList,
+  cleanupTestList,
+} from "./helpers/common";
+import { test, expect } from "@playwright/test";
 /**
  * @fileoverview share/ingest ページの e2e テスト
  */
 
-import { test, expect } from "@playwright/test";
-import {
-  BASE_URL,
-  STORAGE_STATE_PATH,
-  setupTestList,
-  cleanupTestList,
-} from "./helpers/common";
-
-const LIST_NAME = `shareテスト_${Date.now()}`;
+const LIST_NAME = `shareテスト_${uniqueTestName("e2e")}`;
 
 test.describe("share/ingest", () => {
   test.beforeAll(async ({ browser }) => {
@@ -79,15 +78,11 @@ test.describe("share/ingest", () => {
   test("共有追加したタスクが別コンテキストのメインページへSSEで反映される", async ({
     browser,
   }) => {
-    const listName = `共有追加SSE_${Date.now()}`;
-    const taskTitle = `共有追加タスク_${Date.now()}`;
+    const listName = `共有追加SSE_${uniqueTestName("e2e")}`;
+    const taskTitle = `共有追加タスク_${uniqueTestName("e2e")}`;
     await setupTestList(browser, listName);
 
-    const ctxOptions = {
-      baseURL: BASE_URL,
-      storageState: STORAGE_STATE_PATH,
-      ignoreHTTPSErrors: true,
-    };
+    const ctxOptions = makeContextOptions();
 
     // ctxView: メインページで対象リストを表示して反映を待つ側
     // ctxShare: 共有追加ページからフォーム送信する側

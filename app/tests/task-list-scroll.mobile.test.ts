@@ -1,47 +1,24 @@
-/**
- * @fileoverview モバイル表示におけるタスク一覧の内部スクロール回帰テスト
- */
-
-import { test, type Browser } from "@playwright/test";
 import {
-  BASE_URL,
-  STORAGE_STATE_PATH,
+  setupTestList,
+  uniqueTestName,
   cleanupTestList,
 } from "./helpers/common";
+import { test } from "@playwright/test";
 import {
   verifyAttachmentListKeepsTaskListAvailable,
   verifyTagListsKeepTaskListAvailable,
   verifyTaskAdditionScrollsToTop,
   verifyTaskListInternalScroll,
 } from "./helpers/task-list-scroll";
+/**
+ * @fileoverview モバイル表示におけるタスク一覧の内部スクロール回帰テスト
+ */
 
-const LIST_NAME = `モバイルスクロール_${Date.now()}`;
-
-async function setupMobileTestList(
-  browser: Browser,
-  listName: string,
-): Promise<void> {
-  const context = await browser.newContext({
-    baseURL: BASE_URL,
-    storageState: STORAGE_STATE_PATH,
-    ignoreHTTPSErrors: true,
-  });
-  const page = await context.newPage();
-  await Promise.all([
-    page.goto("/"),
-    page.waitForResponse((response) => response.url().includes("/api/trpc")),
-  ]);
-  await page.fill('aside input[placeholder="新しいリスト"]', listName);
-  await page.click('aside button[type="submit"]');
-  await page
-    .locator(`[data-testid="list-select-btn"]:has-text("${listName}")`)
-    .waitFor({ state: "attached", timeout: 15000 });
-  await context.close();
-}
+const LIST_NAME = `モバイルスクロール_${uniqueTestName("e2e")}`;
 
 test.describe("task list scroll", () => {
   test.beforeAll(async ({ browser }) => {
-    await setupMobileTestList(browser, LIST_NAME);
+    await setupTestList(browser, LIST_NAME);
   });
 
   test.afterAll(async ({ browser }) => {

@@ -1,15 +1,16 @@
+import {
+  isTrpcUrl,
+  uniqueTestName,
+  addTask,
+  cleanupTestLists,
+  setupTestLists,
+} from "./helpers/common";
+import { test, expect, type Page, type Response } from "@playwright/test";
 /**
  * @fileoverview 検索表示種別と選択中リスト優先表示のe2eテスト
  */
 
-import { test, expect, type Page, type Response } from "@playwright/test";
-import {
-  cleanupTestLists,
-  setupTestLists,
-  waitForPersistedTask,
-} from "./helpers/common";
-
-const STAMP = Date.now();
+const STAMP = uniqueTestName("e2e");
 
 function requireSuccessfulResponse(
   response: Response,
@@ -28,27 +29,13 @@ async function selectList(page: Page, listName: string): Promise<void> {
   await page.getByTestId("task-add-form").waitFor({ timeout: 15000 });
 }
 
-async function addTask(page: Page, title: string): Promise<void> {
-  const form = page.getByTestId("task-add-form");
-  await form.locator("textarea").fill(title);
-  const responsePromise = page.waitForResponse((response) =>
-    response.url().includes("/api/trpc/tasks.create"),
-  );
-  await form.locator('button[type="submit"]').click();
-  const response = await responsePromise;
-  requireSuccessfulResponse(response, "tasks.create");
-  const row = page.getByTestId("task-item").filter({ hasText: title });
-  await expect(row).toBeVisible({ timeout: 15000 });
-  await waitForPersistedTask(row);
-}
-
 async function archiveMatchingTasks(page: Page, title: string): Promise<void> {
   const row = page.getByTestId("task-item").filter({ hasText: title });
   await row.getByTestId("task-edit-btn").click();
   const dialog = page.getByRole("dialog").last();
   await dialog.getByRole("checkbox", { name: "完了" }).check();
   const updateResponsePromise = page.waitForResponse((response) =>
-    response.url().includes("/api/trpc/tasks.update"),
+    isTrpcUrl(response.url(), "tasks.update"),
   );
   await dialog.getByTestId("task-edit-save-close-btn").click();
   const updateResponse = await updateResponsePromise;
@@ -56,7 +43,7 @@ async function archiveMatchingTasks(page: Page, title: string): Promise<void> {
   await expect(row.getByRole("checkbox")).toBeChecked();
   const [clearResponse] = await Promise.all([
     page.waitForResponse((response) =>
-      response.url().includes("/api/trpc/lists.clear"),
+      isTrpcUrl(response.url(), "lists.clear"),
     ),
     page.getByTitle("完了済みタスクを非表示にする").click(),
   ]);
@@ -105,7 +92,7 @@ test("検索の表示種別と選択リスト優先表示が反映される", as
     await archivedRow.getByText("アーカイブ", { exact: true }).click();
     const [archiveResponse] = await Promise.all([
       page.waitForResponse((response) =>
-        response.url().includes("/api/trpc/lists.archive"),
+        isTrpcUrl(response.url(), "lists.archive"),
       ),
       page
         .getByRole("dialog")
@@ -189,7 +176,7 @@ test("検索の表示種別と選択リスト優先表示が反映される", as
       await archivedRow.getByTestId("list-menu-btn").click();
       const [unarchiveResponse] = await Promise.all([
         page.waitForResponse((response) =>
-          response.url().includes("/api/trpc/lists.unarchive"),
+          isTrpcUrl(response.url(), "lists.unarchive"),
         ),
         archivedRow.getByText("アーカイブ解除", { exact: true }).click(),
       ]);
@@ -204,7 +191,7 @@ test("検索結果に選択リストが無い場合は受信したグループ�
   browser,
 }) => {
   test.setTimeout(60_000);
-  const stamp = Date.now();
+  const stamp = uniqueTestName("e2e");
   const firstList = `検索結果先頭_${stamp}`;
   const secondList = `検索結果次点_${stamp}`;
   const emptyList = `検索結果なし_${stamp}`;

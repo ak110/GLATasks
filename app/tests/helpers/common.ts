@@ -1,3 +1,11 @@
+import {
+  expect,
+  type Browser,
+  type BrowserContextOptions,
+  type Locator,
+  type Page,
+  type Response,
+} from "@playwright/test";
 /**
  * @fileoverview e2eテスト共通ヘルパー
  *
@@ -6,13 +14,6 @@
  * 不統一なパス形式（絶対パスと相対パスの混在）を解消する。
  */
 
-import {
-  expect,
-  type Browser,
-  type Locator,
-  type Page,
-  type Response,
-} from "@playwright/test";
 import * as path from "node:path";
 
 /** テスト対象のベースURL */
@@ -26,7 +27,7 @@ export const BASE_URL = process.env.BASE_URL ?? "https://localhost:38180";
  * テストコード内では絶対パスを使うことで一貫性を保つ。
  */
 export const STORAGE_STATE_PATH = process.env.E2E_STORAGE_STATE
-  ? path.resolve(process.env.E2E_STORAGE_STATE)
+  ? path.resolve(import.meta.dirname, "../../..", process.env.E2E_STORAGE_STATE)
   : path.join(import.meta.dirname, "..", ".auth", "user.json");
 
 /** 指定したprocedureを含むtRPC応答かどうかを判定する */
@@ -34,7 +35,11 @@ export function isMutationResponse(
   response: Response,
   procedure: string,
 ): boolean {
-  const pathname = new URL(response.url()).pathname;
+  return isTrpcUrl(response.url(), procedure);
+}
+
+export function isTrpcUrl(url: string, procedure: string): boolean {
+  const pathname = new URL(url).pathname;
   const prefix = "/api/trpc/";
   if (!pathname.startsWith(prefix)) return false;
   return pathname.slice(prefix.length).split(",").includes(procedure);
@@ -112,13 +117,80 @@ export async function toggleTaskAndWaitForUpdate(
 }
 
 /** テスト用リストを作成するための共通コンテキストオプション */
-function makeContextOptions() {
+export function makeContextOptions(
+  overrides: BrowserContextOptions = {},
+): BrowserContextOptions {
   return {
     baseURL: BASE_URL,
     storageState: STORAGE_STATE_PATH,
     ignoreHTTPSErrors: true,
     viewport: { width: 1280, height: 720 },
+    ...overrides,
   };
+}
+
+/** 並行するテストと衝突しない名前を作る */
+export function uniqueTestName(prefix: string): string {
+  return `${prefix}_${Date.now()}_${crypto.randomUUID().slice(0, 8)}`;
+}
+
+export async function requireBoundingBox(locator: Locator) {
+  const box = await locator.boundingBox();
+  if (!box) throw new Error("要素の境界ボックスを取得できません");
+  return box;
+}
+
+/** 公開UIでリストを追加し、必要に応じて選択する */
+export async function createListFromPage(
+  page: Page,
+  listName: string,
+  select = true,
+): Promise<void> {
+  await page.getByPlaceholder("新しいリスト", { exact: true }).fill(listName);
+  const response = waitForSuccessfulMutationResponse(page, "lists.create");
+  await page.locator('aside button[type="submit"]').click();
+  await response;
+  const button = page
+    .getByTestId("list-select-btn")
+    .filter({ hasText: listName });
+  await expect(button).toBeVisible({ timeout: 15_000 });
+  if (select) {
+    await button.click();
+    await expect(
+      page.getByRole("heading", { name: listName, exact: true }),
+    ).toBeVisible();
+    await expect(page.getByTestId("task-add-form")).toBeVisible();
+  }
+}
+
+/** 入力内容を追加し、実IDと追加欄の復元を待つ */
+export async function addTask(
+  page: Page,
+  text: string,
+  options: { todo?: boolean; openEdit?: boolean } = {},
+): Promise<Locator> {
+  const form = page.getByTestId("task-add-form");
+  await form.locator("textarea").click();
+  await form.locator("textarea").fill(text);
+  if (options.todo !== undefined) {
+    await form.getByTestId("task-add-todo-checkbox").setChecked(options.todo);
+  }
+  const response = waitForSuccessfulMutationResponse(page, "tasks.create");
+  await form.locator('button[type="submit"]').click();
+  await response;
+  const taskRow = page
+    .getByTestId("task-item")
+    .filter({ hasText: text.split("\n")[0] });
+  await expect(taskRow).toBeVisible({ timeout: 15_000 });
+  await waitForPersistedTask(taskRow);
+  await expect(form.locator("textarea")).toHaveValue("");
+  if (options.openEdit) {
+    await taskRow.getByTestId("task-edit-btn").dispatchEvent("click");
+    await expect(
+      page.getByRole("dialog").last().locator('input[type="file"]'),
+    ).toBeVisible();
+  }
+  return taskRow;
 }
 
 type FixtureOperation =
@@ -163,17 +235,7 @@ async function mutateTestListFixtures(
 
   if (operation.kind === "create") {
     for (const listName of operation.listNames) {
-      await page.fill('aside input[placeholder="新しいリスト"]', listName);
-      const responsePromise = waitForSuccessfulMutationResponse(
-        page,
-        "lists.create",
-      );
-      await page.click('aside button[type="submit"]');
-      await responsePromise;
-      await page
-        .getByTestId("list-select-btn")
-        .filter({ hasText: listName })
-        .waitFor({ timeout: 15000 });
+      await createListFromPage(page, listName, false);
     }
   } else {
     const errors: unknown[] = [];

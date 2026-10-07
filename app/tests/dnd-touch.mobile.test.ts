@@ -1,3 +1,11 @@
+import {
+  isTrpcUrl,
+  uniqueTestName,
+  addTask,
+  cleanupTestLists,
+  setupTestLists,
+} from "./helpers/common";
+import { test, expect, type Page, type Request } from "@playwright/test";
 /**
  * @fileoverview モバイル相当の viewport におけるタスクD&Dのe2eテスト
  *
@@ -5,14 +13,7 @@
  * ドラッグ中もリスト一覧へ切り替えず別リストへの移動を受け付けないことを検証する。
  */
 
-import { test, expect, type Page, type Request } from "@playwright/test";
-import {
-  cleanupTestLists,
-  setupTestLists,
-  waitForPersistedTask,
-} from "./helpers/common";
-
-const stamp = Date.now();
+const stamp = uniqueTestName("e2e");
 const sourceListName = `タッチ並び替え元_${stamp}`;
 const otherListName = `タッチ並び替え他_${stamp}`;
 const longListName = `タッチ自動スクロール_${stamp}`;
@@ -38,20 +39,6 @@ async function dispatchPointerEvent(
     },
     { type, pointerId, clientX, clientY },
   );
-}
-
-async function addTask(page: Page, title: string): Promise<void> {
-  const form = page.getByTestId("task-add-form");
-  await form.locator("textarea").fill(title);
-  const createResponsePromise = page.waitForResponse((response) =>
-    response.url().includes("/api/trpc/tasks.create"),
-  );
-  await form.locator('button[type="submit"]').click();
-  const createResponse = await createResponsePromise;
-  expect(createResponse.ok()).toBe(true);
-  const taskRow = page.getByTestId("task-item").filter({ hasText: title });
-  await expect(taskRow).toBeVisible({ timeout: 15000 });
-  await waitForPersistedTask(taskRow);
 }
 
 async function taskTitlesInOrder(
@@ -92,8 +79,8 @@ test.describe("dnd task reorder (mobile viewport)", () => {
       .click();
     await page.getByTestId("task-add-form").waitFor({ timeout: 15000 });
 
-    const firstTitle = `タッチ並び替えA_${Date.now()}`;
-    const secondTitle = `タッチ並び替えB_${Date.now()}`;
+    const firstTitle = `タッチ並び替えA_${uniqueTestName("e2e")}`;
+    const secondTitle = `タッチ並び替えB_${uniqueTestName("e2e")}`;
     await addTask(page, firstTitle);
     await addTask(page, secondTitle);
     const titles = [firstTitle, secondTitle];
@@ -107,7 +94,7 @@ test.describe("dnd task reorder (mobile viewport)", () => {
 
     let updateRequestCount = 0;
     const onRequest = (request: Request) => {
-      if (request.url().includes("/api/trpc/tasks.update")) {
+      if (isTrpcUrl(request.url(), "tasks.update")) {
         updateRequestCount += 1;
       }
     };
@@ -144,7 +131,7 @@ test.describe("dnd task reorder (mobile viewport)", () => {
       const dropX = targetBox.x + targetBox.width / 2;
       const dropY = targetBox.y + targetBox.height * 0.75;
       const reorderResponsePromise = page.waitForResponse((response) =>
-        response.url().includes("/api/trpc/tasks.reorder"),
+        isTrpcUrl(response.url(), "tasks.reorder"),
       );
       await dispatchPointerEvent(page, "pointermove", 1, dropX, dropY);
       await dispatchPointerEvent(page, "pointerup", 1, dropX, dropY);
@@ -176,7 +163,7 @@ test.describe("dnd task reorder (mobile viewport)", () => {
 
     const titles: string[] = [];
     for (let i = 0; i < 14; i++) {
-      const title = `自動スクロール${String(i).padStart(2, "0")}_${Date.now()}`;
+      const title = `自動スクロール${String(i).padStart(2, "0")}_${uniqueTestName("e2e")}`;
       titles.push(title);
       await addTask(page, title);
     }
@@ -244,7 +231,7 @@ test.describe("dnd task reorder (mobile viewport)", () => {
           ? edgeBox.y + edgeBox.height * 0.75
           : edgeBox.y + edgeBox.height * 0.25;
       const reorderResponsePromise = page.waitForResponse((response) =>
-        response.url().includes("/api/trpc/tasks.reorder"),
+        isTrpcUrl(response.url(), "tasks.reorder"),
       );
       await dispatchPointerEvent(page, "pointermove", pointerId, x, dropY);
       await dispatchPointerEvent(page, "pointerup", pointerId, x, dropY);

@@ -9,7 +9,6 @@ const storageState = path.resolve(
 
 export default defineConfig({
   testDir: "./tests",
-  testIgnore: /global-setup\.ts/,
   outputDir: path.resolve(
     import.meta.dirname,
     "..",

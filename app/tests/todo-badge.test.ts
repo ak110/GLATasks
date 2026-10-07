@@ -1,3 +1,11 @@
+import {
+  uniqueTestName,
+  addTask,
+  setupTestList,
+  cleanupTestList,
+  toggleTaskAndWaitForUpdate,
+} from "./helpers/common";
+import { test, expect } from "@playwright/test";
 /**
  * @fileoverview TODO区分タスクの通知バッジ表示に関する e2e テスト
  *
@@ -7,18 +15,11 @@
  * 集計対象をテスト単体に閉じる。
  */
 
-import { test, expect } from "@playwright/test";
-import {
-  setupTestList,
-  cleanupTestList,
-  toggleTaskAndWaitForUpdate,
-} from "./helpers/common";
-
 test.describe("todo-badge", () => {
   let listName: string;
 
   test.beforeEach(async ({ page, browser }) => {
-    listName = `TODOバッジテスト_${Date.now()}`;
+    listName = `TODOバッジテスト_${uniqueTestName("e2e")}`;
     await setupTestList(browser, listName);
     await Promise.all([
       page.goto("/"),
@@ -41,29 +42,17 @@ test.describe("todo-badge", () => {
       .locator('[data-testid="todo-badge"]');
   }
 
-  async function addTodoTask(
-    page: import("@playwright/test").Page,
-    title: string,
-  ) {
-    await page.fill('textarea[placeholder*="タスクを追加"]', title);
-    await page.check('[data-testid="task-add-todo-checkbox"]');
-    await page.click('[data-testid="task-add-form"] button[type="submit"]');
-    await expect(
-      page.locator('[data-testid="task-item"]').filter({ hasText: title }),
-    ).toBeVisible({ timeout: 15000 });
-  }
-
   test("TODOタスク作成でバッジが表示される", async ({ page }) => {
-    const title = `TODO作成_${Date.now()}`;
-    await addTodoTask(page, title);
+    const title = `TODO作成_${uniqueTestName("e2e")}`;
+    await addTask(page, title, { todo: true });
     await expect(badgeLocator(page)).toHaveText("1", { timeout: 15000 });
   });
 
   test("TODOタスク完了でバッジ件数が減少し0件で非表示になる", async ({
     page,
   }) => {
-    const title = `TODO完了_${Date.now()}`;
-    await addTodoTask(page, title);
+    const title = `TODO完了_${uniqueTestName("e2e")}`;
+    await addTask(page, title, { todo: true });
     await expect(badgeLocator(page)).toBeVisible({ timeout: 15000 });
 
     const taskRow = page
@@ -78,8 +67,8 @@ test.describe("todo-badge", () => {
   test("完了済みTODOタスクのチェックを外すとバッジが復活する", async ({
     page,
   }) => {
-    const title = `TODO復活_${Date.now()}`;
-    await addTodoTask(page, title);
+    const title = `TODO復活_${uniqueTestName("e2e")}`;
+    await addTask(page, title, { todo: true });
     const taskRow = page
       .locator('[data-testid="task-item"]')
       .filter({ hasText: title });
@@ -93,9 +82,8 @@ test.describe("todo-badge", () => {
   });
 
   test("通常タスクのみのリストはバッジが表示されない", async ({ page }) => {
-    const title = `通常タスク_${Date.now()}`;
-    await page.fill('textarea[placeholder*="タスクを追加"]', title);
-    await page.click('[data-testid="task-add-form"] button[type="submit"]');
+    const title = `通常タスク_${uniqueTestName("e2e")}`;
+    await addTask(page, title, { todo: false });
     await expect(
       page.locator('[data-testid="task-item"]').filter({ hasText: title }),
     ).toBeVisible({ timeout: 15000 });

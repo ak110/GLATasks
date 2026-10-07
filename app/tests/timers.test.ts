@@ -1,7 +1,4 @@
-/**
- * @fileoverview タイマー機能の e2e テスト
- */
-
+import { uniqueTestName, makeContextOptions } from "./helpers/common";
 import {
   test,
   expect,
@@ -9,7 +6,9 @@ import {
   type Locator,
   type Request,
 } from "@playwright/test";
-import { BASE_URL, STORAGE_STATE_PATH } from "./helpers/common";
+/**
+ * @fileoverview タイマー機能の e2e テスト
+ */
 
 /**
  * タイマーカードを削除する。
@@ -41,7 +40,7 @@ test.describe("timers", () => {
   });
 
   test("タイマーを追加すると一覧に表示される", async ({ page }) => {
-    const timerName = `テスト_${Date.now()}`;
+    const timerName = `テスト_${uniqueTestName("e2e")}`;
 
     // 追加ボタンをクリック
     await page.click('[data-testid="timer-add-btn"]');
@@ -72,7 +71,7 @@ test.describe("timers", () => {
   });
 
   test("タイマーを開始・一時停止できる", async ({ page }) => {
-    const timerName = `開始停止_${Date.now()}`;
+    const timerName = `開始停止_${uniqueTestName("e2e")}`;
 
     // タイマー作成
     await page.click('[data-testid="timer-add-btn"]');
@@ -93,7 +92,7 @@ test.describe("timers", () => {
     });
 
     // 少し待つ
-    await page.waitForTimeout(1500);
+    await expect(card.getByTestId("timer-display")).not.toHaveText("00:01:00");
 
     // 一時停止
     await card.locator('[data-testid="timer-pause-btn"]').click();
@@ -112,7 +111,7 @@ test.describe("timers", () => {
   });
 
   test("タイマーをリセットできる", async ({ page }) => {
-    const timerName = `リセット_${Date.now()}`;
+    const timerName = `リセット_${uniqueTestName("e2e")}`;
 
     // タイマー作成
     await page.click('[data-testid="timer-add-btn"]');
@@ -128,7 +127,7 @@ test.describe("timers", () => {
 
     // 開始 → 少し待って → リセット
     await card.locator('[data-testid="timer-start-btn"]').click();
-    await page.waitForTimeout(1500);
+    await expect(card.getByTestId("timer-display")).not.toHaveText("00:02:30");
     await card.locator('[data-testid="timer-reset-btn"]').click();
 
     // リセット後は元の時間に戻る
@@ -142,7 +141,7 @@ test.describe("timers", () => {
   });
 
   test("タイマーの延長・削減ができる", async ({ page }) => {
-    const timerName = `延長削減_${Date.now()}`;
+    const timerName = `延長削減_${uniqueTestName("e2e")}`;
 
     // タイマー作成（5分、延長/削減=5分）
     await page.click('[data-testid="timer-add-btn"]');
@@ -176,7 +175,7 @@ test.describe("timers", () => {
   });
 
   test("アラームモードでタイマーを追加できる", async ({ page }) => {
-    const timerName = `アラーム_${Date.now()}`;
+    const timerName = `アラーム_${uniqueTestName("e2e")}`;
 
     // 追加ボタンをクリック
     await page.click('[data-testid="timer-add-btn"]');
@@ -219,7 +218,7 @@ test.describe("timers", () => {
   });
 
   test("アラームモードの±ボタンで目標時刻がずれる", async ({ page }) => {
-    const timerName = `アラーム±_${Date.now()}`;
+    const timerName = `アラーム±_${uniqueTestName("e2e")}`;
 
     // アラームタイマー作成
     await page.click('[data-testid="timer-add-btn"]');
@@ -255,7 +254,7 @@ test.describe("timers", () => {
   });
 
   test("アラームモードのリセットで再計算される", async ({ page }) => {
-    const timerName = `アラームReset_${Date.now()}`;
+    const timerName = `アラームReset_${uniqueTestName("e2e")}`;
 
     // アラームタイマー作成
     await page.click('[data-testid="timer-add-btn"]');
@@ -303,19 +302,11 @@ test.describe("timers", () => {
     // ブラウザ A でタイマーを削除したあと、SSE イベントを受け取れていない
     // 別ブラウザ B が同じタイマーを削除しようとするケース。
     // 冪等な削除 API のため、B 側もエラートーストが出ず正常完了する。
-    const timerName = `冪等削除_${Date.now()}`;
+    const timerName = `冪等削除_${uniqueTestName("e2e")}`;
 
-    const ctxA = await browser.newContext({
-      storageState: STORAGE_STATE_PATH,
-      ignoreHTTPSErrors: true,
-      baseURL: BASE_URL,
-    });
+    const ctxA = await browser.newContext(makeContextOptions());
     // ブラウザ B は SSE エンドポイントへの接続を遮断する (= 切断中の状態を模擬)
-    const ctxB = await browser.newContext({
-      storageState: STORAGE_STATE_PATH,
-      ignoreHTTPSErrors: true,
-      baseURL: BASE_URL,
-    });
+    const ctxB = await browser.newContext(makeContextOptions());
     await ctxB.route("**/api/events", (route) => route.abort());
 
     try {
@@ -366,8 +357,8 @@ test.describe("timers", () => {
   });
 
   test("タイマーを編集できる", async ({ page }) => {
-    const timerName = `編集前_${Date.now()}`;
-    const newName = `編集後_${Date.now()}`;
+    const timerName = `編集前_${uniqueTestName("e2e")}`;
+    const newName = `編集後_${uniqueTestName("e2e")}`;
 
     // タイマー作成
     await page.click('[data-testid="timer-add-btn"]');
@@ -400,7 +391,7 @@ test.describe("timers", () => {
   });
 
   test("一時タイマーを追加し満了時に確認なしで削除できる", async ({ page }) => {
-    const timerName = `一時_${Date.now()}`;
+    const timerName = `一時_${uniqueTestName("e2e")}`;
 
     // 一時追加ボタンをクリック → 専用タイトルのダイアログが開く
     await page.click('[data-testid="timer-add-ephemeral-btn"]');
@@ -436,7 +427,7 @@ test.describe("timers", () => {
   });
 
   test("鳴らす時間の秒数指定と既定値保存が機能する", async ({ page }) => {
-    const timerName = `鳴動秒数_${Date.now()}`;
+    const timerName = `鳴動秒数_${uniqueTestName("e2e")}`;
 
     // 既定値テストは前回テスト失敗時の状態が残ると誤判定するため、
     // 冒頭で確実に既定値（3秒）へリセットしてから本題に入る
@@ -508,7 +499,7 @@ test.describe("timers", () => {
   test("数値入力欄の未入力・範囲外はブラウザ側の検証で送信が止まる", async ({
     page,
   }) => {
-    const timerName = `入力検証_${Date.now()}`;
+    const timerName = `入力検証_${uniqueTestName("e2e")}`;
     const adjustInput = page.locator('[data-testid="timer-adjust-input"]');
     const ringInput = page.locator('[data-testid="timer-ring-seconds-input"]');
     const dialogTitle = page.locator('[data-testid="timer-dialog-title"]');
@@ -585,7 +576,7 @@ test.describe("timers", () => {
   test("一時タイマーは未満了だと通常どおり確認ダイアログが出る", async ({
     page,
   }) => {
-    const timerName = `一時未満了_${Date.now()}`;
+    const timerName = `一時未満了_${uniqueTestName("e2e")}`;
 
     // 一時タイマーを長めの時間で作成
     await page.click('[data-testid="timer-add-ephemeral-btn"]');

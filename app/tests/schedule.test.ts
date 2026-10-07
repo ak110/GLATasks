@@ -1,3 +1,9 @@
+import {
+  uniqueTestName,
+  setupTestList,
+  cleanupTestList,
+} from "./helpers/common";
+import { test, expect, type Page } from "@playwright/test";
 /**
  * @fileoverview 定期TODOスケジュールのCRUD操作とダイアログ表示に関する e2e テスト
  *
@@ -5,10 +11,7 @@
  * （発火ロジックはサーバー側vitestの `scheduler.test.ts` が担当する）。
  */
 
-import { test, expect, type Page } from "@playwright/test";
-import { setupTestList, cleanupTestList } from "./helpers/common";
-
-const LIST_NAME = `定期TODOテスト_${Date.now()}`;
+const LIST_NAME = `定期TODOテスト_${uniqueTestName("e2e")}`;
 
 test.describe("schedule", () => {
   test.beforeAll(async ({ browser }) => {
@@ -55,7 +58,7 @@ test.describe("schedule", () => {
   }
 
   test("定期TODOの作成とスケジュール一覧への表示", async ({ page }) => {
-    const title = `週次TODO_${Date.now()}`;
+    const title = `週次TODO_${uniqueTestName("e2e")}`;
     await openScheduleDialog(page);
     await createWeeklySchedule(page, title);
 
@@ -68,7 +71,7 @@ test.describe("schedule", () => {
   });
 
   test("定期TODOの編集で繰り返し条件が更新される", async ({ page }) => {
-    const title = `編集TODO_${Date.now()}`;
+    const title = `編集TODO_${uniqueTestName("e2e")}`;
     await openScheduleDialog(page);
     await createWeeklySchedule(page, title);
 
@@ -87,7 +90,7 @@ test.describe("schedule", () => {
   });
 
   test("定期TODOの無効化切替が一覧へ反映される", async ({ page }) => {
-    const title = `無効化TODO_${Date.now()}`;
+    const title = `無効化TODO_${uniqueTestName("e2e")}`;
     await openScheduleDialog(page);
     await createWeeklySchedule(page, title);
 
@@ -102,7 +105,7 @@ test.describe("schedule", () => {
   });
 
   test("定期TODOの削除で一覧から消える", async ({ page }) => {
-    const title = `削除TODO_${Date.now()}`;
+    const title = `削除TODO_${uniqueTestName("e2e")}`;
     await openScheduleDialog(page);
     await createWeeklySchedule(page, title);
 

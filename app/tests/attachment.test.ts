@@ -1,14 +1,10 @@
-/**
- * @fileoverview タスク添付ファイルの e2e テスト
- */
-
-import { test, expect, type Page, type Locator } from "@playwright/test";
-import * as fs from "node:fs/promises";
 import {
+  uniqueTestName,
+  addTask,
   setupTestList,
   cleanupTestList,
-  waitForPersistedTask,
 } from "./helpers/common";
+import { test, expect } from "@playwright/test";
 import {
   MUTATION_UI_DEADLINE_MS,
   observeMutationResponses,
@@ -17,8 +13,13 @@ import {
   type MutationObservationTracker,
 } from "./helpers/mutation-observation";
 import { MAX_ATTACHMENT_BYTES } from "../src/lib/schemas";
+/**
+ * @fileoverview タスク添付ファイルの e2e テスト
+ */
 
-const LIST_NAME = `添付テスト_${Date.now()}`;
+import * as fs from "node:fs/promises";
+
+const LIST_NAME = `添付テスト_${uniqueTestName("e2e")}`;
 
 // 1x1 透過PNGの最小バイナリ（添付テストのサンプル画像として使用）
 const TINY_PNG_BASE64 =
@@ -54,23 +55,6 @@ async function expectAttachmentUiResult(
 }
 
 /** タスクを追加し、編集ダイアログを開いた状態にして、タスク行のlocatorを返す */
-async function addTaskAndOpenEditDialog(
-  page: Page,
-  title: string,
-): Promise<Locator> {
-  await page.fill('textarea[placeholder*="タスクを追加"]', title);
-  await page.click('[data-testid="task-add-form"] button[type="submit"]');
-  const taskRow = page
-    .locator('[data-testid="task-item"]')
-    .filter({ hasText: title });
-  await taskRow.waitFor({ timeout: 15000 });
-  await waitForPersistedTask(taskRow);
-  await taskRow.locator('[data-testid="task-edit-btn"]').dispatchEvent("click");
-  await page
-    .locator('[role="dialog"] input[type="file"]')
-    .waitFor({ timeout: 15000 });
-  return taskRow;
-}
 
 test.describe("attachments", () => {
   test.beforeAll(async ({ browser }) => {
@@ -97,8 +81,8 @@ test.describe("attachments", () => {
   test("編集ダイアログでファイルを添付するとタスク行にアイコンが件数分表示される", async ({
     page,
   }) => {
-    const title = `添付_${Date.now()}`;
-    const taskRow = await addTaskAndOpenEditDialog(page, title);
+    const title = `添付_${uniqueTestName("e2e")}`;
+    const taskRow = await addTask(page, title, { openEdit: true });
 
     const attachmentObservation = observeMutationResponses(
       page,
@@ -138,9 +122,9 @@ test.describe("attachments", () => {
   });
 
   test("添付アイコンのtitle属性でファイル名を確認できる", async ({ page }) => {
-    const title = `添付title確認_${Date.now()}`;
-    const filename = `title確認_${Date.now()}.txt`;
-    const taskRow = await addTaskAndOpenEditDialog(page, title);
+    const title = `添付title確認_${uniqueTestName("e2e")}`;
+    const filename = `title確認_${uniqueTestName("e2e")}.txt`;
+    const taskRow = await addTask(page, title, { openEdit: true });
 
     const attachmentObservation = observeMutationResponses(
       page,
@@ -173,10 +157,10 @@ test.describe("attachments", () => {
   test("添付アイコンをクリックするとダウンロードが発火し内容が復元される", async ({
     page,
   }) => {
-    const title = `ダウンロード_${Date.now()}`;
-    const filename = `download_${Date.now()}.txt`;
-    const content = `ダウンロード内容_${Date.now()}`;
-    const taskRow = await addTaskAndOpenEditDialog(page, title);
+    const title = `ダウンロード_${uniqueTestName("e2e")}`;
+    const filename = `download_${uniqueTestName("e2e")}.txt`;
+    const content = `ダウンロード内容_${uniqueTestName("e2e")}`;
+    const taskRow = await addTask(page, title, { openEdit: true });
 
     const attachmentObservation = observeMutationResponses(
       page,
@@ -217,8 +201,8 @@ test.describe("attachments", () => {
   });
 
   test("10 MiB超過ファイルの添付はエラー通知で拒否される", async ({ page }) => {
-    const title = `サイズ超過_${Date.now()}`;
-    const taskRow = await addTaskAndOpenEditDialog(page, title);
+    const title = `サイズ超過_${uniqueTestName("e2e")}`;
+    const taskRow = await addTask(page, title, { openEdit: true });
 
     const oversized = Buffer.alloc(10 * 1024 * 1024 + 1, 0x41);
     const attachmentObservation = observeMutationResponses(
@@ -250,9 +234,9 @@ test.describe("attachments", () => {
   });
 
   test("既存添付を削除するとリロード後も削除が保たれる", async ({ page }) => {
-    const title = `削除_${Date.now()}`;
-    const filename = `delete_${Date.now()}.txt`;
-    const taskRow = await addTaskAndOpenEditDialog(page, title);
+    const title = `削除_${uniqueTestName("e2e")}`;
+    const filename = `delete_${uniqueTestName("e2e")}.txt`;
+    const taskRow = await addTask(page, title, { openEdit: true });
 
     const attachmentObservation = observeMutationResponses(
       page,
@@ -297,7 +281,7 @@ test.describe("attachments", () => {
   test("タスク追加時にファイルを指定するとタスク行にアイコンが表示される", async ({
     page,
   }) => {
-    const title = `追加時添付_${Date.now()}`;
+    const title = `追加時添付_${uniqueTestName("e2e")}`;
     await page.fill('textarea[placeholder*="タスクを追加"]', title);
     await page
       .locator('[data-testid="task-add-form"] input[type="file"]')
@@ -327,7 +311,7 @@ test.describe("attachments", () => {
   test("タスク追加フォームへファイルをドラッグアンドドロップすると添付として追加される", async ({
     page,
   }) => {
-    const title = `DnD追加_${Date.now()}`;
+    const title = `DnD追加_${uniqueTestName("e2e")}`;
     await page.fill('textarea[placeholder*="タスクを追加"]', title);
 
     const dataTransfer = await page.evaluateHandle(() => {
@@ -362,7 +346,7 @@ test.describe("attachments", () => {
   test("タスク追加フォームでサイズ超過ファイルを添付した際のエラートースト検証", async ({
     page,
   }) => {
-    const title = `追加時サイズ超過_${Date.now()}`;
+    const title = `追加時サイズ超過_${uniqueTestName("e2e")}`;
     await page.fill('textarea[placeholder*="タスクを追加"]', title);
 
     const oversized = Buffer.alloc(MAX_ATTACHMENT_BYTES + 1, 0x41);
@@ -424,7 +408,9 @@ test.describe("attachments", () => {
   test("編集ダイアログでクリップボードから画像を貼り付けて添付できる", async ({
     page,
   }) => {
-    await addTaskAndOpenEditDialog(page, `編集ダイアログ貼付_${Date.now()}`);
+    await addTask(page, `編集ダイアログ貼付_${uniqueTestName("e2e")}`, {
+      openEdit: true,
+    });
     await page.locator('[role="dialog"] textarea#edit-text').focus();
     const attachmentObservation = observeMutationResponses(
       page,
@@ -460,8 +446,8 @@ test.describe("attachments", () => {
   test("画像添付は一覧でサムネイル表示され、クリックで原寸ポップアップが開く", async ({
     page,
   }) => {
-    const title = `画像プレビュー_${Date.now()}`;
-    await addTaskAndOpenEditDialog(page, title);
+    const title = `画像プレビュー_${uniqueTestName("e2e")}`;
+    await addTask(page, title, { openEdit: true });
     const attachmentObservation = observeMutationResponses(
       page,
       "attachments.create",
@@ -494,8 +480,8 @@ test.describe("attachments", () => {
   test("タスク編集ダイアログ本体へファイルをドラッグアンドドロップすると添付として追加される", async ({
     page,
   }) => {
-    const title = `DnD編集_${Date.now()}`;
-    const taskRow = await addTaskAndOpenEditDialog(page, title);
+    const title = `DnD編集_${uniqueTestName("e2e")}`;
+    const taskRow = await addTask(page, title, { openEdit: true });
 
     const dataTransfer = await page.evaluateHandle(() => {
       const dt = new DataTransfer();

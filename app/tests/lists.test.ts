@@ -1,15 +1,16 @@
-/**
- * @fileoverview リスト CRUD の e2e テスト
- */
-
-import { test, expect } from "@playwright/test";
 import {
+  uniqueTestName,
+  addTask,
+  createListFromPage,
   cleanupTestLists,
   setupTestLists,
   toggleTaskAndWaitForUpdate,
-  waitForPersistedTask,
   waitForSuccessfulMutationResponse,
 } from "./helpers/common";
+import { test, expect } from "@playwright/test";
+/**
+ * @fileoverview リスト CRUD の e2e テスト
+ */
 
 test.describe("lists", () => {
   test.beforeEach(async ({ page }) => {
@@ -38,28 +39,9 @@ test.describe("lists", () => {
       .click();
   }
 
-  async function addTaskToSelectedList(
-    page: import("@playwright/test").Page,
-    title: string,
-  ) {
-    const form = page.getByTestId("task-add-form");
-    await form.locator("textarea").fill(title);
-    const responsePromise = waitForSuccessfulMutationResponse(
-      page,
-      "tasks.create",
-    );
-    await form.locator('button[type="submit"]').click();
-    await responsePromise;
-    const taskRow = page.getByTestId("task-item").filter({ hasText: title });
-    await expect(taskRow).toBeVisible({ timeout: 15000 });
-    await waitForPersistedTask(taskRow);
-    return taskRow;
-  }
-
   test("リストを追加するとサイドバーに表示される", async ({ page }) => {
-    const listName = `テストリスト_${Date.now()}`;
-    await page.fill('aside input[placeholder="新しいリスト"]', listName);
-    await page.click('aside button[type="submit"]');
+    const listName = `テストリスト_${uniqueTestName("e2e")}`;
+    await createListFromPage(page, listName, false);
     await expect(
       page.locator(`[data-testid="list-select-btn"]:has-text("${listName}")`),
     ).toBeVisible({
@@ -69,9 +51,8 @@ test.describe("lists", () => {
   });
 
   test("リストを選択するとサイドバーで選択状態になる", async ({ page }) => {
-    const listName = `選択テスト_${Date.now()}`;
-    await page.fill('aside input[placeholder="新しいリスト"]', listName);
-    await page.click('aside button[type="submit"]');
+    const listName = `選択テスト_${uniqueTestName("e2e")}`;
+    await createListFromPage(page, listName, false);
     await page
       .locator(`[data-testid="list-select-btn"]:has-text("${listName}")`)
       .waitFor({ timeout: 15000 });
@@ -84,12 +65,11 @@ test.describe("lists", () => {
   });
 
   test("⋮ メニューから名前変更できる", async ({ page }) => {
-    const originalName = `名変テスト_${Date.now()}`;
-    const newName = `名変後_${Date.now()}`;
+    const originalName = `名変テスト_${uniqueTestName("e2e")}`;
+    const newName = `名変後_${uniqueTestName("e2e")}`;
 
     // リスト追加
-    await page.fill('aside input[placeholder="新しいリスト"]', originalName);
-    await page.click('aside button[type="submit"]');
+    await createListFromPage(page, originalName, false);
     await expect(
       page.locator(
         `[data-testid="list-select-btn"]:has-text("${originalName}")`,
@@ -115,11 +95,10 @@ test.describe("lists", () => {
   });
 
   test("⋮ メニューから削除できる", async ({ page }) => {
-    const listName = `削除テスト_${Date.now()}`;
+    const listName = `削除テスト_${uniqueTestName("e2e")}`;
 
     // リスト追加
-    await page.fill('aside input[placeholder="新しいリスト"]', listName);
-    await page.click('aside button[type="submit"]');
+    await createListFromPage(page, listName, false);
     await expect(
       page.locator(`[data-testid="list-select-btn"]:has-text("${listName}")`),
     ).toBeVisible({ timeout: 15000 });
@@ -145,7 +124,7 @@ test.describe("lists", () => {
     page,
     browser,
   }) => {
-    const stamp = Date.now();
+    const stamp = uniqueTestName("e2e");
     const sourceListName = `統合元_${stamp}`;
     const targetListName = `統合先_${stamp}`;
     const sourceTaskTitle = `統合元タスク_${stamp}`;
@@ -168,9 +147,9 @@ test.describe("lists", () => {
         .filter({ hasText: targetListName });
 
       await sourceList.getByTestId("list-select-btn").click();
-      await addTaskToSelectedList(page, sourceTaskTitle);
+      await addTask(page, sourceTaskTitle);
       await targetList.getByTestId("list-select-btn").click();
-      await addTaskToSelectedList(page, targetTaskTitle);
+      await addTask(page, targetTaskTitle);
 
       await sourceList.getByTestId("list-menu-btn").click();
       await page.getByRole("button", { name: "他のリストに統合" }).click();
@@ -193,7 +172,7 @@ test.describe("lists", () => {
         page.getByTestId("task-item").filter({ hasText: targetTaskTitle }),
       ).toBeVisible({ timeout: 15000 });
 
-      const addedTask = await addTaskToSelectedList(page, addedTaskTitle);
+      const addedTask = await addTask(page, addedTaskTitle);
       const checkbox = addedTask.locator('input[type="checkbox"]');
       await toggleTaskAndWaitForUpdate(page, checkbox);
       await toggleTaskAndWaitForUpdate(page, checkbox);

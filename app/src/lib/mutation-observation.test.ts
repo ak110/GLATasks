@@ -1,11 +1,11 @@
-import { expect, test } from "@playwright/test";
+import { describe, expect, test } from "vitest";
 import {
   classifyMutationObservation,
   MUTATION_DIAGNOSTIC_PREFIX,
   selectMutationDiagnosticObservation,
   serializeMutationDiagnostic,
   type MutationObservation,
-} from "./mutation-observation";
+} from "../../tests/helpers/mutation-observation";
 
 const FIXED_FIELDS = [
   "procedure",
@@ -42,7 +42,7 @@ function parseDiagnostic(serialized: string): Record<string, unknown> {
   return payload as Record<string, unknown>;
 }
 
-test.describe("mutation診断分類", () => {
+describe("mutation診断分類", () => {
   test("複数観測では先行成功より後続エラーを優先する", () => {
     const success: MutationObservation = {
       ...baseObservation,

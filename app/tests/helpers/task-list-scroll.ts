@@ -1,15 +1,20 @@
+import {
+  uniqueTestName,
+  requireBoundingBox,
+  addTask,
+  toggleTaskAndWaitForUpdate,
+  waitForPersistedTask,
+} from "./common";
+import { expect, type Locator, type Page } from "@playwright/test";
+import { MAX_ATTACHMENTS_PER_TASK } from "../../src/lib/schemas";
 /**
  * @fileoverview タスク一覧の内部スクロール回帰テスト用ヘルパー
  */
 
-import { expect, type Locator, type Page } from "@playwright/test";
-import { MAX_ATTACHMENTS_PER_TASK } from "../../src/lib/schemas";
-import { toggleTaskAndWaitForUpdate, waitForPersistedTask } from "./common";
-
 const MINIMUM_TASK_ROWS = 18;
 const MAX_TAGS_PER_TASK = 32;
 
-function makeLongTagNames(prefix: string, stamp: number): string[] {
+function makeLongTagNames(prefix: string, stamp: string): string[] {
   return Array.from(
     { length: MAX_TAGS_PER_TASK },
     (_, index) =>
@@ -17,29 +22,13 @@ function makeLongTagNames(prefix: string, stamp: number): string[] {
   );
 }
 
-async function requireBoundingBox(locator: Locator) {
-  const box = await locator.boundingBox();
-  if (!box) throw new Error("要素の境界ボックスを取得できません");
-  return box;
-}
-
 export async function prepareScrollableTaskList(page: Page): Promise<void> {
   const taskItems = page.getByTestId("task-item");
-  const form = page.getByTestId("task-add-form");
-  const textarea = form.locator("textarea");
-  const submitButton = form.locator('button[type="submit"]');
-  const stamp = Date.now();
+  const stamp = uniqueTestName("e2e");
 
   for (let i = await taskItems.count(); i < MINIMUM_TASK_ROWS; i++) {
     const title = `スクロール_${stamp}_${i}`;
-    await textarea.click();
-    await textarea.fill(title);
-    await expect(submitButton).toBeVisible();
-    await submitButton.click();
-    await expect(taskItems.filter({ hasText: title })).toBeVisible({
-      timeout: 15000,
-    });
-    await waitForPersistedTask(taskItems.filter({ hasText: title }));
+    await addTask(page, title);
   }
 }
 
@@ -66,7 +55,7 @@ export async function verifyTaskListInternalScroll(
   const form = page.getByTestId("task-add-form");
   const textarea = form.locator("textarea");
   const submitButton = form.locator('button[type="submit"]');
-  const stamp = Date.now();
+  const stamp = uniqueTestName("e2e");
 
   await prepareScrollableTaskList(page);
 
@@ -124,7 +113,7 @@ export async function verifyTaskAdditionScrollsToTop(
   const taskList = page.getByTestId("task-list-scroll");
   const taskItems = page.getByTestId("task-item");
   const form = page.getByTestId("task-add-form");
-  const title = `追加後スクロール_${Date.now()}`;
+  const title = `追加後スクロール_${uniqueTestName("e2e")}`;
   await form.locator("textarea").fill(title);
   await form.locator('button[type="submit"]').click();
 
@@ -188,7 +177,7 @@ export async function verifyTagListsKeepTaskListAvailable(
   const tagEditor = form.getByTestId("tag-editor");
   const tagInput = tagEditor.getByTestId("tag-editor-input");
   const taskList = page.getByTestId("task-list-scroll");
-  const stamp = Date.now();
+  const stamp = uniqueTestName("e2e");
   const candidateTags = makeLongTagNames("候補", stamp);
   const currentTags = makeLongTagNames("現在", stamp);
   const candidatePrefix = `候補_${stamp}_`;

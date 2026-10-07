@@ -1,11 +1,8 @@
-/**
- * @fileoverview activeTasks 差分sync・楽観的更新・SSE経路の e2e テスト
- */
-
-import { test, expect } from "@playwright/test";
 import {
-  BASE_URL,
-  STORAGE_STATE_PATH,
+  isTrpcUrl,
+  uniqueTestName,
+  makeContextOptions,
+  addTask,
   setupTestList,
   setupTestLists,
   cleanupTestList,
@@ -15,25 +12,12 @@ import {
   waitForSuccessfulMutationResponse,
   waitForTaskUpdateResponse,
 } from "./helpers/common";
+import { test, expect } from "@playwright/test";
+/**
+ * @fileoverview activeTasks 差分sync・楽観的更新・SSE経路の e2e テスト
+ */
 
-const STAMP = Date.now();
-
-async function addTaskToSelectedList(
-  page: import("@playwright/test").Page,
-  title: string,
-): Promise<void> {
-  const form = page.getByTestId("task-add-form");
-  await form.locator("textarea").fill(title);
-  const responsePromise = waitForSuccessfulMutationResponse(
-    page,
-    "tasks.create",
-  );
-  await form.locator('button[type="submit"]').click();
-  await responsePromise;
-  const taskRow = page.getByTestId("task-item").filter({ hasText: title });
-  await expect(taskRow).toBeVisible({ timeout: 15000 });
-  await waitForPersistedTask(taskRow);
-}
+const STAMP = uniqueTestName("e2e");
 
 test.describe("activeTasks 差分sync・楽観的更新", () => {
   // ---------------------------------------------------------------------------
@@ -49,11 +33,7 @@ test.describe("activeTasks 差分sync・楽観的更新", () => {
     await setupTestList(browser, listAName);
     await setupTestList(browser, listBName);
 
-    const ctx = await browser.newContext({
-      baseURL: BASE_URL,
-      storageState: STORAGE_STATE_PATH,
-      ignoreHTTPSErrors: true,
-    });
+    const ctx = await browser.newContext(makeContextOptions());
 
     try {
       const page = await ctx.newPage();
@@ -71,13 +51,7 @@ test.describe("activeTasks 差分sync・楽観的更新", () => {
       await page
         .locator('[data-testid="task-add-form"]')
         .waitFor({ timeout: 15000 });
-      await page.fill('textarea[placeholder*="タスクを追加"]', taskATitle);
-      await Promise.all([
-        page
-          .locator('[data-testid="task-add-form"] button[type="submit"]')
-          .click(),
-        page.waitForResponse((res) => res.url().includes("/api/trpc")),
-      ]);
+      await addTask(page, taskATitle);
       await expect(
         page
           .locator('[data-testid="task-item"]')
@@ -91,13 +65,7 @@ test.describe("activeTasks 差分sync・楽観的更新", () => {
       await page
         .locator('[data-testid="task-add-form"]')
         .waitFor({ timeout: 15000 });
-      await page.fill('textarea[placeholder*="タスクを追加"]', taskBTitle);
-      await Promise.all([
-        page
-          .locator('[data-testid="task-add-form"] button[type="submit"]')
-          .click(),
-        page.waitForResponse((res) => res.url().includes("/api/trpc")),
-      ]);
+      await addTask(page, taskBTitle);
       await expect(
         page
           .locator('[data-testid="task-item"]')
@@ -140,8 +108,13 @@ test.describe("activeTasks 差分sync・楽観的更新", () => {
       ).toBeVisible({ timeout: 500 });
 
       // 切替によって tasks.listActive（差分sync）が実行されないことを検証する
-      // 切替後の短い時間だけ待機してからリクエスト数が0であることを確認する
-      await page.waitForTimeout(300);
+      // 切替に伴う描画フレームを完了してから要求の有無を確認する
+      await page.evaluate(
+        () =>
+          new Promise<void>((resolve) =>
+            requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+          ),
+      );
       // listActive リクエストが発火した場合は count > 0 になる
       // リスト切替だけでは trpc リクエストは不要な設計であることを確認する
       expect(trpcRequestCount).toBe(0);
@@ -164,11 +137,7 @@ test.describe("activeTasks 差分sync・楽観的更新", () => {
     const listName = `楽観追加_${STAMP}`;
     await setupTestList(browser, listName);
 
-    const ctx = await browser.newContext({
-      baseURL: BASE_URL,
-      storageState: STORAGE_STATE_PATH,
-      ignoreHTTPSErrors: true,
-    });
+    const ctx = await browser.newContext(makeContextOptions());
 
     try {
       const page = await ctx.newPage();
@@ -201,7 +170,7 @@ test.describe("activeTasks 差分sync・楽観的更新", () => {
       const taskTitle = `楽観タスク_${STAMP}`;
       await page.fill('textarea[placeholder*="タスクを追加"]', taskTitle);
       const createResponsePromise = page.waitForResponse((response) =>
-        response.url().includes("/api/trpc/tasks.create"),
+        isTrpcUrl(response.url(), "tasks.create"),
       );
       await page
         .locator('[data-testid="task-add-form"] button[type="submit"]')
@@ -243,11 +212,7 @@ test.describe("activeTasks 差分sync・楽観的更新", () => {
     const taskTitle = `編集対象_${STAMP}`;
     await setupTestList(browser, listName);
 
-    const ctx = await browser.newContext({
-      baseURL: BASE_URL,
-      storageState: STORAGE_STATE_PATH,
-      ignoreHTTPSErrors: true,
-    });
+    const ctx = await browser.newContext(makeContextOptions());
 
     try {
       const page = await ctx.newPage();
@@ -264,13 +229,7 @@ test.describe("activeTasks 差分sync・楽観的更新", () => {
       await page
         .locator('[data-testid="task-add-form"]')
         .waitFor({ timeout: 15000 });
-      await page.fill('textarea[placeholder*="タスクを追加"]', taskTitle);
-      await Promise.all([
-        page
-          .locator('[data-testid="task-add-form"] button[type="submit"]')
-          .click(),
-        page.waitForResponse((res) => res.url().includes("/api/trpc")),
-      ]);
+      await addTask(page, taskTitle);
 
       const taskRow = page
         .locator('[data-testid="task-item"]')
@@ -325,11 +284,7 @@ test.describe("activeTasks 差分sync・楽観的更新", () => {
     const taskByCtxB = `コンテキストB_${STAMP}`;
     await setupTestList(browser, listName);
 
-    const ctxOptions = {
-      baseURL: BASE_URL,
-      storageState: STORAGE_STATE_PATH,
-      ignoreHTTPSErrors: true,
-    };
+    const ctxOptions = makeContextOptions();
 
     const ctxA = await browser.newContext(ctxOptions);
     const ctxB = await browser.newContext(ctxOptions);
@@ -347,13 +302,7 @@ test.describe("activeTasks 差分sync・楽観的更新", () => {
       await pageA
         .locator('[data-testid="task-add-form"]')
         .waitFor({ timeout: 15000 });
-      await pageA.fill('textarea[placeholder*="タスクを追加"]', taskByCtxA);
-      await Promise.all([
-        pageA
-          .locator('[data-testid="task-add-form"] button[type="submit"]')
-          .click(),
-        pageA.waitForResponse((res) => res.url().includes("/api/trpc")),
-      ]);
+      await addTask(pageA, taskByCtxA);
       const taskARow = pageA
         .locator('[data-testid="task-item"]')
         .filter({ hasText: taskByCtxA });
@@ -375,15 +324,7 @@ test.describe("activeTasks 差分sync・楽観的更新", () => {
       await pageB
         .locator('[data-testid="task-add-form"]')
         .waitFor({ timeout: 15000 });
-      await pageB.fill('textarea[placeholder*="タスクを追加"]', taskByCtxB);
-      await Promise.all([
-        pageB.waitForResponse((res) =>
-          res.url().includes("/api/trpc/tasks.create"),
-        ),
-        pageB
-          .locator('[data-testid="task-add-form"] button[type="submit"]')
-          .click(),
-      ]);
+      await addTask(pageB, taskByCtxB);
       // コンテキストBでタスクが追加されたことを確認する
       const taskBRow = pageB
         .locator('[data-testid="task-item"]')
@@ -409,18 +350,14 @@ test.describe("activeTasks 差分sync・楽観的更新", () => {
   });
 
   test("別コンテキストのリスト統合を全件同期する", async ({ browser }) => {
-    const stamp = Date.now();
+    const stamp = uniqueTestName("e2e");
     const sourceListName = `SSE統合元_${stamp}`;
     const targetListName = `SSE統合先_${stamp}`;
     const sourceTaskTitle = `SSE統合元タスク_${stamp}`;
     const targetTaskTitle = `SSE統合先タスク_${stamp}`;
     await setupTestLists(browser, [sourceListName, targetListName]);
 
-    const ctxOptions = {
-      baseURL: BASE_URL,
-      storageState: STORAGE_STATE_PATH,
-      ignoreHTTPSErrors: true,
-    };
+    const ctxOptions = makeContextOptions();
     const ctxA = await browser.newContext(ctxOptions);
     const ctxB = await browser.newContext(ctxOptions);
 
@@ -439,13 +376,13 @@ test.describe("activeTasks 差分sync・楽観的更新", () => {
         .getByTestId("list-item")
         .filter({ hasText: targetListName });
       await sourceListA.getByTestId("list-select-btn").click();
-      await addTaskToSelectedList(pageA, sourceTaskTitle);
+      await addTask(pageA, sourceTaskTitle);
       await targetListA.getByTestId("list-select-btn").click();
-      await addTaskToSelectedList(pageA, targetTaskTitle);
+      await addTask(pageA, targetTaskTitle);
 
       const activeTaskRequestInputs: string[] = [];
       pageA.on("request", (request) => {
-        if (!request.url().includes("/api/trpc/tasks.listActive")) return;
+        if (!isTrpcUrl(request.url(), "tasks.listActive")) return;
         const urlInput = new URL(request.url()).searchParams.get("input");
         activeTaskRequestInputs.push(urlInput ?? request.postData() ?? "");
       });

@@ -1,11 +1,12 @@
+import { requireBoundingBox } from "./common";
+import { expect, type Page } from "@playwright/test";
+import { openStubbedPage } from "./translate-page";
+export { requireBoundingBox } from "./common";
 /**
  * @fileoverview 画面横断のスクロール境界テスト用ヘルパー
  *
  * ヘッダーを配置する各画面の遷移と、文書ルート・スクロール領域の寸法取得を共通化する。
  */
-
-import { expect, type Locator, type Page } from "@playwright/test";
-import { openStubbedPage } from "./translate-page";
 
 /** 共通ヘッダーを配置する画面 */
 export const PAGE_NAMES = ["tasks", "timers", "translate", "calories"] as const;
@@ -34,12 +35,6 @@ export function getRootOverflow(page: Page): Promise<number> {
     if (!root) throw new Error("文書ルートを取得できません");
     return root.scrollHeight - root.clientHeight;
   });
-}
-
-export async function requireBoundingBox(locator: Locator) {
-  const box = await locator.boundingBox();
-  if (!box) throw new Error("要素の境界ボックスを取得できません");
-  return box;
 }
 
 /** ヘッダー下のスクロール領域が内部でスクロールし、文書ルートが動かないことを確認する */
