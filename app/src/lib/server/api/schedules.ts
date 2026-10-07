@@ -1,3 +1,4 @@
+import { ApiError } from "../api-errors";
 /**
  * @fileoverview 定期TODOスケジュール関連API（一覧・作成・更新・削除）
  *
@@ -48,7 +49,7 @@ async function getOwnedSchedule(scheduleId: number, userId: number) {
     .innerJoin(lists, eq(schedules.list_id, lists.id))
     .where(and(eq(schedules.id, scheduleId), eq(lists.user_id, userId)))
     .limit(1);
-  if (rows.length === 0) throw new Error("schedule_not_found");
+  if (rows.length === 0) throw new ApiError("schedule_not_found");
   return rows[0]!.schedule;
 }
 

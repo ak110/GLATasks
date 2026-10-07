@@ -6,7 +6,9 @@
  * `attachments.delete` を呼び出して `sendEvent` の呼び出し引数を確認する。
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { RequestEvent } from "@sveltejs/kit";
+import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
+import { ApiError } from "./api-errors";
+import { extractErrorMessage } from "#lib/extract-error-message.ts";
 
 import { SSE_EVENTS } from "#lib/sse-events.ts";
 
@@ -20,9 +22,9 @@ vi.mock("#lib/server/api.ts", async (importOriginal) => {
     createCalorieItem: vi.fn().mockResolvedValue(undefined),
     getCalorieRecords: vi
       .fn()
-      .mockResolvedValue({ records: [], window_offset: 0 }),
+      .mockResolvedValue({ records: [], windowOffset: 0 }),
     getCalorieSummary: vi.fn().mockResolvedValue({
-      goal_kcal: 1615,
+      goalKcal: 1615,
       periods: [],
     }),
   };
@@ -55,8 +57,6 @@ function makeCtx(userId: number, tabId: string | null) {
   return {
     userId,
     tabId,
-    encryptKey: "test-encrypt-key",
-    event: {} as RequestEvent,
   };
 }
 
@@ -109,7 +109,7 @@ describe("withApiErrorsのエラーマッピング", () => {
 
   it("attachment_too_largeがBAD_REQUESTへマッピングされる", async () => {
     vi.mocked(createAttachment).mockRejectedValueOnce(
-      new Error("attachment_too_large"),
+      new ApiError("attachment_too_large"),
     );
     const caller = appRouter.createCaller(makeCtx(42, "tab-1"));
 
@@ -123,6 +123,46 @@ describe("withApiErrorsのエラーマッピング", () => {
     await expect(result).rejects.toThrow("ファイルサイズが上限を超えています");
     await expect(result).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
+
+  it("未知の例外はログへ残し、内部の詳細を応答へ出さない", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      vi.mocked(createAttachment).mockRejectedValueOnce(
+        new Error("database private detail"),
+      );
+      const caller = appRouter.createCaller(makeCtx(42, null));
+      await expect(
+        caller.attachments.create({
+          taskId: 1,
+          filename: "memo",
+          mimeType: "text/plain",
+          data: "",
+        }),
+      ).rejects.toThrow("処理に失敗しました。時間をおいて再試行してください。");
+      expect(log).toHaveBeenCalled();
+    } finally {
+      log.mockRestore();
+    }
+  });
+
+  it("HTTPの入力不正は構造化した検証結果から表示文言を取得できる", async () => {
+    const response = await fetchRequestHandler({
+      endpoint: "/api/trpc",
+      router: appRouter,
+      createContext: () => makeCtx(42, null),
+      req: new Request("http://localhost/api/trpc/tasks.create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ listId: 1, text: "" }),
+      }),
+    });
+    const body = await response.json();
+    expect(response.status).toBe(400);
+    const error = Object.assign(new Error(body.error.message), {
+      data: body.error.data,
+    });
+    expect(extractErrorMessage(error)).toBe("タスク内容は必須です");
+  });
 });
 
 describe("caloriesルーター", () => {
@@ -134,8 +174,8 @@ describe("caloriesルーター", () => {
     const caller = appRouter.createCaller(makeCtx(42, "tab-calorie"));
 
     await caller.calories.records({
-      window_offset: 2,
-      tz_offset_minutes: 540,
+      windowOffset: 2,
+      tzOffsetMinutes: 540,
     });
     await caller.calories.createItem({
       name: "食品",
@@ -144,8 +184,8 @@ describe("caloriesルーター", () => {
     });
 
     expect(getCalorieRecords).toHaveBeenCalledWith(42, {
-      window_offset: 2,
-      tz_offset_minutes: 540,
+      windowOffset: 2,
+      tzOffsetMinutes: 540,
     });
     expect(createCalorieItem).toHaveBeenCalledWith(42, {
       name: "食品",
@@ -162,14 +202,14 @@ describe("caloriesルーター", () => {
   it("集計の入力の時差をAPIへ渡す", async () => {
     const caller = appRouter.createCaller(makeCtx(42, null));
 
-    await caller.calories.summary({ tz_offset_minutes: 540 });
+    await caller.calories.summary({ tzOffsetMinutes: 540 });
 
     expect(getCalorieSummary).toHaveBeenCalledWith(42, 540);
   });
 
   it("品目名衝突をBAD_REQUESTへ変換する", async () => {
     vi.mocked(createCalorieItem).mockRejectedValueOnce(
-      new Error("calorie_item_name_conflict"),
+      new ApiError("calorie_item_name_conflict"),
     );
     const caller = appRouter.createCaller(makeCtx(42, null));
 

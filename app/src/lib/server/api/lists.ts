@@ -1,3 +1,4 @@
+import { ApiError } from "../api-errors";
 /**
  * @fileoverview リスト関連API（CRUD・統合・アーカイブ）
  */
@@ -172,13 +173,13 @@ export async function mergeLists(
   targetListId: number,
 ): Promise<void> {
   if (sourceListId === targetListId) {
-    throw new Error("same_list");
+    throw new ApiError("same_list");
   }
   await getDb().transaction(async (db) => {
     const sourceList = await getOwnedList(sourceListId, userId, db);
     const targetList = await getOwnedList(targetListId, userId, db);
     if (sourceList.status !== "active" || targetList.status !== "active") {
-      throw new Error("list_not_active");
+      throw new ApiError("list_not_active");
     }
 
     // 両リストの全タスクを sort_order 昇順で取得

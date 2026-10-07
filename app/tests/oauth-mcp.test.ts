@@ -1,7 +1,7 @@
 /** @fileoverview OAuth登録からMCP認証付き要求までをHTTPと画面入口で確認する。 */
 
 import { createHash, randomBytes } from "node:crypto";
-import { expect, test } from "@playwright/test";
+import { expect, test, type APIRequestContext } from "@playwright/test";
 
 test("OAuth登録から認可とトークン交換を経てMCPへ接続できる", async ({
   page,
@@ -63,7 +63,7 @@ test("OAuth登録から認可とトークン交換を経てMCPへ接続できる
   ).toBeVisible();
   await expect(page.getByText("E2E MCP client")).toBeVisible();
   const consent = await page.request.post(`/oauth/authorize?${query}`, {
-    form: {},
+    form: { decision: "allow" },
     maxRedirects: 0,
   });
   expect(consent.ok()).toBe(true);
@@ -108,4 +108,122 @@ test("OAuth登録から認可とトークン交換を経てMCPへ接続できる
   });
   expect(initialized.ok()).toBe(true);
   expect(await initialized.text()).toContain("result");
+});
+
+async function authorizationRequest(request: APIRequestContext) {
+  const redirectUri = "https://client.example/callback";
+  const response = await request.post("/oauth/register", {
+    data: { redirect_uris: [redirectUri], token_endpoint_auth_method: "none" },
+  });
+  expect(response.status()).toBe(201);
+  const { client_id: clientId } = await response.json();
+  return new URLSearchParams({
+    response_type: "code",
+    client_id: clientId,
+    redirect_uri: redirectUri,
+    code_challenge: "a".repeat(43),
+    code_challenge_method: "S256",
+    state: "拒否と失敗のstate",
+  });
+}
+
+test("OAuth認可の拒否は登録した戻り先へstateとaccess_deniedを返す", async ({
+  page,
+}) => {
+  const query = await authorizationRequest(page.request);
+  await page.route("https://client.example/callback**", (route) =>
+    route.fulfill({ status: 200, body: "認可結果" }),
+  );
+  await page.goto(`/oauth/authorize?${query}`);
+  await page.getByTestId("oauth-deny").click();
+  await page.waitForURL("https://client.example/callback**");
+  const callback = new URL(page.url());
+  expect(callback.searchParams.get("error")).toBe("access_denied");
+  expect(callback.searchParams.get("state")).toBe(query.get("state"));
+  expect(callback.searchParams.has("code")).toBe(false);
+});
+
+test("OAuth認可の入力不正は検証済み戻り先へ分類とstateを返す", async ({
+  page,
+}) => {
+  const query = await authorizationRequest(page.request);
+  const cases: Array<[string, string | undefined, string]> = [
+    ["code_challenge", undefined, "invalid_request"],
+    ["code_challenge", "short", "invalid_request"],
+    ["code_challenge_method", undefined, "invalid_request"],
+    ["code_challenge_method", "plain", "invalid_request"],
+    ["response_type", undefined, "invalid_request"],
+    ["response_type", "token", "unsupported_response_type"],
+    ["resource", "invalid-url", "invalid_target"],
+  ];
+  for (const [name, value, error] of cases) {
+    const invalid = new URLSearchParams(query);
+    if (value === undefined) invalid.delete(name);
+    else invalid.set(name, value);
+    for (const method of ["get", "post"] as const) {
+      const response =
+        method === "get"
+          ? await page.request.get(`/oauth/authorize?${invalid}`, {
+              maxRedirects: 0,
+            })
+          : await page.request.post(`/oauth/authorize?${invalid}`, {
+              form: { decision: "allow" },
+              maxRedirects: 0,
+            });
+      const location =
+        method === "get"
+          ? response.headers().location
+          : (await response.json()).location;
+      const callback = new URL(location);
+      expect(callback.searchParams.get("error"), `${method} ${name}`).toBe(
+        error,
+      );
+      expect(callback.searchParams.get("state")).toBe(query.get("state"));
+      expect(callback.searchParams.has("code")).toBe(false);
+    }
+  }
+  const invalid = new URLSearchParams(query);
+  invalid.set("redirect_uri", "https://unregistered.example/callback");
+  await page.goto(`/oauth/authorize?${invalid}`);
+  await expect(
+    page.getByRole("heading", { name: "認可リクエストエラー" }),
+  ).toBeVisible();
+  expect(new URL(page.url()).pathname).toBe("/oauth/authorize");
+});
+
+test("OAuth登録は本文の解析失敗とスキーマ不正をJSONのinvalid_client_metadataで返す", async ({
+  page,
+}) => {
+  for (const accept of ["application/json", "text/html"]) {
+    for (const data of ["{not json", '{"redirect_uris":[]}']) {
+      const response = await page.request.post("/oauth/register", {
+        headers: { Accept: accept, "Content-Type": "application/json" },
+        data,
+      });
+      expect(response.status()).toBe(400);
+      expect(response.headers()["content-type"]).toContain("application/json");
+      expect((await response.json()).error).toBe("invalid_client_metadata");
+    }
+  }
+});
+
+test("OAuthトークンのBasic認証失敗は401とWWW-Authenticateを返す", async ({
+  page,
+}) => {
+  for (const credentials of [
+    "!!!",
+    Buffer.from("%E:").toString("base64"),
+    Buffer.from("missing-colon").toString("base64"),
+    Buffer.from("unknown:y").toString("base64"),
+  ]) {
+    for (const grantType of ["authorization_code", "refresh_token"]) {
+      const response = await page.request.post("/oauth/token", {
+        headers: { Authorization: `Basic ${credentials}` },
+        form: { grant_type: grantType },
+      });
+      expect(response.status()).toBe(401);
+      expect((await response.json()).error).toBe("invalid_client");
+      expect(response.headers()["www-authenticate"]).toBe("Basic");
+    }
+  }
 });

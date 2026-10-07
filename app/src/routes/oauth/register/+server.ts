@@ -5,7 +5,12 @@
  * 本エンドポイントは認証不要（公開）で運用する。
  */
 
-import { json, error } from "@sveltejs/kit";
+import { json } from "@sveltejs/kit";
+import { errorResponse } from "#lib/server/mcp/oauth-response.ts";
+import {
+  OAUTH_GRANT_TYPES,
+  OAUTH_RESPONSE_TYPES,
+} from "#lib/server/mcp/oauth-config.ts";
 import crypto from "node:crypto";
 import { z } from "zod";
 import { registerClient } from "#lib/server/mcp/store.ts";
@@ -14,10 +19,8 @@ import type { RequestHandler } from "./$types";
 const RegisterRequestSchema = z.object({
   redirect_uris: z.array(z.string().url()).min(1),
   token_endpoint_auth_method: z.string().default("client_secret_basic"),
-  grant_types: z
-    .array(z.string())
-    .default(["authorization_code", "refresh_token"]),
-  response_types: z.array(z.string()).default(["code"]),
+  grant_types: z.array(z.string()).default(OAUTH_GRANT_TYPES),
+  response_types: z.array(z.string()).default(OAUTH_RESPONSE_TYPES),
   client_name: z.string().optional(),
   scope: z.string().optional(),
 });
@@ -27,17 +30,11 @@ export const POST: RequestHandler = async ({ request }) => {
   try {
     payload = await request.json();
   } catch {
-    error(400, "invalid_client_metadata");
+    return errorResponse("invalid_client_metadata", "JSONとして解析できません");
   }
   const parsed = RegisterRequestSchema.safeParse(payload);
   if (!parsed.success) {
-    return json(
-      {
-        error: "invalid_client_metadata",
-        error_description: parsed.error.message,
-      },
-      { status: 400 },
-    );
+    return errorResponse("invalid_client_metadata", parsed.error.message);
   }
   const metadata = parsed.data;
   const isPublic = metadata.token_endpoint_auth_method === "none";

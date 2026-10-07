@@ -6,23 +6,27 @@
  */
 
 import { json } from "@sveltejs/kit";
+import {
+  OAUTH_PATHS,
+  OAUTH_RESPONSE_TYPES,
+  OAUTH_GRANT_TYPES,
+  OAUTH_CHALLENGE_METHODS,
+  OAUTH_AUTH_METHODS,
+  OAUTH_SCOPES,
+} from "#lib/server/mcp/oauth-config.ts";
 import type { RequestHandler } from "./$types";
 
 export const GET: RequestHandler = ({ url }) => {
   const issuer = url.origin;
   return json({
     issuer,
-    authorization_endpoint: `${issuer}/oauth/authorize`,
-    token_endpoint: `${issuer}/oauth/token`,
-    registration_endpoint: `${issuer}/oauth/register`,
-    response_types_supported: ["code"],
-    grant_types_supported: ["authorization_code", "refresh_token"],
-    code_challenge_methods_supported: ["S256"],
-    token_endpoint_auth_methods_supported: [
-      "none",
-      "client_secret_basic",
-      "client_secret_post",
-    ],
-    scopes_supported: ["mcp"],
+    authorization_endpoint: `${issuer}${OAUTH_PATHS.authorize}`,
+    token_endpoint: `${issuer}${OAUTH_PATHS.token}`,
+    registration_endpoint: `${issuer}${OAUTH_PATHS.register}`,
+    response_types_supported: OAUTH_RESPONSE_TYPES,
+    grant_types_supported: OAUTH_GRANT_TYPES,
+    code_challenge_methods_supported: OAUTH_CHALLENGE_METHODS,
+    token_endpoint_auth_methods_supported: OAUTH_AUTH_METHODS,
+    scopes_supported: OAUTH_SCOPES,
   });
 };

@@ -13,6 +13,8 @@ import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
 import crypto from "node:crypto";
 import { createMcpServer } from "#lib/server/mcp/server.ts";
 import { verifyAccessToken } from "#lib/server/mcp/oauth.ts";
+import { McpSessions } from "#lib/server/mcp/sessions.ts";
+import { OAUTH_PATHS } from "#lib/server/mcp/oauth-config.ts";
 import type { RequestHandler } from "./$types";
 
 /**
@@ -20,10 +22,12 @@ import type { RequestHandler } from "./$types";
  * Streamable HTTP のステートフルモードでは初期化リクエストで session id を発行し、
  * 後続リクエストは同じ transport インスタンスへルーティングする。
  */
-const sessions = new Map<string, WebStandardStreamableHTTPServerTransport>();
+const sessions = new McpSessions<WebStandardStreamableHTTPServerTransport>();
+const cleanup = setInterval(() => void sessions.expire(), 60_000);
+cleanup.unref();
 
 function unauthorized(originUrl: URL): Response {
-  const metadataUrl = `${originUrl.origin}/.well-known/oauth-protected-resource`;
+  const metadataUrl = `${originUrl.origin}${OAUTH_PATHS.protectedResourceMetadata}`;
   return new Response(
     JSON.stringify({
       error: "invalid_token",
@@ -63,9 +67,7 @@ async function getOrCreateTransport(
   sessionId: string | undefined,
   isInitialize: boolean,
 ): Promise<WebStandardStreamableHTTPServerTransport | null> {
-  if (sessionId && sessions.has(sessionId)) {
-    return sessions.get(sessionId)!;
-  }
+  if (sessionId) return sessions.get(sessionId) ?? null;
   if (!isInitialize) return null;
   const transport: WebStandardStreamableHTTPServerTransport =
     new WebStandardStreamableHTTPServerTransport({
@@ -102,7 +104,10 @@ export const POST: RequestHandler = async ({ request, url }) => {
         error: "invalid_session",
         error_description: "unknown session",
       }),
-      { status: 400, headers: { "Content-Type": "application/json" } },
+      {
+        status: sessionId ? 404 : 400,
+        headers: { "Content-Type": "application/json" },
+      },
     );
   }
   return transport.handleRequest(request, { authInfo: auth, parsedBody: body });

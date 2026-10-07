@@ -6,14 +6,23 @@
 export function extractErrorMessage(error: unknown): string {
   if (!(error instanceof Error)) return "エラーが発生しました";
 
-  // tRPC の ZodValidationError: message が JSON 配列文字列になっている
-  try {
-    const parsed = JSON.parse(error.message);
-    if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].message) {
-      return parsed[0].message;
+  if (
+    "data" in error &&
+    typeof error.data === "object" &&
+    error.data !== null &&
+    "validationIssues" in error.data
+  ) {
+    const issues = error.data.validationIssues;
+    if (Array.isArray(issues)) {
+      const issue: unknown = issues[0];
+      if (
+        typeof issue === "object" &&
+        issue !== null &&
+        "message" in issue &&
+        typeof issue.message === "string"
+      )
+        return issue.message;
     }
-  } catch {
-    // JSON でなければそのまま使う
   }
 
   return error.message || "エラーが発生しました";

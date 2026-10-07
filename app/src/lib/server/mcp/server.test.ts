@@ -8,6 +8,7 @@ import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SSE_EVENTS } from "#lib/sse-events.ts";
+import { ApiError } from "../api-errors";
 
 let preferences: Record<string, unknown> = {};
 
@@ -21,7 +22,11 @@ vi.mock("../api", async (importOriginal) => {
         preferences = { ...preferences, ...input };
       },
     ),
-    getCalorieSummary: vi.fn(async () => ({ goal_kcal: 1615 })),
+    getCalorieSummary: vi.fn(async () => ({ goalKcal: 1615 })),
+    mergeLists: vi.fn(async () => {}),
+    createTask: vi.fn(async () => {
+      throw new ApiError("not_found_or_forbidden");
+    }),
   };
 });
 
@@ -60,10 +65,10 @@ const TOOL_CONTRACTS: Record<string, readonly [string, readonly string[]]> = {
     "既存タスクを更新する（テキスト・ステータス・タグ・移動）",
     [
       "completed",
-      "keep_order",
+      "keepOrder",
       "kind",
       "listId",
-      "move_to",
+      "moveTo",
       "status",
       "tags",
       "taskId",
@@ -79,38 +84,38 @@ const TOOL_CONTRACTS: Record<string, readonly [string, readonly string[]]> = {
   "timers.create": [
     "タイマーを新規作成する",
     [
-      "adjust_minutes",
-      "base_seconds",
+      "adjustMinutes",
+      "baseSeconds",
       "ephemeral",
       "mode",
       "name",
-      "ring_seconds",
-      "target_minutes",
-      "tz_offset_minutes",
+      "ringSeconds",
+      "targetMinutes",
+      "tzOffsetMinutes",
     ],
   ],
   "timers.update": [
     "タイマー設定を更新する",
     [
-      "adjust_minutes",
-      "base_seconds",
+      "adjustMinutes",
+      "baseSeconds",
       "mode",
       "name",
-      "ring_seconds",
-      "target_minutes",
+      "ringSeconds",
+      "targetMinutes",
       "timerId",
-      "tz_offset_minutes",
+      "tzOffsetMinutes",
     ],
   ],
   "timers.delete": ["タイマーを削除する", ["timerId"]],
   "timers.start": [
     "タイマーを開始する（アラーム時はクライアントのTZオフセットを渡す）",
-    ["timerId", "tz_offset_minutes"],
+    ["timerId", "tzOffsetMinutes"],
   ],
   "timers.pause": ["実行中タイマーを一時停止する", ["timerId"]],
   "timers.reset": [
     "タイマーを初期状態にリセットする",
-    ["timerId", "tz_offset_minutes"],
+    ["timerId", "tzOffsetMinutes"],
   ],
   "timers.adjust": [
     "タイマーの残り時間を加算・減算する（minutes は正負の整数）",
@@ -118,20 +123,20 @@ const TOOL_CONTRACTS: Record<string, readonly [string, readonly string[]]> = {
   ],
   "timers.setTime": [
     "タイマーのベース時間・目標時刻を上書きする",
-    ["seconds", "target_minutes", "timerId", "tz_offset_minutes"],
+    ["seconds", "targetMinutes", "timerId", "tzOffsetMinutes"],
   ],
   "timers.stop": [
-    "鳴っているタイマーを止める（started_at の不変条件を確認）",
-    ["started_at", "timerId"],
+    "鳴っているタイマーを止める（startedAt の不変条件を確認）",
+    ["startedAt", "timerId"],
   ],
   "timers.reorder": ["タイマー並び順を更新する", ["timerIds"]],
   "calories.summary": [
-    "カロリーの集計（1日当たりペース・7日間平均・28日間平均・達成状況）を取得する（tz_offset_minutes はUTCからの時差の分数で、日本時間は540）",
-    ["tz_offset_minutes"],
+    "カロリーの集計（1日当たりペース・7日間平均・28日間平均・達成状況）を取得する（tzOffsetMinutes はUTCからの時差の分数で、日本時間は540）",
+    ["tzOffsetMinutes"],
   ],
   "calories.listRecords": [
-    "カロリーの摂取記録を30日単位で新しい順に取得する（window_offset は0で今日までの30日、1でその前の30日。tz_offset_minutes はUTCからの時差の分数で、日本時間は540。品目表へ登録しない一時項目の記録は temporary が true で、quantity がkcal）",
-    ["tz_offset_minutes", "window_offset"],
+    "カロリーの摂取記録を30日単位で新しい順に取得する（windowOffset は0で今日までの30日、1でその前の30日。tzOffsetMinutes はUTCからの時差の分数で、日本時間は540。品目表へ登録しない一時項目の記録は temporary が true で、quantity がkcal）",
+    ["tzOffsetMinutes", "windowOffset"],
   ],
   "calories.listItems": [
     "カロリーの品目（名前・1個当たりのkcal・備考）を取得する",
@@ -143,13 +148,7 @@ const TOOL_CONTRACTS: Record<string, readonly [string, readonly string[]]> = {
   ],
   "users.updatePreferences": [
     "利用者の新規タイマーデフォルト値とカロリー目標値のうち、指定した項目だけを更新する",
-    [
-      "adjust_minutes",
-      "base_seconds",
-      "calorie_goal_kcal",
-      "mode",
-      "ring_seconds",
-    ],
+    ["adjustMinutes", "baseSeconds", "calorieGoalKcal", "mode", "ringSeconds"],
   ],
 };
 
@@ -206,21 +205,21 @@ describe("利用者設定MCPツール", () => {
     try {
       await client.callTool({
         name: "users.updatePreferences",
-        arguments: { ring_seconds: 10 },
+        arguments: { ringSeconds: 10 },
       });
       await client.callTool({
         name: "users.updatePreferences",
-        arguments: { calorie_goal_kcal: 1800 },
+        arguments: { calorieGoalKcal: 1800 },
       });
       expect(updateUserPreferences).toHaveBeenNthCalledWith(1, 42, {
-        ring_seconds: 10,
+        ringSeconds: 10,
       });
       expect(updateUserPreferences).toHaveBeenNthCalledWith(2, 42, {
-        calorie_goal_kcal: 1800,
+        calorieGoalKcal: 1800,
       });
       expect(await getUserPreferences(42)).toEqual({
-        ring_seconds: 10,
-        calorie_goal_kcal: 1800,
+        ringSeconds: 10,
+        calorieGoalKcal: 1800,
       });
       expect(sendEvent).toHaveBeenCalledWith(
         42,
@@ -244,11 +243,11 @@ describe("利用者設定MCPツール", () => {
     try {
       const result = await client.callTool({
         name: "calories.summary",
-        arguments: { tz_offset_minutes: 540 },
+        arguments: { tzOffsetMinutes: 540 },
       });
       expect(getCalorieSummary).toHaveBeenCalledWith(42, 540);
       expect(result.content).toEqual([
-        { type: "text", text: JSON.stringify({ goal_kcal: 1615 }, null, 2) },
+        { type: "text", text: JSON.stringify({ goalKcal: 1615 }, null, 2) },
       ]);
     } finally {
       await client.close();
@@ -261,10 +260,59 @@ describe("利用者設定MCPツール", () => {
     try {
       const result = await client.callTool({
         name: "users.updatePreferences",
-        arguments: { calorie_goal_kcal: 1800 },
+        arguments: { calorieGoalKcal: 1800 },
       });
       expect(result.isError).toBe(true);
       expect(updateUserPreferences).not.toHaveBeenCalled();
+    } finally {
+      await client.close();
+      await server.close();
+    }
+  });
+
+  it("リスト統合はタスクと定期TODOを含む3資源を通知する", async () => {
+    const { client, server } = await createClient({
+      token: "test-token",
+      clientId: "test-client",
+      scopes: [],
+      extra: { userId: 42 },
+    });
+    try {
+      await client.callTool({
+        name: "lists.merge",
+        arguments: { sourceListId: 1, targetListId: 2 },
+      });
+      expect(vi.mocked(sendEvent).mock.calls).toEqual([
+        [42, SSE_EVENTS.listsUpdated, null],
+        [42, SSE_EVENTS.tasksUpdated, null],
+        [42, SSE_EVENTS.schedulesUpdated, null],
+      ]);
+    } finally {
+      await client.close();
+      await server.close();
+    }
+  });
+
+  it("存在しないリストへの追加は内部識別子を公開せず表示文言を返す", async () => {
+    const { client, server } = await createClient({
+      token: "test-token",
+      clientId: "test-client",
+      scopes: [],
+      extra: { userId: 42 },
+    });
+    try {
+      const result = await client.callTool({
+        name: "tasks.create",
+        arguments: { listId: 999, text: "追加" },
+      });
+      expect(result.isError).toBe(true);
+      expect(result.content).toEqual([
+        {
+          type: "text",
+          text: JSON.stringify({ error: "対象が見つかりません" }, null, 2),
+        },
+      ]);
+      expect(sendEvent).not.toHaveBeenCalled();
     } finally {
       await client.close();
       await server.close();

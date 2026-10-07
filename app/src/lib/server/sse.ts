@@ -152,19 +152,19 @@ export function replayEvents(
 }
 
 /** SSEプロトコル形式の文字列を生成する */
-function formatEvent(
-  id: number,
+export function formatEvent(
+  id: number | undefined,
   eventType: SseEventName,
   sourceTabId: string,
 ): string {
-  return `id: ${id}\nevent: ${eventType}\ndata: ${sourceTabId}\n\n`;
+  return `${id === undefined ? "" : `id: ${id}\n`}event: ${eventType}\ndata: ${sourceTabId}\n\n`;
 }
 
 /** `reset` イベントをコントローラーへ送出する */
 function enqueueReset(controller: ReadableStreamDefaultController): void {
   try {
     controller.enqueue(
-      encoder.encode(`event: ${SSE_EVENTS.reset}\ndata: \n\n`),
+      encoder.encode(formatEvent(undefined, SSE_EVENTS.reset, "")),
     );
   } catch {
     // 接続が閉じられている場合は無視

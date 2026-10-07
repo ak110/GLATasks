@@ -1,7 +1,9 @@
 import type { Handle, ServerInit } from "@sveltejs/kit/hooks";
+import { redirect } from "@sveltejs/kit";
 import { building } from "$app/env";
 import { verifySessionToken } from "#lib/server/session.ts";
 import { startScheduler } from "#lib/server/scheduler.ts";
+import { isPublicPath } from "#lib/server/auth-routes.ts";
 
 /**
  * サーバー起動時に定期処理スケジューラー（定期TODOとカロリー自動記録）を起動する。
@@ -31,6 +33,13 @@ export const handle: Handle = async ({ event, resolve }) => {
   event.locals.user_id = sessionCookie
     ? await verifySessionToken(sessionCookie)
     : null;
+
+  if (!event.locals.user_id && !isPublicPath(event.url.pathname)) {
+    if (event.url.pathname.startsWith("/api/")) {
+      return new Response("Unauthorized", { status: 401 });
+    }
+    redirect(302, "/auth/login");
+  }
 
   return resolve(event);
 };

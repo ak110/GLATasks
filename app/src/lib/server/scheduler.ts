@@ -3,7 +3,7 @@
  *
  * `hooks.server.ts` の `init` エクスポートから `startScheduler()` を呼び出し、
  * サーバー起動時に一度だけ起動する。以降は60秒間隔のポーリングで発火予定を検出し、
- * 定期TODOは `postTask` でTODOタスクを生成する。
+ * 定期TODOは `createTask` でTODOタスクを生成する。
  * カロリーの自動記録は `processCalorieAutoRecords` が記録を追加する。
  *
  * 発火判定処理は `now` を引数化しており（`processSchedules`）、サーバー側vitestから
@@ -16,11 +16,13 @@ import { rrulestr } from "rrule";
 
 import { getDb } from "./db";
 import { lists, schedules } from "./schema";
-import { processCalorieAutoRecords } from "./api/calories";
+import { processCalorieAutoRecords } from "./calorie-scheduler";
 import { parseTags } from "./api/common";
-import { postTask } from "./api/tasks";
-import { sendEvent } from "./sse";
-import { SSE_EVENTS } from "#lib/sse-events.ts";
+import { createTask } from "./api/tasks";
+import {
+  notifyScheduleExecution,
+  notifyCalorieExecution,
+} from "./operations/scheduler";
 
 /** ポーリング間隔（ミリ秒） */
 const POLL_INTERVAL_MS = 60 * 1000;
@@ -135,27 +137,28 @@ export async function processSchedules(now: Date): Promise<boolean> {
       if (occurrences.length === 0) continue;
 
       const tagList = parseTags(schedule.tags);
-      for (const _occurrence of occurrences) {
-        await postTask(
-          userId,
-          schedule.list_id,
-          schedule.title,
-          tagList,
-          "todo",
-        );
-      }
-
       // last_fired は収集済みiteratorの打ち切り結果ではなく、rule.before(now, true) で
       // 現在時刻以前の直近の発火予定を求め直す。これにより次回tickでの再検出（二重発火）を防ぐ。
       const rule = rrulestr(schedule.rrule, { tzid: "Asia/Tokyo" });
       const lastOccurrence = rule.before(now, true);
-      await db
-        .update(schedules)
-        .set({ last_fired: lastOccurrence ?? now, updated: now })
-        .where(eq(schedules.id, schedule.id));
+      await db.transaction(async (tx) => {
+        for (const _occurrence of occurrences) {
+          await createTask(
+            userId,
+            schedule.list_id,
+            schedule.title,
+            tagList,
+            "todo",
+            tx,
+          );
+        }
+        await tx
+          .update(schedules)
+          .set({ last_fired: lastOccurrence ?? now, updated: now })
+          .where(eq(schedules.id, schedule.id));
+      });
 
-      sendEvent(userId, SSE_EVENTS.tasksUpdated);
-      sendEvent(userId, SSE_EVENTS.schedulesUpdated);
+      notifyScheduleExecution(userId);
     } catch (error) {
       succeeded = false;
       console.error(
@@ -176,7 +179,7 @@ async function tick(): Promise<void> {
     const schedulesSucceeded = await processSchedules(now);
     const caloriesResult = await processCalorieAutoRecords(now);
     for (const userId of caloriesResult.userIds) {
-      sendEvent(userId, SSE_EVENTS.caloriesUpdated);
+      notifyCalorieExecution(userId);
     }
     lastRunFailed = !schedulesSucceeded || !caloriesResult.succeeded;
     if (!lastRunFailed) lastSuccessAt = new Date();

@@ -30,16 +30,18 @@
         </p>
         <form method="POST" class="flex justify-end gap-3">
             <button
-                type="button"
-                onclick={() => {
-                    window.location.href = "/";
-                }}
+                type="submit"
+                name="decision"
+                value="deny"
+                data-testid="oauth-deny"
                 class="cursor-pointer rounded bg-gray-100 px-4 py-2 text-sm text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
             >
                 拒否
             </button>
             <button
                 type="submit"
+                name="decision"
+                value="allow"
                 class="cursor-pointer rounded bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
             >
                 許可

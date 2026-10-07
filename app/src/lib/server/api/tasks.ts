@@ -1,3 +1,4 @@
+import { ApiError } from "../api-errors";
 /**
  * @fileoverview タスク関連API（取得・追加・更新・検索・並び替え）
  */
@@ -221,7 +222,7 @@ export async function updateTask(
       .from(tasks)
       .where(and(eq(tasks.id, taskId), eq(tasks.list_id, listId)))
       .limit(1);
-    if (taskRows.length === 0) throw new Error("task_not_found");
+    if (taskRows.length === 0) throw new ApiError("task_not_found");
     const task = taskRows[0];
 
     const updates: Partial<typeof tasks.$inferInsert> = {};

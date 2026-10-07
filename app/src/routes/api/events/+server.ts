@@ -15,7 +15,9 @@ import {
   addConnection,
   removeConnection,
   replayEvents,
+  formatEvent,
 } from "#lib/server/sse.ts";
+import { SSE_EVENTS } from "#lib/sse-events.ts";
 
 export const GET: RequestHandler = async ({ locals, request, url }) => {
   const userId = locals.user_id;
@@ -41,7 +43,9 @@ export const GET: RequestHandler = async ({ locals, request, url }) => {
       } else {
         // 初回接続: 既存挙動を維持し connected で全 invalidate を促す
         controller.enqueue(
-          new TextEncoder().encode(`event: connected\ndata: ${Date.now()}\n\n`),
+          new TextEncoder().encode(
+            formatEvent(undefined, SSE_EVENTS.connected, String(Date.now())),
+          ),
         );
       }
       // 30秒間隔でハートビートイベントを送出する
@@ -50,7 +54,7 @@ export const GET: RequestHandler = async ({ locals, request, url }) => {
         try {
           controller.enqueue(
             new TextEncoder().encode(
-              `event: heartbeat\ndata: ${Date.now()}\n\n`,
+              formatEvent(undefined, SSE_EVENTS.heartbeat, String(Date.now())),
             ),
           );
         } catch {

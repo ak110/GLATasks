@@ -1,3 +1,4 @@
+import { ApiError } from "../api-errors";
 /** 品目・記録・自動記録のCRUDとCSVの保存境界。DBとCSVの列名はそれぞれの形式を保つ。 */
 
 import { and, desc, eq, gte, isNotNull, lt, or, sql } from "drizzle-orm";
@@ -64,7 +65,7 @@ async function assertOwnedItem(userId: number, itemId: number): Promise<void> {
     .from(calorieItems)
     .where(and(eq(calorieItems.id, itemId), eq(calorieItems.user_id, userId)))
     .limit(1);
-  if (rows.length === 0) throw new Error("calorie_item_not_found");
+  if (rows.length === 0) throw new ApiError("calorie_item_not_found");
 }
 
 export async function getCalorieItems(userId: number) {
@@ -105,7 +106,7 @@ export async function createCalorieItem(
     });
   } catch (error) {
     if (isDuplicateEntry(error)) {
-      throw new Error("calorie_item_name_conflict", { cause: error });
+      throw new ApiError("calorie_item_name_conflict", { cause: error });
     }
     throw error;
   }
@@ -133,7 +134,7 @@ export async function updateCalorieItem(
       );
   } catch (error) {
     if (isDuplicateEntry(error)) {
-      throw new Error("calorie_item_name_conflict", { cause: error });
+      throw new ApiError("calorie_item_name_conflict", { cause: error });
     }
     throw error;
   }
@@ -158,7 +159,7 @@ export async function deleteCalorieItem(
       );
   } catch (error) {
     if (isReferencedRow(error)) {
-      throw new Error("calorie_item_in_use", { cause: error });
+      throw new ApiError("calorie_item_in_use", { cause: error });
     }
     throw error;
   }
@@ -242,7 +243,7 @@ async function recordTargetValues(
   if (input.temporaryName !== undefined) {
     return { item_id: null, temporary_name: input.temporaryName };
   }
-  if (input.itemId === undefined) throw new Error("calorie_item_not_found");
+  if (input.itemId === undefined) throw new ApiError("calorie_item_not_found");
   await assertOwnedItem(userId, input.itemId);
   return { item_id: input.itemId, temporary_name: null };
 }
@@ -280,7 +281,7 @@ export async function updateCalorieRecord(
       ),
     )
     .limit(1);
-  if (existing.length === 0) throw new Error("calorie_record_not_found");
+  if (existing.length === 0) throw new ApiError("calorie_record_not_found");
   await getDb()
     .update(calorieRecords)
     .set({
@@ -403,7 +404,7 @@ async function assertOwnedAutoRecord(
       ),
     )
     .limit(1);
-  if (rows.length === 0) throw new Error("calorie_auto_record_not_found");
+  if (rows.length === 0) throw new ApiError("calorie_auto_record_not_found");
 }
 
 /**
@@ -475,7 +476,7 @@ export async function importCalorieItems(
   rows: CalorieItemCsvRow[],
 ): Promise<{ added: number; updated: number }> {
   if (new Set(rows.map((row) => row.name)).size !== rows.length) {
-    throw new Error("calorie_csv_duplicate_item");
+    throw new ApiError("calorie_csv_duplicate_item");
   }
   let added = 0;
   let updated = 0;
@@ -521,7 +522,7 @@ export async function importCalorieRecords(
   const itemIds = new Map(items.map((item) => [item.name, item.id]));
   const values = rows.map((row) => {
     const itemId = row.temporary ? null : itemIds.get(row.item_name);
-    if (itemId === undefined) throw new Error("calorie_csv_unknown_item");
+    if (itemId === undefined) throw new ApiError("calorie_csv_unknown_item");
     const now = new Date();
     return {
       user_id: userId,

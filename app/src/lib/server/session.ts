@@ -4,17 +4,9 @@
 
 import type { Cookies } from "@sveltejs/kit";
 import { SignJWT, jwtVerify } from "jose";
-import { getJwtSecret } from "./env";
+import { getJwtKey } from "./jwt-key";
 
 const SESSION_AUDIENCE = "glatasks-session";
-
-/**
- * セッション署名用の秘密鍵を取得する（Uint8Array形式で）。
- */
-function getSecret(): Uint8Array {
-  const base64Secret = getJwtSecret();
-  return Uint8Array.from(atob(base64Secret), (c) => c.codePointAt(0)!);
-}
 
 /**
  * ユーザーIDを含む署名済みセッショントークンを生成する。
@@ -25,7 +17,7 @@ export async function createSessionToken(userId: number): Promise<string> {
     .setIssuedAt()
     .setAudience(SESSION_AUDIENCE)
     .setExpirationTime("365d")
-    .sign(getSecret());
+    .sign(getJwtKey());
 }
 
 /** セッション Cookie 名 */
@@ -55,7 +47,7 @@ export async function verifySessionToken(
   token: string,
 ): Promise<number | null> {
   try {
-    const { payload } = await jwtVerify(token, getSecret(), {
+    const { payload } = await jwtVerify(token, getJwtKey(), {
       algorithms: ["HS256"],
     });
     // 既存のaud無しCookieは維持し、同じ鍵で署名したMCP用JWTの転用を拒否する。

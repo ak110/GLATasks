@@ -113,7 +113,7 @@ export function connect(queryClient: QueryClient): void {
   // 1. サーバー時刻から暫定オフセットを設定 (tRPC レスポンスの RTT/2 補正値で上書きされる)
   // 2. 全クエリーを invalidate して、切断中に取りこぼしたイベントぶんを取り直す
   //    (EventSource は自動再接続するため、再接続時もこのハンドラが再発火する)
-  es.addEventListener("connected", (e: MessageEvent) => {
+  es.addEventListener(SSE_EVENTS.connected, (e: MessageEvent) => {
     debugLog("sse", "connected", { lastEventId: e.lastEventId });
     touchReceived();
     captureEventId(e);
@@ -139,7 +139,7 @@ export function connect(queryClient: QueryClient): void {
   // （サーバー時刻オフセット更新には用いない。
   //  SSE は片道通信で RTT を測定できない。
   //  heartbeat のサーバー時刻でオフセットを上書きすると精度が劣化する）
-  es.addEventListener("heartbeat", () => {
+  es.addEventListener(SSE_EVENTS.heartbeat, () => {
     touchReceived();
   });
 

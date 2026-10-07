@@ -1,3 +1,4 @@
+import { ApiError } from "../api-errors";
 /**
  * @fileoverview サーバーAPI共通ユーティリティ（DB更新ヘルパー・変換関数・タグ操作）
  */
@@ -105,6 +106,6 @@ export async function getOwnedList(
     .from(lists)
     .where(and(eq(lists.id, listId), eq(lists.user_id, userId)))
     .limit(1);
-  if (rows.length === 0) throw new Error("not_found_or_forbidden");
+  if (rows.length === 0) throw new ApiError("not_found_or_forbidden");
   return rows[0];
 }

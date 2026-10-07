@@ -5,7 +5,6 @@
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import type { RequestHandler } from "@sveltejs/kit";
 import { appRouter } from "#lib/server/trpc.ts";
-import { getEncryptKey } from "#lib/server/env.ts";
 
 export const GET: RequestHandler = async (event) => {
   return fetchRequestHandler({
@@ -13,9 +12,7 @@ export const GET: RequestHandler = async (event) => {
     req: event.request,
     router: appRouter,
     createContext: () => ({
-      event,
       userId: event.locals.user_id ?? null,
-      encryptKey: getEncryptKey(),
       tabId: event.request.headers.get("x-tab-id"),
     }),
     onError: ({ error, path }) => {

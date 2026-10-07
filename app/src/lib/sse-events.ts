@@ -8,6 +8,8 @@
 
 /** SSEイベント種別の定数オブジェクト */
 export const SSE_EVENTS = {
+  connected: "connected",
+  heartbeat: "heartbeat",
   listsUpdated: "lists:updated",
   tasksUpdated: "tasks:updated",
   timersUpdated: "timers:updated",

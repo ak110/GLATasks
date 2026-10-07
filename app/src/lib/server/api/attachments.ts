@@ -1,3 +1,4 @@
+import { ApiError } from "../api-errors";
 /**
  * @fileoverview 添付ファイル関連API（追加・削除・ダウンロード・一覧紐づけ）
  */
@@ -29,7 +30,7 @@ export async function createAttachment(params: {
 }): Promise<{ attachmentId: number }> {
   const decoded = Buffer.from(params.data, "base64");
   if (decoded.length > MAX_ATTACHMENT_BYTES) {
-    throw new Error("attachment_too_large");
+    throw new ApiError("attachment_too_large");
   }
 
   return await getDb().transaction(async (tx) => {
@@ -39,7 +40,7 @@ export async function createAttachment(params: {
       .where(eq(tasks.id, params.taskId))
       .for("update")
       .limit(1);
-    if (taskRows.length === 0) throw new Error("task_not_found");
+    if (taskRows.length === 0) throw new ApiError("task_not_found");
     const task = taskRows[0]!;
 
     const listRows = await tx
@@ -47,7 +48,7 @@ export async function createAttachment(params: {
       .from(lists)
       .where(and(eq(lists.id, task.list_id), eq(lists.user_id, params.userId)))
       .limit(1);
-    if (listRows.length === 0) throw new Error("task_not_found");
+    if (listRows.length === 0) throw new ApiError("task_not_found");
     const list = listRows[0]!;
 
     const [{ existingCount }] = await tx
@@ -55,7 +56,7 @@ export async function createAttachment(params: {
       .from(attachments)
       .where(eq(attachments.task_id, task.id));
     if (existingCount >= MAX_ATTACHMENTS_PER_TASK) {
-      throw new Error("attachment_limit_exceeded");
+      throw new ApiError("attachment_limit_exceeded");
     }
 
     const now = new Date();
@@ -105,7 +106,7 @@ export async function deleteAttachment(params: {
         ),
       )
       .limit(1);
-    if (rows.length === 0) throw new Error("attachment_not_found");
+    if (rows.length === 0) throw new ApiError("attachment_not_found");
     const { task, list } = rows[0]!;
 
     await tx
@@ -143,7 +144,7 @@ export async function downloadAttachment(params: {
       ),
     )
     .limit(1);
-  if (rows.length === 0) throw new Error("attachment_not_found");
+  if (rows.length === 0) throw new ApiError("attachment_not_found");
   const attachment = rows[0]!.attachment;
 
   return {

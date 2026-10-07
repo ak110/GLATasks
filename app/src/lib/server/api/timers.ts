@@ -1,3 +1,4 @@
+import { ApiError } from "../api-errors";
 /**
  * @fileoverview タイマー関連API（CRUD・開始・停止・リセット・調整・並び替え）
  */
@@ -28,7 +29,7 @@ async function getOwnedTimer(timerId: number, userId: number) {
     .from(timers)
     .where(and(eq(timers.id, timerId), eq(timers.user_id, userId)))
     .limit(1);
-  if (rows.length === 0) throw new Error("not_found_or_forbidden");
+  if (rows.length === 0) throw new ApiError("not_found_or_forbidden");
   return rows[0];
 }
 
@@ -124,10 +125,10 @@ export function calcAlarmSecondsOrThrow(
   tzOffsetMinutes: number | null | undefined,
 ): number {
   if (targetMinutes === null || targetMinutes === undefined) {
-    throw new Error("alarm_missing_params");
+    throw new ApiError("alarm_missing_params");
   }
   if (tzOffsetMinutes === null || tzOffsetMinutes === undefined) {
-    throw new Error("alarm_missing_params");
+    throw new ApiError("alarm_missing_params");
   }
   return calcAlarmRemainingSeconds(targetMinutes, tzOffsetMinutes);
 }
@@ -216,7 +217,7 @@ export async function updateTimer(
 
   // モード変更処理
   if (data.mode !== undefined && data.mode !== timer.mode) {
-    if (timer.running) throw new Error("timer_is_running");
+    if (timer.running) throw new ApiError("timer_is_running");
     updates.mode = data.mode;
     updates.expired = 0;
     if (data.mode === "alarm") {
@@ -229,7 +230,7 @@ export async function updateTimer(
     } else {
       // alarm → countdown
       if (data.baseSeconds === undefined)
-        throw new Error("countdown_missing_base_seconds");
+        throw new ApiError("countdown_missing_base_seconds");
       updates.base_seconds = data.baseSeconds;
       updates.target_minutes = null;
       updates.remaining_seconds = data.baseSeconds;
@@ -444,7 +445,7 @@ export async function setTimerTime(
   tzOffsetMinutes?: number,
 ): Promise<void> {
   const timer = await getOwnedTimer(timerId, userId);
-  if (timer.running) throw new Error("timer_is_running");
+  if (timer.running) throw new ApiError("timer_is_running");
   const db = getDb();
   const updates: Partial<typeof timers.$inferInsert> = {
     expired: 0,
@@ -483,7 +484,7 @@ export async function reorderTimers(
       timerIds.length !== ownedIds.size ||
       !timerIds.every((id) => ownedIds.has(id))
     ) {
-      throw new Error("invalid_timer_ids");
+      throw new ApiError("invalid_timer_ids");
     }
     // timerIds の順に sort_order を 0, 1000, 2000... で再割当
     // 依存関係のないタイマーを並列更新し、直列実行による RTT の線形増大を回避する

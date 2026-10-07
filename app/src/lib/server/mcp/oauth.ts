@@ -6,7 +6,7 @@
 
 import { createHash } from "node:crypto";
 import { SignJWT, jwtVerify } from "jose";
-import { getJwtSecret } from "../env";
+import { getJwtKey } from "../jwt-key";
 
 /** アクセストークンの aud クレーム */
 const ACCESS_AUDIENCE = "glatasks-mcp";
@@ -17,11 +17,6 @@ const REFRESH_AUDIENCE = "glatasks-mcp-refresh";
 export const ACCESS_TOKEN_TTL_SECONDS = 60 * 60;
 /** リフレッシュトークン有効期間（秒） */
 export const REFRESH_TOKEN_TTL_SECONDS = 30 * 24 * 60 * 60;
-
-function getSecret(): Uint8Array {
-  const base64Secret = getJwtSecret();
-  return Uint8Array.from(atob(base64Secret), (c) => c.codePointAt(0)!);
-}
 
 export interface AccessTokenPayload {
   userId: number;
@@ -44,14 +39,14 @@ export async function createAccessToken(params: {
     .setIssuedAt()
     .setAudience(ACCESS_AUDIENCE)
     .setExpirationTime(`${ACCESS_TOKEN_TTL_SECONDS}s`)
-    .sign(getSecret());
+    .sign(getJwtKey());
 }
 
 export async function verifyAccessToken(
   token: string,
 ): Promise<AccessTokenPayload | null> {
   try {
-    const { payload } = await jwtVerify(token, getSecret(), {
+    const { payload } = await jwtVerify(token, getJwtKey(), {
       audience: ACCESS_AUDIENCE,
     });
     const userId = payload.sub ? parseInt(payload.sub, 10) : NaN;
@@ -85,7 +80,7 @@ export async function createRefreshToken(params: {
     .setIssuedAt()
     .setAudience(REFRESH_AUDIENCE)
     .setExpirationTime(`${REFRESH_TOKEN_TTL_SECONDS}s`)
-    .sign(getSecret());
+    .sign(getJwtKey());
 }
 
 export interface RefreshTokenPayload {
@@ -98,7 +93,7 @@ export async function verifyRefreshToken(
   token: string,
 ): Promise<RefreshTokenPayload | null> {
   try {
-    const { payload } = await jwtVerify(token, getSecret(), {
+    const { payload } = await jwtVerify(token, getJwtKey(), {
       audience: REFRESH_AUDIENCE,
     });
     const userId = payload.sub ? parseInt(payload.sub, 10) : NaN;

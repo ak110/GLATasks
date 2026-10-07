@@ -7,6 +7,7 @@ import { eq } from "drizzle-orm";
 
 import { getDb } from "../db";
 import { users } from "../schema";
+import { ApiError } from "../api-errors";
 
 export type UserInfo = {
   id: number;
@@ -35,17 +36,11 @@ export async function validateCredentials(
   return { id: row.id, user: row.user };
 }
 
-/** ユーザー登録。バリデーション失敗時は Error を throw する。 */
+/** 検証済みの利用者情報を登録する。 */
 export async function registerUser(
   userId: string,
   password: string,
 ): Promise<UserInfo> {
-  if (!/^[a-zA-Z0-9]{4,32}$/.test(userId)) {
-    throw new Error("ユーザーIDは4～32文字の英数字としてください。");
-  }
-  if (password.length === 0) {
-    throw new Error("パスワードは必須です。");
-  }
   const db = getDb();
   const existing = await db
     .select()
@@ -53,7 +48,7 @@ export async function registerUser(
     .where(eq(users.user, userId))
     .limit(1);
   if (existing.length > 0) {
-    throw new Error("既に存在するユーザーIDです。");
+    throw new ApiError("user_id_conflict");
   }
   const passHash = await bcrypt.hash(password, 10);
   const result = await db

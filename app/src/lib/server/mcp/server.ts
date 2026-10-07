@@ -1,7 +1,7 @@
 /**
  * @fileoverview MCP サーバー定義
  *
- * `app/src/lib/server/api/` 配下の関数を MCP ツールとして公開する。
+ * 操作層の関数を MCP ツールとして公開する。
  * リスト・タスク・タイマー・利用者設定はtRPCルーター（`trpc.ts`）と同じ操作を網羅し、
  * カロリーは参照だけを公開する。
  */
@@ -9,9 +9,8 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
 import { z } from "zod";
-import * as api from "../api";
-import { sendEvent } from "../sse";
-import { SSE_EVENTS } from "#lib/sse-events.ts";
+import * as operations from "../operations";
+import { getPublicError } from "../api-errors";
 import {
   CreateListSchema,
   CreateTaskSchema,
@@ -33,7 +32,7 @@ import {
   ReorderTasksSchema,
   ReorderTimersSchema,
   UserPreferencesSchema,
-  CalorieSummaryInputSchema,
+  GetCalorieSummarySchema,
   ListCalorieRecordsSchema,
 } from "#lib/schemas.ts";
 
@@ -58,8 +57,16 @@ function jsonResult(value: unknown) {
   };
 }
 
-function successResult(extra?: Record<string, unknown>) {
-  return jsonResult({ success: true, ...extra });
+/** すべてのツールで同じ公開エラーへ変換する。 */
+async function toolResult(operation: () => Promise<unknown>) {
+  try {
+    return jsonResult(await operation());
+  } catch (error) {
+    return {
+      ...jsonResult({ error: getPublicError(error).message }),
+      isError: true,
+    };
+  }
 }
 
 export function createMcpServer(): McpServer {
@@ -78,8 +85,12 @@ export function createMcpServer(): McpServer {
     "lists.list",
     { description: "リスト一覧を取得する", inputSchema: ShowTypeSchema },
     async (input, { authInfo }) => {
-      const result = await api.getLists(getUserId(authInfo), input);
-      return jsonResult(result);
+      return toolResult(() =>
+        operations.lists.list(
+          { userId: getUserId(authInfo), tabId: null },
+          input,
+        ),
+      );
     },
   );
 
@@ -87,10 +98,12 @@ export function createMcpServer(): McpServer {
     "lists.create",
     { description: "新規リストを作成する", inputSchema: CreateListSchema },
     async (input, { authInfo }) => {
-      const userId = getUserId(authInfo);
-      await api.postList(userId, input.title);
-      sendEvent(userId, SSE_EVENTS.listsUpdated, null);
-      return successResult();
+      return toolResult(() =>
+        operations.lists.create(
+          { userId: getUserId(authInfo), tabId: null },
+          input,
+        ),
+      );
     },
   );
 
@@ -98,10 +111,12 @@ export function createMcpServer(): McpServer {
     "lists.rename",
     { description: "リスト名を変更する", inputSchema: UpdateListSchema },
     async (input, { authInfo }) => {
-      const userId = getUserId(authInfo);
-      await api.renameList(userId, input.listId, input.title);
-      sendEvent(userId, SSE_EVENTS.listsUpdated, null);
-      return successResult();
+      return toolResult(() =>
+        operations.lists.rename(
+          { userId: getUserId(authInfo), tabId: null },
+          input,
+        ),
+      );
     },
   );
 
@@ -112,10 +127,12 @@ export function createMcpServer(): McpServer {
       inputSchema: UpdateListSchema.pick({ listId: true }),
     },
     async (input, { authInfo }) => {
-      const userId = getUserId(authInfo);
-      await api.deleteList(userId, input.listId);
-      sendEvent(userId, SSE_EVENTS.listsUpdated, null);
-      return successResult();
+      return toolResult(() =>
+        operations.lists.delete(
+          { userId: getUserId(authInfo), tabId: null },
+          input,
+        ),
+      );
     },
   );
 
@@ -126,10 +143,12 @@ export function createMcpServer(): McpServer {
       inputSchema: UpdateListSchema.pick({ listId: true }),
     },
     async (input, { authInfo }) => {
-      const userId = getUserId(authInfo);
-      await api.archiveList(userId, input.listId);
-      sendEvent(userId, SSE_EVENTS.listsUpdated, null);
-      return successResult();
+      return toolResult(() =>
+        operations.lists.archive(
+          { userId: getUserId(authInfo), tabId: null },
+          input,
+        ),
+      );
     },
   );
 
@@ -140,10 +159,12 @@ export function createMcpServer(): McpServer {
       inputSchema: UpdateListSchema.pick({ listId: true }),
     },
     async (input, { authInfo }) => {
-      const userId = getUserId(authInfo);
-      await api.unarchiveList(userId, input.listId);
-      sendEvent(userId, SSE_EVENTS.listsUpdated, null);
-      return successResult();
+      return toolResult(() =>
+        operations.lists.unarchive(
+          { userId: getUserId(authInfo), tabId: null },
+          input,
+        ),
+      );
     },
   );
 
@@ -154,10 +175,12 @@ export function createMcpServer(): McpServer {
       inputSchema: UpdateListSchema.pick({ listId: true }),
     },
     async (input, { authInfo }) => {
-      const userId = getUserId(authInfo);
-      await api.clearList(userId, input.listId);
-      sendEvent(userId, SSE_EVENTS.tasksUpdated, null);
-      return successResult();
+      return toolResult(() =>
+        operations.lists.clear(
+          { userId: getUserId(authInfo), tabId: null },
+          input,
+        ),
+      );
     },
   );
 
@@ -168,11 +191,12 @@ export function createMcpServer(): McpServer {
       inputSchema: MergeListSchema,
     },
     async (input, { authInfo }) => {
-      const userId = getUserId(authInfo);
-      await api.mergeLists(userId, input.sourceListId, input.targetListId);
-      sendEvent(userId, SSE_EVENTS.listsUpdated, null);
-      sendEvent(userId, SSE_EVENTS.tasksUpdated, null);
-      return successResult();
+      return toolResult(() =>
+        operations.lists.merge(
+          { userId: getUserId(authInfo), tabId: null },
+          input,
+        ),
+      );
     },
   );
 
@@ -184,13 +208,12 @@ export function createMcpServer(): McpServer {
       inputSchema: GetListTasksSchema,
     },
     async (input, { authInfo }) => {
-      const result = await api.getListTasks(
-        getUserId(authInfo),
-        input.listId,
-        input.showType,
-        input.ifModifiedSince,
+      return toolResult(() =>
+        operations.tasks.list(
+          { userId: getUserId(authInfo), tabId: null },
+          input,
+        ),
       );
-      return jsonResult(result);
     },
   );
 
@@ -201,9 +224,12 @@ export function createMcpServer(): McpServer {
       inputSchema: GetActiveTasksSchema,
     },
     async (input, { authInfo }) => {
-      const since = input.since ? new Date(input.since) : undefined;
-      const result = await api.getActiveTasks(getUserId(authInfo), since);
-      return jsonResult(result);
+      return toolResult(() =>
+        operations.tasks.listActive(
+          { userId: getUserId(authInfo), tabId: null },
+          input,
+        ),
+      );
     },
   );
 
@@ -211,16 +237,12 @@ export function createMcpServer(): McpServer {
     "tasks.create",
     { description: "新規タスクを追加する", inputSchema: CreateTaskSchema },
     async (input, { authInfo }) => {
-      const userId = getUserId(authInfo);
-      const taskId = await api.postTask(
-        userId,
-        input.listId,
-        input.text,
-        input.tags,
-        input.kind,
+      return toolResult(() =>
+        operations.tasks.create(
+          { userId: getUserId(authInfo), tabId: null },
+          input,
+        ),
       );
-      sendEvent(userId, SSE_EVENTS.tasksUpdated, null);
-      return jsonResult({ success: true, taskId });
     },
   );
 
@@ -231,11 +253,12 @@ export function createMcpServer(): McpServer {
       inputSchema: UpdateTaskSchema,
     },
     async (input, { authInfo }) => {
-      const userId = getUserId(authInfo);
-      const { listId, taskId, ...data } = input;
-      await api.patchTask(userId, listId, taskId, data);
-      sendEvent(userId, SSE_EVENTS.tasksUpdated, null);
-      return successResult();
+      return toolResult(() =>
+        operations.tasks.update(
+          { userId: getUserId(authInfo), tabId: null },
+          input,
+        ),
+      );
     },
   );
 
@@ -247,12 +270,12 @@ export function createMcpServer(): McpServer {
       inputSchema: SearchTasksSchema,
     },
     async (input, { authInfo }) => {
-      const result = await api.searchTasks(
-        getUserId(authInfo),
-        input.query,
-        input.showType,
+      return toolResult(() =>
+        operations.tasks.search(
+          { userId: getUserId(authInfo), tabId: null },
+          input,
+        ),
       );
-      return jsonResult(result);
     },
   );
 
@@ -263,10 +286,12 @@ export function createMcpServer(): McpServer {
       inputSchema: ReorderTasksSchema,
     },
     async (input, { authInfo }) => {
-      const userId = getUserId(authInfo);
-      await api.reorderTasks(userId, input.listId, input.taskIds);
-      sendEvent(userId, SSE_EVENTS.tasksUpdated, null);
-      return successResult();
+      return toolResult(() =>
+        operations.tasks.reorder(
+          { userId: getUserId(authInfo), tabId: null },
+          input,
+        ),
+      );
     },
   );
 
@@ -275,8 +300,12 @@ export function createMcpServer(): McpServer {
     "timers.list",
     { description: "タイマー一覧を取得する", inputSchema: z.object({}) },
     async (_input, { authInfo }) => {
-      const result = await api.getTimers(getUserId(authInfo));
-      return jsonResult(result);
+      return toolResult(() =>
+        operations.timers.list({
+          userId: getUserId(authInfo),
+          tabId: null,
+        }),
+      );
     },
   );
 
@@ -284,20 +313,12 @@ export function createMcpServer(): McpServer {
     "timers.create",
     { description: "タイマーを新規作成する", inputSchema: CreateTimerSchema },
     async (input, { authInfo }) => {
-      const userId = getUserId(authInfo);
-      await api.createTimer({
-        userId,
-        name: input.name,
-        baseSeconds: input.base_seconds,
-        adjustMinutes: input.adjust_minutes,
-        mode: input.mode,
-        targetMinutes: input.target_minutes ?? null,
-        tzOffsetMinutes: input.tz_offset_minutes ?? null,
-        ephemeral: input.ephemeral,
-        ringSeconds: input.ring_seconds,
-      });
-      sendEvent(userId, SSE_EVENTS.timersUpdated, null);
-      return successResult();
+      return toolResult(() =>
+        operations.timers.create(
+          { userId: getUserId(authInfo), tabId: null },
+          input,
+        ),
+      );
     },
   );
 
@@ -305,11 +326,12 @@ export function createMcpServer(): McpServer {
     "timers.update",
     { description: "タイマー設定を更新する", inputSchema: UpdateTimerSchema },
     async (input, { authInfo }) => {
-      const userId = getUserId(authInfo);
-      const { timerId, ...data } = input;
-      await api.updateTimer(userId, timerId, data);
-      sendEvent(userId, SSE_EVENTS.timersUpdated, null);
-      return successResult();
+      return toolResult(() =>
+        operations.timers.update(
+          { userId: getUserId(authInfo), tabId: null },
+          input,
+        ),
+      );
     },
   );
 
@@ -317,10 +339,12 @@ export function createMcpServer(): McpServer {
     "timers.delete",
     { description: "タイマーを削除する", inputSchema: TimerIdSchema },
     async (input, { authInfo }) => {
-      const userId = getUserId(authInfo);
-      await api.deleteTimer(userId, input.timerId);
-      sendEvent(userId, SSE_EVENTS.timersUpdated, null);
-      return successResult();
+      return toolResult(() =>
+        operations.timers.delete(
+          { userId: getUserId(authInfo), tabId: null },
+          input,
+        ),
+      );
     },
   );
 
@@ -332,10 +356,12 @@ export function createMcpServer(): McpServer {
       inputSchema: StartTimerSchema,
     },
     async (input, { authInfo }) => {
-      const userId = getUserId(authInfo);
-      await api.startTimer(userId, input.timerId, input.tz_offset_minutes);
-      sendEvent(userId, SSE_EVENTS.timersUpdated, null);
-      return successResult();
+      return toolResult(() =>
+        operations.timers.start(
+          { userId: getUserId(authInfo), tabId: null },
+          input,
+        ),
+      );
     },
   );
 
@@ -343,10 +369,12 @@ export function createMcpServer(): McpServer {
     "timers.pause",
     { description: "実行中タイマーを一時停止する", inputSchema: TimerIdSchema },
     async (input, { authInfo }) => {
-      const userId = getUserId(authInfo);
-      await api.pauseTimer(userId, input.timerId);
-      sendEvent(userId, SSE_EVENTS.timersUpdated, null);
-      return successResult();
+      return toolResult(() =>
+        operations.timers.pause(
+          { userId: getUserId(authInfo), tabId: null },
+          input,
+        ),
+      );
     },
   );
 
@@ -357,10 +385,12 @@ export function createMcpServer(): McpServer {
       inputSchema: ResetTimerSchema,
     },
     async (input, { authInfo }) => {
-      const userId = getUserId(authInfo);
-      await api.resetTimer(userId, input.timerId, input.tz_offset_minutes);
-      sendEvent(userId, SSE_EVENTS.timersUpdated, null);
-      return successResult();
+      return toolResult(() =>
+        operations.timers.reset(
+          { userId: getUserId(authInfo), tabId: null },
+          input,
+        ),
+      );
     },
   );
 
@@ -371,10 +401,12 @@ export function createMcpServer(): McpServer {
       inputSchema: AdjustTimerSchema,
     },
     async (input, { authInfo }) => {
-      const userId = getUserId(authInfo);
-      await api.adjustTimer(userId, input.timerId, input.minutes);
-      sendEvent(userId, SSE_EVENTS.timersUpdated, null);
-      return successResult();
+      return toolResult(() =>
+        operations.timers.adjust(
+          { userId: getUserId(authInfo), tabId: null },
+          input,
+        ),
+      );
     },
   );
 
@@ -385,30 +417,28 @@ export function createMcpServer(): McpServer {
       inputSchema: SetTimerTimeSchema,
     },
     async (input, { authInfo }) => {
-      const userId = getUserId(authInfo);
-      await api.setTimerTime(
-        userId,
-        input.timerId,
-        input.seconds,
-        input.target_minutes,
-        input.tz_offset_minutes,
+      return toolResult(() =>
+        operations.timers.setTime(
+          { userId: getUserId(authInfo), tabId: null },
+          input,
+        ),
       );
-      sendEvent(userId, SSE_EVENTS.timersUpdated, null);
-      return successResult();
     },
   );
 
   server.registerTool(
     "timers.stop",
     {
-      description: "鳴っているタイマーを止める（started_at の不変条件を確認）",
+      description: "鳴っているタイマーを止める（startedAt の不変条件を確認）",
       inputSchema: TimerStopSchema,
     },
     async (input, { authInfo }) => {
-      const userId = getUserId(authInfo);
-      await api.stopTimer(userId, input.timerId, input.started_at);
-      sendEvent(userId, SSE_EVENTS.timersUpdated, null);
-      return successResult();
+      return toolResult(() =>
+        operations.timers.stop(
+          { userId: getUserId(authInfo), tabId: null },
+          input,
+        ),
+      );
     },
   );
 
@@ -419,10 +449,12 @@ export function createMcpServer(): McpServer {
       inputSchema: ReorderTimersSchema,
     },
     async (input, { authInfo }) => {
-      const userId = getUserId(authInfo);
-      await api.reorderTimers(userId, input.timerIds);
-      sendEvent(userId, SSE_EVENTS.timersUpdated, null);
-      return successResult();
+      return toolResult(() =>
+        operations.timers.reorder(
+          { userId: getUserId(authInfo), tabId: null },
+          input,
+        ),
+      );
     },
   );
 
@@ -431,15 +463,16 @@ export function createMcpServer(): McpServer {
     "calories.summary",
     {
       description:
-        "カロリーの集計（1日当たりペース・7日間平均・28日間平均・達成状況）を取得する（tz_offset_minutes はUTCからの時差の分数で、日本時間は540）",
-      inputSchema: CalorieSummaryInputSchema,
+        "カロリーの集計（1日当たりペース・7日間平均・28日間平均・達成状況）を取得する（tzOffsetMinutes はUTCからの時差の分数で、日本時間は540）",
+      inputSchema: GetCalorieSummarySchema,
     },
     async (input, { authInfo }) => {
-      const result = await api.getCalorieSummary(
-        getUserId(authInfo),
-        input.tz_offset_minutes,
+      return toolResult(() =>
+        operations.calories.summary(
+          { userId: getUserId(authInfo), tabId: null },
+          input,
+        ),
       );
-      return jsonResult(result);
     },
   );
 
@@ -447,12 +480,16 @@ export function createMcpServer(): McpServer {
     "calories.listRecords",
     {
       description:
-        "カロリーの摂取記録を30日単位で新しい順に取得する（window_offset は0で今日までの30日、1でその前の30日。tz_offset_minutes はUTCからの時差の分数で、日本時間は540。品目表へ登録しない一時項目の記録は temporary が true で、quantity がkcal）",
+        "カロリーの摂取記録を30日単位で新しい順に取得する（windowOffset は0で今日までの30日、1でその前の30日。tzOffsetMinutes はUTCからの時差の分数で、日本時間は540。品目表へ登録しない一時項目の記録は temporary が true で、quantity がkcal）",
       inputSchema: ListCalorieRecordsSchema,
     },
     async (input, { authInfo }) => {
-      const result = await api.getCalorieRecords(getUserId(authInfo), input);
-      return jsonResult(result);
+      return toolResult(() =>
+        operations.calories.records(
+          { userId: getUserId(authInfo), tabId: null },
+          input,
+        ),
+      );
     },
   );
 
@@ -463,8 +500,12 @@ export function createMcpServer(): McpServer {
       inputSchema: z.object({}),
     },
     async (_input, { authInfo }) => {
-      const result = await api.getCalorieItems(getUserId(authInfo));
-      return jsonResult(result);
+      return toolResult(() =>
+        operations.calories.items({
+          userId: getUserId(authInfo),
+          tabId: null,
+        }),
+      );
     },
   );
 
@@ -476,8 +517,12 @@ export function createMcpServer(): McpServer {
       inputSchema: z.object({}),
     },
     async (_input, { authInfo }) => {
-      const result = await api.getUserPreferences(getUserId(authInfo));
-      return jsonResult(result);
+      return toolResult(() =>
+        operations.users.getPreferences({
+          userId: getUserId(authInfo),
+          tabId: null,
+        }),
+      );
     },
   );
 
@@ -489,10 +534,12 @@ export function createMcpServer(): McpServer {
       inputSchema: UserPreferencesSchema,
     },
     async (input, { authInfo }) => {
-      const userId = getUserId(authInfo);
-      await api.updateUserPreferences(userId, input);
-      sendEvent(userId, SSE_EVENTS.usersPreferencesUpdated, null);
-      return successResult();
+      return toolResult(() =>
+        operations.users.updatePreferences(
+          { userId: getUserId(authInfo), tabId: null },
+          input,
+        ),
+      );
     },
   );
 

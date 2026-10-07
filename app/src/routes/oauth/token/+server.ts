@@ -6,7 +6,10 @@
  */
 
 import { json } from "@sveltejs/kit";
-import { consumeAuthorizationCode, getClient } from "#lib/server/mcp/store.ts";
+import { errorResponse } from "#lib/server/mcp/oauth-response.ts";
+import { authenticateClient } from "#lib/server/mcp/client-auth.ts";
+import { OAUTH_GRANTS } from "#lib/server/mcp/oauth-config.ts";
+import { consumeAuthorizationCode } from "#lib/server/mcp/store.ts";
 import {
   createAccessToken,
   createRefreshToken,
@@ -16,41 +19,12 @@ import {
 } from "#lib/server/mcp/oauth.ts";
 import type { RequestHandler } from "./$types";
 
-function errorResponse(
-  code: string,
-  description: string,
-  status = 400,
-): Response {
-  return json({ error: code, error_description: description }, { status });
-}
-
-function extractClientCredentials(
-  request: Request,
-  form: FormData,
-): { clientId: string; clientSecret: string | null } | null {
-  const authHeader = request.headers.get("authorization");
-  if (authHeader?.startsWith("Basic ")) {
-    const decoded = atob(authHeader.slice(6));
-    const idx = decoded.indexOf(":");
-    if (idx < 0) return null;
-    return {
-      clientId: decodeURIComponent(decoded.slice(0, idx)),
-      clientSecret: decodeURIComponent(decoded.slice(idx + 1)),
-    };
-  }
-  const clientId = form.get("client_id");
-  if (typeof clientId !== "string" || !clientId) return null;
-  const clientSecret = form.get("client_secret");
-  return {
-    clientId,
-    clientSecret: typeof clientSecret === "string" ? clientSecret : null,
-  };
-}
-
 async function handleAuthorizationCode(
   request: Request,
   form: FormData,
 ): Promise<Response> {
+  const credentials = authenticateClient(request, form);
+  if (credentials instanceof Response) return credentials;
   const code = form.get("code");
   const redirectUri = form.get("redirect_uri");
   const codeVerifier = form.get("code_verifier");
@@ -61,17 +35,7 @@ async function handleAuthorizationCode(
   ) {
     return errorResponse("invalid_request", "missing fields");
   }
-  const credentials = extractClientCredentials(request, form);
-  if (!credentials)
-    return errorResponse("invalid_client", "client_id required");
 
-  const client = getClient(credentials.clientId);
-  if (!client) return errorResponse("invalid_client", "unknown client", 401);
-  if (client.client_secret) {
-    if (credentials.clientSecret !== client.client_secret) {
-      return errorResponse("invalid_client", "secret mismatch", 401);
-    }
-  }
   const record = consumeAuthorizationCode(code);
   if (!record) return errorResponse("invalid_grant", "code unknown or expired");
   if (record.client_id !== credentials.clientId) {
@@ -112,25 +76,17 @@ async function handleRefreshToken(
   request: Request,
   form: FormData,
 ): Promise<Response> {
+  const credentials = authenticateClient(request, form);
+  if (credentials instanceof Response) return credentials;
   const refreshToken = form.get("refresh_token");
   if (typeof refreshToken !== "string") {
     return errorResponse("invalid_request", "refresh_token required");
   }
-  const credentials = extractClientCredentials(request, form);
-  if (!credentials)
-    return errorResponse("invalid_client", "client_id required");
 
   const payload = await verifyRefreshToken(refreshToken);
   if (!payload) return errorResponse("invalid_grant", "refresh token invalid");
   if (payload.clientId !== credentials.clientId) {
     return errorResponse("invalid_grant", "client mismatch");
-  }
-  const client = getClient(credentials.clientId);
-  if (!client) return errorResponse("invalid_client", "unknown client", 401);
-  if (client.client_secret) {
-    if (credentials.clientSecret !== client.client_secret) {
-      return errorResponse("invalid_client", "secret mismatch", 401);
-    }
   }
   const accessToken = await createAccessToken({
     userId: payload.userId,
@@ -153,10 +109,10 @@ export const POST: RequestHandler = async ({ request }) => {
     return errorResponse("invalid_request", "form parse failed");
   }
   const grantType = form.get("grant_type");
-  if (grantType === "authorization_code") {
+  if (grantType === OAUTH_GRANTS.authorizationCode) {
     return handleAuthorizationCode(request, form);
   }
-  if (grantType === "refresh_token") {
+  if (grantType === OAUTH_GRANTS.refreshToken) {
     return handleRefreshToken(request, form);
   }
   return errorResponse(
