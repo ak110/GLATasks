@@ -2,11 +2,18 @@
  * @fileoverview 狭い画面で長い名前と共通ヘッダーの操作が画面内に収まることの回帰テスト
  */
 
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import {
+  expect,
+  test,
+  type Locator,
+  type Page,
+  type Route,
+} from "@playwright/test";
 
 import {
   cleanupTestList,
   createListFromPage,
+  makeContextOptions,
   requireBoundingBox,
   uniqueTestName,
 } from "./helpers/common";
@@ -116,6 +123,42 @@ test.describe("狭い画面の共通ヘッダー", () => {
     }
   });
 
+  test("読み込み中の表示があってもヘッダーの操作が画面内で操作できる", async ({
+    browser,
+  }) => {
+    // サービスワーカー経由の要求はpage.routeで止められないため、この検証では無効にする
+    const ctx = await browser.newContext(
+      makeContextOptions({ serviceWorkers: "block", viewport: NARROW }),
+    );
+    try {
+      const page = await ctx.newPage();
+      for (const name of ["tasks", "timers", "calories"] as const) {
+        // tRPCの応答を保留し、読み込み中の表示がヘッダーへ並ぶ状態にする
+        let release: () => void = () => {};
+        const blocked = new Promise<void>((resolve) => {
+          release = resolve;
+        });
+        const handler = async (route: Route) => {
+          await blocked;
+          await route.continue();
+        };
+        await page.route("**/api/trpc/**", handler);
+        await page.goto(name === "tasks" ? "/" : `/${name}`);
+        await expect(page.locator("header"), name).toContainText(
+          "読み込み中...",
+        );
+        await expectHeaderActionsReachable(page, name);
+        release();
+        await page.unrouteAll({ behavior: "ignoreErrors" });
+        await expect(page.locator("header"), name).not.toContainText(
+          "読み込み中...",
+        );
+      }
+    } finally {
+      await ctx.close();
+    }
+  });
+
   test("タスク画面の検索と表示切替がどの状態でも画面内で操作できる", async ({
     page,
   }) => {
@@ -164,6 +207,11 @@ test.describe("狭い画面の長い名前", () => {
       { name: longName("alarm"), ephemeral: false, alarm: true },
       { name: longName("eph-countdown"), ephemeral: true, alarm: false },
       { name: longName("eph-alarm"), ephemeral: true, alarm: true },
+      {
+        name: `https://example.com/${uniqueTestName("url")}/${"a".repeat(60)}`,
+        ephemeral: false,
+        alarm: false,
+      },
       {
         name: `日本語の通常の名前_${uniqueTestName("ja")}`,
         ephemeral: false,
