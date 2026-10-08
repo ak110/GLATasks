@@ -5,7 +5,12 @@
 
     import type { ActionData, PageData } from "./$types";
 
-    const { data, form }: { data: PageData; form: ActionData } = $props();
+    interface Props {
+        data: PageData;
+        form: ActionData;
+    }
+
+    let { data, form }: Props = $props();
     const defaultText = $derived(
         [data.title, data.text, data.pageUrl].filter(Boolean).join("\n\n"),
     );

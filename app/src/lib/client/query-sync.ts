@@ -8,7 +8,7 @@ export const eventQueryKeys: Record<
   SseEventName | "connected" | "heartbeat",
   readonly QueryKey[]
 > = {
-  [SSE_EVENTS.listsUpdated]: [queryKeys.lists],
+  [SSE_EVENTS.listsUpdated]: [queryKeys.lists, queryKeys.search],
   [SSE_EVENTS.tasksUpdated]: [
     queryKeys.activeTasks,
     queryKeys.tasks,

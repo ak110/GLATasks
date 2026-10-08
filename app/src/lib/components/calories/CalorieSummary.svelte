@@ -1,16 +1,17 @@
 <script lang="ts">
+    import type { RouterInputs, RouterOutputs } from "#lib/client/trpc.ts";
     import { grayButtonClass } from "#lib/components/ui/styles.ts";
-    type Period = {
-        days: 1 | 7 | 28;
-        daily_kcal: number;
-        percentage: number;
-    };
+    type Period = RouterOutputs["calories"]["summary"]["periods"][number];
 
-    type Props = {
+    interface Props {
         periods: Period[];
         goalKcal: number;
-        onSaveGoal: (goalKcal: number) => unknown;
-    };
+        onSaveGoal: (
+            goalKcal: NonNullable<
+                RouterInputs["users"]["updatePreferences"]["calorieGoalKcal"]
+            >,
+        ) => unknown;
+    }
 
     let { periods, goalKcal, onSaveGoal }: Props = $props();
 
@@ -27,7 +28,7 @@
     // 数値だけを強調するため、前後の文言と数値を分けて持つ
     const remaining = $derived.by(() => {
         if (!dailyPeriod) return undefined;
-        const value = goalKcal - dailyPeriod.daily_kcal;
+        const value = goalKcal - dailyPeriod.dailyKcal;
         return {
             prefix: value >= 0 ? "あと " : "",
             value: Math.abs(value).toLocaleString("ja-JP"),
@@ -109,7 +110,7 @@
     <div class="grid gap-3 md:grid-cols-2">
         {#if dailyPeriod && remaining}
             <article
-                class={`flex items-center gap-4 rounded border p-4 ${paceColorClass(dailyPeriod.daily_kcal)}`}
+                class={`flex items-center gap-4 rounded border p-4 ${paceColorClass(dailyPeriod.dailyKcal)}`}
                 data-testid="calorie-summary-1"
             >
                 <!-- 円周を100とし、目標比の分だけ円弧を伸ばす。目標を超えたら全周を塗る -->
@@ -150,7 +151,7 @@
                             class="text-xl font-bold"
                             data-testid="calorie-summary-pace"
                         >
-                            {dailyPeriod.daily_kcal.toLocaleString("ja-JP")}
+                            {dailyPeriod.dailyKcal.toLocaleString("ja-JP")}
                             <span class="text-base font-normal"
                                 >kcal ({dailyPeriod.percentage.toFixed(
                                     1,
@@ -174,14 +175,14 @@
         <div class="grid content-center gap-3">
             {#each averagePeriods as period (period.days)}
                 <article
-                    class={`flex flex-wrap items-baseline justify-between gap-2 rounded border p-4 ${averageColorClass(period.daily_kcal)}`}
+                    class={`flex flex-wrap items-baseline justify-between gap-2 rounded border p-4 ${averageColorClass(period.dailyKcal)}`}
                     data-testid={`calorie-summary-${period.days}`}
                 >
                     <h3 class="text-sm font-semibold">
                         {periodLabels[period.days]}
                     </h3>
                     <p class="text-xl font-bold">
-                        {period.daily_kcal.toLocaleString("ja-JP")}
+                        {period.dailyKcal.toLocaleString("ja-JP")}
                         <span class="text-base font-normal"
                             >kcal ({period.percentage.toFixed(1)}%)</span
                         >

@@ -2,6 +2,7 @@
 
 import { createHash, randomBytes } from "node:crypto";
 import { expect, test, type APIRequestContext } from "@playwright/test";
+import { BASE_URL } from "./helpers/common";
 
 test("OAuth登録から認可とトークン交換を経てMCPへ接続できる", async ({
   page,
@@ -110,8 +111,10 @@ test("OAuth登録から認可とトークン交換を経てMCPへ接続できる
   expect(await initialized.text()).toContain("result");
 });
 
-async function authorizationRequest(request: APIRequestContext) {
-  const redirectUri = "https://client.example/callback";
+async function authorizationRequest(
+  request: APIRequestContext,
+  redirectUri = "https://client.example/callback",
+) {
   const response = await request.post("/oauth/register", {
     data: { redirect_uris: [redirectUri], token_endpoint_auth_method: "none" },
   });
@@ -130,14 +133,21 @@ async function authorizationRequest(request: APIRequestContext) {
 test("OAuth認可の拒否は登録した戻り先へstateとaccess_deniedを返す", async ({
   page,
 }) => {
-  const query = await authorizationRequest(page.request);
-  await page.route("https://client.example/callback**", (route) =>
-    route.fulfill({ status: 200, body: "認可結果" }),
-  );
+  // HTTPリダイレクトの後続要求はrouteで捕捉されないため、実在する戻り先を登録する。
+  const redirectUri = new URL("/?oauth-callback=e2e", BASE_URL);
+  const query = await authorizationRequest(page.request, redirectUri.href);
   await page.goto(`/oauth/authorize?${query}`);
   await page.getByTestId("oauth-deny").click();
-  await page.waitForURL("https://client.example/callback**");
+  await page.waitForURL(
+    (url) =>
+      url.origin === redirectUri.origin &&
+      url.pathname === redirectUri.pathname &&
+      url.searchParams.get("oauth-callback") === "e2e" &&
+      url.searchParams.get("error") === "access_denied",
+  );
   const callback = new URL(page.url());
+  expect(callback.origin).toBe(redirectUri.origin);
+  expect(callback.pathname).toBe(redirectUri.pathname);
   expect(callback.searchParams.get("error")).toBe("access_denied");
   expect(callback.searchParams.get("state")).toBe(query.get("state"));
   expect(callback.searchParams.has("code")).toBe(false);

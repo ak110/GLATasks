@@ -6,7 +6,12 @@
      */
 
     import type { AttachmentMeta, TagInfo } from "#lib/types.ts";
-    import { trpc } from "#lib/client/trpc.ts";
+    import type { TaskEditSubmission } from "#lib/client/tasks/task-form-types.ts";
+    import {
+        trpc,
+        type RouterInputs,
+        type RouterOutputs,
+    } from "#lib/client/trpc.ts";
     import { showErrorToast } from "#lib/client/ui/toast-store.svelte.ts";
     import { extractErrorMessage } from "#lib/client/ui/extract-error-message.ts";
     import {
@@ -20,28 +25,21 @@
     import AttachmentPicker from "./AttachmentPicker.svelte";
     import ConfirmDialog from "#lib/components/dialogs/ConfirmDialog.svelte";
 
-    type Props = {
+    interface Props {
         open: boolean;
         text: string;
         moveTo: string;
         completed: boolean;
         tags: TagInfo[];
-        kind: "normal" | "todo";
+        kind: TaskEditSubmission["kind"];
         listTagCandidates: TagInfo[];
-        lists: Array<{ id: number; title: string }>;
+        lists: Pick<RouterOutputs["lists"]["list"][number], "id" | "title">[];
         taskId: number;
         attachments: AttachmentMeta[];
         onAttachmentChange: () => void;
-        onSubmit: (data: {
-            text: string;
-            moveTo: string;
-            completed: boolean;
-            tags: TagInfo[];
-            kind: "normal" | "todo";
-            closeAfter: boolean;
-        }) => void;
+        onSubmit: (data: TaskEditSubmission) => void;
         onClose: () => void;
-    };
+    }
 
     let {
         open,
@@ -63,7 +61,7 @@
     let localMoveTo = $state("");
     let localCompleted = $state(false);
     let localTags = $state<TagInfo[]>([]);
-    let localKind = $state<"normal" | "todo">("normal");
+    let localKind = $state<TaskEditSubmission["kind"]>("normal");
     let textareaEl = $state<HTMLTextAreaElement | null>(null);
     // 未保存変更がある状態で閉じようとしたときの確認ダイアログ
     let confirmCloseOpen = $state(false);
@@ -78,7 +76,7 @@
     let baselineCompleted = $state(false);
     // タグは順序込みで比較したいため JSON 文字列化して扱う
     let baselineTagsKey = $state("[]");
-    let baselineKind = $state<"normal" | "todo">("normal");
+    let baselineKind = $state<TaskEditSubmission["kind"]>("normal");
 
     // 添付一覧はダイアログ内の編集状態として保持し、追加・削除の更新処理成功後に
     // onAttachmentChange 経由で親側キャッシュが更新され次第、プロパティ経由で反映する
@@ -128,7 +126,7 @@
         // - 「保存」（closeAfter=false）: 編集続行用。同一リスト内編集では並び順を維持する
         // - 「保存して閉じる」（closeAfter=true）: 同一リスト内編集では並び順を更新して閉じる
         // リスト変更を伴う場合は両ボタンとも移動先リストの先頭へ配置される（サーバー仕様）。
-        // keep_order の値は呼び出し側で closeAfter から決定する
+        // keepOrder の値は呼び出し側で closeAfter から決定する
         onSubmit({
             text: localText,
             moveTo: localMoveTo,
@@ -156,7 +154,9 @@
         void uploadFiles(files);
     }
 
-    async function handleDeleteAttachment(attachmentId: number) {
+    async function handleDeleteAttachment(
+        attachmentId: RouterInputs["attachments"]["delete"]["attachmentId"],
+    ) {
         try {
             await trpc.attachments.delete.mutate({ attachmentId });
             onAttachmentChange();

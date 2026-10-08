@@ -15,12 +15,12 @@ export function calcTimerRemainingMs(
   timer: TimerInfo,
   offsetMs: number,
 ): number {
-  if (!timer.running || !timer.started_at) {
-    return timer.remaining_seconds * 1000;
+  if (!timer.running || !timer.startedAt) {
+    return timer.remainingSeconds * 1000;
   }
-  const startedAtMs = new Date(timer.started_at).getTime();
+  const startedAtMs = new Date(timer.startedAt).getTime();
   const elapsedMs = Date.now() + offsetMs - startedAtMs;
-  return Math.max(0, timer.remaining_seconds * 1000 - elapsedMs);
+  return Math.max(0, timer.remainingSeconds * 1000 - elapsedMs);
 }
 
 /** 秒数を HH:MM:SS 形式にフォーマットする */
@@ -31,14 +31,14 @@ export function formatTime(totalSeconds: number): string {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
-/** target_minutes を "HH:MM" 形式にフォーマットする */
+/** targetMinutes を "HH:MM" 形式にフォーマットする */
 export function formatTargetTime(targetMinutes: number): string {
   const h = Math.floor(targetMinutes / 60);
   const m = targetMinutes % 60;
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
-/** "HH:MM" 形式を target_minutes (0-1439) にパースする */
+/** "HH:MM" 形式を targetMinutes (0-1439) にパースする */
 export function parseTargetTime(input: string): number | null {
   const trimmed = input.trim();
   const match = trimmed.match(/^(\d{1,2}):(\d{2})$/);

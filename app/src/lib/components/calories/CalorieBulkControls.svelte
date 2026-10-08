@@ -1,32 +1,29 @@
 <script lang="ts">
+    import type { RouterInputs, RouterOutputs } from "#lib/client/trpc.ts";
     import { inputClass } from "#lib/components/ui/styles.ts";
-    import { getTimezoneOffsetMinutes } from "#lib/date-time.ts";
+    import { getUtcOffsetMinutes } from "#lib/date-time.ts";
     /**
      * @fileoverview 期間を指定したカロリー記録の一括追加と一括削除
      */
 
     import ConfirmDialog from "#lib/components/dialogs/ConfirmDialog.svelte";
 
-    type Item = { id: number; name: string };
-    type BulkCreateInput = {
-        start_date: string;
-        end_date: string;
-        time_of_day: string;
-        item_id: number;
-        quantity: number;
-        tz_offset_minutes: number;
-    };
-    type BulkDeleteInput = {
-        start_date: string;
-        end_date: string;
-        item_id: number;
-        tz_offset_minutes: number;
-    };
-    type Props = {
+    type Item = Pick<RouterOutputs["calories"]["items"][number], "id" | "name">;
+    type BulkCreateInput = RouterInputs["calories"]["bulkCreateRecords"];
+    type BulkDeleteInput = RouterInputs["calories"]["bulkDeleteRecords"];
+    interface Props {
         items: Item[];
-        onBulkCreate: (input: BulkCreateInput) => Promise<{ added: number }>;
-        onBulkDelete: (input: BulkDeleteInput) => Promise<{ deleted: number }>;
-    };
+        onBulkCreate: (
+            input: BulkCreateInput,
+        ) => Promise<
+            Pick<RouterOutputs["calories"]["bulkCreateRecords"], "added">
+        >;
+        onBulkDelete: (
+            input: BulkDeleteInput,
+        ) => Promise<
+            Pick<RouterOutputs["calories"]["bulkDeleteRecords"], "deleted">
+        >;
+    }
 
     let { items, onBulkCreate, onBulkDelete }: Props = $props();
     let createStart = $state("");
@@ -55,12 +52,12 @@
         const quantity = Number(createQuantity);
         if (!item || !Number.isInteger(quantity) || quantity < 0) return;
         const result = await onBulkCreate({
-            start_date: toApiDate(createStart),
-            end_date: toApiDate(createEnd),
-            time_of_day: createTime,
-            item_id: item.id,
+            startDate: toApiDate(createStart),
+            endDate: toApiDate(createEnd),
+            timeOfDay: createTime,
+            itemId: item.id,
             quantity,
-            tz_offset_minutes: getTimezoneOffsetMinutes(),
+            tzOffsetMinutes: getUtcOffsetMinutes(),
         });
         statusMessage = `${result.added}件の記録を追加しました`;
     }
@@ -70,10 +67,10 @@
         const item = findItem(deleteItemName);
         if (!item) return;
         pendingDelete = {
-            start_date: toApiDate(deleteStart),
-            end_date: toApiDate(deleteEnd),
-            item_id: item.id,
-            tz_offset_minutes: getTimezoneOffsetMinutes(),
+            startDate: toApiDate(deleteStart),
+            endDate: toApiDate(deleteEnd),
+            itemId: item.id,
+            tzOffsetMinutes: getUtcOffsetMinutes(),
         };
     }
 
@@ -225,7 +222,7 @@
     open={pendingDelete !== undefined}
     title="記録の一括削除"
     message={pendingDelete
-        ? `${pendingDelete.start_date}から${pendingDelete.end_date}までの「${deleteItemName}」の記録を削除しますか？`
+        ? `${pendingDelete.startDate}から${pendingDelete.endDate}までの「${deleteItemName}」の記録を削除しますか？`
         : ""}
     confirmLabel="削除"
     variant="danger"

@@ -57,8 +57,3 @@ export const DeleteScheduleSchema = z.object({
 export const ListSchedulesSchema = z.object({
   listId: z.number().int().positive(),
 });
-
-export type CreateScheduleInput = z.infer<typeof CreateScheduleSchema>;
-export type UpdateScheduleInput = z.infer<typeof UpdateScheduleSchema>;
-export type DeleteScheduleInput = z.infer<typeof DeleteScheduleSchema>;
-export type ListSchedulesInput = z.infer<typeof ListSchedulesSchema>;

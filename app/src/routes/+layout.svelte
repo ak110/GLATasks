@@ -31,8 +31,12 @@
     import { updated } from "$app/state";
     import type { LayoutData } from "./$types";
 
-    const { children, data }: { children: Snippet; data: LayoutData } =
-        $props();
+    interface Props {
+        children: Snippet;
+        data: LayoutData;
+    }
+
+    let { children, data }: Props = $props();
 
     let theme = $state<Theme>("system");
 

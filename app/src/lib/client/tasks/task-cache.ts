@@ -6,9 +6,8 @@ import type { GetActiveTasksResult, TaskListItem } from "#lib/types.ts";
 import { matchesShowType } from "#lib/show-type.ts";
 
 /** 全アクティブタスクキャッシュ */
-export type ActiveTasksCache = {
+export type ActiveTasksCache = Pick<GetActiveTasksResult, "serverTime"> & {
   tasks: TaskListItem[];
-  serverTime: string;
 };
 
 /**
@@ -71,13 +70,13 @@ export function mergeActiveTasks(
 }
 
 /**
- * タスク配列を sort_order 昇順（同値は id 昇順）で並べ替えて返す純関数。
+ * タスク配列を sortOrder 昇順（同値は id 昇順）で並べ替えて返す純関数。
  *
  * リスト単位フィルタ後にこの関数で並べることで決定論的な表示順を保証する。
  */
 export function sortByTaskOrder(tasks: TaskListItem[]): TaskListItem[] {
   return [...tasks].sort((a, b) => {
-    if (a.sort_order !== b.sort_order) return a.sort_order - b.sort_order;
+    if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
     return a.id - b.id;
   });
 }

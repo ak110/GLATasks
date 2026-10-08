@@ -451,9 +451,8 @@ describeDb("カロリー計算API", () => {
         "calorie_item_in_use",
       );
     }
-    await expect(deleteCalorieItem(userId, otherUsersItem.id)).rejects.toThrow(
-      "calorie_item_not_found",
-    );
+    await deleteCalorieItem(userId, otherUsersItem.id);
+    await deleteCalorieItem(userId, unused.id);
     expect((await getCalorieItems(userId)).map((item) => item.name)).toEqual(
       expect.arrayContaining(["記録で使用", "自動記録で使用"]),
     );

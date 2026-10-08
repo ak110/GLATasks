@@ -16,7 +16,7 @@
         createMutation,
         useQueryClient,
     } from "@tanstack/svelte-query";
-    import { trpc } from "#lib/client/trpc.ts";
+    import { trpc, type RouterInputs } from "#lib/client/trpc.ts";
     import type { TagInfo, ScheduleInfo } from "#lib/types.ts";
     import { showErrorToast } from "#lib/client/ui/toast-store.svelte.ts";
     import { extractErrorMessage } from "#lib/client/ui/extract-error-message.ts";
@@ -25,11 +25,11 @@
     import RecurrenceEditor from "./RecurrenceEditor.svelte";
     import ScheduleList from "./ScheduleList.svelte";
 
-    type Props = {
+    interface Props {
         open: boolean;
         listId: number | null;
         onClose: () => void;
-    };
+    }
 
     let { open, listId, onClose }: Props = $props();
 
@@ -53,29 +53,21 @@
     }
 
     const createMut = createMutation(() => ({
-        mutationFn: (input: {
-            listId: number;
-            title: string;
-            tags: TagInfo[];
-            rrule: string;
-        }) => trpc.schedules.create.mutate(input),
+        mutationFn: (input: RouterInputs["schedules"]["create"]) =>
+            trpc.schedules.create.mutate(input),
         onSuccess: invalidate,
     }));
 
     const updateMut = createMutation(() => ({
-        mutationFn: (input: {
-            scheduleId: number;
-            title?: string;
-            tags?: TagInfo[];
-            rrule?: string;
-            enabled?: boolean;
-        }) => trpc.schedules.update.mutate(input),
+        mutationFn: (input: RouterInputs["schedules"]["update"]) =>
+            trpc.schedules.update.mutate(input),
         onSuccess: invalidate,
     }));
 
     const deleteMut = createMutation(() => ({
-        mutationFn: (scheduleId: number) =>
-            trpc.schedules.delete.mutate({ scheduleId }),
+        mutationFn: (
+            scheduleId: RouterInputs["schedules"]["delete"]["scheduleId"],
+        ) => trpc.schedules.delete.mutate({ scheduleId }),
         onSuccess: invalidate,
     }));
 
@@ -95,7 +87,9 @@
         formTarget = null;
     }
 
-    async function handleRecurrenceSubmit(input: { rrule: string }) {
+    async function handleRecurrenceSubmit(
+        input: Pick<RouterInputs["schedules"]["create"], "rrule">,
+    ) {
         const title = formTitle.trim();
         if (!title || listId === null) return;
         try {

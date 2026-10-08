@@ -1,11 +1,21 @@
 /**
- * @fileoverview カロリー品目一覧の検索語による表示と空状態のテスト
+ * @fileoverview カロリー品目一覧の検索・使用件数・編集時の再読込保留のテスト
  */
 
-import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/svelte";
 import { describe, expect, it, vi } from "vitest";
 
 import CalorieItemTable from "./CalorieItemTable.svelte";
+import {
+  checkConnectivity,
+  connectivityState,
+} from "#lib/client/sse/connection-recovery.svelte.ts";
 
 const items = [
   {
@@ -39,6 +49,43 @@ function renderTable(overrides: Record<string, unknown> = {}) {
 }
 
 describe("CalorieItemTable", () => {
+  it("品目の編集ダイアログを開いている間は、入力欄にフォーカスがなくても再読込を保留する", async () => {
+    const { unmount } = renderTable({ items: [items[0]] });
+    const previousPendingReload = connectivityState.pendingReload;
+    connectivityState.pendingReload = false;
+    try {
+      await fireEvent.click(screen.getByRole("button", { name: "品目の操作" }));
+      await fireEvent.click(
+        await screen.findByRole("menuitem", { name: "編集" }),
+      );
+      const dialog = await screen.findByRole("dialog", { name: "品目の編集" });
+      await waitFor(() => expect(dialog).toHaveAttribute("open"));
+      expect(dialog.tagName).toBe("DIALOG");
+      // 共通Dialogの非同期の初期フォーカスを待ってから、入力欄以外へ移す。
+      await waitFor(() =>
+        expect(within(dialog).getByLabelText("品目名")).toHaveFocus(),
+      );
+      const submitButton = within(dialog).getByRole("button", {
+        name: "変更",
+      });
+      submitButton.focus();
+      expect(submitButton).toHaveFocus();
+      expect(document.activeElement?.tagName).toBe("BUTTON");
+
+      // 接続不健全時の公開処理で、ダイアログによるisUserBusyの真分岐を観測する。
+      const unhealthyFetch: typeof fetch = vi.fn(
+        async () => new Response(null, { status: 503 }),
+      );
+      await checkConnectivity(unhealthyFetch);
+      expect(unhealthyFetch).toHaveBeenCalledOnce();
+      expect(connectivityState.pendingReload).toBe(true);
+      expect(dialog).toHaveAttribute("open");
+    } finally {
+      connectivityState.pendingReload = previousPendingReload;
+      unmount();
+    }
+  });
+
   it("APIの使用件数に基づいて削除を無効にし、理由を表示する", async () => {
     renderTable({
       items: [{ ...items[0], recordCount: 12, autoRecordCount: 2 }],

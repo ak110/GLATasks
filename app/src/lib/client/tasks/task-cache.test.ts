@@ -24,7 +24,7 @@ function makeTask(overrides: Partial<TaskListItem> = {}): TaskListItem {
     status: "active",
     kind: "normal",
     tags: [],
-    sort_order: 0,
+    sortOrder: 0,
     updated: "2024-01-01T00:00:00.000Z",
     attachments: [],
     ...overrides,
@@ -115,21 +115,21 @@ describe("mergeActiveTasks", () => {
 });
 
 describe("sortByTaskOrder", () => {
-  it("sort_order 昇順に並べる", () => {
+  it("sortOrder 昇順に並べる", () => {
     const tasks = [
-      makeTask({ id: 1, sort_order: 2000 }),
-      makeTask({ id: 2, sort_order: 1000 }),
-      makeTask({ id: 3, sort_order: 3000 }),
+      makeTask({ id: 1, sortOrder: 2000 }),
+      makeTask({ id: 2, sortOrder: 1000 }),
+      makeTask({ id: 3, sortOrder: 3000 }),
     ];
     const sorted = sortByTaskOrder(tasks);
     expect(sorted.map((t) => t.id)).toEqual([2, 1, 3]);
   });
 
-  it("sort_order が同値の場合は id 昇順に並べる", () => {
+  it("sortOrder が同値の場合は id 昇順に並べる", () => {
     const tasks = [
-      makeTask({ id: 3, sort_order: 1000 }),
-      makeTask({ id: 1, sort_order: 1000 }),
-      makeTask({ id: 2, sort_order: 1000 }),
+      makeTask({ id: 3, sortOrder: 1000 }),
+      makeTask({ id: 1, sortOrder: 1000 }),
+      makeTask({ id: 2, sortOrder: 1000 }),
     ];
     const sorted = sortByTaskOrder(tasks);
     expect(sorted.map((t) => t.id)).toEqual([1, 2, 3]);
@@ -137,8 +137,8 @@ describe("sortByTaskOrder", () => {
 
   it("元の配列を変更しない", () => {
     const tasks = [
-      makeTask({ id: 2, sort_order: 2000 }),
-      makeTask({ id: 1, sort_order: 1000 }),
+      makeTask({ id: 2, sortOrder: 2000 }),
+      makeTask({ id: 1, sortOrder: 1000 }),
     ];
     sortByTaskOrder(tasks);
     expect(tasks[0].id).toBe(2);

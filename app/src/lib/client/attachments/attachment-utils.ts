@@ -2,7 +2,7 @@
  * @fileoverview 添付ファイルのデータ変換・アップロード共通処理
  */
 
-import { trpc } from "#lib/client/trpc.ts";
+import { trpc, type RouterInputs } from "#lib/client/trpc.ts";
 
 /** ファイルドロップ中のハイライト表示に使うTailwindクラス（タスク追加フォーム・編集ダイアログ共通） */
 export const FILE_DROP_HIGHLIGHT_CLASSES =
@@ -24,7 +24,7 @@ export function readFileAsBase64(file: File): Promise<string> {
 
 /** ファイルを読み込みタスクへ添付登録する。失敗時は例外をそのまま呼び出し元へ再送出する */
 export async function uploadAttachment(
-  taskId: number,
+  taskId: RouterInputs["attachments"]["create"]["taskId"],
   file: File,
 ): Promise<void> {
   const data = await readFileAsBase64(file);

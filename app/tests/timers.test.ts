@@ -91,8 +91,10 @@ test.describe("timers", () => {
       timeout: 5000,
     });
 
-    // 少し待つ
-    await expect(card.getByTestId("timer-display")).not.toHaveText("00:01:00");
+    // 59秒表示は開始直後にも現れるため、サーバーの整数秒が減る58秒以下を待つ。
+    await expect(card.getByTestId("timer-display")).toHaveText(
+      /^00:00:(?:[0-4]\d|5[0-8])$/,
+    );
 
     // 一時停止
     await card.locator('[data-testid="timer-pause-btn"]').click();
@@ -101,10 +103,9 @@ test.describe("timers", () => {
     });
 
     // 時間が減少していることを確認する（1 分 = 00:01:00 からの経過分）
-    const display = await card
-      .locator('[data-testid="timer-display"]')
-      .textContent();
-    expect(display).not.toBe("00:01:00");
+    await expect(card.getByTestId("timer-display")).toHaveText(
+      /^00:00:[0-5]\d$/,
+    );
 
     // 後片付け
     await deleteTimerCard(page, card);

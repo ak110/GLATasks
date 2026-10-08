@@ -6,7 +6,7 @@
 
 import { createHash } from "node:crypto";
 import { SignJWT, jwtVerify } from "jose";
-import { getJwtKey } from "../jwt-key";
+import { getSecret } from "../jwt-key";
 
 /** アクセストークンの aud クレーム */
 const ACCESS_AUDIENCE = "glatasks-mcp";
@@ -39,14 +39,14 @@ export async function createAccessToken(params: {
     .setIssuedAt()
     .setAudience(ACCESS_AUDIENCE)
     .setExpirationTime(`${ACCESS_TOKEN_TTL_SECONDS}s`)
-    .sign(getJwtKey());
+    .sign(getSecret());
 }
 
 export async function verifyAccessToken(
   token: string,
 ): Promise<AccessTokenPayload | null> {
   try {
-    const { payload } = await jwtVerify(token, getJwtKey(), {
+    const { payload } = await jwtVerify(token, getSecret(), {
       audience: ACCESS_AUDIENCE,
     });
     const userId = payload.sub ? parseInt(payload.sub, 10) : NaN;
@@ -80,7 +80,7 @@ export async function createRefreshToken(params: {
     .setIssuedAt()
     .setAudience(REFRESH_AUDIENCE)
     .setExpirationTime(`${REFRESH_TOKEN_TTL_SECONDS}s`)
-    .sign(getJwtKey());
+    .sign(getSecret());
 }
 
 export interface RefreshTokenPayload {
@@ -93,7 +93,7 @@ export async function verifyRefreshToken(
   token: string,
 ): Promise<RefreshTokenPayload | null> {
   try {
-    const { payload } = await jwtVerify(token, getJwtKey(), {
+    const { payload } = await jwtVerify(token, getSecret(), {
       audience: REFRESH_AUDIENCE,
     });
     const userId = payload.sub ? parseInt(payload.sub, 10) : NaN;

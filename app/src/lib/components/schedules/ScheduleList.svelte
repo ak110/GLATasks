@@ -9,12 +9,12 @@
     import type { ScheduleInfo } from "#lib/types.ts";
     import { describeSchedule } from "#lib/schedule-utils.ts";
 
-    type Props = {
+    interface Props {
         schedules: ScheduleInfo[];
         onEdit: (s: ScheduleInfo) => void;
         onToggle: (s: ScheduleInfo) => void;
         onDelete: (s: ScheduleInfo) => void;
-    };
+    }
 
     let { schedules, onEdit, onToggle, onDelete }: Props = $props();
 </script>

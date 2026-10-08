@@ -5,7 +5,7 @@
  * Service Worker がオフライン時に追加のスクリプトを取得できないため、キャッシュ対象を増やさない。
  */
 
-import connectivityCheckSource from "#lib/connectivity-check.js?raw";
+import connectivityCheckSource from "#lib/client/sse/connectivity-check.js?raw";
 
 const HTML = `<!doctype html>
 <html lang="ja">

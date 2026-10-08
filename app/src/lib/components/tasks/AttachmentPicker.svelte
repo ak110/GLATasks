@@ -4,11 +4,11 @@
      * タスク追加フォーム・タスク編集ダイアログの双方から利用する
      */
 
-    type Props = {
+    interface Props {
         attachments?: File[];
         onAdd: (files: File[]) => void;
         onRemove?: (index: number) => void;
-    };
+    }
 
     let {
         attachments = undefined,

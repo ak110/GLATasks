@@ -7,14 +7,14 @@
 
     import type { ListInfo } from "#lib/types.ts";
 
-    type Props = {
+    interface Props {
         open: boolean;
-        sourceList: { id: number; title: string };
+        sourceList: Pick<ListInfo, "id" | "title">;
         allLists: ListInfo[];
         taskCount: number;
         onSubmit: (targetListId: number) => void;
         onClose: () => void;
-    };
+    }
 
     let { open, sourceList, allLists, taskCount, onSubmit, onClose }: Props =
         $props();

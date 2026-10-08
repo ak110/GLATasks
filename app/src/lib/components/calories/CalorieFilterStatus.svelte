@@ -1,9 +1,9 @@
 <script lang="ts">
     // 追加欄の入力を検索語として兼用するため、検索で一覧を限定している間だけ理由と解除操作を示す
-    type Props = {
+    interface Props {
         keywords: string[];
         onClear: () => void;
-    };
+    }
 
     let { keywords, onClear }: Props = $props();
 </script>

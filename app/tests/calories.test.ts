@@ -1,6 +1,7 @@
 import {
   uniqueTestName,
   requireBoundingBox,
+  isTrpcUrl,
   waitForSuccessfulMutationResponse,
 } from "./helpers/common";
 import { test, expect, type Locator } from "@playwright/test";
@@ -13,10 +14,124 @@ import {
   openItemMenu,
   createContext,
   addRecordNow,
+  bulkCreate,
+  confirmedDay,
 } from "./helpers/calorie-page";
 test.describe("calories", () => {
   test.beforeEach(async ({ page }) => {
     await openCalories(page);
+  });
+
+  test("初期表示は全記録を取得せず、全期間の使用件数と古い記録を含むCSVを表示・出力する", async ({
+    page,
+  }) => {
+    const itemName = uniqueTestName("全期間確認");
+    const allRecordRequests: string[] = [];
+    const observeRequest = (request: import("@playwright/test").Request) => {
+      if (isTrpcUrl(request.url(), "calories.allRecords")) {
+        allRecordRequests.push(request.url());
+      }
+    };
+    page.on("request", observeRequest);
+    try {
+      // beforeEachの表示とは別に、監視を開始してから初期表示の全クエリを待つ。
+      await Promise.all([
+        ...[
+          "calories.items",
+          "calories.autoRecords",
+          "calories.records",
+          "calories.summary",
+        ].map((procedure) =>
+          waitForSuccessfulMutationResponse(page, procedure),
+        ),
+        page.reload(),
+      ]);
+      await expect(
+        page.getByRole("heading", { name: "カロリー計算" }),
+      ).toBeVisible();
+      expect(allRecordRequests).toEqual([]);
+      await addItem(page, itemName, "123");
+      await bulkCreate(page, itemName, 45, 45);
+      await bulkCreate(page, itemName, 0, 0);
+      const itemRow = page
+        .getByTestId("calorie-item-row")
+        .filter({ hasText: itemName });
+      // 初期の30日分には当日1件だけが表示されるが、使用件数には45日前も含まれる。
+      await expect(
+        page.getByTestId("calorie-record-row").filter({ hasText: itemName }),
+      ).toHaveCount(1);
+      await openItemMenu(itemRow);
+      const deleteItem = itemRow.getByRole("menuitem", { name: /削除/ });
+      await expect(deleteItem).toBeDisabled();
+      await expect(deleteItem).toContainText("記録2件で使用中");
+      await page.keyboard.press("Escape");
+      expect(allRecordRequests).toEqual([]);
+
+      const exportResponse = waitForSuccessfulMutationResponse(
+        page,
+        "calories.allRecords",
+      );
+      const downloadPromise = page.waitForEvent("download");
+      await page.getByRole("button", { name: "記録をエクスポート" }).click();
+      await exportResponse;
+      const download = await downloadPromise;
+      expect(download.suggestedFilename()).toBe("カロリー記録.csv");
+      const downloadPath = await download.path();
+      expect(downloadPath).not.toBeNull();
+      const csv = await readFile(downloadPath!, "utf8");
+      const itemLines = csv
+        .split(/\r?\n/)
+        .filter((line) => line.includes(itemName));
+      expect(itemLines).toHaveLength(2);
+      for (const daysAgo of [45, 0]) {
+        const date = confirmedDay(daysAgo).replaceAll("-", "/");
+        expect(itemLines).toContain(`${date} 12:00,${itemName},1,`);
+      }
+      expect(allRecordRequests).toHaveLength(1);
+    } finally {
+      page.off("request", observeRequest);
+      await page.keyboard.press("Escape");
+      const itemRow = page
+        .getByTestId("calorie-item-row")
+        .filter({ hasText: itemName });
+      if ((await itemRow.count()) > 0) {
+        // 固有の品目と期間を指定し、このテストが実DBに作成した記録だけを削除する。
+        const deleteForm = page.getByTestId("calorie-bulk-delete-form");
+        await deleteForm.getByLabel("開始日").fill(confirmedDay(45));
+        await deleteForm.getByLabel("終了日").fill(confirmedDay(0));
+        await deleteForm.getByLabel("品目").fill(itemName);
+        await deleteForm.getByRole("button", { name: "一括削除" }).click();
+        const deleteRecords = waitForSuccessfulMutationResponse(
+          page,
+          "calories.bulkDeleteRecords",
+        );
+        await page
+          .getByRole("dialog", { name: "記録の一括削除" })
+          .getByRole("button", { name: "削除", exact: true })
+          .click();
+        await deleteRecords;
+        await expect(
+          page.getByRole("dialog", { name: "記録の一括削除" }),
+        ).not.toBeVisible();
+        await openItemMenu(itemRow);
+        const deleteItem = itemRow.getByRole("menuitem", {
+          name: "削除",
+          exact: true,
+        });
+        await expect(deleteItem).toBeEnabled();
+        await deleteItem.click();
+        const deleteItemResponse = waitForSuccessfulMutationResponse(
+          page,
+          "calories.deleteItem",
+        );
+        await page
+          .getByRole("dialog", { name: "品目の削除" })
+          .getByRole("button", { name: "削除", exact: true })
+          .click();
+        await deleteItemResponse;
+        await expect(itemRow).toHaveCount(0);
+      }
+    }
   });
 
   test("ヘッダーからカロリー計算へ移動できる", async ({ page }) => {

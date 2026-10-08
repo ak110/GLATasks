@@ -1,4 +1,5 @@
 <script lang="ts">
+    import type { RouterInputs, RouterOutputs } from "#lib/client/trpc.ts";
     import { grayButtonClass } from "#lib/components/ui/styles.ts";
     import { formatLocalMinute } from "#lib/date-time.ts";
     import {
@@ -7,33 +8,28 @@
         parseCalorieItemsCsv,
         parseCalorieRecordsCsv,
     } from "#lib/calorie-csv.ts";
-    import type {
-        CalorieItemCsvRow,
-        CalorieRecordCsvRow,
-    } from "#lib/schemas.ts";
     import ConfirmDialog from "#lib/components/dialogs/ConfirmDialog.svelte";
 
-    type Item = { name: string; kcal: number; note: string };
-    type RecordRow = {
-        consumed_at: string;
-        item_name: string;
-        quantity: number;
-        temporary: boolean;
-    };
-    type Props = {
+    type Item = RouterOutputs["calories"]["items"][number];
+    type RecordRow = RouterOutputs["calories"]["allRecords"][number];
+    interface Props {
         items: Item[];
         onExportRecords: () => Promise<RecordRow[]>;
         onImportItems: (
-            rows: CalorieItemCsvRow[],
-        ) => Promise<{ added: number; updated: number }>;
+            rows: RouterInputs["calories"]["importItems"]["rows"],
+        ) => Promise<
+            Pick<RouterOutputs["calories"]["importItems"], "added" | "updated">
+        >;
         onImportRecords: (
-            rows: CalorieRecordCsvRow[],
-        ) => Promise<{ added: number }>;
-    };
+            rows: RouterInputs["calories"]["importRecords"]["rows"],
+        ) => Promise<Pick<RouterOutputs["calories"]["importRecords"], "added">>;
+    }
 
     let { items, onExportRecords, onImportItems, onImportRecords }: Props =
         $props();
-    let pendingRecords = $state<CalorieRecordCsvRow[] | undefined>();
+    let pendingRecords = $state<
+        RouterInputs["calories"]["importRecords"]["rows"] | undefined
+    >();
     let resultMessage = $state("");
 
     function showError(error: unknown) {
@@ -96,11 +92,13 @@
             download(
                 exportCalorieRecordsCsv(
                     records.map((record) => ({
-                        ...record,
-                        consumed_at: formatLocalMinute(record.consumed_at),
+                        consumed_at: formatLocalMinute(record.consumedAt),
+                        item_name: record.itemName,
+                        quantity: record.quantity,
+                        temporary: record.temporary,
                     })),
                 ),
-                "calorie-records.csv",
+                "カロリー記録.csv",
             );
         } catch (error) {
             resultMessage =

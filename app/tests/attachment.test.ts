@@ -491,7 +491,12 @@ test.describe("attachments", () => {
       dt.items.add(file);
       return dt;
     });
-    const dialogBody = page.locator('[role="dialog"] > div').first();
+    const dialogBody = page
+      .getByRole("dialog", { name: "タスクの編集", exact: true })
+      .getByRole("group", {
+        name: "タスク編集フォーム（ファイルドロップ対応）",
+        exact: true,
+      });
     const attachmentObservation = observeMutationResponses(
       page,
       "attachments.create",

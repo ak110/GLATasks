@@ -21,7 +21,7 @@
     "eslint-plugin-svelte": "^3.23.0",
     "globals": "^17.13.0",
     "markdownlint-cli2": "^0.23.3",
-    "oxlint": "^1.86.0",
+    "oxlint": "^1.87.0",
     "prettier": "^3.9.9",
     "prettier-plugin-svelte": "^4.1.1",
     "prettier-plugin-tailwindcss": "^0.8.1",
@@ -31,7 +31,7 @@
     "textlint-rule-preset-ja-technical-writing": "^12.0.2",
     "textlint-rule-preset-jtf-style": "^3.0.3",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.71.0"
+    "typescript-eslint": "^8.71.1"
   },
   "packageManager": "pnpm@12.9.1+sha512.06b055fff5cd20dc12781de173ced3310ce0951bf2ec620211a16045d5444d5c93a663210764ef29a653a610459ba0368f0e74f84d80c54723cf95aae7bc0d6d"
 }

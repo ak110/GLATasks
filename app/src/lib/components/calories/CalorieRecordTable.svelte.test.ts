@@ -9,23 +9,23 @@ import CalorieRecordTable from "./CalorieRecordTable.svelte";
 
 const record = {
   id: 1,
-  item_id: 2,
-  item_name: "食品",
-  item_kcal: 120,
-  consumed_at: "2026-08-01T01:00:00.000Z",
+  itemId: 2,
+  itemName: "食品",
+  itemKcal: 120,
+  consumedAt: "2026-08-01T01:00:00.000Z",
   quantity: 2,
-  total_kcal: 240,
+  totalKcal: 240,
   temporary: false,
 };
 
 const secondRecord = {
   ...record,
   id: 2,
-  item_id: 3,
-  item_name: "飲料水",
-  item_kcal: 0,
+  itemId: 3,
+  itemName: "飲料水",
+  itemKcal: 0,
   quantity: 1,
-  total_kcal: 0,
+  totalKcal: 0,
 };
 
 function renderTable(overrides: Record<string, unknown> = {}) {
@@ -85,7 +85,7 @@ describe("CalorieRecordTable", () => {
 
   it("一覧の日時はモバイルで年を省略して日付と時刻を2行に分け、広い画面で年を表示する", () => {
     const consumedAt = new Date(2026, 7, 1, 1).toISOString();
-    renderTable({ records: [{ ...record, consumed_at: consumedAt }] });
+    renderTable({ records: [{ ...record, consumedAt: consumedAt }] });
 
     const mobile = screen.getByText("08/01").parentElement;
     expect(mobile).toHaveClass("sm:hidden");
@@ -115,7 +115,7 @@ describe("CalorieRecordTable", () => {
     await fireEvent.click(screen.getByRole("button", { name: "追加" }));
 
     expect(onCreate).toHaveBeenCalledWith(
-      expect.objectContaining({ item_id: 1, quantity: 0 }),
+      expect.objectContaining({ itemId: 1, quantity: 0 }),
     );
   });
 
@@ -142,11 +142,11 @@ describe("CalorieRecordTable", () => {
       records: [
         {
           ...record,
-          item_id: null,
-          item_name: "外食",
-          item_kcal: null,
+          itemId: null,
+          itemName: "外食",
+          itemKcal: null,
           quantity: 850,
-          total_kcal: 850,
+          totalKcal: 850,
           temporary: true,
         },
       ],
@@ -162,9 +162,9 @@ describe("CalorieRecordTable", () => {
     expect(screen.getByLabelText("kcal")).toHaveValue(850);
     await fireEvent.click(screen.getByRole("button", { name: "追加" }));
     expect(onCreate).toHaveBeenCalledWith(
-      expect.objectContaining({ temporary_name: "外食", quantity: 850 }),
+      expect.objectContaining({ temporaryName: "外食", quantity: 850 }),
     );
-    expect(onCreate.mock.calls[0][0]).not.toHaveProperty("item_id");
+    expect(onCreate.mock.calls[0][0]).not.toHaveProperty("itemId");
 
     await fireEvent.click(screen.getByRole("button", { name: "記録の操作" }));
     await fireEvent.click(screen.getByRole("menuitem", { name: "コピー" }));

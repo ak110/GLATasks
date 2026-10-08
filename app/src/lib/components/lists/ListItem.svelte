@@ -11,7 +11,7 @@
 
     import type { ListInfo } from "#lib/types.ts";
 
-    type Props = {
+    interface Props {
         list: ListInfo;
         isSelected: boolean;
         openMenuId: number | null;
@@ -24,7 +24,7 @@
         onMerge: (listId: number) => void;
         onDelete: (listId: number) => void;
         onOpenSchedules: (listId: number) => void;
-    };
+    }
 
     let {
         list,
@@ -59,12 +59,12 @@
         onclick={() => onSelect(list.id)}
     >
         <span class="min-w-0 flex-1 truncate">{list.title}</span>
-        {#if list.todo_count > 0}
+        {#if list.todoCount > 0}
             <span
                 class="inline-flex shrink-0 items-center rounded-full bg-red-500 px-1.5 py-0.5 text-xs text-white"
                 data-testid="todo-badge"
             >
-                {list.todo_count}
+                {list.todoCount}
             </span>
         {/if}
     </button>

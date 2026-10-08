@@ -12,7 +12,7 @@ import {
   waitForSuccessfulMutationResponse,
   waitForTaskUpdateResponse,
 } from "./helpers/common";
-import { test, expect } from "@playwright/test";
+import { test, expect, type Request } from "@playwright/test";
 /**
  * @fileoverview activeTasks 差分sync・楽観的更新・SSE経路の e2e テスト
  */
@@ -380,11 +380,11 @@ test.describe("activeTasks 差分sync・楽観的更新", () => {
       await targetListA.getByTestId("list-select-btn").click();
       await addTask(pageA, targetTaskTitle);
 
-      const activeTaskRequestInputs: string[] = [];
+      const activeTaskRequests: Request[] = [];
       pageA.on("request", (request) => {
-        if (!isTrpcUrl(request.url(), "tasks.listActive")) return;
-        const urlInput = new URL(request.url()).searchParams.get("input");
-        activeTaskRequestInputs.push(urlInput ?? request.postData() ?? "");
+        if (isTrpcUrl(request.url(), "tasks.listActive")) {
+          activeTaskRequests.push(request);
+        }
       });
 
       const pageB = await ctxB.newPage();
@@ -398,7 +398,7 @@ test.describe("activeTasks 差分sync・楽観的更新", () => {
         .getByTestId("list-item")
         .filter({ hasText: sourceListName });
       await sourceListB.getByTestId("list-menu-btn").click();
-      await pageB.getByRole("button", { name: "他のリストに統合" }).click();
+      await pageB.getByRole("menuitem", { name: "他のリストに統合" }).click();
       const mergeDialog = pageB.getByRole("dialog", {
         name: "リストの統合",
       });
@@ -420,13 +420,27 @@ test.describe("activeTasks 差分sync・楽観的更新", () => {
       await expect(
         pageA.getByTestId("task-item").filter({ hasText: targetTaskTitle }),
       ).toBeVisible({ timeout: 15000 });
-      expect(activeTaskRequestInputs.length).toBeGreaterThan(0);
-      const requestedFullSync = activeTaskRequestInputs.some((rawInput) => {
-        const batchInput = JSON.parse(rawInput) as Record<
-          string,
-          Record<string, unknown>
-        >;
-        return Object.values(batchInput).some((input) => !("since" in input));
+      expect(activeTaskRequests.length).toBeGreaterThan(0);
+      const requestedFullSync = activeTaskRequests.some((request) => {
+        const url = new URL(request.url());
+        const rawInput = url.searchParams.get("input") ?? request.postData();
+        if (!rawInput) throw new Error("tasks.listActive の入力がありません");
+        const payload = JSON.parse(rawInput) as Record<string, unknown>;
+        const procedures = url.pathname.slice("/api/trpc/".length).split(",");
+        // HTTPバッチはURLの手続き順と入力番号が対応する。他手続きの入力は除外する。
+        return procedures.some((procedure, index) => {
+          if (procedure !== "tasks.listActive") return false;
+          const input =
+            url.searchParams.get("batch") === "1"
+              ? payload[String(index)]
+              : payload;
+          return (
+            input !== null &&
+            typeof input === "object" &&
+            !Array.isArray(input) &&
+            !("since" in input)
+          );
+        });
       });
       expect(requestedFullSync).toBe(true);
     } finally {

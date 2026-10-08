@@ -10,8 +10,8 @@ export { validateCredentials, registerUser } from "./api/auth";
 
 export type { ListInfo } from "./api/lists";
 export {
-  getLists,
-  postList,
+  listLists,
+  createList,
   clearList,
   renameList,
   deleteList,
@@ -29,10 +29,10 @@ export type {
   GetActiveTasksResult,
 } from "./api/tasks";
 export {
-  getListTasks,
-  getActiveTasks,
-  postTask,
-  patchTask,
+  listTasks,
+  listActiveTasks,
+  createTask,
+  updateTask,
   searchTasks,
   reorderTasks,
 } from "./api/tasks";
@@ -52,7 +52,7 @@ export {
 } from "./api/schedules";
 
 export {
-  getTimers,
+  listTimers,
   createTimer,
   updateTimer,
   deleteTimer,

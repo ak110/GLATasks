@@ -1,4 +1,5 @@
 <script lang="ts">
+    import type { RouterInputs, RouterOutputs } from "#lib/client/trpc.ts";
     import { inputClass } from "#lib/components/ui/styles.ts";
     import { menuBehavior } from "#lib/actions/menu.ts";
     import {
@@ -6,7 +7,7 @@
         menuBlueItemClass,
         menuDangerItemClass,
     } from "#lib/components/ui/styles.ts";
-    import { getTimezoneOffsetMinutes } from "#lib/date-time.ts";
+    import { getUtcOffsetMinutes } from "#lib/date-time.ts";
     /**
      * @fileoverview カロリーの自動記録設定（毎日指定時刻に記録を追加する）の一覧と編集
      */
@@ -14,31 +15,20 @@
     import Dialog from "#lib/components/dialogs/Dialog.svelte";
     import ConfirmDialog from "#lib/components/dialogs/ConfirmDialog.svelte";
 
-    type Item = { id: number; name: string };
-    type AutoRecord = {
-        id: number;
-        item_id: number;
-        item_name: string;
-        time_of_day: string;
-        quantity: number;
-        enabled: boolean;
-    };
-    type AutoRecordInput = {
-        time_of_day: string;
-        item_id: number;
-        quantity: number;
-        enabled: boolean;
-        tz_offset_minutes: number;
-    };
-    type Props = {
+    type Item = Pick<RouterOutputs["calories"]["items"][number], "id" | "name">;
+    type AutoRecord = RouterOutputs["calories"]["autoRecords"][number];
+    type AutoRecordInput = RouterInputs["calories"]["createAutoRecord"];
+    interface Props {
         items: Item[];
         autoRecords: AutoRecord[];
         onCreate: (input: AutoRecordInput) => unknown;
         onUpdate: (
-            input: AutoRecordInput & { autoRecordId: number },
+            input: RouterInputs["calories"]["updateAutoRecord"],
         ) => unknown;
-        onDelete: (autoRecordId: number) => unknown;
-    };
+        onDelete: (
+            autoRecordId: RouterInputs["calories"]["deleteAutoRecord"]["autoRecordId"],
+        ) => unknown;
+    }
 
     let { items, autoRecords, onCreate, onUpdate, onDelete }: Props = $props();
     let editing = $state<AutoRecord | undefined>();
@@ -49,7 +39,7 @@
     let quantity = $state("1");
 
     function tzOffsetMinutes(): number {
-        return getTimezoneOffsetMinutes();
+        return getUtcOffsetMinutes();
     }
 
     function resetForm() {
@@ -62,19 +52,19 @@
     function edit(autoRecord: AutoRecord) {
         openMenuId = undefined;
         editing = autoRecord;
-        timeOfDay = autoRecord.time_of_day;
-        itemName = autoRecord.item_name;
+        timeOfDay = autoRecord.timeOfDay;
+        itemName = autoRecord.itemName;
         quantity = String(autoRecord.quantity);
     }
 
     async function toggle(autoRecord: AutoRecord) {
         await onUpdate({
             autoRecordId: autoRecord.id,
-            time_of_day: autoRecord.time_of_day,
-            item_id: autoRecord.item_id,
+            timeOfDay: autoRecord.timeOfDay,
+            itemId: autoRecord.itemId,
             quantity: autoRecord.quantity,
             enabled: !autoRecord.enabled,
-            tz_offset_minutes: tzOffsetMinutes(),
+            tzOffsetMinutes: tzOffsetMinutes(),
         });
     }
 
@@ -85,11 +75,11 @@
         if (!item || !Number.isInteger(numericQuantity) || numericQuantity < 0)
             return;
         const input = {
-            time_of_day: timeOfDay,
-            item_id: item.id,
+            timeOfDay: timeOfDay,
+            itemId: item.id,
             quantity: numericQuantity,
             enabled: editing?.enabled ?? true,
-            tz_offset_minutes: tzOffsetMinutes(),
+            tzOffsetMinutes: tzOffsetMinutes(),
         };
         if (editing === undefined) await onCreate(input);
         else await onUpdate({ autoRecordId: editing.id, ...input });
@@ -199,9 +189,9 @@
                     class="border-b border-gray-200 text-gray-800 last:border-0 dark:border-gray-700 dark:text-gray-100"
                     data-testid="calorie-auto-record-row"
                 >
-                    <td class="p-2">{autoRecord.time_of_day}</td>
-                    <td class="truncate p-2" title={autoRecord.item_name}
-                        >{autoRecord.item_name}</td
+                    <td class="p-2">{autoRecord.timeOfDay}</td>
+                    <td class="truncate p-2" title={autoRecord.itemName}
+                        >{autoRecord.itemName}</td
                     >
                     <td class="p-2 text-right">{autoRecord.quantity}</td>
                     <td class="p-2 text-center"
@@ -209,7 +199,7 @@
                             type="checkbox"
                             checked={autoRecord.enabled}
                             onchange={() => toggle(autoRecord)}
-                            aria-label={`${autoRecord.time_of_day} ${autoRecord.item_name}の自動記録`}
+                            aria-label={`${autoRecord.timeOfDay} ${autoRecord.itemName}の自動記録`}
                             data-testid="calorie-auto-record-enabled"
                             class="cursor-pointer"
                         /></td
@@ -279,7 +269,7 @@
     open={deleteTarget !== undefined}
     title="自動記録の削除"
     message={deleteTarget
-        ? `${deleteTarget.time_of_day}の「${deleteTarget.item_name}」の自動記録を削除しますか？追加済みの記録は残ります。`
+        ? `${deleteTarget.timeOfDay}の「${deleteTarget.itemName}」の自動記録を削除しますか？追加済みの記録は残ります。`
         : ""}
     confirmLabel="削除"
     variant="danger"

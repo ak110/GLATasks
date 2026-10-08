@@ -8,7 +8,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { ApiError } from "./api-errors";
-import { extractErrorMessage } from "#lib/extract-error-message.ts";
+import { extractErrorMessage } from "#lib/client/ui/extract-error-message.ts";
 
 import { SSE_EVENTS } from "#lib/sse-events.ts";
 
@@ -124,7 +124,7 @@ describe("withApiErrorsのエラーマッピング", () => {
     await expect(result).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
 
-  it("未知の例外はログへ残し、内部の詳細を応答へ出さない", async () => {
+  it("未知の例外はログへ残し、内部の詳細を応答へ含めない", async () => {
     const log = vi.spyOn(console, "error").mockImplementation(() => {});
     try {
       vi.mocked(createAttachment).mockRejectedValueOnce(

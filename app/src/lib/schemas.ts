@@ -92,8 +92,8 @@ export const UpdateTaskSchema = z
       .optional(),
     status: TaskStatusSchema.optional(),
     completed: z.string().datetime().nullable().optional(),
-    move_to: z.number().int().positive().optional(),
-    keep_order: z.boolean().default(false),
+    moveTo: z.number().int().positive().optional(),
+    keepOrder: z.boolean().default(false),
     tags: TagsSchema.optional(),
     kind: TaskKindSchema.optional(),
   })
@@ -101,7 +101,7 @@ export const UpdateTaskSchema = z
     (data) =>
       data.text !== undefined ||
       data.status !== undefined ||
-      data.move_to !== undefined ||
+      data.moveTo !== undefined ||
       data.tags !== undefined ||
       data.kind !== undefined,
     { message: "更新する項目が指定されていません" },
@@ -144,6 +144,12 @@ export const TIMER_MODES = ["countdown", "alarm"] as const;
 export const TimerModeSchema = z.enum(TIMER_MODES);
 export type TimerMode = z.infer<typeof TimerModeSchema>;
 
+/** タイマー系で共有する入力範囲。 */
+export const TimezoneOffsetSchema = z.number().int().min(-720).max(840);
+export const TimerSecondsSchema = z.number().int().min(0).max(359999);
+export const TimerRingSecondsSchema = z.number().int().min(1).max(3600);
+export const TimerAdjustMinutesSchema = z.number().int().min(1).max(999);
+
 // ── 利用者デフォルト値スキーマ ──
 
 /**
@@ -151,11 +157,11 @@ export type TimerMode = z.infer<typeof TimerModeSchema>;
  * 各フィールドはオプショナル。欠落時はコード側のフォールバック定数で補う。
  */
 export const UserPreferencesSchema = z.object({
-  ring_seconds: z.number().int().min(1).max(3600).optional(),
-  base_seconds: z.number().int().min(0).max(359999).optional(),
-  adjust_minutes: z.number().int().min(1).max(999).optional(),
+  ringSeconds: TimerRingSecondsSchema.optional(),
+  baseSeconds: TimerSecondsSchema.optional(),
+  adjustMinutes: TimerAdjustMinutesSchema.optional(),
   mode: TimerModeSchema.optional(),
-  calorie_goal_kcal: z.number().int().positive().max(1_000_000).optional(),
+  calorieGoalKcal: z.number().int().positive().max(1_000_000).optional(),
 });
 export type UserPreferences = z.infer<typeof UserPreferencesSchema>;
 
@@ -211,15 +217,14 @@ const LocalTimeSchema = z
     const [hour, minute] = value.split(":").map(Number);
     return hour < 24 && minute < 60;
   }, "実在する時刻を入力してください");
-const TimezoneOffsetSchema = z.number().int().min(-720).max(840);
 
-export const CalorieItemInputSchema = z.object({
+export const CreateCalorieItemSchema = z.object({
   name: z.string().trim().min(1, "品目名は必須です").max(255),
   kcal: PositiveCalorieIntegerSchema,
   note: z.string().max(10_000).default(""),
 });
 
-export const UpdateCalorieItemSchema = CalorieItemInputSchema.extend({
+export const UpdateCalorieItemSchema = CreateCalorieItemSchema.extend({
   itemId: z.number().int().positive(),
 });
 
@@ -228,29 +233,29 @@ export const CalorieItemIdSchema = z.object({
 });
 
 /**
- * 記録の入力項目。品目の記録は`item_id`を、品目表へ登録しない一時項目の記録は
- * `temporary_name`を、どちらか一方だけ指定する。一時項目の`quantity`はkcalとして扱う
+ * 記録の入力項目。品目の記録は`itemId`を、品目表へ登録しない一時項目の記録は
+ * `temporaryName`を、どちらか一方だけ指定する。一時項目の`quantity`はkcalとして扱う
  */
 const CalorieRecordFieldsSchema = z.object({
-  consumed_at: LocalMinuteSchema,
-  item_id: z.number().int().positive().optional(),
-  temporary_name: z.string().trim().min(1).max(255).optional(),
+  consumedAt: LocalMinuteSchema,
+  itemId: z.number().int().positive().optional(),
+  temporaryName: z.string().trim().min(1).max(255).optional(),
   quantity: NonNegativeCalorieIntegerSchema,
-  tz_offset_minutes: TimezoneOffsetSchema,
+  tzOffsetMinutes: TimezoneOffsetSchema,
 });
 
 function hasItemOrTemporaryName(data: {
-  item_id?: number;
-  temporary_name?: string;
+  itemId?: number;
+  temporaryName?: string;
 }): boolean {
-  return (data.item_id === undefined) !== (data.temporary_name === undefined);
+  return (data.itemId === undefined) !== (data.temporaryName === undefined);
 }
 
 const itemOrTemporaryNameMessage = {
   message: "品目か一時項目名のどちらか一方を指定してください",
 };
 
-export const CalorieRecordInputSchema = CalorieRecordFieldsSchema.refine(
+export const CreateCalorieRecordSchema = CalorieRecordFieldsSchema.refine(
   hasItemOrTemporaryName,
   itemOrTemporaryNameMessage,
 );
@@ -264,12 +269,12 @@ export const CalorieRecordIdSchema = z.object({
 });
 
 export const ListCalorieRecordsSchema = z.object({
-  window_offset: z.number().int().min(0).max(120).default(0),
-  tz_offset_minutes: TimezoneOffsetSchema,
+  windowOffset: z.number().int().min(0).max(120).default(0),
+  tzOffsetMinutes: TimezoneOffsetSchema,
 });
 
-export const CalorieSummaryInputSchema = z.object({
-  tz_offset_minutes: TimezoneOffsetSchema,
+export const GetCalorieSummarySchema = z.object({
+  tzOffsetMinutes: TimezoneOffsetSchema,
 });
 
 export const CalorieItemCsvRowSchema = z.object({
@@ -291,35 +296,35 @@ export const ImportCalorieItemsSchema = z.object({
 
 export const ImportCalorieRecordsSchema = z.object({
   rows: z.array(CalorieRecordCsvRowSchema).max(MAX_CALORIE_CSV_ROWS),
-  tz_offset_minutes: TimezoneOffsetSchema,
+  tzOffsetMinutes: TimezoneOffsetSchema,
 });
 
 export const BulkCreateCalorieRecordsSchema = z.object({
-  start_date: LocalDateSchema,
-  end_date: LocalDateSchema,
-  time_of_day: LocalTimeSchema,
-  item_id: z.number().int().positive(),
+  startDate: LocalDateSchema,
+  endDate: LocalDateSchema,
+  timeOfDay: LocalTimeSchema,
+  itemId: z.number().int().positive(),
   quantity: NonNegativeCalorieIntegerSchema,
-  tz_offset_minutes: TimezoneOffsetSchema,
+  tzOffsetMinutes: TimezoneOffsetSchema,
 });
 
 export const BulkDeleteCalorieRecordsSchema = z.object({
-  start_date: LocalDateSchema,
-  end_date: LocalDateSchema,
-  item_id: z.number().int().positive(),
-  tz_offset_minutes: TimezoneOffsetSchema,
+  startDate: LocalDateSchema,
+  endDate: LocalDateSchema,
+  itemId: z.number().int().positive(),
+  tzOffsetMinutes: TimezoneOffsetSchema,
 });
 
-export const CalorieAutoRecordInputSchema = z.object({
-  time_of_day: LocalTimeSchema,
-  item_id: z.number().int().positive(),
+export const CreateCalorieAutoRecordSchema = z.object({
+  timeOfDay: LocalTimeSchema,
+  itemId: z.number().int().positive(),
   quantity: NonNegativeCalorieIntegerSchema,
   enabled: z.boolean(),
-  tz_offset_minutes: TimezoneOffsetSchema,
+  tzOffsetMinutes: TimezoneOffsetSchema,
 });
 
 export const UpdateCalorieAutoRecordSchema =
-  CalorieAutoRecordInputSchema.extend({
+  CreateCalorieAutoRecordSchema.extend({
     autoRecordId: z.number().int().positive(),
   });
 
@@ -333,30 +338,21 @@ export const CreateTimerSchema = z
   .object({
     name: z.string().trim().max(255),
     mode: TimerModeSchema.default("countdown"),
-    base_seconds: z.number().int().min(0, "ベース時間は0以上の整数が必要です"),
-    target_minutes: z.number().int().min(0).max(1439).optional(),
-    tz_offset_minutes: z.number().int().min(-720).max(840).optional(),
-    adjust_minutes: z
-      .number()
-      .int()
-      .min(1)
-      .max(999)
-      .default(TIMER_DEFAULT_ADJUST_MINUTES),
+    baseSeconds: TimerSecondsSchema,
+    targetMinutes: z.number().int().min(0).max(1439).optional(),
+    tzOffsetMinutes: TimezoneOffsetSchema.optional(),
+    adjustMinutes: TimerAdjustMinutesSchema.default(
+      TIMER_DEFAULT_ADJUST_MINUTES,
+    ),
     // 1回限りのタイマー。満了時に削除ボタンを強調し、確認ダイアログを省略する
     ephemeral: z.boolean().default(false),
     // 期限切れ後にビープを鳴らす秒数（上限・既定値の根拠は TIMER_DEFAULT_RING_SECONDS のコメントを参照）
-    ring_seconds: z
-      .number()
-      .int()
-      .min(1)
-      .max(3600)
-      .default(TIMER_DEFAULT_RING_SECONDS),
+    ringSeconds: TimerRingSecondsSchema.default(TIMER_DEFAULT_RING_SECONDS),
   })
   .refine(
     (data) =>
       data.mode !== "alarm" ||
-      (data.target_minutes !== undefined &&
-        data.tz_offset_minutes !== undefined),
+      (data.targetMinutes !== undefined && data.tzOffsetMinutes !== undefined),
     { message: "アラームモードでは目標時刻とタイムゾーンオフセットが必須です" },
   );
 
@@ -365,23 +361,22 @@ export const UpdateTimerSchema = z
     timerId: z.number().int().positive(),
     name: z.string().trim().max(255).optional(),
     mode: TimerModeSchema.optional(),
-    base_seconds: z.number().int().min(0).optional(),
-    target_minutes: z.number().int().min(0).max(1439).optional(),
-    tz_offset_minutes: z.number().int().min(-720).max(840).optional(),
-    adjust_minutes: z.number().int().min(1).max(999).optional(),
-    ring_seconds: z.number().int().min(1).max(3600).optional(),
+    baseSeconds: TimerSecondsSchema.optional(),
+    targetMinutes: z.number().int().min(0).max(1439).optional(),
+    tzOffsetMinutes: TimezoneOffsetSchema.optional(),
+    adjustMinutes: TimerAdjustMinutesSchema.optional(),
+    ringSeconds: TimerRingSecondsSchema.optional(),
   })
   .refine(
     (data) =>
       data.mode !== "alarm" ||
-      (data.target_minutes !== undefined &&
-        data.tz_offset_minutes !== undefined),
+      (data.targetMinutes !== undefined && data.tzOffsetMinutes !== undefined),
     { message: "アラームモードでは目標時刻とタイムゾーンオフセットが必須です" },
   )
   .refine(
     (data) =>
       data.mode !== "countdown" ||
-      data.base_seconds !== undefined ||
+      data.baseSeconds !== undefined ||
       data.mode === undefined,
     { message: "カウントダウンモードではベース時間が必須です" },
   );
@@ -392,18 +387,18 @@ export const TimerIdSchema = z.object({
 
 export const StartTimerSchema = z.object({
   timerId: z.number().int().positive(),
-  tz_offset_minutes: z.number().int().min(-720).max(840).optional(),
+  tzOffsetMinutes: TimezoneOffsetSchema.optional(),
 });
 
 export const ResetTimerSchema = z.object({
   timerId: z.number().int().positive(),
-  tz_offset_minutes: z.number().int().min(-720).max(840).optional(),
+  tzOffsetMinutes: TimezoneOffsetSchema.optional(),
 });
 
 export const TimerStopSchema = z.object({
   timerId: z.number().int().positive(),
-  // アラーム発火時の started_at。リセット/再開されていないことを確認するために使用
-  started_at: z.string().datetime().nullable().optional(),
+  // アラーム発火時の startedAt。リセット/再開されていないことを確認するために使用
+  startedAt: z.string().datetime().nullable().optional(),
 });
 
 export const AdjustTimerSchema = z.object({
@@ -413,9 +408,9 @@ export const AdjustTimerSchema = z.object({
 
 export const SetTimerTimeSchema = z.object({
   timerId: z.number().int().positive(),
-  seconds: z.number().int().min(0).max(359999),
-  target_minutes: z.number().int().min(0).max(1439).optional(),
-  tz_offset_minutes: z.number().int().min(-720).max(840).optional(),
+  seconds: TimerSecondsSchema,
+  targetMinutes: z.number().int().min(0).max(1439).optional(),
+  tzOffsetMinutes: TimezoneOffsetSchema.optional(),
 });
 
 // ── 認証スキーマ ──
@@ -428,11 +423,6 @@ export const RegisterUserSchema = z.object({
       "ユーザーIDは4～32文字の英数字としてください",
     ),
   password: z.string().min(1, "パスワードは必須です"),
-});
-
-export const LoginSchema = z.object({
-  userId: z.string().min(1),
-  password: z.string().min(1),
 });
 
 // ── 差分syncスキーマ ──
@@ -453,11 +443,21 @@ export const MergeListSchema = z.object({
 
 export const ReorderTasksSchema = z.object({
   listId: z.number().int().positive(),
-  taskIds: z.array(z.number().int().positive()),
+  taskIds: z
+    .array(z.number().int().positive())
+    .refine(
+      (ids) => new Set(ids).size === ids.length,
+      "タスクIDが重複しています",
+    ),
 });
 
 export const ReorderTimersSchema = z.object({
-  timerIds: z.array(z.number().int().positive()),
+  timerIds: z
+    .array(z.number().int().positive())
+    .refine(
+      (ids) => new Set(ids).size === ids.length,
+      "タイマーIDが重複しています",
+    ),
 });
 
 // ── 添付スキーマ ──
@@ -478,7 +478,7 @@ export const DeleteAttachmentSchema = z.object({
   attachmentId: z.number().int().positive(),
 });
 
-export const DownloadAttachmentInputSchema = z.object({
+export const DownloadAttachmentSchema = z.object({
   attachmentId: z.number().int().positive(),
 });
 
@@ -486,37 +486,12 @@ export const DownloadAttachmentInputSchema = z.object({
 
 export type TaskStatus = z.infer<typeof TaskStatusSchema>;
 export type ShowType = z.infer<typeof ShowTypeSchema>;
-export type ListStatus = z.infer<typeof ListStatusSchema>;
 /** タグ情報型（`TagInfoSchema` からの推論） */
 export type TagInfo = z.infer<typeof TagInfoSchema>;
 
-export type CreateTaskInput = z.infer<typeof CreateTaskSchema>;
-export type UpdateTaskInput = z.infer<typeof UpdateTaskSchema>;
-export type CreateListInput = z.infer<typeof CreateListSchema>;
-export type UpdateListInput = z.infer<typeof UpdateListSchema>;
-export type GetListTasksInput = z.infer<typeof GetListTasksSchema>;
-export type CreateTimerInput = z.infer<typeof CreateTimerSchema>;
-export type UpdateTimerInput = z.infer<typeof UpdateTimerSchema>;
-export type AdjustTimerInput = z.infer<typeof AdjustTimerSchema>;
-export type SetTimerTimeInput = z.infer<typeof SetTimerTimeSchema>;
-export type StartTimerInput = z.infer<typeof StartTimerSchema>;
-export type ResetTimerInput = z.infer<typeof ResetTimerSchema>;
-export type TimerStopInput = z.infer<typeof TimerStopSchema>;
-export type SearchTasksInput = z.infer<typeof SearchTasksSchema>;
-export type ReorderTasksInput = z.infer<typeof ReorderTasksSchema>;
-export type MergeListInput = z.infer<typeof MergeListSchema>;
-export type ReorderTimersInput = z.infer<typeof ReorderTimersSchema>;
-export type RegisterUserInput = z.infer<typeof RegisterUserSchema>;
-export type LoginInput = z.infer<typeof LoginSchema>;
-export type GetActiveTasksInput = z.infer<typeof GetActiveTasksSchema>;
-export type CreateAttachmentInput = z.infer<typeof CreateAttachmentSchema>;
-export type DeleteAttachmentInput = z.infer<typeof DeleteAttachmentSchema>;
-export type DownloadAttachmentInput = z.infer<
-  typeof DownloadAttachmentInputSchema
->;
-export type CalorieItemInput = z.infer<typeof CalorieItemInputSchema>;
+export type CalorieItemInput = z.infer<typeof CreateCalorieItemSchema>;
 export type UpdateCalorieItemInput = z.infer<typeof UpdateCalorieItemSchema>;
-export type CalorieRecordInput = z.infer<typeof CalorieRecordInputSchema>;
+export type CalorieRecordInput = z.infer<typeof CreateCalorieRecordSchema>;
 export type UpdateCalorieRecordInput = z.infer<
   typeof UpdateCalorieRecordSchema
 >;
@@ -530,7 +505,7 @@ export type BulkDeleteCalorieRecordsInput = z.infer<
   typeof BulkDeleteCalorieRecordsSchema
 >;
 export type CalorieAutoRecordInput = z.infer<
-  typeof CalorieAutoRecordInputSchema
+  typeof CreateCalorieAutoRecordSchema
 >;
 export type UpdateCalorieAutoRecordInput = z.infer<
   typeof UpdateCalorieAutoRecordSchema

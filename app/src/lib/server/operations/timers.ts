@@ -39,8 +39,8 @@ export const timers = {
       baseSeconds: input.baseSeconds,
       adjustMinutes: input.adjustMinutes,
       mode: input.mode,
-      targetMinutes: input.targetMinutes ?? null,
-      tzOffsetMinutes: input.tzOffsetMinutes ?? null,
+      targetMinutes: input.targetMinutes,
+      tzOffsetMinutes: input.tzOffsetMinutes,
       ephemeral: input.ephemeral,
       ringSeconds: input.ringSeconds,
     });

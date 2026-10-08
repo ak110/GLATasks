@@ -129,7 +129,7 @@ export function makeContextOptions(
   };
 }
 
-/** 並行するテストと衝突しない名前を作る */
+/** 並行するテストと衝突しない名前を生成する */
 export function uniqueTestName(prefix: string): string {
   return `${prefix}_${Date.now()}_${crypto.randomUUID().slice(0, 8)}`;
 }

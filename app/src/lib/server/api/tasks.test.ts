@@ -8,7 +8,7 @@ import {
 } from "../db-test-helpers";
 import { getDb } from "../db";
 import { lists, tasks } from "../schema";
-import { getActiveTasks, getListTasks, patchTask, postTask } from "./tasks";
+import { listActiveTasks, listTasks, updateTask, createTask } from "./tasks";
 
 describeDb("タスク更新と差分同期", () => {
   const userIds: number[] = [];
@@ -19,13 +19,13 @@ describeDb("タスク更新と差分同期", () => {
     const target = await createFixtureList(source.userId);
     const other = await createFixtureList();
     userIds.push(source.userId, other.userId);
-    const taskId = await postTask(source.userId, source.listId, "旧題\n注記");
-    await patchTask(source.userId, source.listId, taskId, {
+    const taskId = await createTask(source.userId, source.listId, "旧題\n注記");
+    await updateTask(source.userId, source.listId, taskId, {
       text: "新題\n新注記  ",
       status: "completed",
       kind: "todo",
       tags: [{ name: "確認", color: "red" }],
-      keep_order: true,
+      keepOrder: true,
     });
     const [completed] = await getDb()
       .select()
@@ -38,21 +38,21 @@ describeDb("タスク更新と差分同期", () => {
     });
     expect(completed.completed).toBeInstanceOf(Date);
     await expect(
-      patchTask(source.userId, source.listId, taskId, {
-        move_to: other.listId,
-        keep_order: true,
+      updateTask(source.userId, source.listId, taskId, {
+        moveTo: other.listId,
+        keepOrder: true,
       }),
     ).rejects.toThrow("not_found_or_forbidden");
     expect(
       (await getDb().select().from(tasks).where(eq(tasks.id, taskId)))[0]
         .list_id,
     ).toBe(source.listId);
-    await patchTask(source.userId, source.listId, taskId, {
-      move_to: target.listId,
+    await updateTask(source.userId, source.listId, taskId, {
+      moveTo: target.listId,
       completed: null,
-      keep_order: true,
+      keepOrder: true,
     });
-    const moved = await getListTasks(source.userId, target.listId, "all");
+    const moved = await listTasks(source.userId, target.listId, "all");
     expect(moved.status).toBe(200);
     if (moved.status !== 200) throw new Error("移動したタスクが取得できません");
     expect(moved.data).toMatchObject([
@@ -68,9 +68,9 @@ describeDb("タスク更新と差分同期", () => {
         .completed,
     ).toBeNull();
     await expect(
-      patchTask(source.userId, source.listId, taskId, {
+      updateTask(source.userId, source.listId, taskId, {
         status: "active",
-        keep_order: true,
+        keepOrder: true,
       }),
     ).rejects.toThrow("task_not_found");
   });
@@ -80,10 +80,10 @@ describeDb("タスク更新と差分同期", () => {
     const archivedList = await createFixtureList(own.userId);
     const other = await createFixtureList();
     userIds.push(own.userId, other.userId);
-    const unchanged = await postTask(own.userId, own.listId, "古い更新");
-    const changed = await postTask(own.userId, own.listId, "アーカイブ");
-    await postTask(own.userId, archivedList.listId, "非activeリスト");
-    await postTask(other.userId, other.listId, "他人");
+    const unchanged = await createTask(own.userId, own.listId, "古い更新");
+    const changed = await createTask(own.userId, own.listId, "アーカイブ");
+    await createTask(own.userId, archivedList.listId, "非activeリスト");
+    await createTask(other.userId, other.listId, "他人");
     await getDb()
       .update(lists)
       .set({ status: "archived" })
@@ -97,11 +97,11 @@ describeDb("タスク更新と差分同期", () => {
       .update(tasks)
       .set({ status: "archived", updated: since })
       .where(eq(tasks.id, changed));
-    expect(await getActiveTasks(own.userId)).toMatchObject({
+    expect(await listActiveTasks(own.userId)).toMatchObject({
       mode: "full",
       tasks: [{ id: unchanged }],
     });
-    const delta = await getActiveTasks(own.userId, since);
+    const delta = await listActiveTasks(own.userId, since);
     expect(delta).toMatchObject({
       mode: "delta",
       tasks: [{ id: changed, status: "archived" }],

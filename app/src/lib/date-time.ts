@@ -1,7 +1,7 @@
 export const SCHEDULE_TIMEZONE = "Asia/Tokyo";
 export const SCHEDULE_UTC_OFFSET_MS = 9 * 3600 * 1000;
 
-export function getTimezoneOffsetMinutes(): number {
+export function getUtcOffsetMinutes(): number {
   return -new Date().getTimezoneOffset();
 }
 

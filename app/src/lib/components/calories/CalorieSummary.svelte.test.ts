@@ -18,8 +18,8 @@ describe("CalorieSummary", () => {
     (dailyKcal, color) => {
       const { getByTestId } = render(CalorieSummary, {
         periods: [
-          { days: 7, daily_kcal: dailyKcal, percentage: 0 },
-          { days: 28, daily_kcal: dailyKcal, percentage: 0 },
+          { days: 7, dailyKcal: dailyKcal, percentage: 0 },
+          { days: 28, dailyKcal: dailyKcal, percentage: 0 },
         ],
         goalKcal: 1615,
         onSaveGoal: vi.fn(),
@@ -38,7 +38,7 @@ describe("CalorieSummary", () => {
     "1日当たりペース %s kcal は目標までの残りが1食分以上の場合だけ緑系にする",
     (dailyKcal, color) => {
       const { getByTestId } = render(CalorieSummary, {
-        periods: [{ days: 1, daily_kcal: dailyKcal, percentage: 0 }],
+        periods: [{ days: 1, dailyKcal: dailyKcal, percentage: 0 }],
         goalKcal: 1615,
         onSaveGoal: vi.fn(),
       });
@@ -48,7 +48,7 @@ describe("CalorieSummary", () => {
 
   it("1日当たりkcalと割合を1行へまとめ、上下判定の状態文言を追加しない", () => {
     const { getByTestId, queryByText } = render(CalorieSummary, {
-      periods: [{ days: 7, daily_kcal: 969, percentage: 60 }],
+      periods: [{ days: 7, dailyKcal: 969, percentage: 60 }],
       goalKcal: 1615,
       onSaveGoal: vi.fn(),
     });
@@ -60,7 +60,7 @@ describe("CalorieSummary", () => {
 
   it("1日当たりペースのカードへ目標値までの残りを表示する", () => {
     const { getByTestId } = render(CalorieSummary, {
-      periods: [{ days: 1, daily_kcal: 1000, percentage: 61.9 }],
+      periods: [{ days: 1, dailyKcal: 1000, percentage: 61.9 }],
       goalKcal: 1615,
       onSaveGoal: vi.fn(),
     });
@@ -71,7 +71,7 @@ describe("CalorieSummary", () => {
 
   it("1日当たりペースは見出しと値を同じ行へ並べ、残りは数値だけを強調する", () => {
     const { getByTestId } = render(CalorieSummary, {
-      periods: [{ days: 1, daily_kcal: 1080, percentage: 67.5 }],
+      periods: [{ days: 1, dailyKcal: 1080, percentage: 67.5 }],
       goalKcal: 1600,
       onSaveGoal: vi.fn(),
     });
@@ -96,7 +96,7 @@ describe("CalorieSummary", () => {
     "残量リングは目標比 %s%% の分だけ円弧を伸ばし、超過時は全周にする",
     (percentage, dasharray) => {
       const { getByTestId } = render(CalorieSummary, {
-        periods: [{ days: 1, daily_kcal: 1000, percentage }],
+        periods: [{ days: 1, dailyKcal: 1000, percentage }],
         goalKcal: 1615,
         onSaveGoal: vi.fn(),
       });
@@ -112,7 +112,7 @@ describe("CalorieSummary", () => {
 
   it("目標値を超えた場合は超過量を表示する", () => {
     const { getByTestId } = render(CalorieSummary, {
-      periods: [{ days: 1, daily_kcal: 1800, percentage: 111.5 }],
+      periods: [{ days: 1, dailyKcal: 1800, percentage: 111.5 }],
       goalKcal: 1615,
       onSaveGoal: vi.fn(),
     });
@@ -124,8 +124,8 @@ describe("CalorieSummary", () => {
   it("7日間平均と28日間平均のカードへは残りを表示しない", () => {
     const { queryByTestId } = render(CalorieSummary, {
       periods: [
-        { days: 7, daily_kcal: 969, percentage: 60 },
-        { days: 28, daily_kcal: 969, percentage: 60 },
+        { days: 7, dailyKcal: 969, percentage: 60 },
+        { days: 28, dailyKcal: 969, percentage: 60 },
       ],
       goalKcal: 1615,
       onSaveGoal: vi.fn(),

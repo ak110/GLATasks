@@ -1,7 +1,7 @@
 import type { SearchTaskResult } from "#lib/types.ts";
 
 export type SearchResultGroup = {
-  title: string;
+  title: SearchTaskResult["listTitle"];
   tasks: SearchTaskResult[];
 };
 

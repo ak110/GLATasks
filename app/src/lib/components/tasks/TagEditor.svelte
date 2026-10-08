@@ -8,12 +8,12 @@
     import type { TagInfo, TagColorKey } from "#lib/types.ts";
     import { getTagColorClass, resolveTagColor } from "#lib/tag-palette.ts";
 
-    type Props = {
+    interface Props {
         /** 現在設定中のタグ配列（双方向バインド） */
         tags: TagInfo[];
         /** 同一リスト内で既に使われているタグ候補 */
         candidates: TagInfo[];
-    };
+    }
 
     let { tags = $bindable(), candidates }: Props = $props();
 

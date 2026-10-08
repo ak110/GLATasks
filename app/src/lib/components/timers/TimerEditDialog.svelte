@@ -1,7 +1,7 @@
 <script lang="ts">
     import { timerInputClass } from "#lib/components/ui/styles.ts";
     import { grayButtonClass } from "#lib/components/ui/styles.ts";
-    import { getTimezoneOffsetMinutes } from "#lib/date-time.ts";
+    import { getUtcOffsetMinutes } from "#lib/date-time.ts";
     import Dialog from "#lib/components/dialogs/Dialog.svelte";
     /**
      * @fileoverview タイマー追加/編集ダイアログ
@@ -11,7 +11,8 @@
         TIMER_DEFAULT_ADJUST_MINUTES,
         TIMER_DEFAULT_RING_SECONDS,
     } from "#lib/schemas.ts";
-    import type { TimerMode, UserPreferences } from "#lib/schemas.ts";
+    import type { RouterInputs } from "#lib/client/trpc.ts";
+    import type { TimerFormSubmission } from "#lib/client/timers/timer-form-types.ts";
     import {
         formatTime,
         parseTimeInput,
@@ -19,28 +20,22 @@
         parseTargetTime,
     } from "#lib/timer-utils.ts";
 
-    type Props = {
+    interface Props {
         open: boolean;
         mode: "create" | "edit";
         ephemeral: boolean;
         name: string;
-        timerMode: TimerMode;
+        timerMode: TimerFormSubmission["mode"];
         baseSeconds: number;
         targetMinutes: number | null;
         adjustMinutes: number;
         ringSeconds: number;
-        onSubmit: (data: {
-            name: string;
-            mode: TimerMode;
-            base_seconds: number;
-            target_minutes: number | null;
-            tz_offset_minutes: number | null;
-            adjust_minutes: number;
-            ring_seconds: number;
-        }) => void;
+        onSubmit: (data: TimerFormSubmission) => void;
         onClose: () => void;
-        onSaveAsDefault?: (preferences: UserPreferences) => void;
-    };
+        onSaveAsDefault?: (
+            preferences: RouterInputs["users"]["updatePreferences"],
+        ) => void;
+    }
 
     let {
         open,
@@ -67,7 +62,7 @@
     );
 
     let localName = $state("");
-    let localTimerMode = $state<TimerMode>("countdown");
+    let localTimerMode = $state<TimerFormSubmission["mode"]>("countdown");
     let localBaseTime = $state("");
     let localTargetTime = $state("");
     let localAdjustMinutes = $state(TIMER_DEFAULT_ADJUST_MINUTES);
@@ -98,11 +93,11 @@
             onSubmit({
                 name: localName.trim(),
                 mode: "alarm",
-                base_seconds: 0,
-                target_minutes: target,
-                tz_offset_minutes: getTimezoneOffsetMinutes(),
-                adjust_minutes: localAdjustMinutes,
-                ring_seconds: localRingSeconds,
+                baseSeconds: 0,
+                targetMinutes: target,
+                tzOffsetMinutes: getUtcOffsetMinutes(),
+                adjustMinutes: localAdjustMinutes,
+                ringSeconds: localRingSeconds,
             });
         } else {
             const baseSeconds = parseTimeInput(localBaseTime);
@@ -110,11 +105,11 @@
             onSubmit({
                 name: localName.trim(),
                 mode: "countdown",
-                base_seconds: baseSeconds,
-                target_minutes: null,
-                tz_offset_minutes: null,
-                adjust_minutes: localAdjustMinutes,
-                ring_seconds: localRingSeconds,
+                baseSeconds: baseSeconds,
+                targetMinutes: null,
+                tzOffsetMinutes: null,
+                adjustMinutes: localAdjustMinutes,
+                ringSeconds: localRingSeconds,
             });
         }
     }
@@ -129,9 +124,9 @@
                 ? (parseTimeInput(localBaseTime) ?? undefined)
                 : undefined;
         onSaveAsDefault({
-            ring_seconds: localRingSeconds,
-            base_seconds: baseSeconds,
-            adjust_minutes: localAdjustMinutes,
+            ringSeconds: localRingSeconds,
+            baseSeconds: baseSeconds,
+            adjustMinutes: localAdjustMinutes,
             mode: localTimerMode,
         });
     }

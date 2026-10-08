@@ -7,7 +7,11 @@
     import AuthCard from "#lib/components/layout/AuthCard.svelte";
     import { resolve } from "$app/paths";
 
-    const { form }: { form: ActionData } = $props();
+    interface Props {
+        form: ActionData;
+    }
+
+    let { form }: Props = $props();
 </script>
 
 <AuthCard title="GLATasks" error={form?.error}>

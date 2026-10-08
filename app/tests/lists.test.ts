@@ -7,7 +7,7 @@ import {
   toggleTaskAndWaitForUpdate,
   waitForSuccessfulMutationResponse,
 } from "./helpers/common";
-import { test, expect } from "@playwright/test";
+import { test, expect, type Locator } from "@playwright/test";
 /**
  * @fileoverview リスト CRUD の e2e テスト
  */
@@ -38,6 +38,130 @@ test.describe("lists", () => {
       .last()
       .click();
   }
+
+  test("編集と最前面の破棄確認でTabが循環し、Escape後にフォーカスが戻る", async ({
+    page,
+    browser,
+  }) => {
+    const listName = uniqueTestName("フォーカス確認");
+    const taskTitle = uniqueTestName("フォーカス対象");
+    await setupTestLists(browser, [listName]);
+    try {
+      await Promise.all([
+        waitForSuccessfulMutationResponse(page, "lists.list"),
+        page.reload(),
+      ]);
+      await page
+        .getByTestId("list-select-btn")
+        .filter({ hasText: listName })
+        .click();
+      const task = await addTask(page, taskTitle);
+      const opener = task.getByTestId("task-edit-btn");
+      await opener.click();
+      const editor = page.getByRole("dialog", { name: "タスクの編集" });
+      await expect(editor).toBeVisible();
+
+      // 各方向にフォーカス可能な要素の数以上を2周し、背面へ移らないことを確かめる。
+      async function cycleFocus(dialog: Locator) {
+        const steps =
+          2 *
+          ((await dialog
+            .locator('button, input, textarea, select, a[href], [tabindex="0"]')
+            .count()) +
+            1);
+        for (const key of ["Tab", "Shift+Tab"]) {
+          for (let step = 0; step < steps; step++) {
+            await page.keyboard.press(key);
+            await expect
+              .poll(() =>
+                dialog.evaluate((element) =>
+                  element.contains(document.activeElement),
+                ),
+              )
+              .toBe(true);
+          }
+        }
+      }
+
+      await cycleFocus(editor);
+      await editor.getByLabel("内容").fill(`${taskTitle}変更`);
+      await page.keyboard.press("Escape");
+      const confirmation = page.getByRole("dialog", { name: "変更を破棄" });
+      await expect(confirmation).toBeVisible();
+      await cycleFocus(confirmation);
+      await page.keyboard.press("Escape");
+      await expect(confirmation).not.toBeVisible();
+      await expect(editor).toBeVisible();
+      await expect
+        .poll(() =>
+          editor.evaluate((element) =>
+            element.contains(document.activeElement),
+          ),
+        )
+        .toBe(true);
+
+      // 未保存の変更を戻して、編集ダイアログ自体をEscapeで閉じる。
+      await editor.getByLabel("内容").fill(taskTitle);
+      await page.keyboard.press("Escape");
+      await expect(editor).not.toBeVisible();
+      await expect(opener).toBeFocused();
+    } finally {
+      await cleanupTestLists(browser, [listName]);
+    }
+  });
+
+  test("既存リストより名前が先行する新規リストのIDとタイトルが自動選択される", async ({
+    page,
+    browser,
+  }) => {
+    const stamp = uniqueTestName("自動選択");
+    const existingName = `zz_${stamp}`;
+    const createdName = `aa_${stamp}`;
+    await setupTestLists(browser, [existingName]);
+    try {
+      await Promise.all([
+        waitForSuccessfulMutationResponse(page, "lists.list"),
+        page.reload(),
+      ]);
+      await page
+        .getByTestId("list-select-btn")
+        .filter({ hasText: existingName })
+        .click();
+      // 作成後の選択ボタンをクリックしない。作成そのものによる選択を検証する。
+      await createListFromPage(page, createdName, false);
+      await expect(
+        page.getByRole("heading", { name: createdName, exact: true }),
+      ).toBeVisible();
+      const titles = await page
+        .getByTestId("list-select-btn")
+        .allTextContents();
+      const createdIndex = titles.findIndex((title) =>
+        title.includes(createdName),
+      );
+      const existingIndex = titles.findIndex((title) =>
+        title.includes(existingName),
+      );
+      expect(createdIndex).toBeGreaterThanOrEqual(0);
+      expect(existingIndex).toBeGreaterThan(createdIndex);
+
+      // 公開編集フォームのリスト選択肢から作成IDを取得し、URLと実際の所属先を照合する。
+      const task = await addTask(page, uniqueTestName("新規リスト所属"));
+      await task.getByTestId("task-edit-btn").click();
+      const editor = page.getByRole("dialog", { name: "タスクの編集" });
+      const listSelect = editor.getByLabel("リスト", { exact: true });
+      const createdId = await listSelect
+        .locator("option")
+        .filter({ hasText: createdName })
+        .getAttribute("value");
+      expect(createdId).toMatch(/^[1-9]\d*$/);
+      expect(new URL(page.url()).hash).toBe(`#${createdId}`);
+      await expect(listSelect).toHaveValue(createdId!);
+      await page.keyboard.press("Escape");
+      await expect(editor).not.toBeVisible();
+    } finally {
+      await cleanupTestLists(browser, [existingName, createdName]);
+    }
+  });
 
   test("リストを追加するとサイドバーに表示される", async ({ page }) => {
     const listName = `テストリスト_${uniqueTestName("e2e")}`;
@@ -152,7 +276,7 @@ test.describe("lists", () => {
       await addTask(page, targetTaskTitle);
 
       await sourceList.getByTestId("list-menu-btn").click();
-      await page.getByRole("button", { name: "他のリストに統合" }).click();
+      await page.getByRole("menuitem", { name: "他のリストに統合" }).click();
       const mergeDialog = page.getByRole("dialog", { name: "リストの統合" });
       await mergeDialog.getByLabel("統合先リスト").selectOption({
         label: targetListName,

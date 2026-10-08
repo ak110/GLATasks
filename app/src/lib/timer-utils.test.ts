@@ -19,16 +19,16 @@ function makeTimer(overrides: Partial<TimerInfo> = {}): TimerInfo {
     id: 1,
     name: "テスト",
     mode: "countdown" as const,
-    target_minutes: null,
-    base_seconds: 300,
-    adjust_minutes: 5,
+    targetMinutes: null,
+    baseSeconds: 300,
+    adjustMinutes: 5,
     running: false,
     expired: false,
     ephemeral: false,
-    ring_seconds: 3,
-    remaining_seconds: 300,
-    started_at: null,
-    sort_order: 0,
+    ringSeconds: 3,
+    remainingSeconds: 300,
+    startedAt: null,
+    sortOrder: 0,
     ...overrides,
   };
 }
@@ -36,13 +36,13 @@ function makeTimer(overrides: Partial<TimerInfo> = {}): TimerInfo {
 describe("calcTimerRemainingMs", () => {
   afterEach(() => vi.useRealTimers());
 
-  it("停止中のタイマーは remaining_seconds をミリ秒で返す", () => {
-    const timer = makeTimer({ remaining_seconds: 120 });
+  it("停止中のタイマーは remainingSeconds をミリ秒で返す", () => {
+    const timer = makeTimer({ remainingSeconds: 120 });
     expect(calcTimerRemainingMs(timer, 0)).toBe(120_000);
   });
 
-  it("running で started_at が null の場合は remaining_seconds をミリ秒で返す", () => {
-    const timer = makeTimer({ running: true, started_at: null });
+  it("running で startedAt が null の場合は remainingSeconds をミリ秒で返す", () => {
+    const timer = makeTimer({ running: true, startedAt: null });
     expect(calcTimerRemainingMs(timer, 0)).toBe(300_000);
   });
 
@@ -50,8 +50,8 @@ describe("calcTimerRemainingMs", () => {
     vi.useFakeTimers({ now: 10_000 });
     const timer = makeTimer({
       running: true,
-      remaining_seconds: 60,
-      started_at: new Date(7_000).toISOString(), // 3秒前に開始
+      remainingSeconds: 60,
+      startedAt: new Date(7_000).toISOString(), // 3秒前に開始
     });
     expect(calcTimerRemainingMs(timer, 0)).toBe(57_000);
   });
@@ -60,8 +60,8 @@ describe("calcTimerRemainingMs", () => {
     vi.useFakeTimers({ now: 10_000 });
     const timer = makeTimer({
       running: true,
-      remaining_seconds: 60,
-      started_at: new Date(7_000).toISOString(),
+      remainingSeconds: 60,
+      startedAt: new Date(7_000).toISOString(),
     });
     // オフセット +2000ms → サーバー時刻は 12秒 → 経過5秒 → 残り55秒
     expect(calcTimerRemainingMs(timer, 2_000)).toBe(55_000);
@@ -71,8 +71,8 @@ describe("calcTimerRemainingMs", () => {
     vi.useFakeTimers({ now: 100_000 });
     const timer = makeTimer({
       running: true,
-      remaining_seconds: 10,
-      started_at: new Date(0).toISOString(), // 100秒前
+      remainingSeconds: 10,
+      startedAt: new Date(0).toISOString(), // 100秒前
     });
     expect(calcTimerRemainingMs(timer, 0)).toBe(0);
   });

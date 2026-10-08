@@ -1,10 +1,11 @@
 <script lang="ts">
     import { grayButtonClass } from "#lib/components/ui/styles.ts";
-    import { getTimezoneOffsetMinutes } from "#lib/date-time.ts";
+    import { getUtcOffsetMinutes } from "#lib/date-time.ts";
     /**
      * @fileoverview タイマーカードコンポーネント
      */
 
+    import type { RouterInputs } from "#lib/client/trpc.ts";
     import type { TimerInfo } from "#lib/types.ts";
     import { getServerOffset } from "#lib/client/timers/time-sync.ts";
     import {
@@ -16,24 +17,27 @@
         calcSecondsUntilTarget,
     } from "#lib/timer-utils.ts";
 
-    type Props = {
+    interface Props {
         timer: TimerInfo;
-        onStart: (timerId: number) => void;
-        onPause: (timerId: number) => void;
-        onReset: (timerId: number) => void;
-        onAdjust: (timerId: number, minutes: number) => void;
+        onStart: (timerId: RouterInputs["timers"]["start"]["timerId"]) => void;
+        onPause: (timerId: RouterInputs["timers"]["pause"]["timerId"]) => void;
+        onReset: (timerId: RouterInputs["timers"]["reset"]["timerId"]) => void;
+        onAdjust: (
+            timerId: RouterInputs["timers"]["adjust"]["timerId"],
+            minutes: RouterInputs["timers"]["adjust"]["minutes"],
+        ) => void;
         onSetTime: (
-            timerId: number,
-            seconds: number,
-            targetMinutes?: number,
-            tzOffsetMinutes?: number,
+            timerId: RouterInputs["timers"]["setTime"]["timerId"],
+            seconds: RouterInputs["timers"]["setTime"]["seconds"],
+            targetMinutes?: RouterInputs["timers"]["setTime"]["targetMinutes"],
+            tzOffsetMinutes?: RouterInputs["timers"]["setTime"]["tzOffsetMinutes"],
         ) => void;
         onEdit: (timer: TimerInfo) => void;
         onDelete: (timer: TimerInfo, skipConfirm: boolean) => void;
         isDragging?: boolean;
         dropIndicator?: "before" | "after" | null;
         onDragStart?: (timerId: number, e: PointerEvent) => void;
-    };
+    }
 
     let {
         timer,
@@ -61,9 +65,9 @@
         if (
             timer.mode === "alarm" &&
             !timer.running &&
-            timer.target_minutes !== null
+            timer.targetMinutes !== null
         ) {
-            return calcSecondsUntilTarget(timer.target_minutes);
+            return calcSecondsUntilTarget(timer.targetMinutes);
         }
         return Math.floor(
             calcTimerRemainingMs(timer, getServerOffset()) / 1000,
@@ -74,7 +78,7 @@
     const isStoppedAlarm = $derived(
         timer.mode === "alarm" &&
             !timer.running &&
-            timer.target_minutes !== null,
+            timer.targetMinutes !== null,
     );
 
     // 1秒ごとに表示更新
@@ -104,8 +108,8 @@
     function startEditing() {
         if (timer.running) return;
         editing = true;
-        if (timer.mode === "alarm" && timer.target_minutes !== null) {
-            editValue = formatTargetTime(timer.target_minutes);
+        if (timer.mode === "alarm" && timer.targetMinutes !== null) {
+            editValue = formatTargetTime(timer.targetMinutes);
         } else {
             editValue = formatTime(displaySeconds);
         }
@@ -116,8 +120,8 @@
         editing = false;
         if (timer.mode === "alarm") {
             const target = parseTargetTime(editValue);
-            if (target !== null && target !== timer.target_minutes) {
-                const tzOffset = getTimezoneOffsetMinutes();
+            if (target !== null && target !== timer.targetMinutes) {
+                const tzOffset = getUtcOffsetMinutes();
                 onSetTime(timer.id, 0, target, tzOffset);
             }
         } else {
@@ -207,7 +211,7 @@
     </div>
 
     <!-- アラームモード: 目標時刻表示 -->
-    {#if timer.mode === "alarm" && timer.target_minutes !== null}
+    {#if timer.mode === "alarm" && timer.targetMinutes !== null}
         {#if editing}
             <div
                 class="mb-1 text-center text-sm"
@@ -228,14 +232,14 @@
                 onclick={startEditing}
                 data-testid="timer-target-display"
             >
-                🔔 {formatTargetTime(timer.target_minutes)}
+                🔔 {formatTargetTime(timer.targetMinutes)}
             </button>
         {:else}
             <div
                 class="mb-1 text-center text-sm text-gray-500 dark:text-gray-400"
                 data-testid="timer-target-display"
             >
-                🔔 {formatTargetTime(timer.target_minutes)}
+                🔔 {formatTargetTime(timer.targetMinutes)}
             </div>
         {/if}
     {/if}
@@ -295,14 +299,14 @@
         </div>
         <div class="flex flex-nowrap items-center gap-2">
             <button
-                onclick={() => onAdjust(timer.id, timer.adjust_minutes)}
+                onclick={() => onAdjust(timer.id, timer.adjustMinutes)}
                 class="cursor-pointer rounded bg-blue-50 px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50"
-                data-testid="timer-plus-btn">+{timer.adjust_minutes}分</button
+                data-testid="timer-plus-btn">+{timer.adjustMinutes}分</button
             >
             <button
-                onclick={() => onAdjust(timer.id, -timer.adjust_minutes)}
+                onclick={() => onAdjust(timer.id, -timer.adjustMinutes)}
                 class="cursor-pointer rounded bg-blue-50 px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50"
-                data-testid="timer-minus-btn">-{timer.adjust_minutes}分</button
+                data-testid="timer-minus-btn">-{timer.adjustMinutes}分</button
             >
         </div>
     </div>

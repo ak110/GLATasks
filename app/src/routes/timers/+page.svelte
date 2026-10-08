@@ -5,7 +5,7 @@
         preferencesOptions,
         queryKeys,
     } from "#lib/client/query-options.ts";
-    import { getTimezoneOffsetMinutes } from "#lib/date-time.ts";
+    import { getUtcOffsetMinutes } from "#lib/date-time.ts";
     /**
      * @fileoverview タイマーページ
      */
@@ -15,14 +15,14 @@
         createMutation,
         useQueryClient,
     } from "@tanstack/svelte-query";
-    import { trpc } from "#lib/client/trpc.ts";
+    import { trpc, type RouterInputs } from "#lib/client/trpc.ts";
     import { createDragReorder } from "#lib/actions/dnd-reorder.svelte.ts";
     import {
         TIMER_DEFAULT_BASE_MINUTES,
         TIMER_DEFAULT_ADJUST_MINUTES,
         TIMER_DEFAULT_RING_SECONDS,
     } from "#lib/schemas.ts";
-    import type { TimerMode, UserPreferences } from "#lib/schemas.ts";
+    import type { TimerFormSubmission } from "#lib/client/timers/timer-form-types.ts";
     import { playStartBeep } from "#lib/client/timers/beep.ts";
     import { SSE_EVENTS } from "#lib/sse-events.ts";
     import type { TimerInfo, TimersResult } from "#lib/types.ts";
@@ -41,7 +41,7 @@
         ephemeral: boolean;
         timerId: number;
         name: string;
-        timerMode: TimerMode;
+        timerMode: TimerFormSubmission["mode"];
         baseSeconds: number;
         targetMinutes: number | null;
         adjustMinutes: number;
@@ -72,7 +72,7 @@
     const preferencesQuery = createQuery(() => preferencesOptions());
 
     const updatePreferencesMutation = createMutation(() => ({
-        mutationFn: (input: UserPreferences) =>
+        mutationFn: (input: RouterInputs["users"]["updatePreferences"]) =>
             trpc.users.updatePreferences.mutate(input),
         onSuccess: () =>
             queryClient.invalidateQueries({ queryKey: queryKeys.preferences }),
@@ -86,51 +86,36 @@
         SSE_EVENTS.usersPreferencesUpdated,
     ]);
 
-    /** アラームモードのタイマーかどうかで tz_offset_minutes を付加するヘルパー */
+    /** アラームモードのタイマーかどうかで tzOffsetMinutes を付加するヘルパー */
     function getTzOffset(timerId: number): number | undefined {
         const timer = timersList.find((t) => t.id === timerId);
-        return timer?.mode === "alarm" ? getTimezoneOffsetMinutes() : undefined;
+        return timer?.mode === "alarm" ? getUtcOffsetMinutes() : undefined;
     }
 
     // ミューテーション群
     const createTimerMutation = createMutation(() => ({
-        mutationFn: (input: {
-            name: string;
-            mode: TimerMode;
-            base_seconds: number;
-            target_minutes?: number;
-            tz_offset_minutes?: number;
-            adjust_minutes: number;
-            ephemeral: boolean;
-            ring_seconds: number;
-        }) => trpc.timers.create.mutate(input),
+        mutationFn: (input: RouterInputs["timers"]["create"]) =>
+            trpc.timers.create.mutate(input),
         onSuccess: () =>
             queryClient.invalidateQueries({ queryKey: queryKeys.timers }),
     }));
 
     const updateTimerMutation = createMutation(() => ({
-        mutationFn: (input: {
-            timerId: number;
-            name?: string;
-            mode?: TimerMode;
-            base_seconds?: number;
-            target_minutes?: number;
-            tz_offset_minutes?: number;
-            adjust_minutes?: number;
-            ring_seconds?: number;
-        }) => trpc.timers.update.mutate(input),
+        mutationFn: (input: RouterInputs["timers"]["update"]) =>
+            trpc.timers.update.mutate(input),
         onSuccess: () =>
             queryClient.invalidateQueries({ queryKey: queryKeys.timers }),
     }));
 
     const deleteTimerMutation = createMutation(() => ({
-        mutationFn: (timerId: number) => trpc.timers.delete.mutate({ timerId }),
+        mutationFn: (timerId: RouterInputs["timers"]["delete"]["timerId"]) =>
+            trpc.timers.delete.mutate({ timerId }),
         onSuccess: () =>
             queryClient.invalidateQueries({ queryKey: queryKeys.timers }),
     }));
 
     const startTimerMutation = createMutation(() => ({
-        mutationFn: (input: { timerId: number; tz_offset_minutes?: number }) =>
+        mutationFn: (input: RouterInputs["timers"]["start"]) =>
             trpc.timers.start.mutate(input),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: queryKeys.timers });
@@ -147,38 +132,35 @@
     }));
 
     const pauseTimerMutation = createMutation(() => ({
-        mutationFn: (timerId: number) => trpc.timers.pause.mutate({ timerId }),
+        mutationFn: (timerId: RouterInputs["timers"]["pause"]["timerId"]) =>
+            trpc.timers.pause.mutate({ timerId }),
         onSuccess: () =>
             queryClient.invalidateQueries({ queryKey: queryKeys.timers }),
     }));
 
     const resetTimerMutation = createMutation(() => ({
-        mutationFn: (input: { timerId: number; tz_offset_minutes?: number }) =>
+        mutationFn: (input: RouterInputs["timers"]["reset"]) =>
             trpc.timers.reset.mutate(input),
         onSuccess: () =>
             queryClient.invalidateQueries({ queryKey: queryKeys.timers }),
     }));
 
     const adjustTimerMutation = createMutation(() => ({
-        mutationFn: (input: { timerId: number; minutes: number }) =>
+        mutationFn: (input: RouterInputs["timers"]["adjust"]) =>
             trpc.timers.adjust.mutate(input),
         onSuccess: () =>
             queryClient.invalidateQueries({ queryKey: queryKeys.timers }),
     }));
 
     const setTimerTimeMutation = createMutation(() => ({
-        mutationFn: (input: {
-            timerId: number;
-            seconds: number;
-            target_minutes?: number;
-            tz_offset_minutes?: number;
-        }) => trpc.timers.setTime.mutate(input),
+        mutationFn: (input: RouterInputs["timers"]["setTime"]) =>
+            trpc.timers.setTime.mutate(input),
         onSuccess: () =>
             queryClient.invalidateQueries({ queryKey: queryKeys.timers }),
     }));
 
     const reorderTimersMutation = createMutation(() => ({
-        mutationFn: (input: { timerIds: number[] }) =>
+        mutationFn: (input: RouterInputs["timers"]["reorder"]) =>
             trpc.timers.reorder.mutate(input),
         onSettled: () =>
             queryClient.invalidateQueries({ queryKey: queryKeys.timers }),
@@ -218,10 +200,10 @@
             timerId: 0,
             name: "",
             timerMode: prefs.mode ?? "countdown",
-            baseSeconds: prefs.base_seconds ?? TIMER_DEFAULT_BASE_MINUTES * 60,
+            baseSeconds: prefs.baseSeconds ?? TIMER_DEFAULT_BASE_MINUTES * 60,
             targetMinutes: null,
-            adjustMinutes: prefs.adjust_minutes ?? TIMER_DEFAULT_ADJUST_MINUTES,
-            ringSeconds: prefs.ring_seconds ?? TIMER_DEFAULT_RING_SECONDS,
+            adjustMinutes: prefs.adjustMinutes ?? TIMER_DEFAULT_ADJUST_MINUTES,
+            ringSeconds: prefs.ringSeconds ?? TIMER_DEFAULT_RING_SECONDS,
         };
     }
 
@@ -233,48 +215,42 @@
             timerId: timer.id,
             name: timer.name,
             timerMode: timer.mode,
-            baseSeconds: timer.base_seconds,
-            targetMinutes: timer.target_minutes,
-            adjustMinutes: timer.adjust_minutes,
-            ringSeconds: timer.ring_seconds,
+            baseSeconds: timer.baseSeconds,
+            targetMinutes: timer.targetMinutes,
+            adjustMinutes: timer.adjustMinutes,
+            ringSeconds: timer.ringSeconds,
         };
     }
 
-    function handleSaveAsDefault(preferences: UserPreferences) {
+    function handleSaveAsDefault(
+        preferences: RouterInputs["users"]["updatePreferences"],
+    ) {
         updatePreferencesMutation.mutate(preferences);
     }
 
-    async function handleDialogSubmit(data: {
-        name: string;
-        mode: TimerMode;
-        base_seconds: number;
-        target_minutes: number | null;
-        tz_offset_minutes: number | null;
-        adjust_minutes: number;
-        ring_seconds: number;
-    }) {
+    async function handleDialogSubmit(data: TimerFormSubmission) {
         try {
             if (dialog.mode === "create") {
                 await createTimerMutation.mutateAsync({
                     name: data.name,
                     mode: data.mode,
-                    base_seconds: data.base_seconds,
-                    target_minutes: data.target_minutes ?? undefined,
-                    tz_offset_minutes: data.tz_offset_minutes ?? undefined,
-                    adjust_minutes: data.adjust_minutes,
+                    baseSeconds: data.baseSeconds,
+                    targetMinutes: data.targetMinutes ?? undefined,
+                    tzOffsetMinutes: data.tzOffsetMinutes ?? undefined,
+                    adjustMinutes: data.adjustMinutes,
                     ephemeral: dialog.ephemeral,
-                    ring_seconds: data.ring_seconds,
+                    ringSeconds: data.ringSeconds,
                 });
             } else {
                 await updateTimerMutation.mutateAsync({
                     timerId: dialog.timerId,
                     name: data.name,
                     mode: data.mode,
-                    base_seconds: data.base_seconds,
-                    target_minutes: data.target_minutes ?? undefined,
-                    tz_offset_minutes: data.tz_offset_minutes ?? undefined,
-                    adjust_minutes: data.adjust_minutes,
-                    ring_seconds: data.ring_seconds,
+                    baseSeconds: data.baseSeconds,
+                    targetMinutes: data.targetMinutes ?? undefined,
+                    tzOffsetMinutes: data.tzOffsetMinutes ?? undefined,
+                    adjustMinutes: data.adjustMinutes,
+                    ringSeconds: data.ringSeconds,
                 });
             }
             dialog.open = false;
@@ -342,13 +318,13 @@
                         onStart={(id) =>
                             startTimerMutation.mutate({
                                 timerId: id,
-                                tz_offset_minutes: getTzOffset(id),
+                                tzOffsetMinutes: getTzOffset(id),
                             })}
                         onPause={(id) => pauseTimerMutation.mutate(id)}
                         onReset={(id) =>
                             resetTimerMutation.mutate({
                                 timerId: id,
-                                tz_offset_minutes: getTzOffset(id),
+                                tzOffsetMinutes: getTzOffset(id),
                             })}
                         onAdjust={(id, minutes) =>
                             adjustTimerMutation.mutate({
@@ -364,8 +340,8 @@
                             setTimerTimeMutation.mutate({
                                 timerId: id,
                                 seconds,
-                                target_minutes: targetMinutes,
-                                tz_offset_minutes: tzOffsetMinutes,
+                                targetMinutes: targetMinutes,
+                                tzOffsetMinutes: tzOffsetMinutes,
                             })}
                         onEdit={openEditDialog}
                         onDelete={handleDelete}

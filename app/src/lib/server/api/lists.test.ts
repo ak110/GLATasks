@@ -13,7 +13,7 @@ import { attachments, lists, schedules, tasks } from "../schema";
 import { createAttachment, downloadAttachment } from "./attachments";
 import { createSchedule, listSchedules } from "./schedules";
 import { deleteList, mergeLists } from "./lists";
-import { postTask } from "./tasks";
+import { createTask } from "./tasks";
 
 const rrule = "DTSTART;TZID=Asia/Tokyo:20260101T090000\nRRULE:FREQ=DAILY";
 
@@ -62,7 +62,7 @@ describeDb("リストの削除と統合", () => {
     const source = await createFixtureTask();
     const target = await createFixtureList(source.userId);
     userIds.push(source.userId);
-    const targetTask = await postTask(source.userId, target.listId, "移動先");
+    const targetTask = await createTask(source.userId, target.listId, "移動先");
     const { attachmentId } = await createAttachment({
       userId: source.userId,
       taskId: source.taskId,
@@ -122,7 +122,7 @@ describeDb("リストの削除と統合", () => {
     const source = await createFixtureTask();
     const target = await createFixtureList(source.userId);
     userIds.push(source.userId);
-    await postTask(source.userId, target.listId, "移動先");
+    await createTask(source.userId, target.listId, "移動先");
     await createSchedule(source.userId, {
       listId: source.listId,
       title: "定期",

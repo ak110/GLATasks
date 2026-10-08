@@ -90,7 +90,7 @@ export async function openCaloriesAsNewUser(browser: Browser) {
     makeContextOptions({ storageState: { cookies: [], origins: [] } }),
   );
   const page = await context.newPage();
-  const userId = `cal${uniqueTestName("e2e")}${Math.random().toString(36).slice(2, 6)}`;
+  const userId = `cal${uniqueTestName("e2e").replaceAll("_", "")}${Math.random().toString(36).slice(2, 6)}`;
   await page.goto("/auth/regist_user");
   await page.fill('[name="user_id"]', userId);
   await page.fill('[name="password"]', "e2etestpass123");

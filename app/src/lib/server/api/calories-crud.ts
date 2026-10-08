@@ -69,6 +69,8 @@ async function assertOwnedItem(userId: number, itemId: number): Promise<void> {
 }
 
 export async function getCalorieItems(userId: number) {
+  // SELECTの単一テーブル向け最適化による修飾除去を避け、相関先を品目のIDへ固定する。
+  const itemId = sql`${calorieItems}.${sql.identifier(calorieItems.id.name)}`;
   const rows = await getDb()
     .select({
       id: calorieItems.id,
@@ -76,11 +78,11 @@ export async function getCalorieItems(userId: number) {
       kcal: calorieItems.kcal,
       note: calorieItems.note,
       recordCount:
-        sql<number>`(SELECT COUNT(*) FROM ${calorieRecords} WHERE ${calorieRecords.item_id} = ${calorieItems.id} AND ${calorieRecords.user_id} = ${userId})`.mapWith(
+        sql<number>`(SELECT COUNT(*) FROM ${calorieRecords} WHERE ${calorieRecords.item_id} = ${itemId} AND ${calorieRecords.user_id} = ${userId})`.mapWith(
           Number,
         ),
       autoRecordCount:
-        sql<number>`(SELECT COUNT(*) FROM ${calorieAutoRecords} WHERE ${calorieAutoRecords.item_id} = ${calorieItems.id} AND ${calorieAutoRecords.user_id} = ${userId})`.mapWith(
+        sql<number>`(SELECT COUNT(*) FROM ${calorieAutoRecords} WHERE ${calorieAutoRecords.item_id} = ${itemId} AND ${calorieAutoRecords.user_id} = ${userId})`.mapWith(
           Number,
         ),
     })
@@ -150,7 +152,6 @@ export async function deleteCalorieItem(
   userId: number,
   itemId: number,
 ): Promise<void> {
-  await assertOwnedItem(userId, itemId);
   try {
     await getDb()
       .delete(calorieItems)

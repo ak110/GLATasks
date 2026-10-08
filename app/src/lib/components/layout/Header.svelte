@@ -20,14 +20,14 @@
               : "💻",
     );
 
-    type Props = {
+    interface Props {
         page: (typeof navigationItems)[number]["key"];
         isLoading: boolean;
         showType?: "active" | "archived" | "all";
         onChangeShowType?: (type: "active" | "archived" | "all") => void;
         searchQuery?: string;
         onSearchChange?: (query: string) => void;
-    };
+    }
 
     let {
         page,

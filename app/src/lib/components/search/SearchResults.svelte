@@ -13,7 +13,7 @@
     import { clampDetector } from "#lib/actions/clamp.ts";
     import { linkify } from "#lib/client/search/linkify.ts";
 
-    type Props = {
+    interface Props {
         /** 現在の検索クエリ（見出し表示用） */
         query: string;
         /** 検索結果をリスト id でグループ化したマップ */
@@ -25,7 +25,7 @@
         isLoading: boolean;
         /** 検索結果のタスクをクリックしたときのコールバック */
         onGoToResult: (listId: number) => void;
-    };
+    }
 
     let { query, searchResultsByList, isLoading, onGoToResult }: Props =
         $props();

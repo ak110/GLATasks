@@ -4,9 +4,9 @@
     type Achievement = RouterOutputs["calories"]["summary"]["achievement"];
     type Status = Achievement["days"][number]["status"];
 
-    type Props = {
+    interface Props {
         achievement: Achievement;
-    };
+    }
 
     let { achievement }: Props = $props();
 
@@ -23,11 +23,11 @@
     };
 
     // 昨日が達成日なら、ブロック全体を淡い緑系の配色へ変える
-    const achieved = $derived(achievement.streak_days > 0);
+    const achieved = $derived(achievement.streakDays > 0);
     const streakText = $derived(
-        achievement.streak_days >= achievement.days.length
+        achievement.streakDays >= achievement.days.length
             ? `${achievement.days.length}日以上`
-            : `${achievement.streak_days}日`,
+            : `${achievement.streakDays}日`,
     );
 
     function formatKcal(value: number): string {
@@ -36,9 +36,9 @@
 
     function dotLabel(day: Achievement["days"][number]): string {
         const average =
-            day.average_kcal === null
+            day.averageKcal === null
                 ? ""
-                : ` 7日平均 ${formatKcal(day.average_kcal)} kcal`;
+                : ` 7日平均 ${formatKcal(day.averageKcal)} kcal`;
         return `${day.date}${average} ${statusLabels[day.status]}`;
     }
 </script>
@@ -62,15 +62,15 @@
             <span class="text-2xl font-bold">{streakText}</span>連続で目標内
         </p>
     {/if}
-    {#if achievement.latest_average_kcal === null}
+    {#if achievement.latestAverageKcal === null}
         <p class="text-sm" data-testid="calorie-achievement-guide">
             記録が7日分たまると判定を始めます
         </p>
     {/if}
-    {#if achievement.today_remaining_kcal !== null}
+    {#if achievement.todayRemainingKcal !== null}
         <p class="text-base" data-testid="calorie-achievement-remaining">
             あと <span class="text-xl font-bold tabular-nums"
-                >{formatKcal(achievement.today_remaining_kcal)}</span
+                >{formatKcal(achievement.todayRemainingKcal)}</span
             > kcal
         </p>
     {/if}

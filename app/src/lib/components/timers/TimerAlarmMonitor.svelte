@@ -26,8 +26,8 @@
     import { resolve } from "$app/paths";
 
     type AlarmInfo = {
-        timerId: number;
-        timerName: string;
+        timerId: TimerInfo["id"];
+        timerName: TimerInfo["name"];
     };
 
     const queryClient = useQueryClient();
@@ -167,7 +167,7 @@
     }
 
     /** タイマー完了時にブラウザ通知を表示する */
-    function showNotification(timerName: string) {
+    function showNotification(timerName: TimerInfo["name"]) {
         if (
             typeof Notification === "undefined" ||
             Notification.permission !== "granted"
@@ -207,17 +207,17 @@
             // （refetchOnWindowFocus / refetchInterval で最新データ取得後に再スケジュールされる）
             return;
         }
-        const data = queryClient.getQueryData<RouterOutputs["timers"]["list"]>([
-            "timers",
-        ]);
+        const data = queryClient.getQueryData<RouterOutputs["timers"]["list"]>(
+            queryKeys.timers,
+        );
         const timer = data?.timers?.find((t) => t.id === timerId);
         if (!timer) return;
         // autoStopIfExpired で停止済み（expired=true）→ 完了として扱う
         const isCompleted = timer.expired && !timer.running;
-        // まだ running で started_at が一致 → 完了直前
+        // まだ running で startedAt が一致 → 完了直前
         const isAboutToComplete =
-            timer.running && timer.started_at === startedAt;
-        // リセット（remaining > 0）や再開（started_at 変更）はスキップ
+            timer.running && timer.startedAt === startedAt;
+        // リセット（remaining > 0）や再開（startedAt 変更）はスキップ
         if (!isCompleted && !isAboutToComplete) return;
         handleAlarm(timerId, timerName, startedAt);
     }
@@ -231,10 +231,10 @@
         if (alarmedIds.has(timerId)) return;
         alarmedIds = new Set([...alarmedIds, timerId]);
 
-        // アラーム対象のタイマーに設定された ring_seconds 秒だけビープをループ再生する
+        // アラーム対象のタイマーに設定された ringSeconds 秒だけビープをループ再生する
         const timers = timersQuery.data?.timers ?? [];
         const timer = timers.find((t) => t.id === timerId);
-        const ringSeconds = timer?.ring_seconds ?? TIMER_DEFAULT_RING_SECONDS;
+        const ringSeconds = timer?.ringSeconds ?? TIMER_DEFAULT_RING_SECONDS;
 
         // ビープ音 + ブラウザ通知 + トースト
         import("#lib/client/timers/beep.ts").then((m) => {
@@ -243,9 +243,9 @@
         showNotification(timerName);
         alarms = [...alarms, { timerId, timerName }];
 
-        // サーバーに停止報告（started_at でリセット/再開されていないことを確認）
+        // サーバーに停止報告（startedAt でリセット/再開されていないことを確認）
         trpc.timers.stop
-            .mutate({ timerId, started_at: startedAt })
+            .mutate({ timerId, startedAt: startedAt })
             .then(() =>
                 queryClient.invalidateQueries({ queryKey: queryKeys.timers }),
             )
@@ -284,8 +284,8 @@
             if (alarmedIds.has(timer.id)) continue;
 
             const remainingMs = calcRemainingMs(timer);
-            // started_at をキャプチャしてリセット/再開の検出に使用
-            const startedAt = timer.started_at;
+            // startedAt をキャプチャしてリセット/再開の検出に使用
+            const startedAt = timer.startedAt;
             if (remainingMs <= 0) {
                 // 既に満了済み → サーバー確認してからアラーム
                 checkAndAlarm(timer.id, timer.name, startedAt);

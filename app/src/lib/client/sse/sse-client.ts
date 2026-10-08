@@ -13,9 +13,9 @@
  * 送信されるため、サーバー側は両方を受け取る前提とする。
  *
  * 永続化は行わない。タブを閉じれば失う前提で、再起動後の初回接続は
- * サーバー側の `connected` イベントによる全 invalidate に委ねる。
+ * サーバー側の `connected` イベントによる全クエリーのリセットに委ねる。
  *
- * `reset` イベントを受信した場合は、`connected` 受信時と同じ全 `invalidateQueries()` を行い、
+ * `reset` イベントを受信した場合は、`connected` 受信時と同じ全 `resetQueries()` を行い、
  * バッファ外れやサーバー再起動による差分取りこぼしから整合性を回復する。
  *
  * ## 接続健全性監視
@@ -89,7 +89,7 @@ export function connect(queryClient: QueryClient): void {
 
   // 接続確立時の処理:
   // 1. サーバー時刻から暫定オフセットを設定 (tRPC レスポンスの RTT/2 補正値で上書きされる)
-  // 2. 全クエリーを invalidate して、切断中に取りこぼしたイベントぶんを取り直す
+  // 2. 全クエリーをリセットし、差分カーソルを破棄して切断中の変更を全件取り直す
   //    (EventSource は自動再接続するため、再接続時もこのハンドラが再発火する)
   es.addEventListener(SSE_EVENTS.connected, (e: MessageEvent) => {
     debugLog("sse", "connected", { lastEventId: e.lastEventId });
@@ -99,18 +99,18 @@ export function connect(queryClient: QueryClient): void {
     if (serverMs) {
       setServerOffset(serverMs - Date.now());
     }
-    void queryClient.invalidateQueries();
+    void queryClient.resetQueries();
   });
 
   // reset イベント: サーバー側バッファ外れ・再起動などで差分catchupが成立しない場合に送出される。
-  // connected と同等に全クエリーを invalidate して整合性を回復する。
+  // connected と同等に差分カーソルを破棄し、全件取得で整合性を回復する。
   // 受信時点で保持中の lastEventId は破棄し、次回再接続を初回接続扱い（connected経路）に戻す。
   // これにより `reset` ループ（古い lastEventId を送り続けて毎回 reset が返る状態）を避ける。
   es.addEventListener(SSE_EVENTS.reset, () => {
     debugLog("sse", "reset");
     touchReceived();
     lastEventId = null;
-    void queryClient.invalidateQueries();
+    void queryClient.resetQueries();
   });
 
   // heartbeat はサーバー側の生存通知。ウォッチドッグの最終受信時刻更新のみに使う

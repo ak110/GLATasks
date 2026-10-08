@@ -4,21 +4,17 @@
      * @fileoverview タスク追加フォーム（テキストエリア + タグ設定 + 追加ボタン）
      */
 
+    import type { TaskAddSubmission } from "#lib/client/tasks/task-form-types.ts";
     import type { TagInfo } from "#lib/types.ts";
     import { FILE_DROP_HIGHLIGHT_CLASSES } from "#lib/client/attachments/attachment-utils.ts";
     import TagEditor from "./TagEditor.svelte";
     import AttachmentPicker from "./AttachmentPicker.svelte";
 
-    type Props = {
+    interface Props {
         value: string;
         listTagCandidates: TagInfo[];
-        onSubmit: (data: {
-            text: string;
-            tags: TagInfo[];
-            attachments: File[];
-            kind: "normal" | "todo";
-        }) => Promise<boolean>;
-    };
+        onSubmit: (data: TaskAddSubmission) => Promise<boolean>;
+    }
 
     let { value = $bindable(), listTagCandidates, onSubmit }: Props = $props();
     let formFocused = $state(false);

@@ -1,4 +1,3 @@
-import type { RequestEvent } from "@sveltejs/kit";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("#lib/server/mcp/oauth.ts", () => ({
@@ -28,7 +27,7 @@ describe("MCP sessionのHTTP応答", () => {
         params: {},
       }),
     });
-    const response = await POST({ request, url } as RequestEvent);
+    const response = await POST({ request, url } as Parameters<typeof POST>[0]);
     expect(response.status).toBe(404);
   });
 });

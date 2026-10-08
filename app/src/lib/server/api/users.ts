@@ -9,6 +9,16 @@ import { UserPreferencesSchema } from "#lib/schemas.ts";
 import { getDb } from "../db";
 import { users } from "../schema";
 
+/** 保存されたJSONを検査し、破損値は未設定として扱う。 */
+function parsePreferences(raw: string): UserPreferences {
+  try {
+    const result = UserPreferencesSchema.safeParse(JSON.parse(raw));
+    return result.success ? result.data : {};
+  } catch {
+    return {};
+  }
+}
+
 /**
  * 利用者の新規タイマー作成時の既定値を取得する。
  * 破損データや未保存の利用者には空オブジェクトを返し、欠落フィールドは
@@ -24,13 +34,7 @@ export async function getUserPreferences(
     .where(eq(users.id, userId))
     .limit(1);
   if (rows.length === 0) return {};
-  try {
-    const parsed: unknown = JSON.parse(rows[0].preferences);
-    const result = UserPreferencesSchema.safeParse(parsed);
-    return result.success ? result.data : {};
-  } catch {
-    return {};
-  }
+  return parsePreferences(rows[0].preferences);
 }
 
 /** 利用者の既定値を部分更新し、指定されていない項目を保持する。 */
@@ -48,14 +52,7 @@ export async function updateUserPreferences(
       .for("update");
     if (rows.length === 0) return;
 
-    let current: UserPreferences = {};
-    try {
-      const parsed: unknown = JSON.parse(rows[0].preferences);
-      const result = UserPreferencesSchema.safeParse(parsed);
-      if (result.success) current = result.data;
-    } catch {
-      current = {};
-    }
+    const current = parsePreferences(rows[0].preferences);
 
     await tx
       .update(users)

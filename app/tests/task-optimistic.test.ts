@@ -347,7 +347,7 @@ test.describe("task-optimistic", () => {
     try {
       const title = "経過後復元_" + uniqueTestName("e2e");
       await addTask(page, title);
-      // DBの更新時刻を同期窓より前へ戻し、差分応答へ再掲されない状態を作る。
+      // DBの更新時刻を同期窓より前へ戻し、差分応答へ再掲されない状態にする。
       const row = page.getByTestId("task-item").filter({ hasText: title });
       const taskId = Number(await row.getAttribute("data-reorder-id"));
       const db = await createConnection(
@@ -364,8 +364,22 @@ test.describe("task-optimistic", () => {
       } finally {
         await db.end();
       }
-      // 別タスクの追加で activeTasks を再取得し、同期時刻を対象タスクより後へ進める。
-      await addTask(page, "同期契機_" + uniqueTestName("e2e"));
+      // DBだけを古くするとキャッシュのupdatedと一致しないため、全件読込で一致させる。
+      // この読込の同期時刻は、10秒前に戻した対象タスクのupdatedより後になる。
+      const fixtureReloaded = page.waitForResponse((response) =>
+        isTrpcUrl(response.url(), "tasks.listActive"),
+      );
+      await page.reload();
+      expect((await fixtureReloaded).ok()).toBe(true);
+      await page
+        .getByTestId("list-select-btn")
+        .filter({ hasText: listName })
+        .click();
+      await expect(row).toBeVisible();
+      await expect(row.getByRole("checkbox")).toHaveJSProperty(
+        "indeterminate",
+        false,
+      );
 
       let notifyUpdateIntercepted!: () => void;
       const updateIntercepted = new Promise<void>((resolve) => {

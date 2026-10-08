@@ -1,4 +1,3 @@
-import type { RequestEvent } from "@sveltejs/kit";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("#lib/server/mcp/store.ts", () => ({
@@ -40,7 +39,7 @@ function event(params: Record<string, string> = {}, decision = "allow") {
       method: "POST",
       body: new URLSearchParams({ decision }),
     }),
-  } as RequestEvent;
+  } as Parameters<typeof load>[0];
 }
 
 describe("OAuthの失敗応答", () => {
@@ -95,7 +94,7 @@ describe("OAuthの失敗応答", () => {
             headers: { Accept: accept, "Content-Type": "application/json" },
             body,
           }),
-        } as RequestEvent);
+        } as Parameters<typeof register>[0]);
         expect(response.status).toBe(400);
         expect(response.headers.get("Content-Type")).toContain(
           "application/json",
@@ -122,7 +121,7 @@ describe("OAuthの失敗応答", () => {
             headers: { Authorization: `Basic ${credentials}` },
             body: new URLSearchParams({ grant_type: grant }),
           }),
-        } as RequestEvent);
+        } as Parameters<typeof token>[0]);
         expect(response.status).toBe(401);
         expect(response.headers.get("WWW-Authenticate")).toBe("Basic");
         expect(await response.json()).toMatchObject({

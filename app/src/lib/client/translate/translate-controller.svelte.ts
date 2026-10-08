@@ -2,7 +2,7 @@
  * @fileoverview 翻訳画面の要求、準備、実行と設定の状態管理
  */
 
-import { extractErrorMessage } from "#lib/extract-error-message.ts";
+import { extractErrorMessage } from "#lib/client/ui/extract-error-message.ts";
 import {
   getStoredTranslateSettings,
   buildPromptLanguageOptions,
@@ -12,7 +12,7 @@ import {
   TRANSLATE_DEFAULTS,
   splitTranslationUnits,
   type TranslateEngine,
-} from "#lib/translate.ts";
+} from "#lib/client/translate/translate.ts";
 import {
   abandonEngineCreations,
   MODEL_UNAVAILABLE,
@@ -23,7 +23,7 @@ import {
   runTranslation,
   type TranslationDirectionChoice,
   type TranslationPreparationTarget,
-} from "#lib/translate-client.ts";
+} from "#lib/client/translate/translate-client.ts";
 
 export function createTranslationController() {
   type TranslationRequest = {

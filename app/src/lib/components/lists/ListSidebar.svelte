@@ -6,7 +6,7 @@
     import type { ListInfo } from "#lib/types.ts";
     import ListItem from "./ListItem.svelte";
 
-    type Props = {
+    interface Props {
         lists: ListInfo[];
         selectedListId: number | null;
         isLoading: boolean;
@@ -23,7 +23,7 @@
         onDelete: (listId: number) => void;
         onOpenSchedules: (listId: number) => void;
         onAddList: (title: string) => void;
-    };
+    }
 
     let {
         lists,

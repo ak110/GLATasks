@@ -15,7 +15,11 @@
     import { extractErrorMessage } from "#lib/client/ui/extract-error-message.ts";
     import { uploadAttachment } from "#lib/client/attachments/attachment-utils.ts";
     import { SvelteMap } from "svelte/reactivity";
-    import type { TaskStatus, TaskKind } from "#lib/schemas.ts";
+    import type { TaskStatus } from "#lib/schemas.ts";
+    import type {
+        TaskAddSubmission,
+        TaskEditSubmission,
+    } from "#lib/client/tasks/task-form-types.ts";
     import type { TagInfo, TaskListItem } from "#lib/types.ts";
     import {
         isTempTaskId,
@@ -90,7 +94,7 @@
                 status: t.status,
                 kind: t.kind,
                 tags: t.tags,
-                sort_order: 0,
+                sortOrder: 0,
                 updated: "",
                 attachments: t.attachments,
             }));
@@ -145,12 +149,7 @@
         }
     }
 
-    async function addTask(data: {
-        text: string;
-        tags: TagInfo[];
-        attachments: File[];
-        kind: TaskKind;
-    }): Promise<boolean> {
+    async function addTask(data: TaskAddSubmission): Promise<boolean> {
         if (!state.selectedListId) return false;
         const text = data.text.trimEnd();
         if (!text) return false;
@@ -227,14 +226,7 @@
         };
     }
 
-    async function submitTaskEdit(data: {
-        text: string;
-        moveTo: string;
-        completed: boolean;
-        tags: TagInfo[];
-        kind: TaskKind;
-        closeAfter: boolean;
-    }) {
+    async function submitTaskEdit(data: TaskEditSubmission) {
         const {
             listId,
             taskId,
@@ -254,12 +246,12 @@
                 listId,
                 taskId,
                 text: data.text,
-                move_to: Number(data.moveTo),
+                moveTo: Number(data.moveTo),
                 // 「保存」（closeAfter=false）は編集続行のため並び順を維持し、
                 // 「保存して閉じる」（closeAfter=true）は並び順を更新して閉じる。
                 // 移動先リストが現在のリストと異なる場合は、サーバー側仕様で
-                // keep_order に関わらず移動先リストの先頭へ配置される
-                keep_order: !data.closeAfter,
+                // keepOrder に関わらず移動先リストの先頭へ配置される
+                keepOrder: !data.closeAfter,
                 tags: data.tags,
                 kind: data.kind,
                 ...statusChange,
@@ -410,8 +402,8 @@
             await updateTaskMutation.mutateAsync({
                 listId: state.selectedListId,
                 taskId,
-                move_to: targetListId,
-                keep_order: false,
+                moveTo: targetListId,
+                keepOrder: false,
             });
         } catch {
             // onError でロールバック済みのため追加処理不要

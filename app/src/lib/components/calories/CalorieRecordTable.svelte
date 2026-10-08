@@ -1,4 +1,5 @@
 <script lang="ts">
+    import type { RouterInputs, RouterOutputs } from "#lib/client/trpc.ts";
     import { grayButtonClass, inputClass } from "#lib/components/ui/styles.ts";
     import { menuBehavior } from "#lib/actions/menu.ts";
     import {
@@ -7,7 +8,7 @@
         menuDangerItemClass,
     } from "#lib/components/ui/styles.ts";
     import { formatLocalMinute, pad2 } from "#lib/date-time.ts";
-    import { getTimezoneOffsetMinutes } from "#lib/date-time.ts";
+    import { getUtcOffsetMinutes } from "#lib/date-time.ts";
     import { onMount } from "svelte";
 
     import ConfirmDialog from "#lib/components/dialogs/ConfirmDialog.svelte";
@@ -15,39 +16,31 @@
     import Dialog from "#lib/components/dialogs/Dialog.svelte";
     import CalorieFilterStatus from "./CalorieFilterStatus.svelte";
 
-    type Item = { id: number; name: string; kcal: number };
-    type RecordRow = {
-        id: number;
-        item_id: number | null;
-        item_name: string;
-        item_kcal: number | null;
-        consumed_at: string;
-        quantity: number;
-        total_kcal: number;
-        temporary: boolean;
-    };
-    /** 品目の記録は`item_id`を、一時項目の記録は`temporary_name`を持つ */
-    type RecordInput = {
-        consumed_at: string;
-        item_id?: number;
-        temporary_name?: string;
-        quantity: number;
-        tz_offset_minutes: number;
-    };
-    type Props = {
+    type Item = Pick<
+        RouterOutputs["calories"]["items"][number],
+        "id" | "name" | "kcal"
+    >;
+    type RecordRow = RouterOutputs["calories"]["records"]["records"][number];
+    /** 品目の記録は`itemId`を、一時項目の記録は`temporaryName`を持つ */
+    type RecordInput = RouterInputs["calories"]["createRecord"];
+    interface Props {
         items: Item[];
         records: RecordRow[];
         windowOffset: number;
-        onWindowChange: (offset: number) => void;
+        onWindowChange: (
+            offset: NonNullable<
+                RouterInputs["calories"]["records"]["windowOffset"]
+            >,
+        ) => void;
         onCreate: (input: RecordInput) => unknown;
-        onUpdate: (input: RecordInput & { recordId: number }) => unknown;
+        onUpdate: (input: RouterInputs["calories"]["updateRecord"]) => unknown;
         onDelete: (record: RecordRow) => void;
         /** 追加フォームの品目欄の値。ページが両表の検索語として使う */
         addItemName?: string;
         /** 前後の空白を除いた検索語。大文字小文字を区別せず、全ての語を品目名に含む記録だけを表示する */
         filterKeywords: string[];
         onClearFilter: () => void;
-    };
+    }
 
     let {
         items,
@@ -80,7 +73,7 @@
     >();
     const visibleRecords = $derived(
         records.filter((record) => {
-            const name = record.item_name.toLowerCase();
+            const name = record.itemName.toLowerCase();
             return filterKeywords.every((keyword) =>
                 name.includes(keyword.toLowerCase()),
             );
@@ -130,10 +123,10 @@
     function edit(record: RecordRow) {
         openMenuId = undefined;
         editingId = record.id;
-        consumedAt = formatLocalMinute(new Date(record.consumed_at));
+        consumedAt = formatLocalMinute(new Date(record.consumedAt));
         // 編集の開始で追加フォームの入力を破棄するため、検索も解除される
         addItemName = "";
-        editItemName = record.item_name;
+        editItemName = record.itemName;
         quantity = String(record.quantity);
         keepTemporary = record.temporary;
     }
@@ -142,7 +135,7 @@
         openMenuId = undefined;
         editingId = undefined;
         consumedAt = formatLocalMinute(new Date());
-        addItemName = record.item_name;
+        addItemName = record.itemName;
         quantity = String(record.quantity);
         keepTemporary = record.temporary;
     }
@@ -162,14 +155,14 @@
         const name = itemName.trim();
         const numericQuantity = parseQuantity();
         const target = temporary
-            ? { temporary_name: name }
-            : matchedItem && { item_id: matchedItem.id };
+            ? { temporaryName: name }
+            : matchedItem && { itemId: matchedItem.id };
         if (name === "" || !target || numericQuantity === undefined) return;
         const input = {
-            consumed_at: consumedAt,
+            consumedAt: consumedAt,
             ...target,
             quantity: numericQuantity,
-            tz_offset_minutes: getTimezoneOffsetMinutes(),
+            tzOffsetMinutes: getUtcOffsetMinutes(),
         };
         if (editingId === undefined) await onCreate(input);
         else await onUpdate({ recordId: editingId, ...input });
@@ -196,10 +189,10 @@
         if (!conversion || editingId === undefined) return;
         await onUpdate({
             recordId: editingId,
-            consumed_at: consumedAt,
-            temporary_name: itemName.trim(),
+            consumedAt: consumedAt,
+            temporaryName: itemName.trim(),
             quantity: conversion.kcal,
-            tz_offset_minutes: getTimezoneOffsetMinutes(),
+            tzOffsetMinutes: getUtcOffsetMinutes(),
         });
         resetForm();
     }
@@ -407,22 +400,22 @@
                         <span class="grid sm:hidden"
                             ><span
                                 >{formatLocalMonthDay(
-                                    new Date(record.consumed_at),
+                                    new Date(record.consumedAt),
                                 )}</span
                             ><span
                                 >{formatLocalTime(
-                                    new Date(record.consumed_at),
+                                    new Date(record.consumedAt),
                                 )}</span
                             ></span
                         >
                         <span class="hidden sm:inline"
                             >{formatLocalMinute(
-                                new Date(record.consumed_at),
+                                new Date(record.consumedAt),
                             )}</span
                         >
                     </td>
-                    <td class="truncate p-2" title={record.item_name}>
-                        {record.item_name}
+                    <td class="truncate p-2" title={record.itemName}>
+                        {record.itemName}
                     </td>
                     <!-- 一時項目は数量欄の値をkcalとして持つため、数量の列は空にする -->
                     <td
@@ -432,7 +425,7 @@
                             : undefined}
                         >{record.temporary ? "" : record.quantity}</td
                     >
-                    <td class="p-2 text-right">{record.total_kcal}</td>
+                    <td class="p-2 text-right">{record.totalKcal}</td>
                     <td class="p-2 text-right">
                         <div
                             class="relative"

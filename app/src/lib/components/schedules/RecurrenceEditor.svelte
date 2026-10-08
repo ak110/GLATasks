@@ -13,13 +13,16 @@
 
     import { RRule, rrulestr, datetime } from "rrule";
     import type { Weekday } from "rrule";
+    import type { RouterInputs } from "#lib/client/trpc.ts";
     import type { ScheduleInfo } from "#lib/types.ts";
 
-    type Props = {
+    interface Props {
         value: ScheduleInfo | null;
-        onSubmit: (input: { rrule: string }) => void;
+        onSubmit: (
+            input: Pick<RouterInputs["schedules"]["create"], "rrule">,
+        ) => void;
         onCancel: () => void;
-    };
+    }
 
     let { value, onSubmit, onCancel }: Props = $props();
 

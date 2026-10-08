@@ -1,4 +1,3 @@
-import type { RequestEvent } from "@sveltejs/kit";
 import { describe, expect, it, vi } from "vitest";
 import { ApiError } from "../api-errors";
 
@@ -18,7 +17,7 @@ describe("共有取り込みのエラー", () => {
     const response = await actions.default({
       request,
       locals: { user_id: 42 },
-    } as RequestEvent);
+    } as Parameters<typeof actions.default>[0]);
     expect(response).toMatchObject({
       status: 404,
       data: { error: "対象が見つかりません" },

@@ -9,7 +9,7 @@
     import { isTempTaskId } from "#lib/client/tasks/task-cache.ts";
     import TaskItem from "./TaskItem.svelte";
 
-    type Props = {
+    interface Props {
         tasks: TaskListItem[];
         isLoading: boolean;
         onToggle: (taskId: number, nextStatus: TaskStatus) => void;
@@ -18,7 +18,7 @@
         onTaskDragOver?: (listId: number | null) => void;
         onTaskDrop?: (taskId: number, targetListId: number) => void;
         updatedTaskIds?: Set<number>;
-    };
+    }
 
     let {
         tasks,

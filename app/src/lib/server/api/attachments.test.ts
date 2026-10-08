@@ -180,7 +180,7 @@ describeDb("deleteAttachment", () => {
     expect(rows).toHaveLength(0);
   });
 
-  it("他ユーザーのattachmentIdを渡すと attachment_not_found をスローする", async () => {
+  it("他人の添付と削除済みの添付への削除は成功し、他人の添付を変更しない", async () => {
     const owner = await createFixtureTask();
     const other = await createFixtureTask();
     createdUserIds.push(owner.userId, other.userId);
@@ -192,9 +192,22 @@ describeDb("deleteAttachment", () => {
       data: Buffer.from("owned").toString("base64"),
     });
 
-    await expect(
-      deleteAttachment({ userId: other.userId, attachmentId }),
-    ).rejects.toThrowError("attachment_not_found");
+    const before = await downloadAttachment({
+      userId: owner.userId,
+      attachmentId,
+    });
+    await deleteAttachment({ userId: other.userId, attachmentId });
+    expect(
+      await downloadAttachment({ userId: owner.userId, attachmentId }),
+    ).toEqual(before);
+    await deleteAttachment({ userId: owner.userId, attachmentId });
+    await deleteAttachment({ userId: owner.userId, attachmentId });
+    expect(
+      await getDb()
+        .select()
+        .from(attachments)
+        .where(eq(attachments.id, attachmentId)),
+    ).toEqual([]);
   });
 });
 

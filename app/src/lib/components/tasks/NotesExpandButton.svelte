@@ -1,5 +1,8 @@
 <script lang="ts">
-    type Props = { expanded: boolean; onclick: () => void };
+    interface Props {
+        expanded: boolean;
+        onclick: () => void;
+    }
     let { expanded, onclick }: Props = $props();
 </script>
 

@@ -57,14 +57,14 @@ describe("sse-client", () => {
       .EventSource;
   });
 
-  it("connected イベント受信時に queryClient.invalidateQueries を呼ぶ", async () => {
+  it("connected イベント受信時に queryClient.resetQueries を呼ぶ", async () => {
     // 切断中に取りこぼしたかもしれない更新を取り直すため、初回接続および
-    // EventSource の自動再接続のたびに全クエリーを invalidate する。
+    // EventSource の自動再接続のたびに全クエリーを reset する。
     const { connect, disconnect } =
       await import("#lib/client/sse/sse-client.ts");
-    const invalidate = vi.fn().mockResolvedValue(undefined);
+    const reset = vi.fn().mockResolvedValue(undefined);
     const queryClient = {
-      invalidateQueries: invalidate,
+      resetQueries: reset,
     } as unknown as import("@tanstack/svelte-query").QueryClient;
 
     connect(queryClient);
@@ -73,11 +73,11 @@ describe("sse-client", () => {
     const es = MockEventSource.instances[0];
     // 1回目 (初回接続)
     es.dispatch("connected", String(Date.now()));
-    expect(invalidate).toHaveBeenCalledTimes(1);
+    expect(reset).toHaveBeenCalledTimes(1);
 
     // 2回目 (再接続シミュレーション): 同じ listener が再発火する
     es.dispatch("connected", String(Date.now()));
-    expect(invalidate).toHaveBeenCalledTimes(2);
+    expect(reset).toHaveBeenCalledTimes(2);
 
     disconnect();
   });
@@ -86,7 +86,7 @@ describe("sse-client", () => {
     const { connect, disconnect } =
       await import("#lib/client/sse/sse-client.ts");
     const queryClient = {
-      invalidateQueries: vi.fn().mockResolvedValue(undefined),
+      resetQueries: vi.fn().mockResolvedValue(undefined),
     } as unknown as import("@tanstack/svelte-query").QueryClient;
 
     connect(queryClient);
@@ -123,7 +123,7 @@ describe("sse-client", () => {
       const { connect, disconnect, checkConnection } =
         await import("#lib/client/sse/sse-client.ts");
       const queryClient = {
-        invalidateQueries: vi.fn().mockResolvedValue(undefined),
+        resetQueries: vi.fn().mockResolvedValue(undefined),
       } as unknown as import("@tanstack/svelte-query").QueryClient;
 
       connect(queryClient);
@@ -166,7 +166,7 @@ describe("sse-client", () => {
       const { connect, disconnect } =
         await import("#lib/client/sse/sse-client.ts");
       const queryClient = {
-        invalidateQueries: vi.fn().mockResolvedValue(undefined),
+        resetQueries: vi.fn().mockResolvedValue(undefined),
       } as unknown as import("@tanstack/svelte-query").QueryClient;
 
       connect(queryClient);
@@ -183,21 +183,21 @@ describe("sse-client", () => {
     },
   );
 
-  it("reset イベント受信時に全クエリーを invalidate する", async () => {
+  it("reset イベント受信時に全クエリーを reset する", async () => {
     // バッファ外れやサーバー再起動時、サーバーが reset を送出する。
-    // クライアントは connected と同等の全クエリーinvalidateで整合性を回復する。
+    // クライアントは connected と同等の全クエリーresetで整合性を回復する。
     const { connect, disconnect } =
       await import("#lib/client/sse/sse-client.ts");
-    const invalidate = vi.fn().mockResolvedValue(undefined);
+    const reset = vi.fn().mockResolvedValue(undefined);
     const queryClient = {
-      invalidateQueries: invalidate,
+      resetQueries: reset,
     } as unknown as import("@tanstack/svelte-query").QueryClient;
 
     connect(queryClient);
     expect(MockEventSource.instances.length).toBe(1);
 
     MockEventSource.instances[0].dispatch("reset", "", "");
-    expect(invalidate).toHaveBeenCalledTimes(1);
+    expect(reset).toHaveBeenCalledTimes(1);
 
     disconnect();
   });
@@ -208,7 +208,7 @@ describe("sse-client", () => {
     const { connect, disconnect } =
       await import("#lib/client/sse/sse-client.ts");
     const queryClient = {
-      invalidateQueries: vi.fn().mockResolvedValue(undefined),
+      resetQueries: vi.fn().mockResolvedValue(undefined),
     } as unknown as import("@tanstack/svelte-query").QueryClient;
 
     connect(queryClient);
@@ -233,7 +233,7 @@ describe("sse-client", () => {
     const { connect, disconnect } =
       await import("#lib/client/sse/sse-client.ts");
     const queryClient = {
-      invalidateQueries: vi.fn().mockResolvedValue(undefined),
+      resetQueries: vi.fn().mockResolvedValue(undefined),
     } as unknown as import("@tanstack/svelte-query").QueryClient;
 
     connect(queryClient);
@@ -273,7 +273,7 @@ describe("sse-client", () => {
       const { connect, disconnect } =
         await import("#lib/client/sse/sse-client.ts");
       const queryClient = {
-        invalidateQueries: vi.fn().mockResolvedValue(undefined),
+        resetQueries: vi.fn().mockResolvedValue(undefined),
       } as unknown as import("@tanstack/svelte-query").QueryClient;
 
       connect(queryClient);
@@ -307,7 +307,7 @@ describe("sse-client", () => {
       const { connect, disconnect, getHealth } =
         await import("#lib/client/sse/sse-client.ts");
       const queryClient = {
-        invalidateQueries: vi.fn().mockResolvedValue(undefined),
+        resetQueries: vi.fn().mockResolvedValue(undefined),
       } as unknown as import("@tanstack/svelte-query").QueryClient;
 
       connect(queryClient);
@@ -334,7 +334,7 @@ describe("sse-client", () => {
       const { connect, disconnect, getHealth } =
         await import("#lib/client/sse/sse-client.ts");
       const queryClient = {
-        invalidateQueries: vi.fn().mockResolvedValue(undefined),
+        resetQueries: vi.fn().mockResolvedValue(undefined),
       } as unknown as import("@tanstack/svelte-query").QueryClient;
 
       connect(queryClient);
@@ -382,7 +382,7 @@ describe("sse-client", () => {
     const { connect, disconnect, onHealthChange, getHealth } =
       await import("#lib/client/sse/sse-client.ts");
     const queryClient = {
-      invalidateQueries: vi.fn().mockResolvedValue(undefined),
+      resetQueries: vi.fn().mockResolvedValue(undefined),
     } as unknown as import("@tanstack/svelte-query").QueryClient;
 
     const recorded: string[] = [];
@@ -405,7 +405,7 @@ describe("sse-client", () => {
     const { connect, disconnect, getHealth } =
       await import("#lib/client/sse/sse-client.ts");
     const queryClient = {
-      invalidateQueries: vi.fn().mockResolvedValue(undefined),
+      resetQueries: vi.fn().mockResolvedValue(undefined),
     } as unknown as import("@tanstack/svelte-query").QueryClient;
 
     connect(queryClient);
@@ -433,7 +433,7 @@ describe("sse-client", () => {
     const { connect, subscribe, disconnect } =
       await import("#lib/client/sse/sse-client.ts");
     const queryClient = {
-      invalidateQueries: vi.fn().mockResolvedValue(undefined),
+      resetQueries: vi.fn().mockResolvedValue(undefined),
     } as unknown as import("@tanstack/svelte-query").QueryClient;
 
     const cbBeforeConnect = vi.fn();
@@ -468,7 +468,7 @@ describe("sse-client", () => {
     const { connect, disconnect, checkConnection } =
       await import("#lib/client/sse/sse-client.ts");
     const queryClient = {
-      invalidateQueries: vi.fn().mockResolvedValue(undefined),
+      resetQueries: vi.fn().mockResolvedValue(undefined),
     } as unknown as import("@tanstack/svelte-query").QueryClient;
 
     connect(queryClient);

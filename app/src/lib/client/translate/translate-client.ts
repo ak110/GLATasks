@@ -8,11 +8,11 @@ import {
   ensurePreparationActive,
   getModelApi,
   getResourceGeneration,
-} from "#lib/translate-resources.ts";
+} from "#lib/client/translate/translate-resources.ts";
 export {
   abandonEngineCreations,
   destroyTranslationResources,
-} from "#lib/translate-resources.ts";
+} from "#lib/client/translate/translate-resources.ts";
 
 import {
   buildPromptLanguageOptions,
@@ -21,7 +21,7 @@ import {
   resolveLanguageTag,
   type PromptLanguageOptions,
   type TranslateEngine,
-} from "#lib/translate.ts";
+} from "#lib/client/translate/translate.ts";
 
 export const MODEL_UNAVAILABLE = {
   detector: "Language Detector APIを利用できません",

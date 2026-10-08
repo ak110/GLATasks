@@ -4,11 +4,11 @@
      * @fileoverview タスクリストヘッダー（リスト名 + モバイル戻るボタン + 完了済みを非表示ボタン）
      */
 
-    type Props = {
+    interface Props {
         title: string;
         onBack: () => void;
         onClear: () => void;
-    };
+    }
 
     let { title, onBack, onClear }: Props = $props();
 </script>

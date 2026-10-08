@@ -1,4 +1,5 @@
 <script lang="ts">
+    import type { RouterInputs, RouterOutputs } from "#lib/client/trpc.ts";
     import { inputClass } from "#lib/components/ui/styles.ts";
     import { menuBehavior } from "#lib/actions/menu.ts";
     import {
@@ -10,26 +11,21 @@
     import Dialog from "#lib/components/dialogs/Dialog.svelte";
     import CalorieFilterStatus from "./CalorieFilterStatus.svelte";
 
-    type Item = {
-        id: number;
-        name: string;
-        kcal: number;
-        note: string;
-        recordCount: number;
-        autoRecordCount: number;
-    };
-    type ItemInput = { name: string; kcal: number; note: string };
-    type Props = {
+    type Item = RouterOutputs["calories"]["items"][number];
+    type ItemInput = RouterInputs["calories"]["createItem"];
+    interface Props {
         items: Item[];
         onCreate: (input: ItemInput) => unknown;
-        onUpdate: (input: ItemInput & { itemId: number }) => unknown;
-        onDelete: (itemId: number) => unknown;
+        onUpdate: (input: RouterInputs["calories"]["updateItem"]) => unknown;
+        onDelete: (
+            itemId: RouterInputs["calories"]["deleteItem"]["itemId"],
+        ) => unknown;
         /** 追加フォームの品目名欄の値。ページが両表の検索語として使う */
         addName?: string;
         /** 前後の空白を除いた検索語。大文字小文字を区別せず、全ての語がそれぞれ品目名か備考に含まれる品目だけを表示する */
         filterKeywords: string[];
         onClearFilter: () => void;
-    };
+    }
 
     let {
         items,

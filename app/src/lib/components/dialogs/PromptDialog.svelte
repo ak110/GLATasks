@@ -11,7 +11,7 @@
     // タイトルあり時は <h2> の id を aria-labelledby で参照し、
     // タイトルなし時は aria-label でフォールバックする
 
-    type Props = {
+    interface Props {
         open: boolean;
         title?: string;
         message?: string;
@@ -23,7 +23,7 @@
         onCancel: () => void;
         /** バリデーター。エラーメッセージを返す。問題なければ null を返す */
         validator?: (value: string) => string | null;
-    };
+    }
 
     let {
         open,

@@ -1,6 +1,9 @@
 <script lang="ts">
     import Dialog from "#lib/components/dialogs/Dialog.svelte";
-    type Props = { imageUrl: string; onClose: () => void };
+    interface Props {
+        imageUrl: string;
+        onClose: () => void;
+    }
     let { imageUrl, onClose }: Props = $props();
 </script>
 

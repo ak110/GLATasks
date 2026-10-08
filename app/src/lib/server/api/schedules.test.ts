@@ -48,7 +48,15 @@ describeDb("定期TODOのCRUDと所有権", () => {
       tags: [{ name: "家事", color: "blue" }],
     });
     expect(await listSchedules(own.userId, own.listId)).toEqual([updated]);
+    await expect(
+      deleteSchedule(other.userId, created.id),
+    ).resolves.toBeUndefined();
+    expect(await listSchedules(own.userId, own.listId)).toEqual([updated]);
     await deleteSchedule(own.userId, created.id);
+    expect(await listSchedules(own.userId, own.listId)).toEqual([]);
+    await expect(
+      deleteSchedule(own.userId, created.id),
+    ).resolves.toBeUndefined();
     expect(await listSchedules(own.userId, own.listId)).toEqual([]);
     await expect(
       updateSchedule(own.userId, created.id, { enabled: true }),

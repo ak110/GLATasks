@@ -9,10 +9,21 @@ import {
   MAX_ATTACHMENT_BYTES,
   MAX_ATTACHMENTS_PER_TASK,
 } from "#lib/schemas.ts";
-import type { AttachmentMeta } from "#lib/types.ts";
 import { getDb } from "../db";
 import { attachments, lists, tasks } from "../schema";
 import { toUtcIso } from "./common";
+
+function toAttachmentMeta(row: Omit<typeof attachments.$inferSelect, "data">) {
+  return {
+    id: row.id,
+    filename: row.filename,
+    mimeType: row.mime_type,
+    size: row.size,
+    created: toUtcIso(row.created),
+  };
+}
+
+export type AttachmentMeta = ReturnType<typeof toAttachmentMeta>;
 
 /**
  * タスクへ添付ファイルを追加する。
@@ -106,7 +117,7 @@ export async function deleteAttachment(params: {
         ),
       )
       .limit(1);
-    if (rows.length === 0) throw new ApiError("attachment_not_found");
+    if (rows.length === 0) return;
     const { task, list } = rows[0]!;
 
     await tx
@@ -180,13 +191,7 @@ export async function listAttachmentsForTasks(
     .where(inArray(attachments.task_id, taskIds));
 
   for (const r of rows) {
-    const meta: AttachmentMeta = {
-      id: r.id,
-      filename: r.filename,
-      mimeType: r.mime_type,
-      size: r.size,
-      created: toUtcIso(r.created),
-    };
+    const meta = toAttachmentMeta(r);
     const existing = result.get(r.task_id);
     if (existing) {
       existing.push(meta);

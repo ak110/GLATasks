@@ -15,7 +15,7 @@ describe("セッション認証の入口", () => {
       url: new URL("http://localhost/share/ingest"),
       cookies: { get: () => undefined },
       locals: {},
-    } as Parameters<Handle>[0]["event"];
+    } as unknown as Parameters<Handle>[0]["event"];
     const resolve = vi.fn(async () => new Response("action"));
     await expect(handle({ event, resolve })).rejects.toMatchObject({
       status: 302,

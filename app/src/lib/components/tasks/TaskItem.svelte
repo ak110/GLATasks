@@ -23,7 +23,7 @@
     import { showErrorToast } from "#lib/client/ui/toast-store.svelte.ts";
     import { extractErrorMessage } from "#lib/client/ui/extract-error-message.ts";
 
-    type Props = {
+    interface Props {
         task: TaskListItem;
         onToggle: (taskId: number, nextStatus: TaskStatus) => void;
         onEdit: (task: TaskListItem) => void;
@@ -32,7 +32,7 @@
         isTempTask?: boolean;
         dropIndicator?: "before" | "after" | null;
         onDragStart?: (taskId: number, e: PointerEvent) => void;
-    };
+    }
 
     let {
         task,

@@ -4,12 +4,14 @@
 
 import { createTRPCClient, httpBatchLink, type TRPCLink } from "@trpc/client";
 import { observable } from "@trpc/server/observable";
-import type { inferRouterOutputs } from "@trpc/server";
+import type { inferRouterInputs, inferRouterOutputs } from "@trpc/server";
 import type { AppRouter } from "#lib/server/trpc.ts";
 import { encrypt, decrypt } from "#lib/crypto.ts";
 
 /** tRPC ルーターの戻り値型マップ。クライアント側で型を導出する際に使用する。 */
 export type RouterOutputs = inferRouterOutputs<AppRouter>;
+/** tRPC入力を画面のmutationへ渡すための型マップ。 */
+export type RouterInputs = inferRouterInputs<AppRouter>;
 
 // タブ固有のID（SSEイベントの発信元識別に使用）
 export const tabId = crypto.randomUUID();

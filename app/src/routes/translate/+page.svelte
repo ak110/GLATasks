@@ -2,9 +2,9 @@
     import { onDestroy, onMount } from "svelte";
     import Header from "#lib/components/layout/Header.svelte";
     import PageScrollArea from "#lib/components/layout/PageScrollArea.svelte";
-    import { describePreparationDirection } from "#lib/translate-client.ts";
-    import { createTranslationController } from "#lib/translate-controller.svelte.ts";
-    import type { TranslateEngine } from "#lib/translate.ts";
+    import { describePreparationDirection } from "#lib/client/translate/translate-client.ts";
+    import { createTranslationController } from "#lib/client/translate/translate-controller.svelte.ts";
+    import type { TranslateEngine } from "#lib/client/translate/translate.ts";
 
     const translation = createTranslationController();
     onMount(translation.initialize);

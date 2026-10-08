@@ -10,7 +10,7 @@
     // タイトルあり時は <h2> の id を aria-labelledby で参照し、
     // タイトルなし時は aria-label でフォールバックする
 
-    type Props = {
+    interface Props {
         open: boolean;
         title?: string;
         message: string;
@@ -20,7 +20,7 @@
         variant?: "default" | "danger";
         onConfirm: () => void | Promise<void>;
         onCancel: () => void;
-    };
+    }
 
     let {
         open,

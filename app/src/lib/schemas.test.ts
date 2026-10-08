@@ -5,13 +5,16 @@
 import { describe, it, expect } from "vitest";
 import {
   CalorieItemCsvRowSchema,
-  CalorieItemInputSchema,
+  CreateCalorieItemSchema,
   CalorieRecordCsvRowSchema,
-  CalorieRecordInputSchema,
+  CreateCalorieRecordSchema,
   CreateTaskSchema,
   CreateTimerSchema,
+  UpdateTimerSchema,
   MAX_TASK_TEXT_BYTES,
   SearchTasksSchema,
+  ReorderTasksSchema,
+  ReorderTimersSchema,
   TagInfoSchema,
   TaskStatusSchema,
   UpdateCalorieRecordSchema,
@@ -36,7 +39,7 @@ describe("CreateTimerSchema", () => {
   it("ephemeral は未指定だと false になる", () => {
     const parsed = CreateTimerSchema.parse({
       name: "テスト",
-      base_seconds: 300,
+      baseSeconds: 300,
     });
     expect(parsed.ephemeral).toBe(false);
   });
@@ -44,45 +47,45 @@ describe("CreateTimerSchema", () => {
   it("ephemeral を true にできる", () => {
     const parsed = CreateTimerSchema.parse({
       name: "テスト",
-      base_seconds: 300,
+      baseSeconds: 300,
       ephemeral: true,
     });
     expect(parsed.ephemeral).toBe(true);
   });
 
-  it("ring_seconds は未指定だと既定値3になる", () => {
+  it("ringSeconds は未指定だと既定値3になる", () => {
     const parsed = CreateTimerSchema.parse({
       name: "テスト",
-      base_seconds: 300,
+      baseSeconds: 300,
     });
-    expect(parsed.ring_seconds).toBe(3);
+    expect(parsed.ringSeconds).toBe(3);
   });
 
-  it("ring_seconds を1〜3600の範囲で指定できる", () => {
+  it("ringSeconds を1〜3600の範囲で指定できる", () => {
     const parsed = CreateTimerSchema.parse({
       name: "テスト",
-      base_seconds: 300,
-      ring_seconds: 3600,
+      baseSeconds: 300,
+      ringSeconds: 3600,
     });
-    expect(parsed.ring_seconds).toBe(3600);
+    expect(parsed.ringSeconds).toBe(3600);
   });
 
-  it("ring_seconds の0以下を拒否する", () => {
+  it("ringSeconds の0以下を拒否する", () => {
     expect(() =>
       CreateTimerSchema.parse({
         name: "テスト",
-        base_seconds: 300,
-        ring_seconds: 0,
+        baseSeconds: 300,
+        ringSeconds: 0,
       }),
     ).toThrow();
   });
 
-  it("ring_seconds の3600超を拒否する", () => {
+  it("ringSeconds の3600超を拒否する", () => {
     expect(() =>
       CreateTimerSchema.parse({
         name: "テスト",
-        base_seconds: 300,
-        ring_seconds: 3601,
+        baseSeconds: 300,
+        ringSeconds: 3601,
       }),
     ).toThrow();
   });
@@ -91,9 +94,9 @@ describe("CreateTimerSchema", () => {
     const parsed = CreateTimerSchema.parse({
       name: "アラーム",
       mode: "alarm",
-      base_seconds: 0,
-      target_minutes: 600,
-      tz_offset_minutes: 540,
+      baseSeconds: 0,
+      targetMinutes: 600,
+      tzOffsetMinutes: 540,
       ephemeral: true,
     });
     expect(parsed.ephemeral).toBe(true);
@@ -132,42 +135,42 @@ describe("UserPreferencesSchema", () => {
 
   it("全フィールドを保持する", () => {
     const parsed = UserPreferencesSchema.parse({
-      ring_seconds: 1800,
-      base_seconds: 600,
-      adjust_minutes: 5,
+      ringSeconds: 1800,
+      baseSeconds: 600,
+      adjustMinutes: 5,
       mode: "alarm",
-      calorie_goal_kcal: 1615,
+      calorieGoalKcal: 1615,
     });
-    expect(parsed.ring_seconds).toBe(1800);
-    expect(parsed.base_seconds).toBe(600);
-    expect(parsed.adjust_minutes).toBe(5);
+    expect(parsed.ringSeconds).toBe(1800);
+    expect(parsed.baseSeconds).toBe(600);
+    expect(parsed.adjustMinutes).toBe(5);
     expect(parsed.mode).toBe("alarm");
-    expect(parsed.calorie_goal_kcal).toBe(1615);
+    expect(parsed.calorieGoalKcal).toBe(1615);
   });
 
   it("不正な mode を拒否する", () => {
     expect(() => UserPreferencesSchema.parse({ mode: "stopwatch" })).toThrow();
   });
 
-  it("adjust_minutes の範囲外を拒否する", () => {
-    expect(() => UserPreferencesSchema.parse({ adjust_minutes: 0 })).toThrow();
+  it("adjustMinutes の範囲外を拒否する", () => {
+    expect(() => UserPreferencesSchema.parse({ adjustMinutes: 0 })).toThrow();
     expect(() =>
-      UserPreferencesSchema.parse({ adjust_minutes: 1000 }),
+      UserPreferencesSchema.parse({ adjustMinutes: 1000 }),
     ).toThrow();
   });
 
-  it("ring_seconds の範囲外を拒否する", () => {
-    expect(() => UserPreferencesSchema.parse({ ring_seconds: 0 })).toThrow();
-    expect(() => UserPreferencesSchema.parse({ ring_seconds: 3601 })).toThrow();
+  it("ringSeconds の範囲外を拒否する", () => {
+    expect(() => UserPreferencesSchema.parse({ ringSeconds: 0 })).toThrow();
+    expect(() => UserPreferencesSchema.parse({ ringSeconds: 3601 })).toThrow();
   });
 
-  it("calorie_goal_kcal は正の整数だけを受け入れる", () => {
-    expect(UserPreferencesSchema.parse({ calorie_goal_kcal: 1616 })).toEqual({
-      calorie_goal_kcal: 1616,
+  it("calorieGoalKcal は正の整数だけを受け入れる", () => {
+    expect(UserPreferencesSchema.parse({ calorieGoalKcal: 1616 })).toEqual({
+      calorieGoalKcal: 1616,
     });
     for (const value of [1.5, 0, -1, Number.POSITIVE_INFINITY, Number.NaN]) {
       expect(() =>
-        UserPreferencesSchema.parse({ calorie_goal_kcal: value }),
+        UserPreferencesSchema.parse({ calorieGoalKcal: value }),
       ).toThrow();
     }
   });
@@ -176,11 +179,11 @@ describe("UserPreferencesSchema", () => {
 describe("カロリー計算スキーマ", () => {
   it("品目の正の整数kcalを受け入れ、小数と非正数と非有限値を拒否する", () => {
     expect(
-      CalorieItemInputSchema.parse({ name: "食品", kcal: 13, note: "" }),
+      CreateCalorieItemSchema.parse({ name: "食品", kcal: 13, note: "" }),
     ).toEqual({ name: "食品", kcal: 13, note: "" });
     for (const kcal of [12.5, 0, -1, Number.POSITIVE_INFINITY, Number.NaN]) {
       expect(() =>
-        CalorieItemInputSchema.parse({ name: "食品", kcal, note: "" }),
+        CreateCalorieItemSchema.parse({ name: "食品", kcal, note: "" }),
       ).toThrow();
       expect(() =>
         CalorieItemCsvRowSchema.parse({ name: "食品", kcal, note: "" }),
@@ -190,19 +193,19 @@ describe("カロリー計算スキーマ", () => {
 
   it("記録の0以上の整数数量を受け入れ、小数と負数と非有限値と上限超過を拒否する", () => {
     expect(
-      CalorieRecordInputSchema.parse({
-        consumed_at: "2026/09/01 12:34",
-        item_id: 1,
+      CreateCalorieRecordSchema.parse({
+        consumedAt: "2026/09/01 12:34",
+        itemId: 1,
         quantity: 2,
-        tz_offset_minutes: 540,
+        tzOffsetMinutes: 540,
       }).quantity,
     ).toBe(2);
     expect(
-      CalorieRecordInputSchema.parse({
-        consumed_at: "2026/09/01 12:34",
-        item_id: 1,
+      CreateCalorieRecordSchema.parse({
+        consumedAt: "2026/09/01 12:34",
+        itemId: 1,
         quantity: 0,
-        tz_offset_minutes: 540,
+        tzOffsetMinutes: 540,
       }).quantity,
     ).toBe(0);
     expect(
@@ -214,11 +217,11 @@ describe("カロリー計算スキーマ", () => {
     ).toBe(0);
     for (const quantity of [0.5, -1, Number.NaN, 1_000_001]) {
       expect(() =>
-        CalorieRecordInputSchema.parse({
-          consumed_at: "2026/09/01 12:34",
-          item_id: 1,
+        CreateCalorieRecordSchema.parse({
+          consumedAt: "2026/09/01 12:34",
+          itemId: 1,
           quantity,
-          tz_offset_minutes: 540,
+          tzOffsetMinutes: 540,
         }),
       ).toThrow();
       expect(() =>
@@ -233,25 +236,25 @@ describe("カロリー計算スキーマ", () => {
 
   it("分単位の実在日時とUTCオフセットを検証する", () => {
     expect(
-      CalorieRecordInputSchema.parse({
-        consumed_at: "2026/09/01 12:34",
-        item_id: 1,
+      CreateCalorieRecordSchema.parse({
+        consumedAt: "2026/09/01 12:34",
+        itemId: 1,
         quantity: 1,
-        tz_offset_minutes: 540,
-      }).consumed_at,
+        tzOffsetMinutes: 540,
+      }).consumedAt,
     ).toBe("2026/09/01 12:34");
-    for (const consumed_at of [
+    for (const consumedAt of [
       "2026-09-01 12:34",
       "2026/02/30 12:34",
       "2026/09/01 24:00",
       "2026/09/01 12:34:56",
     ]) {
       expect(() =>
-        CalorieRecordInputSchema.parse({
-          consumed_at,
-          item_id: 1,
+        CreateCalorieRecordSchema.parse({
+          consumedAt,
+          itemId: 1,
           quantity: 1,
-          tz_offset_minutes: 540,
+          tzOffsetMinutes: 540,
         }),
       ).toThrow();
     }
@@ -259,20 +262,20 @@ describe("カロリー計算スキーマ", () => {
 
   it("記録は品目と一時項目名のどちらか一方だけを受け入れ、一時項目名の前後の空白を除く", () => {
     const base = {
-      consumed_at: "2026/09/01 12:34",
+      consumedAt: "2026/09/01 12:34",
       quantity: 450,
-      tz_offset_minutes: 540,
+      tzOffsetMinutes: 540,
     };
     expect(
-      CalorieRecordInputSchema.parse({ ...base, temporary_name: " 外食 " }),
-    ).toMatchObject({ temporary_name: "外食" });
+      CreateCalorieRecordSchema.parse({ ...base, temporaryName: " 外食 " }),
+    ).toMatchObject({ temporaryName: "外食" });
     for (const target of [
       {},
-      { item_id: 1, temporary_name: "外食" },
-      { temporary_name: "  " },
+      { itemId: 1, temporaryName: "外食" },
+      { temporaryName: "  " },
     ]) {
       expect(() =>
-        CalorieRecordInputSchema.parse({ ...base, ...target }),
+        CreateCalorieRecordSchema.parse({ ...base, ...target }),
       ).toThrow();
       expect(() =>
         UpdateCalorieRecordSchema.parse({ ...base, ...target, recordId: 1 }),
@@ -347,5 +350,35 @@ describe("CreateTaskSchema / UpdateTaskSchema の本文バイト長上限", () =
     expect(() =>
       UpdateTaskSchema.parse({ listId: 1, taskId: 2, text }),
     ).toThrow();
+  });
+});
+
+describe("タイマーの秒数上限", () => {
+  it("作成と更新で99時間59分59秒を許容し、それを超える値を拒否する", () => {
+    expect(
+      CreateTimerSchema.parse({ name: "上限", baseSeconds: 359999 })
+        .baseSeconds,
+    ).toBe(359999);
+    expect(
+      UpdateTimerSchema.parse({ timerId: 1, baseSeconds: 359999 }).baseSeconds,
+    ).toBe(359999);
+    expect(() =>
+      CreateTimerSchema.parse({ name: "超過", baseSeconds: 360000 }),
+    ).toThrow();
+    expect(() =>
+      UpdateTimerSchema.parse({ timerId: 1, baseSeconds: 360000 }),
+    ).toThrow();
+  });
+});
+
+describe("並べ替え対象の一意性", () => {
+  it("同じIDを2回指定する入力を拒否する", () => {
+    expect(() => ReorderTimersSchema.parse({ timerIds: [1, 1] })).toThrow();
+    expect(() =>
+      ReorderTasksSchema.parse({ listId: 1, taskIds: [1, 1] }),
+    ).toThrow();
+    expect(ReorderTimersSchema.parse({ timerIds: [1, 2] }).timerIds).toEqual([
+      1, 2,
+    ]);
   });
 });

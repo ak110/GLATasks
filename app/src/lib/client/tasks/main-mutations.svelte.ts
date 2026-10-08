@@ -1,15 +1,14 @@
 import { SvelteMap, SvelteDate } from "svelte/reactivity";
 import { queryKeys } from "#lib/client/query-options.ts";
 import { createMutation, type QueryClient } from "@tanstack/svelte-query";
-import { trpc } from "#lib/client/trpc.ts";
+import { trpc, type RouterInputs } from "#lib/client/trpc.ts";
 import {
   createTempTaskId,
   type ActiveTasksCache,
 } from "#lib/client/tasks/task-cache.ts";
 import { getHeadSortOrder } from "#lib/task-order.ts";
 import { splitTitle, splitNotes } from "#lib/text-split.ts";
-import type { TaskStatus, TaskKind } from "#lib/schemas.ts";
-import type { TagInfo, TaskListItem } from "#lib/types.ts";
+import type { TaskListItem } from "#lib/types.ts";
 import type { MainState } from "./main-state.svelte.ts";
 
 export function createMainMutations(
@@ -19,7 +18,8 @@ export function createMainMutations(
 ) {
   // リスト作成
   const createListMutation = createMutation(() => ({
-    mutationFn: (title: string) => trpc.lists.create.mutate({ title }),
+    mutationFn: (title: RouterInputs["lists"]["create"]["title"]) =>
+      trpc.lists.create.mutate({ title }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: queryKeys.lists });
       state.addListTitle = "";
@@ -33,23 +33,14 @@ export function createMainMutations(
       text,
       tags,
       kind,
-    }: {
-      listId: number;
-      text: string;
-      tags?: TagInfo[];
-      kind?: TaskKind;
-    }) => trpc.tasks.create.mutate({ listId, text, tags, kind }),
+    }: RouterInputs["tasks"]["create"]) =>
+      trpc.tasks.create.mutate({ listId, text, tags, kind }),
     onMutate: async ({
       listId,
       text,
       tags,
       kind,
-    }: {
-      listId: number;
-      text: string;
-      tags?: TagInfo[];
-      kind?: TaskKind;
-    }) => {
+    }: RouterInputs["tasks"]["create"]) => {
       await queryClient.cancelQueries({ queryKey: queryKeys.activeTasks });
       const tempId = createTempTaskId();
       queryClient.setQueryData<ActiveTasksCache>(
@@ -67,10 +58,10 @@ export function createMainMutations(
             status: "active",
             kind: kind ?? "normal",
             tags: tags ?? [],
-            sort_order: getHeadSortOrder(
+            sortOrder: getHeadSortOrder(
               old.tasks
                 .filter((task) => task.listId === listId)
-                .map((task) => task.sort_order),
+                .map((task) => task.sortOrder),
             ),
             updated: new SvelteDate().toISOString(),
             attachments: [],
@@ -121,55 +112,36 @@ export function createMainMutations(
 
   // タスク更新
   const updateTaskMutation = createMutation(() => ({
-    mutationFn: (input: {
-      listId: number;
-      taskId: number;
-      text?: string;
-      status?: TaskStatus;
-      completed?: string | null;
-      move_to?: number;
-      keep_order?: boolean;
-      tags?: TagInfo[];
-      kind?: TaskKind;
-    }) => trpc.tasks.update.mutate(input),
-    onMutate: async (variables: {
-      listId: number;
-      taskId: number;
-      text?: string;
-      status?: TaskStatus;
-      completed?: string | null;
-      move_to?: number;
-      keep_order?: boolean;
-      tags?: TagInfo[];
-      kind?: TaskKind;
-    }) => {
+    mutationFn: (input: RouterInputs["tasks"]["update"]) =>
+      trpc.tasks.update.mutate(input),
+    onMutate: async (variables: RouterInputs["tasks"]["update"]) => {
       await queryClient.cancelQueries({ queryKey: queryKeys.activeTasks });
       const previousUpdated = queryClient
         .getQueryData<ActiveTasksCache>(queryKeys.activeTasks)
         ?.tasks.find((t) => t.id === variables.taskId)?.updated;
-      // text変更かつkeep_order=falseなら先頭移動（サーバーロジック踏襲）
+      // text変更かつkeepOrder=falseなら先頭移動（サーバーロジック踏襲）
       let optimisticSortOrder: number | undefined;
-      if (variables.text !== undefined && variables.keep_order !== true) {
+      if (variables.text !== undefined && variables.keepOrder !== true) {
         const prev2 = queryClient.getQueryData<ActiveTasksCache>(
           queryKeys.activeTasks,
         );
-        const targetListId = variables.move_to ?? variables.listId;
+        const targetListId = variables.moveTo ?? variables.listId;
         const sameListTasks = (prev2?.tasks ?? []).filter(
           (t) => t.listId === targetListId,
         );
         optimisticSortOrder = getHeadSortOrder(
-          sameListTasks.map((task) => task.sort_order),
+          sameListTasks.map((task) => task.sortOrder),
         );
-      } else if (variables.move_to !== undefined) {
-        // move_to のみの場合も移動先リストの先頭に楽観配置
+      } else if (variables.moveTo !== undefined) {
+        // moveTo のみの場合も移動先リストの先頭に楽観配置
         const prev2 = queryClient.getQueryData<ActiveTasksCache>(
           queryKeys.activeTasks,
         );
         const sameListTasks = (prev2?.tasks ?? []).filter(
-          (t) => t.listId === variables.move_to,
+          (t) => t.listId === variables.moveTo,
         );
         optimisticSortOrder = getHeadSortOrder(
-          sameListTasks.map((task) => task.sort_order),
+          sameListTasks.map((task) => task.sortOrder),
         );
       }
       queryClient.setQueryData<ActiveTasksCache>(
@@ -197,11 +169,11 @@ export function createMainMutations(
                 ...(variables.kind !== undefined
                   ? { kind: variables.kind }
                   : {}),
-                ...(variables.move_to !== undefined
-                  ? { listId: variables.move_to }
+                ...(variables.moveTo !== undefined
+                  ? { listId: variables.moveTo }
                   : {}),
                 ...(optimisticSortOrder !== undefined
-                  ? { sort_order: optimisticSortOrder }
+                  ? { sortOrder: optimisticSortOrder }
                   : {}),
                 updated: new SvelteDate().toISOString(),
               };
@@ -228,8 +200,8 @@ export function createMainMutations(
       // タスクが別リストへ移動された場合、または TODO 件数バッジに影響する
       // kind・status の変更を伴う場合はリスト一覧も更新する
       if (
-        (variables.move_to !== undefined &&
-          variables.move_to !== variables.listId) ||
+        (variables.moveTo !== undefined &&
+          variables.moveTo !== variables.listId) ||
         variables.kind !== undefined ||
         variables.status !== undefined
       ) {
@@ -240,7 +212,8 @@ export function createMainMutations(
 
   // リスト削除
   const deleteListMutation = createMutation(() => ({
-    mutationFn: (listId: number) => trpc.lists.delete.mutate({ listId }),
+    mutationFn: (listId: RouterInputs["lists"]["delete"]["listId"]) =>
+      trpc.lists.delete.mutate({ listId }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.lists });
     },
@@ -248,7 +221,7 @@ export function createMainMutations(
 
   // リスト名変更
   const renameListMutation = createMutation(() => ({
-    mutationFn: ({ listId, title }: { listId: number; title: string }) =>
+    mutationFn: ({ listId, title }: RouterInputs["lists"]["rename"]) =>
       trpc.lists.rename.mutate({ listId, title }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.lists });
@@ -257,7 +230,8 @@ export function createMainMutations(
 
   // リストをアーカイブ
   const archiveListMutation = createMutation(() => ({
-    mutationFn: (listId: number) => trpc.lists.archive.mutate({ listId }),
+    mutationFn: (listId: RouterInputs["lists"]["archive"]["listId"]) =>
+      trpc.lists.archive.mutate({ listId }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.lists });
     },
@@ -265,7 +239,8 @@ export function createMainMutations(
 
   // リストをアーカイブ解除
   const unarchiveListMutation = createMutation(() => ({
-    mutationFn: (listId: number) => trpc.lists.unarchive.mutate({ listId }),
+    mutationFn: (listId: RouterInputs["lists"]["unarchive"]["listId"]) =>
+      trpc.lists.unarchive.mutate({ listId }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.lists });
     },
@@ -273,7 +248,8 @@ export function createMainMutations(
 
   // 完了済みタスククリア
   const clearListMutation = createMutation(() => ({
-    mutationFn: (listId: number) => trpc.lists.clear.mutate({ listId }),
+    mutationFn: (listId: RouterInputs["lists"]["clear"]["listId"]) =>
+      trpc.lists.clear.mutate({ listId }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.activeTasks });
     },
@@ -281,7 +257,7 @@ export function createMainMutations(
 
   // リスト統合
   const mergeListMutation = createMutation(() => ({
-    mutationFn: (input: { sourceListId: number; targetListId: number }) =>
+    mutationFn: (input: RouterInputs["lists"]["merge"]) =>
       trpc.lists.merge.mutate(input),
     onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.lists });
@@ -292,9 +268,9 @@ export function createMainMutations(
 
   // タスク並び替え
   const reorderTasksMutation = createMutation(() => ({
-    mutationFn: (input: { listId: number; taskIds: number[] }) =>
+    mutationFn: (input: RouterInputs["tasks"]["reorder"]) =>
       trpc.tasks.reorder.mutate(input),
-    onMutate: async (input: { listId: number; taskIds: number[] }) => {
+    onMutate: async (input: RouterInputs["tasks"]["reorder"]) => {
       await queryClient.cancelQueries({ queryKey: queryKeys.activeTasks });
       const previousUpdated: string[] = [];
       const now = new SvelteDate().toISOString();
@@ -311,7 +287,7 @@ export function createMainMutations(
               previousUpdated.push(task.updated);
               return {
                 ...task,
-                sort_order: newOrder,
+                sortOrder: newOrder,
                 updated: now,
               };
             }),

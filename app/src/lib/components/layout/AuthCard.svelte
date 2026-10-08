@@ -5,12 +5,12 @@
 
     import type { Snippet } from "svelte";
 
-    type Props = {
+    interface Props {
         title: string;
         error?: string | null;
         children: Snippet;
         footer: Snippet;
-    };
+    }
 
     let { title, error, children, footer }: Props = $props();
 </script>

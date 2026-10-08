@@ -8,7 +8,11 @@
 
     import type { Snippet } from "svelte";
 
-    let { children }: { children: Snippet } = $props();
+    interface Props {
+        children: Snippet;
+    }
+
+    let { children }: Props = $props();
 </script>
 
 <!--

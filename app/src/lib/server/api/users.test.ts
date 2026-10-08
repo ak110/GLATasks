@@ -25,18 +25,18 @@ describeDb("updateUserPreferences", () => {
     const userId = await createFixtureUser();
     userIds.push(userId);
 
-    await updateUserPreferences(userId, { ring_seconds: 10 });
-    await updateUserPreferences(userId, { calorie_goal_kcal: 1800 });
+    await updateUserPreferences(userId, { ringSeconds: 10 });
+    await updateUserPreferences(userId, { calorieGoalKcal: 1800 });
     expect(await getUserPreferences(userId)).toEqual({
-      ring_seconds: 10,
-      calorie_goal_kcal: 1800,
+      ringSeconds: 10,
+      calorieGoalKcal: 1800,
     });
 
-    await updateUserPreferences(userId, { adjust_minutes: 5 });
+    await updateUserPreferences(userId, { adjustMinutes: 5 });
     expect(await getUserPreferences(userId)).toEqual({
-      ring_seconds: 10,
-      adjust_minutes: 5,
-      calorie_goal_kcal: 1800,
+      ringSeconds: 10,
+      adjustMinutes: 5,
+      calorieGoalKcal: 1800,
     });
   });
 
@@ -45,10 +45,10 @@ describeDb("updateUserPreferences", () => {
     userIds.push(userId);
     const preferences = {
       mode: "alarm",
-      ring_seconds: 10,
-      base_seconds: 300,
-      adjust_minutes: 5,
-      calorie_goal_kcal: 1800,
+      ringSeconds: 10,
+      baseSeconds: 300,
+      adjustMinutes: 5,
+      calorieGoalKcal: 1800,
     };
     await getDb()
       .update(users)

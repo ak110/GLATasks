@@ -10,7 +10,7 @@
         invalidateEventQueries,
         subscribeQueryEvents,
     } from "#lib/client/query-sync.ts";
-    import { getTimezoneOffsetMinutes } from "#lib/date-time.ts";
+    import { getUtcOffsetMinutes } from "#lib/date-time.ts";
     /**
      * @fileoverview カロリー計算ページ
      */
@@ -33,18 +33,12 @@
     import CalorieSummary from "#lib/components/calories/CalorieSummary.svelte";
     import ConfirmDialog from "#lib/components/dialogs/ConfirmDialog.svelte";
     import { startMinuteTicker } from "#lib/client/minute-ticker.ts";
-    import type {
-        BulkCreateCalorieRecordsInput,
-        BulkDeleteCalorieRecordsInput,
-        CalorieAutoRecordInput,
-        CalorieItemCsvRow,
-        CalorieRecordCsvRow,
-        CalorieRecordInput,
-        UpdateCalorieAutoRecordInput,
-        UpdateCalorieRecordInput,
-    } from "#lib/schemas.ts";
     import { SSE_EVENTS } from "#lib/sse-events.ts";
-    import { trpc, type RouterOutputs } from "#lib/client/trpc.ts";
+    import {
+        trpc,
+        type RouterInputs,
+        type RouterOutputs,
+    } from "#lib/client/trpc.ts";
 
     type RecordRow = RouterOutputs["calories"]["records"]["records"][number];
 
@@ -64,7 +58,7 @@
         recordAddItemName = "";
         itemAddName = "";
     }
-    const tzOffsetMinutes = getTimezoneOffsetMinutes();
+    const tzOffsetMinutes = getUtcOffsetMinutes();
 
     const itemsQuery = createQuery(() => calorieItemsOptions());
     const recordsQuery = createQuery(() =>
@@ -94,81 +88,83 @@
     );
 
     const createItemMutation = createMutation(() => ({
-        mutationFn: (input: { name: string; kcal: number; note: string }) =>
+        mutationFn: (input: RouterInputs["calories"]["createItem"]) =>
             trpc.calories.createItem.mutate(input),
         onSuccess: invalidateCalories,
     }));
     const updateItemMutation = createMutation(() => ({
-        mutationFn: (input: {
-            itemId: number;
-            name: string;
-            kcal: number;
-            note: string;
-        }) => trpc.calories.updateItem.mutate(input),
+        mutationFn: (input: RouterInputs["calories"]["updateItem"]) =>
+            trpc.calories.updateItem.mutate(input),
         onSuccess: invalidateCalories,
     }));
     const deleteItemMutation = createMutation(() => ({
-        mutationFn: (itemId: number) =>
-            trpc.calories.deleteItem.mutate({ itemId }),
+        mutationFn: (
+            itemId: RouterInputs["calories"]["deleteItem"]["itemId"],
+        ) => trpc.calories.deleteItem.mutate({ itemId }),
         onSuccess: invalidateCalories,
     }));
     const createRecordMutation = createMutation(() => ({
-        mutationFn: (input: CalorieRecordInput) =>
+        mutationFn: (input: RouterInputs["calories"]["createRecord"]) =>
             trpc.calories.createRecord.mutate(input),
         onSuccess: invalidateCalories,
     }));
     const updateRecordMutation = createMutation(() => ({
-        mutationFn: (input: UpdateCalorieRecordInput) =>
+        mutationFn: (input: RouterInputs["calories"]["updateRecord"]) =>
             trpc.calories.updateRecord.mutate(input),
         onSuccess: invalidateCalories,
     }));
     const deleteRecordMutation = createMutation(() => ({
-        mutationFn: (recordId: number) =>
-            trpc.calories.deleteRecord.mutate({ recordId }),
+        mutationFn: (
+            recordId: RouterInputs["calories"]["deleteRecord"]["recordId"],
+        ) => trpc.calories.deleteRecord.mutate({ recordId }),
         onSuccess: invalidateCalories,
     }));
     const updateGoalMutation = createMutation(() => ({
-        mutationFn: (calorie_goal_kcal: number) =>
-            trpc.users.updatePreferences.mutate({ calorie_goal_kcal }),
+        mutationFn: (
+            calorieGoalKcal: NonNullable<
+                RouterInputs["users"]["updatePreferences"]["calorieGoalKcal"]
+            >,
+        ) => trpc.users.updatePreferences.mutate({ calorieGoalKcal }),
         onSuccess: invalidatePreferences,
     }));
     const importItemsMutation = createMutation(() => ({
-        mutationFn: (rows: CalorieItemCsvRow[]) =>
+        mutationFn: (rows: RouterInputs["calories"]["importItems"]["rows"]) =>
             trpc.calories.importItems.mutate({ rows }),
         onSuccess: invalidateCalories,
     }));
     const importRecordsMutation = createMutation(() => ({
-        mutationFn: (rows: CalorieRecordCsvRow[]) =>
+        mutationFn: (rows: RouterInputs["calories"]["importRecords"]["rows"]) =>
             trpc.calories.importRecords.mutate({
                 rows,
-                tz_offset_minutes: tzOffsetMinutes,
+                tzOffsetMinutes: tzOffsetMinutes,
             }),
         onSuccess: invalidateCalories,
     }));
 
     const bulkCreateMutation = createMutation(() => ({
-        mutationFn: (input: BulkCreateCalorieRecordsInput) =>
+        mutationFn: (input: RouterInputs["calories"]["bulkCreateRecords"]) =>
             trpc.calories.bulkCreateRecords.mutate(input),
         onSuccess: invalidateCalories,
     }));
     const bulkDeleteMutation = createMutation(() => ({
-        mutationFn: (input: BulkDeleteCalorieRecordsInput) =>
+        mutationFn: (input: RouterInputs["calories"]["bulkDeleteRecords"]) =>
             trpc.calories.bulkDeleteRecords.mutate(input),
         onSuccess: invalidateCalories,
     }));
     const createAutoRecordMutation = createMutation(() => ({
-        mutationFn: (input: CalorieAutoRecordInput) =>
+        mutationFn: (input: RouterInputs["calories"]["createAutoRecord"]) =>
             trpc.calories.createAutoRecord.mutate(input),
         onSuccess: invalidateCalories,
     }));
     const updateAutoRecordMutation = createMutation(() => ({
-        mutationFn: (input: UpdateCalorieAutoRecordInput) =>
+        mutationFn: (input: RouterInputs["calories"]["updateAutoRecord"]) =>
             trpc.calories.updateAutoRecord.mutate(input),
         onSuccess: invalidateCalories,
     }));
     const deleteAutoRecordMutation = createMutation(() => ({
-        mutationFn: (autoRecordId: number) =>
-            trpc.calories.deleteAutoRecord.mutate({ autoRecordId }),
+        mutationFn: (
+            autoRecordId: RouterInputs["calories"]["deleteAutoRecord"]["autoRecordId"],
+        ) => trpc.calories.deleteAutoRecord.mutate({ autoRecordId }),
         onSuccess: invalidateCalories,
     }));
 
@@ -198,7 +194,7 @@
         {#if summaryQuery.data}
             <CalorieSummary
                 periods={summaryQuery.data.periods}
-                goalKcal={summaryQuery.data.goal_kcal}
+                goalKcal={summaryQuery.data.goalKcal}
                 onSaveGoal={(goal) => updateGoalMutation.mutateAsync(goal)}
             />
             <CalorieAchievement achievement={summaryQuery.data.achievement} />
