@@ -28,6 +28,9 @@ overrides:
   js-yaml@<4.3.0: ^4.3.0
   linkify-it@<5.0.2: ^5.0.2
   markdown-it@<14.2.0: ^14.2.0
+  # GHSA-238p-pmpm-9mq7: micromark-extension-math 3.1.0の要求範囲katex ^0.16.0では修正版0.18.2へ到達しない。
+  # micromark-extension-mathが修正版を要求するようになったら撤去できる。
+  "micromark-extension-math@3.1.0>katex": 0.18.2
   nanoid@<3.3.18: ^3.3.18
   postcss@<8.5.18: ^8.5.18
   smol-toml@<1.7.1: ^1.7.1
