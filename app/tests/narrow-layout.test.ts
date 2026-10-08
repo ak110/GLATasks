@@ -111,6 +111,26 @@ test.describe("狭い画面の共通ヘッダー", () => {
       for (const name of PAGE_NAMES) {
         await openPage(page, name);
         await expectHeaderActionsReachable(page, name);
+        // 狭い画面でラベルを隠しても、遷移先とログアウトを名前で識別できる
+        const header = page.locator("header");
+        for (const [item, label] of [
+          ["tasks", "タスク"],
+          ["timers", "タイマー"],
+          ["translate", "翻訳"],
+          ["calories", "カロリー"],
+        ] as const) {
+          if (item !== name) {
+            await expect(
+              header.getByRole("link", { name: label }),
+            ).toBeVisible();
+          }
+        }
+        await expect(
+          header.getByRole("button", { name: "ログアウト" }),
+        ).toBeVisible();
+        await expect(
+          header.getByRole("button", { name: "テーマ切替" }),
+        ).toBeVisible();
         const headerBox = await requireBoundingBox(page.locator("header"));
         const bodyBox = await requireBoundingBox(
           page.locator("header + *").first(),

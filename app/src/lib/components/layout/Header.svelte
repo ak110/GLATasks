@@ -80,9 +80,13 @@
             >
         {/if}
         {#if page === item.key}
+            <!-- 狭い画面ではラベルを隠してアイコンだけを表示するため、名前を属性でも持たせる -->
             <span
                 class="text-sm font-semibold text-gray-200"
                 data-testid={"header-nav-" + item.key}
+                aria-current="page"
+                aria-label={item.label}
+                title={item.label}
                 >{item.icon}<span class="hidden sm:inline">{item.label}</span
                 ></span
             >
@@ -91,6 +95,8 @@
                 href={resolve(item.path)}
                 class="cursor-pointer rounded text-sm text-gray-300 hover:bg-gray-700 hover:text-white"
                 data-testid={"header-nav-" + item.key}
+                aria-label={item.label}
+                title={item.label}
                 >{item.icon}<span class="hidden sm:inline">{item.label}</span
                 ></a
             >
@@ -139,6 +145,8 @@
             <button
                 type="submit"
                 class="cursor-pointer rounded px-2 py-1 text-sm text-gray-300 hover:bg-gray-700 hover:text-white"
+                aria-label="ログアウト"
+                title="ログアウト"
                 ><span class="hidden sm:inline">ログアウト</span><span
                     class="sm:hidden">↩</span
                 ></button
