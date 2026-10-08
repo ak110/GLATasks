@@ -7,6 +7,7 @@
  */
 
 import { RRule, rrulestr } from "rrule";
+import { SCHEDULE_TIMEZONE } from "#lib/date-time.ts";
 
 /** rrule の byweekday 数値表現（0=月曜〜6=日曜）に対応する日本語曜日名 */
 const WEEKDAY_JA = ["月", "火", "水", "木", "金", "土", "日"] as const;
@@ -25,7 +26,7 @@ function joinNumbers(values: number[]): string {
  * 解決後の `options` から取り出す。
  */
 export function describeSchedule(rrule: string): string {
-  const rule = rrulestr(rrule, { tzid: "Asia/Tokyo" });
+  const rule = rrulestr(rrule, { tzid: SCHEDULE_TIMEZONE });
   if (!(rule instanceof RRule)) {
     // RDATE/EXDATE等を含む RRuleSet は本アプリのスケジュールでは生成しないため、
     // 想定外の入力に対するフォールバック表示とする

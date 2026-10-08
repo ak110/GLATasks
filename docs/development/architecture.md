@@ -49,7 +49,8 @@ sequenceDiagram
     A->>S: tRPC mutation（タスク更新）
     S->>S: DB 更新
     S-->>A: SSE: tasks:updated
-    Note over A: 自分のタブIDの通知は無視
+    Note over A: 自タブも再取得（変更タスクの強調表示は更新しない）
+    A->>S: invalidateQueries → 再取得
     S-->>B: SSE: tasks:updated
     B->>S: invalidateQueries → 再取得
     S-->>A: mutation成功応答
@@ -61,7 +62,9 @@ sequenceDiagram
  （`lists:updated` / `tasks:updated` / `timers:updated` / `schedules:updated` /
   `users:preferences:updated` / `calories:updated` / `reset`）
 - クライアントはイベント受信時にTanStack Queryの `invalidateQueries` で該当データを再取得
-- サーバーは送出元タブにも通知する。受信側がイベントのdataにあるタブIDを自分のIDと比較し、同じタブの操作による重複した再取得を避ける
+- サーバーは送出元タブにも通知し、共有接続は全購読者へ配送する。
+  メイン画面の`lists:updated`は送出元を区別せずリスト一覧を再取得する。
+  `tasks:updated`も自タブを含めて再取得するが、自タブ発の場合は変更タスクの強調表示を更新しない
 - 品目、記録または自動記録設定を変更した場合は`calories:updated`を通知し、受信側はカロリーページの全データを再取得する。
   目標値を変更した場合は既存の`users:preferences:updated`を通知し、カロリーページは目標値と期間集計を再取得する
 - 接続の健全性はクライアント側で監視する。`EventSource`の自動再接続に加え、
@@ -85,7 +88,7 @@ sequenceDiagram
   SSE不健全遷移・操作失敗を前倒しトリガーとする。
   不健全検知時は、非入力中なら即時リロードして認証画面への遷移を促し、
   入力中ならバナーで案内し回復検知時に自動解除する
-- 接続判定と検出トリガーは`app/src/lib/connectivity-check.js`が定める。アプリ本体の
+- 接続判定と検出トリガーは`app/src/lib/client/sse/connectivity-check.js`が定める。アプリ本体の
   `connection-recovery.svelte.ts`とService Workerが返すオフライン画面
   （`app/src/routes/offline.html/+server.ts`）が同じモジュールを使う。オフライン画面は、
   オフライン時に追加のスクリプトを取得できずキャッシュ対象を増やせないため、Viteの`?raw`で
@@ -253,9 +256,11 @@ const withApiErrors = t.middleware(async ({ next }) => {
 - 日時カラムはTIMESTAMP型でUTC保存し、APIではISO8601文字列で返す
 - カロリー入力の現地時刻と日付は`tzOffsetMinutes`でサーバーがUTCへ変換する。日ごとの達成状況と今日の残量は現地の早朝4時を日境界とする
 - 定期TODOは`Asia/Tokyo`を使用し、RRULE文字列に`DTSTART;TZID=Asia/Tokyo`形式で保持する
-- 並び順は `sort_order` INTカラム（昇順、1000刻み）。刻み幅を大きくすることで、挿入時に周囲のレコードを更新せずに済む。
-  ドメインごとの挿入位置: リスト（`lists.create`）とタスク（`tasks.create`）は `sort_order = 既存最小値 - 1000` で先頭挿入、
+- タスクとタイマーの並び順は `sort_order` INTカラム（昇順、1000刻み）。刻み幅を大きくすることで、挿入時に周囲のレコードを更新せずに済む。
+  タスク（`tasks.create`）は `sort_order = 既存最小値 - 1000` で先頭挿入、
   タイマー（`timers.create`）は `sort_order = 既存最大値 + 1000` で末尾追加
+- リスト（`lists.create`）も `sort_order = 既存最小値 - 1000` を保存するが、
+  リスト一覧（`lists.list`）は `title` の昇順で返す
 - タイマー一覧の取得ではサーバーが残り秒数を計算し、期限切れを停止する。
   クライアントは`remainingSeconds`、`startedAt`、`serverTime`から表示中の残り時間を計算する。
   秒単位の表示更新にはポーリングを使わない

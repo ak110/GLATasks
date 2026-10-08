@@ -4,7 +4,7 @@
      *
      * SvelteKitのversion.pollIntervalで新デプロイが検知されると
      * $app/state の updated.current が true になる。本コンポーネントは
-     * その状態を購読し、画面上部固定で再読み込みを促すバナーを表示する。
+     * その状態を購読し、画面上部で再読み込みを促すバナーを表示する。
      *
      * 長寿命 SPA セッションで新版 JS が読まれないまま古いコードで操作し続ける
      * ことを防ぐのが目的。navigation 時の hard reload は +layout.svelte 側の

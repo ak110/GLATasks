@@ -13,6 +13,7 @@
 
 import { eq } from "drizzle-orm";
 import { rrulestr } from "rrule";
+import { SCHEDULE_TIMEZONE } from "#lib/date-time.ts";
 
 import { getDb } from "./db";
 import { lists, schedules } from "./schema";
@@ -91,7 +92,7 @@ function collectDueOccurrences(
   now: Date,
   includeAfterBoundary: boolean,
 ): Date[] {
-  const rule = rrulestr(rrule, { tzid: "Asia/Tokyo" });
+  const rule = rrulestr(rrule, { tzid: SCHEDULE_TIMEZONE });
   const occurrences: Date[] = [];
   rule.between(after, now, true, (date) => {
     if (!includeAfterBoundary && date.getTime() === after.getTime()) {
@@ -139,7 +140,7 @@ export async function processSchedules(now: Date): Promise<boolean> {
       const tagList = parseTags(schedule.tags);
       // last_fired は収集済みiteratorの打ち切り結果ではなく、rule.before(now, true) で
       // 現在時刻以前の直近の発火予定を求め直す。これにより次回tickでの再検出（二重発火）を防ぐ。
-      const rule = rrulestr(schedule.rrule, { tzid: "Asia/Tokyo" });
+      const rule = rrulestr(schedule.rrule, { tzid: SCHEDULE_TIMEZONE });
       const lastOccurrence = rule.before(now, true);
       await db.transaction(async (tx) => {
         for (const _occurrence of occurrences) {

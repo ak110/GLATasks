@@ -128,15 +128,15 @@
 </script>
 
 <QueryClientProvider client={queryClient}>
-    <div class="fixed top-0 right-0 left-0 {UI_LAYERS.banner}">
-        <UpdateBanner />
-        <ConnectivityRecoveryBanner />
-    </div>
     <Toast />
     {#if data.logged_in}
         <TimerAlarmMonitor />
     {/if}
     <div class="flex h-screen flex-col bg-gray-50 dark:bg-gray-900">
+        <div class="relative shrink-0 {UI_LAYERS.banner}">
+            <UpdateBanner />
+            <ConnectivityRecoveryBanner />
+        </div>
         {@render children()}
     </div>
 </QueryClientProvider>
