@@ -15,8 +15,9 @@
   - ナビリンク: `cursor-pointer rounded text-sm text-gray-300 hover:bg-gray-700 hover:text-white`
   - アクティブナビ: `text-sm font-semibold text-gray-200`（リンクなし）
 - 画面全体をスクロールさせない
-  - ルートレイアウト（`+layout.svelte`）は`flex h-screen flex-col`とし、ヘッダーとページ本体を縦に並べる
-  - ページ本体の最上位要素には共通コンポーネント`PageScrollArea.svelte`を使い、ヘッダーの下だけをスクロールさせる
+  - ルートレイアウト（`+layout.svelte`）は`flex h-screen flex-col`とし、バナーの領域と各ページの描画内容を縦に並べる
+  - 各ページは最上位に`Header.svelte`とページ本体を兄弟として置く。両者はルートレイアウトの縦flexの直接の子となり、ページ本体がヘッダーの実高さを除いた残りの高さを占める
+  - タイマー・翻訳・カロリー画面はページ本体の最上位要素に共通コンポーネント`PageScrollArea.svelte`を使い、ヘッダーの下だけをスクロールさせる。タスク画面はサイドバーと本文を並べる`min-h-0 flex-1`の領域をページ本体とし、その内側の各領域をスクロールさせる
     - 同コンポーネントは`relative min-h-0 flex-1 overflow-y-auto`を持ち、`data-testid="page-scroll-area"`を付与する
     - `relative`は絶対配置の子孫の含有ブロックをスクロール領域へ固定する。
       位置指定の祖先が無い絶対配置の要素は初期包含ブロックを基準に配置されるため、
