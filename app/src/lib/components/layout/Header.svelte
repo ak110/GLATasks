@@ -66,8 +66,12 @@
     ] as const;
 </script>
 
+<!--
+    幅が足りない場合は右側の操作群を次の行へ折り返し、高さは内容に合わせる。
+    検索欄のフォーカス時の拡大や読み込み中の表示で操作が画面外へ出ないようにするためである。
+-->
 <header
-    class="z-10 flex h-12 shrink-0 items-center gap-1 bg-gray-800 px-2 text-white shadow sm:gap-2 sm:px-4 dark:bg-gray-950"
+    class="z-10 flex min-h-12 shrink-0 flex-wrap items-center gap-x-1 gap-y-1 bg-gray-800 px-2 py-1.5 text-white shadow sm:gap-x-2 sm:px-4 dark:bg-gray-950"
 >
     {#each navigationItems as item (item.key)}
         {#if item.key !== "tasks"}
@@ -95,7 +99,7 @@
     {#if isLoading}
         <span class="text-sm text-gray-400">読み込み中...</span>
     {/if}
-    <div class="ml-auto flex items-center gap-2">
+    <div class="ml-auto flex flex-wrap items-center justify-end gap-2">
         {#if page === "tasks" && onSearchChange}
             <input
                 type="text"

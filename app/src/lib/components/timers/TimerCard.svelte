@@ -1,5 +1,9 @@
 <script lang="ts">
-    import { grayButtonClass } from "#lib/components/ui/styles.ts";
+    import {
+        actionAreaClass,
+        grayButtonClass,
+        nameAreaClass,
+    } from "#lib/components/ui/styles.ts";
     import { getUtcOffsetMinutes } from "#lib/date-time.ts";
     /**
      * @fileoverview タイマーカードコンポーネント
@@ -161,10 +165,10 @@
     role="listitem"
 >
     <!-- ヘッダー: ドラッグハンドル + タイマー名 + 操作ボタン -->
-    <div class="mb-3 flex items-center justify-between">
+    <div class="mb-3 flex items-center justify-between gap-2">
         {#if onDragStart}
             <span
-                class="mr-2 cursor-grab touch-none text-gray-400 select-none dark:text-gray-500"
+                class="shrink-0 cursor-grab touch-none text-gray-400 select-none dark:text-gray-500"
                 class:cursor-grabbing={isDragging}
                 role="button"
                 tabindex="-1"
@@ -176,13 +180,13 @@
         {/if}
         {#if timer.name}
             <h3
-                class="font-medium text-gray-800 dark:text-gray-100"
+                class="{nameAreaClass} font-medium text-gray-800 dark:text-gray-100"
                 data-testid="timer-name"
             >
                 {timer.name}
             </h3>
         {/if}
-        <div class="flex gap-1">
+        <div class="{actionAreaClass} ml-auto flex items-center gap-1">
             <button
                 onclick={() => onEdit(timer)}
                 class="cursor-pointer rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300"

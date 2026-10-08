@@ -1,5 +1,9 @@
 <script lang="ts">
-    import { grayButtonClass } from "#lib/components/ui/styles.ts";
+    import {
+        actionAreaClass,
+        grayButtonClass,
+        nameAreaClass,
+    } from "#lib/components/ui/styles.ts";
     /**
      * @fileoverview タスクリストヘッダー（リスト名 + モバイル戻るボタン + 完了済みを非表示ボタン）
      */
@@ -14,13 +18,13 @@
 </script>
 
 <div
-    class="flex shrink-0 items-center justify-between border-b border-gray-200 bg-blue-50 px-4 py-3 dark:border-gray-700 dark:bg-blue-900/30"
+    class="flex shrink-0 items-center justify-between gap-2 border-b border-gray-200 bg-blue-50 px-4 py-3 dark:border-gray-700 dark:bg-blue-900/30"
 >
-    <div class="flex items-center gap-1">
+    <div class="flex min-w-0 flex-1 items-center gap-1">
         <!-- モバイル用戻るボタン -->
         <button
             onclick={onBack}
-            class="cursor-pointer rounded p-1 text-gray-500 hover:bg-gray-200 hover:text-gray-700 sm:hidden dark:text-gray-400 dark:hover:bg-gray-600 dark:hover:text-gray-200"
+            class="shrink-0 cursor-pointer rounded p-1 text-gray-500 hover:bg-gray-200 hover:text-gray-700 sm:hidden dark:text-gray-400 dark:hover:bg-gray-600 dark:hover:text-gray-200"
             aria-label="リスト一覧に戻る"
             title="戻る"
         >
@@ -38,13 +42,15 @@
                 />
             </svg>
         </button>
-        <h2 class="font-semibold text-gray-800 dark:text-gray-100">
+        <h2
+            class="{nameAreaClass} font-semibold text-gray-800 dark:text-gray-100"
+        >
             {title}
         </h2>
     </div>
     <button
         onclick={onClear}
-        class={grayButtonClass}
+        class="{grayButtonClass} {actionAreaClass}"
         title="完了済みタスクを非表示にする"
         ><span class="sm:hidden">非表示</span><span class="hidden sm:inline"
             >完了済みを非表示</span

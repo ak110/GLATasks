@@ -8,7 +8,10 @@
 - テキスト・絵文字ボタンには `rounded` + パディング + `hover:bg-*` を付与する
   - 通常背景: `rounded p-1 hover:bg-gray-100`（アイコン）/ `rounded px-3 py-1.5 hover:bg-*`（テキスト付き）
   - ダークヘッダー内: `hover:bg-gray-700`
-- ヘッダー: `z-10 h-12 shrink-0 bg-gray-800` 固定。共通コンポーネント `Header.svelte` を使用する
+- ヘッダー: 共通コンポーネント `Header.svelte` を使用する。`z-10 min-h-12 shrink-0 flex-wrap bg-gray-800`とし、高さを固定しない
+  - 幅が足りない場合は右側の操作群（検索・表示切替・テーマ・ログアウト）を次の行へ折り返し、ヘッダーの高さは内容に合わせて増える
+  - 検索欄のフォーカス時の拡大や読み込み中の表示を1行・固定高へ押し込むと、狭い画面で右側の操作が画面外へ出る
+  - 呼び出し元はヘッダーの高さを数値で引かず、ルートレイアウトの縦flexに残りの高さの配分を任せる
   - ナビリンク: `cursor-pointer rounded text-sm text-gray-300 hover:bg-gray-700 hover:text-white`
   - アクティブナビ: `text-sm font-semibold text-gray-200`（リンクなし）
 - 画面全体をスクロールさせない
