@@ -5,10 +5,10 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
 import {
+  cleanupTestList,
   createListFromPage,
   requireBoundingBox,
   uniqueTestName,
-  waitForSuccessfulMutationResponse,
 } from "./helpers/common";
 import {
   getRootOverflow,
@@ -230,6 +230,7 @@ test.describe("狭い画面の長い名前", () => {
 
   test("長い名前のリストを選択しても見出しの戻る・非表示が画面内にある", async ({
     page,
+    browser,
   }) => {
     const listName = longName("list");
     // 狭い画面では作成直後にそのリストが選択されて一覧が隠れるため、作成と選択は広い画面で行う
@@ -250,24 +251,12 @@ test.describe("狭い画面の長い名前", () => {
       );
       await expectReachable(page, page.getByRole("button", { name: "非表示" }));
     } finally {
-      // 共通の削除補助では一覧行を見つけられずに削除されない場合があったため、
-      // 行の表示を確かめたこのページで削除し、削除後の不在まで確認する
+      await cleanupTestList(browser, listName);
       await page.setViewportSize(DESKTOP);
       await openPage(page, "tasks");
-      const listRow = page
-        .getByTestId("list-item")
-        .filter({ hasText: listName });
-      await expect(listRow).toHaveCount(1);
-      await listRow.getByTestId("list-menu-btn").click();
-      await page.getByTestId("list-delete-btn").click();
-      const deleted = waitForSuccessfulMutationResponse(page, "lists.delete");
-      await page
-        .getByRole("dialog")
-        .last()
-        .getByRole("button", { name: "削除", exact: true })
-        .click();
-      await deleted;
-      await expect(listRow).toHaveCount(0);
+      await expect(
+        page.getByTestId("list-item").filter({ hasText: listName }),
+      ).toHaveCount(0);
     }
   });
 });

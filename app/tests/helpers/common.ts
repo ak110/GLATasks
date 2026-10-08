@@ -202,6 +202,9 @@ async function deleteTestListFromPage(
   listName: string,
 ): Promise<void> {
   const listRow = page.getByTestId("list-item").filter({ hasText: listName });
+  // 一覧の取得応答の後も行の描画は遅れて届く。描画前に数えると対象が無いと判定して削除を省くため、
+  // 一覧行の表示を待ってから対象の有無を判定する
+  await expect(page.getByTestId("list-item").first()).toBeVisible();
   if ((await listRow.count()) === 0) return;
   await listRow.getByTestId("list-menu-btn").click();
   await page.getByTestId("list-delete-btn").click();
