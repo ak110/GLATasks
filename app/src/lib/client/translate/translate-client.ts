@@ -35,7 +35,7 @@ export const MODEL_UNAVAILABLE = {
   detector: `Language Detector APIを利用できません。${USE_PROMPT_INSTEAD}`,
   translator: `Translator APIを利用できません。${USE_PROMPT_INSTEAD}`,
   prompt:
-    "Prompt APIを利用できません。翻訳エンジンでTranslator APIを選ぶか、ブラウザ内蔵の言語モデルを使えるChromeのデスクトップ版で開いてください",
+    "Prompt APIを利用できません。翻訳エンジンでTranslator APIを選ぶか、Chrome 148以降のデスクトップ版で開いてください",
 } as const;
 
 export type TranslationDirectionChoice =
