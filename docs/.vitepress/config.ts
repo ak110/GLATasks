@@ -5,6 +5,8 @@ import { defineConfig } from 'vitepress'
 const slugify = (text: string) => text
   .normalize('NFKD')
   .replace(/[\u0300-\u036F]/g, '')
+  // 既定slugifyと同じく制御文字を除去する。
+  // oxlint-disable-next-line no-control-regex
   .replace(/[\u0000-\u001f]/g, '')
   .replace(/[\s~`!@#$%^&*()\-_+=[\]{}|\\;:"'“”‘’<>,.?/]+/g, '-')
   .replace(/-{2,}/g, '-')

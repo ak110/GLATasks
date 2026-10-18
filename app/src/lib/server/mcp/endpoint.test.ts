@@ -34,11 +34,9 @@ function rpc(
   };
   if (sessionId) headers["mcp-session-id"] = sessionId;
   if (body !== undefined) headers["Content-Type"] = "application/json";
-  const request = new Request(url, {
-    method,
-    headers,
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
+  const init: RequestInit = { method, headers };
+  if (body !== undefined) init.body = JSON.stringify(body);
+  const request = new Request(url, init);
   return { request, url } as Parameters<Route["POST"]>[0];
 }
 
