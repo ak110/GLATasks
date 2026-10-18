@@ -1,5 +1,13 @@
 /** 監視APIから定期処理の起動・障害・復旧とDBの応答を検証する。 */
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 
 const database = vi.hoisted(() => ({
   execute: vi.fn(),
@@ -20,8 +28,17 @@ vi.mock("./db", () => ({
   }),
 }));
 
-beforeEach(() => {
+// schedulerと監視APIの依存の初回変換は数秒かかり、並行実行の負荷下では最初の試験の上限を超える。
+// 変換結果はモジュールの読み込み直しをまたいで再利用されるため、試験の前に1回読み込んで済ませる。
+beforeAll(async () => {
+  await import("./scheduler");
+  await import("../../routes/healthcheck/ready/+server");
+}, 60_000);
+
+beforeEach(async () => {
   vi.resetModules();
+  // schedulerの起動済み・health・周期はモジュールの再評価をまたいで保持されるため、試験ごとに破棄する
+  (await import("./process-state"))._resetProcessStateForTest();
   vi.useFakeTimers();
   vi.setSystemTime(new Date("2026-01-01T00:00:00Z"));
   database.execute.mockReset().mockResolvedValue([]);

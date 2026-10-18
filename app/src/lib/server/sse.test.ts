@@ -242,3 +242,119 @@ describe("SSEバッファとリプレイ", () => {
     expect(p1[0]).toContain("data: src-tab");
   });
 });
+
+describe("SSEのモジュール再評価をまたぐ接続と通知", () => {
+  type EventsRoute = typeof import("../../routes/api/events/+server");
+
+  /** 開発サーバーのモジュール再評価と同じく、新しい世代として読み込み直す。 */
+  async function loadGeneration(): Promise<{
+    sse: SseModule;
+    route: EventsRoute;
+  }> {
+    vi.resetModules();
+    return {
+      sse: await import("./sse"),
+      route: await import("../../routes/api/events/+server"),
+    };
+  }
+
+  /** `/api/events`へ接続し、届いたイベントを読み取る */
+  async function connect(
+    route: EventsRoute,
+    userId: number,
+    lastEventId?: number,
+  ) {
+    const url = new URL("http://localhost/api/events");
+    const headers = new Headers();
+    if (lastEventId !== undefined)
+      headers.set("Last-Event-ID", String(lastEventId));
+    const response = await route.GET({
+      locals: { user_id: userId },
+      request: new Request(url, { headers }),
+      url,
+    } as unknown as Parameters<EventsRoute["GET"]>[0]);
+    const reader = response.body!.getReader();
+    const decoder = new TextDecoder();
+    return {
+      async next(): Promise<string> {
+        const { value } = await reader.read();
+        return decoder.decode(value);
+      },
+      cancel: () => reader.cancel(),
+    };
+  }
+
+  beforeEach(async () => {
+    (await import("./process-state"))._resetProcessStateForTest();
+  });
+
+  afterEach(async () => {
+    vi.useRealTimers();
+    (await import("./process-state"))._resetProcessStateForTest();
+  });
+
+  it("再評価前の接続へ再評価後の通知が届き、採番が継続する", async () => {
+    const before = await loadGeneration();
+    const stream = await connect(before.route, 1);
+    expect(await stream.next()).toContain(`event: ${SSE_EVENTS.connected}`);
+    before.sse.sendEvent(1, SSE_EVENTS.tasksUpdated, "old");
+    expect(await stream.next()).toContain("id: 1");
+
+    const after = await loadGeneration();
+    after.sse.sendEvent(1, SSE_EVENTS.listsUpdated, "new");
+    const received = await stream.next();
+    expect(received).toContain("id: 2");
+    expect(received).toContain(`event: ${SSE_EVENTS.listsUpdated}`);
+    await stream.cancel();
+  });
+
+  it("再評価後の接続が再評価前のバッファからLast-Event-ID以降を再送する", async () => {
+    const before = await loadGeneration();
+    for (let i = 0; i < 3; i++)
+      before.sse.sendEvent(1, SSE_EVENTS.tasksUpdated, "old");
+
+    const after = await loadGeneration();
+    const stream = await connect(after.route, 1, 1);
+    const replayed = await stream.next();
+    expect(extractIds([replayed])).toEqual([2]);
+    expect(extractIds([await stream.next()])).toEqual([3]);
+    await stream.cancel();
+  });
+
+  it("再評価前のバッファの上限とTTLを再評価後の通知が適用する", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-01-01T00:00:00Z"));
+    const before = await loadGeneration();
+    for (let i = 0; i < 1000; i++)
+      before.sse.sendEvent(1, SSE_EVENTS.tasksUpdated, "old");
+    before.sse.sendEvent(2, SSE_EVENTS.tasksUpdated, "old");
+
+    const after = await loadGeneration();
+    // 上限: 1001件目で最古（id=1）が破棄され、lastEventId=0との連続性が失われる
+    after.sse.sendEvent(1, SSE_EVENTS.tasksUpdated, "new");
+    const limit = makeController();
+    after.sse.replayEvents(1, 0, limit.controller);
+    expect(limit.payloads[0]).toContain(`event: ${SSE_EVENTS.reset}`);
+    const kept = makeController();
+    after.sse.replayEvents(1, 1, kept.controller);
+    expect(extractIds(kept.payloads)).toHaveLength(1000);
+
+    // TTL: 再評価前に作成されたユーザー2のバッファを、再評価後の発行がGCする
+    vi.setSystemTime(new Date("2026-01-01T00:30:01Z"));
+    after.sse.sendEvent(3, SSE_EVENTS.tasksUpdated, "new");
+    const expired = makeController();
+    after.sse.replayEvents(2, 1000, expired.controller);
+    expect(expired.payloads[0]).toContain(`event: ${SSE_EVENTS.reset}`);
+  });
+
+  it("再評価前の接続を再評価後の処理で解除すると、以後の通知は届かない", async () => {
+    const before = await loadGeneration();
+    const { controller, payloads } = makeController();
+    before.sse.addConnection(1, controller);
+
+    const after = await loadGeneration();
+    after.sse.removeConnection(1, controller);
+    after.sse.sendEvent(1, SSE_EVENTS.tasksUpdated, "new");
+    expect(payloads).toEqual([]);
+  });
+});

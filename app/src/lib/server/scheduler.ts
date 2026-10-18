@@ -16,6 +16,7 @@ import { rrulestr } from "rrule";
 import { SCHEDULE_TIMEZONE } from "#lib/date-time.ts";
 
 import { getDb } from "./db";
+import { processInterval, processState } from "./process-state";
 import { lists, schedules } from "./schema";
 import { processCalorieAutoRecords } from "./calorie-scheduler";
 import { parseTags } from "./api/common";
@@ -38,18 +39,40 @@ const POLL_INTERVAL_MS = 60 * 1000;
  */
 const FILL_FORWARD_LIMIT = 30;
 
-/** 同一プロセス内の起動済みフラグ。二重に `init` が呼ばれても多重登録しない。 */
-let started = false;
+/** 起動・実行中・healthの状態 */
+interface SchedulerState {
+  /** 同一プロセス内の起動済みフラグ。二重に `init` が呼ばれても多重登録しない。 */
+  started: boolean;
+  /** 実行中の1tickが完了する前に次のtickが開始しないようにする再入防止フラグ */
+  processing: boolean;
+  lastSuccessAt: Date | undefined;
+  lastFinishedAt: Date | undefined;
+  lastRunFailed: boolean;
+}
 
-/** 実行中の1tickが完了する前に次のtickが開始しないようにする再入防止フラグ */
-let processing = false;
+/**
+ * モジュールの再評価をまたいで保持する状態。
+ * 再評価後の`init`の呼び出しと`/healthcheck/ready`が、起動済みの同じ実行の状態を扱う（`process-state.ts`を参照）。
+ */
+const state = processState<SchedulerState>("scheduler", () => ({
+  started: false,
+  processing: false,
+  lastSuccessAt: undefined,
+  lastFinishedAt: undefined,
+  lastRunFailed: false,
+}));
 
-let lastSuccessAt: Date | undefined;
-let lastFinishedAt: Date | undefined;
-let lastRunFailed = false;
+/**
+ * ポーリング周期。タイマーは1本だけ保持し、モジュールが評価されるたびに呼び出す処理を
+ * 最新の`tick`へ差し替える。
+ */
+const poll = processInterval("scheduler.poll", POLL_INTERVAL_MS, () => {
+  void tick();
+});
 
 /** 定期処理の停止・失敗を運用監視へ返す。 */
 export function getSchedulerHealth(now = new Date()) {
+  const { lastSuccessAt, lastFinishedAt, lastRunFailed } = state;
   let status: "ok" | "starting" | "error" | "stale";
   if (lastRunFailed) {
     status = "error";
@@ -173,8 +196,8 @@ export async function processSchedules(now: Date): Promise<boolean> {
 
 /** 再入防止しつつ定期TODOとカロリー自動記録を1tick分処理する */
 async function tick(): Promise<void> {
-  if (processing) return;
-  processing = true;
+  if (state.processing) return;
+  state.processing = true;
   try {
     const now = new Date();
     const schedulesSucceeded = await processSchedules(now);
@@ -182,17 +205,17 @@ async function tick(): Promise<void> {
     for (const userId of caloriesResult.userIds) {
       notifyCalorieExecution(userId);
     }
-    lastRunFailed = !schedulesSucceeded || !caloriesResult.succeeded;
-    if (!lastRunFailed) lastSuccessAt = new Date();
+    state.lastRunFailed = !schedulesSucceeded || !caloriesResult.succeeded;
+    if (!state.lastRunFailed) state.lastSuccessAt = new Date();
   } catch (error) {
-    lastRunFailed = true;
+    state.lastRunFailed = true;
     console.error(
       "[scheduler] 定期処理に失敗しました。DB接続と直前のログを確認してください。次の周期で再試行します。",
       error,
     );
   } finally {
-    lastFinishedAt = new Date();
-    processing = false;
+    state.lastFinishedAt = new Date();
+    state.processing = false;
   }
 }
 
@@ -201,10 +224,17 @@ async function tick(): Promise<void> {
  *
  * 即時に1tick実行（起動時フィルフォワード）したのち、60秒間隔でポーリングを繰り返す。
  * 同一プロセス内での多重起動を防ぐため、起動済みフラグを持つ。
+ * フラグと周期はモジュールの再評価をまたいで保持するため、再評価後に呼ばれても周期は増えない。
  */
 export function startScheduler(): void {
-  if (started) return;
-  started = true;
+  if (state.started) return;
+  state.started = true;
   void tick();
-  setInterval(() => void tick(), POLL_INTERVAL_MS);
+  poll.start();
+}
+
+/** スケジューラーを停止する（所有者の明示停止）。次の`startScheduler`で再び起動できる。 */
+export function stopScheduler(): void {
+  poll.stop();
+  state.started = false;
 }

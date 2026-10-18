@@ -23,6 +23,7 @@
 
 import type { SseEventName } from "#lib/sse-events.ts";
 import { SSE_EVENTS } from "#lib/sse-events.ts";
+import { processState } from "./process-state";
 
 export type { SseEventName };
 
@@ -48,18 +49,30 @@ interface UserBuffer {
   lastTouchAt: number;
 }
 
-/** ユーザーID → 接続中の ReadableStreamController の Set */
-const connections = new Map<number, Set<ReadableStreamDefaultController>>();
-
-/** ユーザーID → 直近イベントのリングバッファ */
-const buffers = new Map<number, UserBuffer>();
+/** 接続・再送バッファ・採番の状態 */
+interface SseState {
+  /** ユーザーID → 接続中の ReadableStreamController の Set */
+  connections: Map<number, Set<ReadableStreamDefaultController>>;
+  /** ユーザーID → 直近イベントのリングバッファ */
+  buffers: Map<number, UserBuffer>;
+  /**
+   * SSEイベント採番用のプロセス内グローバルカウンター。
+   * プロセス再起動でリセットされるが、再起動時はバッファ外れとして
+   * `reset` イベントで整合性を回復するため問題ない。
+   */
+  nextEventId: number;
+}
 
 /**
- * SSEイベント採番用のプロセス内グローバルカウンター。
- * プロセス再起動でリセットされるが、再起動時はバッファ外れとして
- * `reset` イベントで整合性を回復するため問題ない。
+ * モジュールの再評価をまたいで保持する状態。
+ * 再評価前に開始した接続へ、再評価後のoperationsの通知と再送が届くようにする（`process-state.ts`を参照）。
  */
-let nextEventId = 1;
+const state = processState<SseState>("sse", () => ({
+  connections: new Map(),
+  buffers: new Map(),
+  nextEventId: 1,
+}));
+const { connections, buffers } = state;
 
 /** SSE 接続を登録する */
 export function addConnection(
@@ -93,7 +106,7 @@ export function sendEvent(
   eventType: SseEventName,
   sourceTabId?: string | null,
 ): void {
-  const id = nextEventId++;
+  const id = state.nextEventId++;
   appendToBuffer(userId, {
     id,
     type: eventType,
@@ -199,5 +212,5 @@ function gcExpiredBuffers(): void {
 export function _resetForTest(): void {
   connections.clear();
   buffers.clear();
-  nextEventId = 1;
+  state.nextEventId = 1;
 }
