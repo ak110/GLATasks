@@ -51,10 +51,15 @@ test.describe("page scroll", () => {
       // 翻訳画面へ画面遷移で入るため、ブラウザー内蔵AIのスタブを最初の読み込みから注入しておく。
       await installAiStubs(page);
       let unhealthy = false;
-      // 更新案内は、画面遷移のデータ応答の`x-sveltekit-version`が読み込み時の版と異なると表示される。
+      // 更新案内は、データ応答の`x-sveltekit-version`が読み込み時の版と異なると表示される。
       // `version.json`の定期確認は開発サーバーで行われないため、両方の環境で働くデータ応答を使う。
+      // 新しい版を返すのは対象の画面への遷移を終えた後に限る。遷移の前に新しい版を検知すると、
+      // ルートlayoutのbeforeNavigateが遷移を再読み込みへ切り替え、再読み込み後は更新案内が出ない。
+      // クリックのmousedownやhoverによる先読みも遷移の前にデータ応答を受け取るため、遷移中は実際の版を返す。
       const newVersion = "e2e-banner-layout-new-version";
+      let reportNewVersion = false;
       await page.route("**/__data.json*", async (route) => {
+        if (!reportNewVersion) return route.continue();
         const response = await route.fetch();
         await route.fulfill({
           response,
@@ -87,17 +92,26 @@ test.describe("page scroll", () => {
 
       for (const name of PAGE_NAMES) {
         unhealthy = false;
-        // 別の画面を読み込み直してから、ヘッダーの画面遷移で対象の画面へ入り、更新案内を表示させる。
-        await openPage(page, name === "tasks" ? "timers" : "tasks");
+        reportNewVersion = false;
+        // 別の画面を読み込み直してから、ヘッダーの画面遷移で対象の画面へ入る。
+        // URLは遷移の確定時に変わるため、変化を待ってbeforeNavigateの通過を確かめる。
+        const otherName = name === "tasks" ? "timers" : "tasks";
+        await openPage(page, otherName);
+        await page.getByTestId(`header-nav-${name}`).click();
+        await expect
+          .poll(() => new URL(page.url()).pathname)
+          .toBe(name === "tasks" ? "/" : `/${name}`);
+        if (name === "translate") await expectStubbedPageReady(page);
+        // 別の画面へのリンクのhoverによる先読みは遷移を伴わずにデータ応答を受け取るため、これで新しい版を検知させる。
+        reportNewVersion = true;
         await Promise.all([
           page.waitForResponse(
             (response) =>
               new URL(response.url()).pathname.endsWith("/__data.json") &&
               response.headers()["x-sveltekit-version"] === newVersion,
           ),
-          page.getByTestId(`header-nav-${name}`).click(),
+          page.getByTestId(`header-nav-${otherName}`).hover(),
         ]);
-        if (name === "translate") await expectStubbedPageReady(page);
         const timerDialog = page.getByRole("dialog", {
           name: /^(?:一時)?タイマー追加$/,
         });
