@@ -68,7 +68,8 @@ e2eテスト（`make test-e2e`）は開発環境（`make deploy`）が起動し�
 TypeScriptの版を6系に留める。
 `typescript-eslint`がTypeScript 7を未サポートであり、
 `svelte-check`もTypeScript 7では6系との併存インストールと専用フラグを要求するためである。
-7系へ上がった場合は`pnpm add -D 'typescript@^6.0.3'`で戻す。
+7系へ上がった場合は、rootを`pnpm add -D -w 'typescript@^6.0.3'`、appを`pnpm --dir app add -D 'typescript@^6.0.3'`で戻す。
+rootへの追加は`-w`を付けないとpnpmが`ERR_PNPM_ADDING_TO_ROOT`で拒否する。
 両ツールがTypeScript 7へ対応した時点で本運用を解除する。
 対応状況は次の2点で判定する。
 

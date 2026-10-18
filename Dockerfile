@@ -4,6 +4,8 @@ ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 RUN corepack enable
 WORKDIR /workspace
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+# pnpm-workspace.yamlのpatchedDependenciesが参照する依存パッチ。無いとpnpm installが失敗する
+COPY patches/ ./patches/
 COPY app/package.json ./app/
 COPY docs/package.json ./docs/
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \

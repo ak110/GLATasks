@@ -1,0 +1,361 @@
+diff --git a/lib/compile.js b/lib/compile.js
+index dce69beb90ece5c3b0ca234a949418f9f34eedbc..08cf635bd5d4ecdc9d43bbf3ea60bd7183583ce3 100644
+--- a/lib/compile.js
++++ b/lib/compile.js
+@@ -4,12 +4,14 @@ const fill = require('fill-range');
+ const utils = require('./utils');
+
+ const compile = (ast, options = {}) => {
+-  const walk = (node, parent = {}) => {
++  // glatasksのパッチ: 木の走査を再帰から明示的なスタックへ置き換え、
++  // 深い入れ子のASTで呼出スタックを使い果たさないようにする（GHSA-vfj7-8cjw-p6xm）。
++  // 走査順と各ノードの判定は上流のwalkと同じ。子を走査する必要があるノードはnullを返す。
++  const enter = (node, parent = {}) => {
+     const invalidBlock = utils.isInvalidBrace(parent);
+     const invalidNode = node.invalid === true && options.escapeInvalid === true;
+     const invalid = invalidBlock === true || invalidNode === true;
+     const prefix = options.escapeInvalid === true ? '\\' : '';
+-    let output = '';
+
+     if (node.isOpen === true) {
+       return prefix + node.value;
+@@ -45,16 +47,30 @@ const compile = (ast, options = {}) => {
+       }
+     }
+
+-    if (node.nodes) {
+-      for (const child of node.nodes) {
+-        output += walk(child, node);
+-      }
+-    }
+-
+-    return output;
++    return node.nodes ? null : '';
+   };
+
+-  return walk(ast);
++  const first = enter(ast);
++  if (first !== null) return first;
++
++  const stack = [{ node: ast, index: 0, output: '' }];
++  while (stack.length > 0) {
++    const frame = stack[stack.length - 1];
++    if (frame.index >= frame.node.nodes.length) {
++      stack.pop();
++      if (stack.length === 0) return frame.output;
++      stack[stack.length - 1].output += frame.output;
++      continue;
++    }
++    const child = frame.node.nodes[frame.index++];
++    const value = enter(child, frame.node);
++    if (value === null) {
++      stack.push({ node: child, index: 0, output: '' });
++    } else {
++      frame.output += value;
++    }
++  }
++  return '';
+ };
+
+ module.exports = compile;
+diff --git a/lib/expand.js b/lib/expand.js
+index 35b2c41d6afdb8f0197959e26079f266e48370d3..073dce65e3c3aa4b6fb1eaec7d43faa96e496f85 100644
+--- a/lib/expand.js
++++ b/lib/expand.js
+@@ -4,36 +4,75 @@ const fill = require('fill-range');
+ const stringify = require('./stringify');
+ const utils = require('./utils');
+
+-const append = (queue = '', stash = '', enclose = false) => {
+-  const result = [];
+-
+-  queue = [].concat(queue);
+-  stash = [].concat(stash);
++// glatasksのパッチ: appendとexpandの走査を再帰から明示的なスタックへ置き換え、
++// 深い入れ子のAST・配列で呼出スタックを使い果たさないようにする（GHSA-vfj7-8cjw-p6xm）。
++// 各呼出の戻り値（早期returnの未平坦化の配列を含む）、処理順、ASTへの書込は上流と同じ。
+
+-  if (!stash.length) return queue;
+-  if (!queue.length) {
+-    return enclose ? utils.flatten(stash).map(ele => `{${ele}}`) : stash;
+-  }
++const append = (queue = '', stash = '', enclose = false) => {
++  // 上流のappend 1回分の開始処理。早期returnの値か、ループを続けるフレームを返す。
++  const start = (q, s) => {
++    q = [].concat(q);
++    s = [].concat(s);
++
++    if (!s.length) return { value: q };
++    if (!q.length) {
++      return { value: enclose ? utils.flatten(s).map(ele => `{${ele}}`) : s };
++    }
++    return { frame: { queue: q, stash: s, result: [], qi: 0, inner: 0 } };
++  };
+
+-  for (const item of queue) {
+-    if (Array.isArray(item)) {
+-      for (const value of item) {
+-        result.push(append(value, stash, enclose));
+-      }
+-    } else {
+-      for (let ele of stash) {
++  const first = start(queue, stash);
++  if (!first.frame) return first.value;
++
++  const stack = [first.frame];
++  while (stack.length > 0) {
++    const f = stack[stack.length - 1];
++    let call = null;
++
++    while (f.qi < f.queue.length) {
++      const item = f.queue[f.qi];
++      if (Array.isArray(item)) {
++        if (f.inner < item.length) {
++          call = [item[f.inner++], f.stash];
++          break;
++        }
++      } else if (f.inner < f.stash.length) {
++        let ele = f.stash[f.inner++];
+         if (enclose === true && typeof ele === 'string') ele = `{${ele}}`;
+-        result.push(Array.isArray(ele) ? append(item, ele, enclose) : item + ele);
++        if (Array.isArray(ele)) {
++          call = [item, ele];
++          break;
++        }
++        f.result.push(item + ele);
++        continue;
++      }
++      f.qi++;
++      f.inner = 0;
++    }
++
++    if (call !== null) {
++      const next = start(call[0], call[1]);
++      if (next.frame) {
++        stack.push(next.frame);
++      } else {
++        f.result.push(next.value);
+       }
++      continue;
+     }
++
++    stack.pop();
++    const value = utils.flatten(f.result);
++    if (stack.length === 0) return value;
++    stack[stack.length - 1].result.push(value);
+   }
+-  return utils.flatten(result);
++  return [];
+ };
+
+ const expand = (ast, options = {}) => {
+   const rangeLimit = options.rangeLimit === undefined ? 1000 : options.rangeLimit;
+
+-  const walk = (node, parent = {}) => {
++  // 上流のwalk 1回分の開始処理。子を走査しないノードはnull、走査するノードはフレームを返す。
++  const enter = (node, parent = {}) => {
+     node.queue = [];
+
+     let p = parent;
+@@ -46,12 +85,12 @@ const expand = (ast, options = {}) => {
+
+     if (node.invalid || node.dollar) {
+       q.push(append(q.pop(), stringify(node, options)));
+-      return;
++      return null;
+     }
+
+     if (node.type === 'brace' && node.invalid !== true && node.nodes.length === 2) {
+       q.push(append(q.pop(), ['{}']));
+-      return;
++      return null;
+     }
+
+     if (node.nodes && node.ranges > 0) {
+@@ -68,7 +107,7 @@ const expand = (ast, options = {}) => {
+
+       q.push(append(q.pop(), range));
+       node.nodes = [];
+-      return;
++      return null;
+     }
+
+     const enclose = utils.encloseBrace(node);
+@@ -80,34 +119,48 @@ const expand = (ast, options = {}) => {
+       queue = block.queue;
+     }
+
+-    for (let i = 0; i < node.nodes.length; i++) {
+-      const child = node.nodes[i];
++    return { node, q, queue, enclose, i: 0 };
++  };
+
+-      if (child.type === 'comma' && node.type === 'brace') {
+-        if (i === 1) queue.push('');
+-        queue.push('');
+-        continue;
+-      }
++  const root = enter(ast);
++  if (root === null) return utils.flatten(undefined);
+
+-      if (child.type === 'close') {
+-        q.push(append(q.pop(), queue, enclose));
+-        continue;
+-      }
++  const stack = [root];
++  while (stack.length > 0) {
++    const f = stack[stack.length - 1];
++    const node = f.node;
+
+-      if (child.value && child.type !== 'open') {
+-        queue.push(append(queue.pop(), child.value));
+-        continue;
+-      }
++    if (f.i >= node.nodes.length) {
++      stack.pop();
++      if (stack.length === 0) return utils.flatten(f.queue);
++      continue;
++    }
+
+-      if (child.nodes) {
+-        walk(child, node);
+-      }
++    const i = f.i++;
++    const child = node.nodes[i];
++
++    if (child.type === 'comma' && node.type === 'brace') {
++      if (i === 1) f.queue.push('');
++      f.queue.push('');
++      continue;
+     }
+
+-    return queue;
+-  };
++    if (child.type === 'close') {
++      f.q.push(append(f.q.pop(), f.queue, f.enclose));
++      continue;
++    }
+
+-  return utils.flatten(walk(ast));
++    if (child.value && child.type !== 'open') {
++      f.queue.push(append(f.queue.pop(), child.value));
++      continue;
++    }
++
++    if (child.nodes) {
++      const frame = enter(child, node);
++      if (frame !== null) stack.push(frame);
++    }
++  }
++  return [];
+ };
+
+ module.exports = expand;
+diff --git a/lib/stringify.js b/lib/stringify.js
+index 8bcf872c31894f81a8c64d9202fd607e4fd7ea2b..a75a14679f9e6f978040587298a5b18085386e20 100644
+--- a/lib/stringify.js
++++ b/lib/stringify.js
+@@ -3,10 +3,13 @@
+ const utils = require('./utils');
+
+ module.exports = (ast, options = {}) => {
+-  const stringify = (node, parent = {}) => {
++  // glatasksのパッチ: 木の走査を再帰から明示的なスタックへ置き換え、
++  // 深い入れ子のASTで呼出スタックを使い果たさないようにする（GHSA-vfj7-8cjw-p6xm）。
++  // 上流は子を親の引数なしで走査するため、parentを受け取るのは根だけである。
++  // 子を走査する必要があるノードはnullを返す。
++  const enter = (node, parent = {}) => {
+     const invalidBlock = options.escapeInvalid && utils.isInvalidBrace(parent);
+     const invalidNode = node.invalid === true && options.escapeInvalid === true;
+-    let output = '';
+
+     if (node.value) {
+       if ((invalidBlock || invalidNode) && utils.isOpenOrClose(node)) {
+@@ -15,18 +18,29 @@ module.exports = (ast, options = {}) => {
+       return node.value;
+     }
+
+-    if (node.value) {
+-      return node.value;
+-    }
+-
+-    if (node.nodes) {
+-      for (const child of node.nodes) {
+-        output += stringify(child);
+-      }
+-    }
+-    return output;
++    return node.nodes ? null : '';
+   };
+
+-  return stringify(ast);
++  const first = enter(ast);
++  if (first !== null) return first;
++
++  const stack = [{ node: ast, index: 0, output: '' }];
++  while (stack.length > 0) {
++    const frame = stack[stack.length - 1];
++    if (frame.index >= frame.node.nodes.length) {
++      stack.pop();
++      if (stack.length === 0) return frame.output;
++      stack[stack.length - 1].output += frame.output;
++      continue;
++    }
++    const child = frame.node.nodes[frame.index++];
++    const value = enter(child);
++    if (value === null) {
++      stack.push({ node: child, index: 0, output: '' });
++    } else {
++      frame.output += value;
++    }
++  }
++  return '';
+ };
+
+diff --git a/lib/utils.js b/lib/utils.js
+index d19311fe044ad5157624077670dc297e8b53da49..599c59e4700b9661dada3637d3b08e3e26500447 100644
+--- a/lib/utils.js
++++ b/lib/utils.js
+@@ -99,24 +99,29 @@ exports.reduce = nodes => nodes.reduce((acc, node) => {
+  */
+
+ exports.flatten = (...args) => {
++  // glatasksのパッチ: 入れ子配列の走査を再帰から明示的なスタックへ置き換え、
++  // 深い入れ子で呼出スタックを使い果たさないようにする（GHSA-vfj7-8cjw-p6xm）。
+   const result = [];
++  const stack = [{ arr: args, index: 0 }];
+
+-  const flat = arr => {
+-    for (let i = 0; i < arr.length; i++) {
+-      const ele = arr[i];
++  while (stack.length > 0) {
++    const top = stack[stack.length - 1];
++    if (top.index >= top.arr.length) {
++      stack.pop();
++      continue;
++    }
++
++    const ele = top.arr[top.index++];
+
+-      if (Array.isArray(ele)) {
+-        flat(ele);
+-        continue;
+-      }
++    if (Array.isArray(ele)) {
++      stack.push({ arr: ele, index: 0 });
++      continue;
++    }
+
+-      if (ele !== undefined) {
+-        result.push(ele);
+-      }
++    if (ele !== undefined) {
++      result.push(ele);
+     }
+-    return result;
+-  };
++  }
+
+-  flat(args);
+   return result;
+ };

@@ -34,3 +34,9 @@ overrides:
   nanoid@<3.3.18: ^3.3.18
   postcss@<8.5.18: ^8.5.18
   smol-toml@<1.9.0: ^1.9.0
+# GHSA-vfj7-8cjw-p6xm: braces 3.0.3（文書lintのmarkdownlint-cli2・globby・fast-glob経由）は
+# ASTと入れ子配列を再帰で走査し、深い入れ子で呼出スタックを使い果たす。修正版が未公開のため、
+# 走査を反復処理へ置き換えるパッチ（patches/braces@3.0.3.patch）を適用する。出力と既存オプションの意味は変えない。
+# bracesが修正版を公開したら、版を更新してパッチとこの指定を撤去できる。
+patchedDependencies:
+  braces@3.0.3: patches/braces@3.0.3.patch
