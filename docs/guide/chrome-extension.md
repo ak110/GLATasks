@@ -13,6 +13,10 @@
 
 ## インストール手順
 
+拡張機能を使うPCへ[GLATasksのリポジトリ](https://github.com/ak110/GLATasks)を取得する。
+Gitを使う場合は`git clone`で複製し、使わない場合はリポジトリのページの「Code」から「Download ZIP」でZIPファイルを保存して展開する。
+以下の手順では、取得したリポジトリ内の`chrome_extension/`ディレクトリーを選ぶ。
+
 1. Chrome拡張機能の管理ページを開く
    - Chromeのアドレスバーに`chrome://extensions/`と入力
    - またはChromeメニューから「その他のツール」→「拡張機能」の順に選択

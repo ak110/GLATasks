@@ -9,6 +9,19 @@
 「入力側の言語（母語）」と「母語のときの翻訳先」を選ぶ。
 原文が母語なら指定した翻訳先へ、それ以外なら母語へ翻訳する。
 使用可能なエンジンがある場合は、Translator APIまたはPrompt APIを選べる。
+
+| エンジン | 仕組みと選ぶ目安 |
+| --- | --- |
+| Translator API | Language Detector APIによる言語判定と、翻訳方向ごとの専用モデルで翻訳する。両方を使える環境では初期選択されるエンジンで、通常はこちらを選ぶ |
+| Prompt API | ブラウザー内蔵の汎用言語モデルGemini Nanoへ翻訳の指示を与え、訳文を生成する。Translator APIを使えない環境で、Prompt APIが使用可能な場合に選ぶ |
+
+Prompt APIは、母語と相手言語がともに英語・日本語・スペイン語・ドイツ語・フランス語のいずれかの場合に選べる。
+Translator APIと言語判定はデスクトップ版Chrome 138以降、WebページのPrompt APIはChrome 148以降に対応する。
+対応版でも、内蔵モデルと言語の利用可否によって選べるエンジンが変わる。
+Prompt APIは対応OSに加え、Chromeプロファイルの保存先に22GB以上の空き容量が必要である。
+GPUで動かす場合は4GBを超えるビデオメモリー、CPUで動かす場合は16GB以上のメモリーと4コア以上が必要になる。
+詳細はChrome公式の[Translator API](https://developer.chrome.com/docs/ai/translator-api)と[Prompt APIの動作条件](https://developer.chrome.com/docs/ai/prompt-api#hardware-requirements)を参照。
+
 選択したエンジンの準備状況を画面下部で確認する。
 モデルの準備が必要な場合は、翻訳方向を選び、準備ボタンを押す。
 ダウンロード中は進捗を表示する。

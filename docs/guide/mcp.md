@@ -20,13 +20,41 @@ Streamable HTTPとOAuth認証を使用する。
 
 ## 提供ツール
 
-| ドメイン | 操作 |
+| ツール | 対象と効果 |
 | --- | --- |
-| `lists.*` | list、create、rename、delete、archive、unarchive、clear、merge |
-| `tasks.*` | list、listActive、create、update、search、reorder |
-| `timers.*` | list、create、update、delete、start、pause、reset、adjust、setTime、stop、reorder |
-| `calories.*` | summary、listRecords、listItems（参照のみ） |
-| `users.*` | getPreferences、updatePreferences |
+| `lists.list` | 使用中・アーカイブ済み・全件から表示範囲を選び、リスト一覧を取得する |
+| `lists.create` | 名前を指定して新しいリストを作成する |
+| `lists.rename` | 指定したリストの名前を変更する |
+| `lists.delete` | 指定したリストと、そのリストにある全タスクを削除する |
+| `lists.archive` | 指定したリストをアーカイブする |
+| `lists.unarchive` | アーカイブ済みのリストを使用中に戻す |
+| `lists.clear` | 指定したリスト内の完了済みタスクをアーカイブする |
+| `lists.merge` | 統合元の全タスクを統合先へ移し、統合元のリストを削除する |
+| `tasks.list` | 指定したリストのタスクを、表示範囲を選んで取得する |
+| `tasks.listActive` | 使用中の全リストからアーカイブ済み以外のタスクを取得する。日時を指定すると、アーカイブ済みを含めてその日時以降の変更を取得する |
+| `tasks.create` | 指定したリストへ本文・タグ・種別を指定してタスクを追加する |
+| `tasks.update` | タスクの本文・状態・タグ・種別の変更や、別のリストへの移動を行う |
+| `tasks.search` | 全タスクから本文を検索する。表示範囲は使用中・アーカイブ済み・全件から選び、省略時は使用中を検索する |
+| `tasks.reorder` | 指定したリスト内のタスクの並び順を変更する |
+| `timers.list` | タイマーとアラームの一覧を取得する |
+| `timers.create` | カウントダウンタイマーまたはアラームを作成する |
+| `timers.update` | 指定したタイマーの名前・モード・時間・鳴動時間などの設定を変更する |
+| `timers.delete` | 指定したタイマーを削除する |
+| `timers.start` | 指定したタイマーを開始する |
+| `timers.pause` | 実行中のタイマーを一時停止する |
+| `timers.reset` | 指定したタイマーを初期状態へ戻す |
+| `timers.adjust` | 指定したタイマーの残り時間を分単位で加算・減算する |
+| `timers.setTime` | 指定したタイマーのベース時間またはアラームの目標時刻を設定する |
+| `timers.stop` | 指定したタイマーの鳴動を止める |
+| `timers.reorder` | タイマーの並び順を変更する |
+| `calories.summary` | カロリー摂取の1日当たりペース・7日間平均・28日間平均・目標の達成状況を取得する |
+| `calories.listRecords` | カロリー摂取記録を新しい順に30日単位で取得する。今日までの30日や、それ以前の期間を選べる |
+| `calories.listItems` | 登録した食品などの品目について、名前・1個当たりのkcal・備考を取得する |
+| `users.getPreferences` | 新規タイマーの既定値とカロリー目標値を取得する |
+| `users.updatePreferences` | 新規タイマーの既定値とカロリー目標値のうち、指定した項目を変更する |
+
+タスク単体の削除とカロリーの品目・摂取記録の追加・変更・削除は、MCPからは行えない。
+これらの操作にはGLATasksの画面を使う。
 
 入力スキーマはクライアントが自動取得する。
 入力と戻り値の項目名はcamelCaseを使う。

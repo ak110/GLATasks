@@ -68,7 +68,8 @@ SSEの購読を所有する画面とcontrollerを確認し、新しいイベン�
 
 機能を追加する場合は`README.md`の「特徴」と、機能に対応する`docs/guide/`のページを更新する。
 新しいガイドを案内する場合は`docs/index.md`の短い紹介とサイドバーも更新する。
-MCPの接続や提供ツールは`docs/guide/mcp.md`へ書く。
+MCPの接続は`docs/guide/mcp.md`へ書く。
+MCPツールを追加・変更した場合は、各ツールの対象と効果をエンドユーザー向けの日本語で同ページへ書く。
 SSEイベント、DBの関連、日時などの設計判断が変わる場合は`docs/development/architecture.md`を更新する。
 
 ### 7. テスト追加
