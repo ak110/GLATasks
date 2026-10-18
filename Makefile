@@ -190,17 +190,27 @@ test-e2e:  # E2Eテスト（E2E_GREP=... 指定で対象限定実行）
 		'
 
 # `describeDb`のテストは`DATABASE_URL`があるときだけ実行されるため、DBと同じネットワークのplaywrightサービスから
-# node project全体を実行する。対象ファイルを列挙しないため、`describeDb`を新設したファイルも登録なしで実行される
-test-db:  # DBへ実接続する統合テスト（Docker環境が起動していること）
+# node project全体を実行する。対象ファイルを列挙しないため、`describeDb`を新設したファイルも登録なしで実行される。
+# 接続先は試験専用のデータベース（TEST_DB_NAME）とし、実行のたびにrootで作成し直してマイグレーションを適用する。
+# アプリと同じデータベースを使うと、稼働中のアプリの定期処理がテストのfixtureへ実時刻の分を書き込み、
+# テストもアプリの開発用データを処理するためである。
+# 本番イメージは`TZ=Asia/Tokyo`で動くため、プロセスの時刻帯に依存する計算を検出できるよう、UTCと本番の時刻帯の両方で実行する
+TEST_DB_NAME = glatasks_test
+
+test-db:  # DBへ実接続する統合テスト（Docker環境が起動していること）。試験専用DBで動き、開発用データと稼働中のアプリの定期処理に影響しない
+	docker compose exec -T db mariadb --user=root --password="$(DB_CREDENTIAL)" \
+		--execute="DROP DATABASE IF EXISTS $(TEST_DB_NAME); CREATE DATABASE $(TEST_DB_NAME); GRANT ALL PRIVILEGES ON $(TEST_DB_NAME).* TO '$(DB_CREDENTIAL)'@'%';"
 	docker compose run --rm \
-		--env=DATABASE_URL=mysql://$(DB_CREDENTIAL):$(DB_CREDENTIAL)@db/glatasks \
+		--env=DATABASE_URL=mysql://$(DB_CREDENTIAL):$(DB_CREDENTIAL)@db/$(TEST_DB_NAME) \
 		--env=CI=$(CI) \
 		--env=COREPACK_ENABLE_DOWNLOAD_PROMPT=0 \
 		playwright \
 		bash -xc '\
 			$(PLAYWRIGHT_PATH) &&\
 			$(PLAYWRIGHT_INSTALL) &&\
-			pnpm run test:unit --project node\
+			node app/scripts/migrate.mjs &&\
+			TZ=UTC pnpm run test:unit --project node &&\
+			TZ=Asia/Tokyo pnpm run test:unit --project node\
 		'
 
 .PHONY: help setup sync backup deploy build start stop restart-app logs ps healthcheck shell node-shell update update-actions format test test-unit test-backup test-db test-e2e start-app logs-app migrate db-studio sql docs docs-dev

@@ -4,6 +4,7 @@
  *
  * 開発用MariaDBへ実接続して検証する（`DATABASE_URL`が到達可能な環境で実行する）。
  * `now` を明示的に引数として渡し、実時刻に依存しないテストとする。
+ * 発火予定の計算はプロセスの時刻帯に依存しないため、`make test-db`は本番と同じ`TZ=Asia/Tokyo`でも実行する。
  */
 
 import { eq } from "drizzle-orm";
@@ -42,6 +43,16 @@ async function insertSchedule(params: {
     })
     .$returningId();
   return result[0]!.id;
+}
+
+/** スケジュールの`last_fired`をISO8601文字列で取得する。 */
+async function getLastFired(scheduleId: number): Promise<string | undefined> {
+  const rows = await getDb()
+    .select({ last_fired: schedules.last_fired })
+    .from(schedules)
+    .where(eq(schedules.id, scheduleId))
+    .limit(1);
+  return rows[0]?.last_fired?.toISOString();
 }
 
 /** 指定リストに生成された kind="todo" タスクの件数を取得する。 */
@@ -159,6 +170,69 @@ describeDb("processSchedules", () => {
     // 02-01, 02-02, 02-03 の3回分のみ（UNTIL は境界を含む）
     expect(await countTodoTasks(listId)).toBe(3);
   });
+
+  it("時刻帯の変換前に9時間遅れで記録されたlast_firedから、重複も欠落もなく生成する", async () => {
+    const { userId, listId } = await createFixtureList();
+    createdUserIds.push(userId);
+
+    // 変換前の実装を本番の時刻帯（Asia/Tokyo）で動かすと、日本時間9:00の予定のlast_firedは
+    // 日本時間18:00（T09:00Z）で記録されていた。
+    // 日付は先行する試験の予定のlast_firedより前にし、それらの予定を処理させない
+    const rrule =
+      "DTSTART;TZID=Asia/Tokyo:20251201T090000\nRRULE:FREQ=DAILY;INTERVAL=1";
+    const scheduleId = await insertSchedule({
+      listId,
+      rrule,
+      created: new Date("2025-12-01T00:00:00.000Z"),
+      lastFired: new Date("2025-12-04T09:00:00.000Z"),
+    });
+
+    // 12-04分は生成済みのため再生成せず、12-05と12-06の日本時間9:00（T00:00Z）の2回分を生成する
+    const now = new Date("2025-12-06T00:30:00.000Z");
+    await processSchedules(now);
+    expect(await countTodoTasks(listId)).toBe(2);
+    expect(await getLastFired(scheduleId)).toBe("2025-12-06T00:00:00.000Z");
+
+    await processSchedules(now);
+    expect(await countTodoTasks(listId)).toBe(2);
+  });
+
+  it.each([
+    {
+      label: "週次（毎週月曜の日本時間9:00）",
+      rrule:
+        "DTSTART;TZID=Asia/Tokyo:20251201T090000\nRRULE:FREQ=WEEKLY;BYDAY=MO",
+      created: "2025-11-30T00:00:00.000Z",
+      now: "2025-12-15T00:00:00.000Z",
+      expectedCount: 3,
+      expectedLastFired: "2025-12-15T00:00:00.000Z",
+    },
+    {
+      label: "月次（毎月15日の日本時間9:00）",
+      rrule: "DTSTART;TZID=Asia/Tokyo:20250915T090000\nRRULE:FREQ=MONTHLY",
+      created: "2025-09-01T00:00:00.000Z",
+      now: "2025-11-15T00:00:00.000Z",
+      expectedCount: 3,
+      expectedLastFired: "2025-11-15T00:00:00.000Z",
+    },
+  ])(
+    "last_fired未設定の予定（$label）を日本時間で生成し、last_firedへ真の時刻を記録する",
+    async ({ rrule, created, now, expectedCount, expectedLastFired }) => {
+      const { userId, listId } = await createFixtureList();
+      createdUserIds.push(userId);
+
+      const scheduleId = await insertSchedule({
+        listId,
+        rrule,
+        created: new Date(created),
+      });
+
+      // 日付は先行する試験の予定のlast_firedより前にし、それらの予定を処理させない
+      await processSchedules(new Date(now));
+      expect(await countTodoTasks(listId)).toBe(expectedCount);
+      expect(await getLastFired(scheduleId)).toBe(expectedLastFired);
+    },
+  );
 
   it("1件のrrule不正で例外が起きても、他の正常スケジュールの発火は継続する", async () => {
     const { userId, listId } = await createFixtureList();

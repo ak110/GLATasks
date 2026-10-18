@@ -198,6 +198,10 @@ sequenceDiagram
 - スケジュールの`rrule`列は`DTSTART;TZID=Asia/Tokyo`形式でタイムゾーンを保持する。
   `rrule`の`between()`が返す`Date`はAsia/Tokyoのローカル時刻をUTCとしてマークした値であるため、
   市民時刻の時・分の取り出しには`getHours()`ではなく`getUTCHours()`等のUTC系アクセサを使う
+- 発火予定の計算はアプリのプロセスの時刻帯に依存しない。
+  `rrule`は`tzid`を指定すると、プロセスの時刻帯の壁時計の時刻をUTCの成分に持つ日時で境界を受け取り結果を返すため、
+  `scheduler.ts`は`between()`と`before()`へ渡す境界をその表現へ変換し、返った日時を真の時刻へ戻してから比較と`last_fired`の保存に使う。
+  本番イメージは`TZ=Asia/Tokyo`、開発用のappと試験のコンテナーはUTCで動くため、`make test-db`はnode projectを両方の時刻帯で実行する
 
 同じポーリングでカロリーの自動記録も処理する。
 

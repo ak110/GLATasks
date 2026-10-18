@@ -117,7 +117,8 @@ function collectDueOccurrences(
 ): Date[] {
   const rule = rrulestr(rrule, { tzid: SCHEDULE_TIMEZONE });
   const occurrences: Date[] = [];
-  rule.between(after, now, true, (date) => {
+  rule.between(toRRuleDate(after), toRRuleDate(now), true, (rruleDate) => {
+    const date = fromRRuleDate(rruleDate);
     if (!includeAfterBoundary && date.getTime() === after.getTime()) {
       return true;
     }
@@ -125,6 +126,41 @@ function collectDueOccurrences(
     return occurrences.length < FILL_FORWARD_LIMIT;
   });
   return occurrences;
+}
+
+/**
+ * 真の時刻を、rruleへ渡す境界の表現へ変換する。
+ *
+ * rruleは`tzid`を指定すると、プロセスの時刻帯の壁時計の時刻をUTCの成分に持つ日時で
+ * 境界を受け取り、結果も同じ表現で返す（rruleのREADME「Important: Use UTC dates」）。
+ * 本番イメージは`TZ=Asia/Tokyo`で動くため、変換しないと発火予定が時差の分だけずれる。
+ * プロセスの時刻帯がUTCなら値は変わらない。
+ */
+function toRRuleDate(date: Date): Date {
+  return new Date(
+    Date.UTC(
+      date.getFullYear(),
+      date.getMonth(),
+      date.getDate(),
+      date.getHours(),
+      date.getMinutes(),
+      date.getSeconds(),
+      date.getMilliseconds(),
+    ),
+  );
+}
+
+/** rruleが返した日時を真の時刻へ戻す（`toRRuleDate`の逆変換）。 */
+function fromRRuleDate(date: Date): Date {
+  return new Date(
+    date.getUTCFullYear(),
+    date.getUTCMonth(),
+    date.getUTCDate(),
+    date.getUTCHours(),
+    date.getUTCMinutes(),
+    date.getUTCSeconds(),
+    date.getUTCMilliseconds(),
+  );
 }
 
 /**
@@ -164,7 +200,8 @@ export async function processSchedules(now: Date): Promise<boolean> {
       // last_fired は収集済みiteratorの打ち切り結果ではなく、rule.before(now, true) で
       // 現在時刻以前の直近の発火予定を求め直す。これにより次回tickでの再検出（二重発火）を防ぐ。
       const rule = rrulestr(schedule.rrule, { tzid: SCHEDULE_TIMEZONE });
-      const lastOccurrence = rule.before(now, true);
+      const lastRRuleDate = rule.before(toRRuleDate(now), true);
+      const lastOccurrence = lastRRuleDate && fromRRuleDate(lastRRuleDate);
       await db.transaction(async (tx) => {
         for (const _occurrence of occurrences) {
           await createTask(
