@@ -1,10 +1,26 @@
 import { defineConfig } from 'vitepress'
 
+// VitePress既定のslugify（@mdit-vue/shared）と同じ変換後に、仮名の濁点・半濁点を合成する。
+// https://github.com/mdit-vue/mdit-vue/blob/main/packages/shared/src/slugify.ts
+const slugify = (text: string) => text
+  .normalize('NFKD')
+  .replace(/[\u0300-\u036F]/g, '')
+  .replace(/[\u0000-\u001f]/g, '')
+  .replace(/[\s~`!@#$%^&*()\-_+=[\]{}|\\;:"'“”‘’<>,.?/]+/g, '-')
+  .replace(/-{2,}/g, '-')
+  .replace(/^-+|-+$/g, '')
+  .replace(/^(\d)/, '_$1')
+  .toLowerCase()
+  .normalize('NFC')
+
 export default defineConfig({
   lang: 'ja',
   title: 'GLATasks',
   description: 'タスク管理とカウントダウンタイマーを統合した Web アプリ',
   base: '/GLATasks/',
+  markdown: {
+    anchor: { slugify },
+  },
 
   themeConfig: {
     nav: [

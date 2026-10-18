@@ -123,8 +123,10 @@ Dependabotのアップデーターが本リポジトリのpnpmロックファイ
 make docs
 ```
 
-静的サイトをビルドし、内部リンクも確認する。
+静的サイトをビルドし、Markdown本文の内部リンクを確認する。
 Dockerを使わずにビルドする場合は`pnpm --dir docs build`を実行する。
+公開する前に`docs.yaml`が、ビルドした全HTMLのリンク先をlycheeで確認する。
+トップページの紹介やナビゲーションも対象に含め、内部リンク、見出しへのリンク、外部URLの確認に成功した場合だけGitHub Pagesへ公開する。
 プレビューには`make docs-dev`を使い、`http://localhost:5173/GLATasks/`を開く。
 
 ## Docker構成
@@ -176,7 +178,10 @@ DBが半端な状態になった場合は`make sql`から`__drizzle_migrations`�
 
 masterへのpushおよびPR時に`ci.yaml`が自動実行される（`.github/workflows/ci.yaml`参照）。
 masterへのpushで`docs/`配下に変更があれば`docs.yaml`ワークフローが自動実行され、
-GitHub Pagesへデプロイされる。
+サイトのビルドと全HTMLのリンク先の確認に成功した場合だけGitHub Pagesへデプロイされる。
+ビルド時はMarkdown本文の内部リンクを確認する。
+後続のlycheeでは、トップページの紹介とナビゲーションを含む全リンクと見出しの実在を確かめる。
+外部URLから429・5xx応答が返った場合やタイムアウトした場合は、lycheeが一時的な障害として許容する。
 `release.yaml`はリリースを作成し、`deploy.yaml`を起動してアプリをデプロイする。
 integration jobはproduction環境でMakeのDB・E2E検証を呼び出す。
 依存の脆弱性監査は`audit.yaml`が毎日06:00 UTC（JST 15:00）に定期実行し、

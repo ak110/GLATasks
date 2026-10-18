@@ -18,6 +18,8 @@ concurrency:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    env:
+      DOCS_BASE: GLATasks
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -39,6 +41,24 @@ jobs:
       - name: Build docs
         working-directory: docs
         run: pnpm build
+
+      - name: Prepare docs link check
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/docs-links/$DOCS_BASE"
+          cp -a docs/.vitepress/dist/. "$RUNNER_TEMP/docs-links/$DOCS_BASE/"
+
+      - name: Check built docs links
+        uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
+        with:
+          args: >-
+            --root-dir '${{ runner.temp }}/docs-links'
+            --include-fragments
+            --max-concurrency 4
+            --accept '200..=299,429,500..=599'
+            --accept-timeouts
+            '${{ runner.temp }}/docs-links/${{ env.DOCS_BASE }}/**/*.html'
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
