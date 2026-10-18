@@ -96,7 +96,10 @@
                     ),
                 )
                 .catch((e) =>
-                    console.log("ServiceWorker registration failed:", e),
+                    console.log(
+                        "ServiceWorker registration failed: オフライン時の代替画面が使えません。オンラインでの利用は続けられます。オフライン画面が必要ならページを再読み込みしてください",
+                        e,
+                    ),
                 );
         }
 

@@ -65,9 +65,14 @@ function parseRows(
     skipEmptyLines: "greedy",
   });
   if (result.errors.length > 0) {
-    throw new Error(`CSVを解析できません: ${result.errors[0].message}`);
+    throw new Error(
+      `CSVを解析できません: ${result.errors[0].message}。区切りの「,」と引用符の対応を直してから取り込み直してください`,
+    );
   }
-  if (result.data.length === 0) throw new Error("CSVが空です");
+  if (result.data.length === 0)
+    throw new Error(
+      "CSVが空です。ヘッダー行とデータ行を含むCSVを選んでください",
+    );
   const [headers, ...rows] = result.data;
   const expectedHeaders = acceptedHeaders.find(
     (candidate) =>
@@ -81,7 +86,9 @@ function parseRows(
     throw new Error(`CSVは${MAX_CALORIE_CSV_ROWS}行以下にしてください`);
   }
   if (rows.some((row) => row.length !== expectedHeaders.length)) {
-    throw new Error("CSVの列数がヘッダーと一致しません");
+    throw new Error(
+      "CSVの列数がヘッダーと一致しません。各行の列数をヘッダーにそろえてから取り込み直してください",
+    );
   }
   return rows;
 }
@@ -95,12 +102,16 @@ export function parseCalorieItemsCsv(csv: string): CalorieItemCsvRow[] {
       note,
     });
     if (!result.success) {
-      throw new Error(`品目CSVの${index + 2}行目が不正です`);
+      throw new Error(
+        `品目CSVの${index + 2}行目が不正です。品目・kcal・備考の値を直してから取り込み直してください`,
+      );
     }
     return result.data;
   });
   if (new Set(parsed.map((row) => row.name)).size !== parsed.length) {
-    throw new Error("品目CSVに重複した品目名があります");
+    throw new Error(
+      "品目CSVに重複した品目名があります。同じ品目名の行を1行にまとめてから、品目CSVを取り込み直してください",
+    );
   }
   return parsed;
 }
@@ -115,7 +126,9 @@ export function parseCalorieRecordsCsv(csv: string): CalorieRecordCsvRow[] {
         temporary: temporary === "1",
       });
       if (!result.success || (temporary !== "" && temporary !== "1")) {
-        throw new Error(`記録CSVの${index + 2}行目が不正です`);
+        throw new Error(
+          `記録CSVの${index + 2}行目が不正です。日時・品目・数量・一時項目（空欄か1）の値を直してから取り込み直してください`,
+        );
       }
       return result.data;
     },

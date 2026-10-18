@@ -309,7 +309,14 @@ describe("利用者設定MCPツール", () => {
       expect(result.content).toEqual([
         {
           type: "text",
-          text: JSON.stringify({ error: "対象が見つかりません" }, null, 2),
+          text: JSON.stringify(
+            {
+              error:
+                "対象が見つかりません。一覧を取得し直し（画面では再読み込みし）、存在する対象を指定してください。",
+            },
+            null,
+            2,
+          ),
         },
       ]);
       expect(sendEvent).not.toHaveBeenCalled();

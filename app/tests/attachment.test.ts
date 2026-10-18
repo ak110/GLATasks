@@ -219,7 +219,7 @@ test.describe("attachments", () => {
       attachmentObservation,
       async () => {
         await expect(page.locator('[data-testid="toast-error"]')).toContainText(
-          "ファイルサイズが上限を超えています",
+          "ファイルサイズが上限（10 MiB）を超えています。10 MiB以下のファイルを選んでください。",
           {
             timeout: MUTATION_UI_DEADLINE_MS,
           },
@@ -368,7 +368,7 @@ test.describe("attachments", () => {
     ]);
 
     await expect(page.locator('[data-testid="toast-error"]')).toContainText(
-      "ファイルサイズが上限を超えています",
+      "ファイルサイズが上限（10 MiB）を超えています。10 MiB以下のファイルを選んでください。",
       { timeout: 15000 },
     );
     const taskRow = page

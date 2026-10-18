@@ -34,7 +34,9 @@
 
     function showError(error: unknown) {
         resultMessage =
-            error instanceof Error ? error.message : "CSVを解析できません";
+            error instanceof Error
+                ? error.message
+                : "CSVを解析できません。CSVファイルを選び直して取り込み直してください";
     }
 
     function download(csv: string, filename: string) {
@@ -104,7 +106,7 @@
             resultMessage =
                 error instanceof Error
                     ? error.message
-                    : "CSVの取得に失敗しました";
+                    : "CSVの取得に失敗しました。時間をおいてからエクスポートをやり直してください";
         }
     }
 </script>

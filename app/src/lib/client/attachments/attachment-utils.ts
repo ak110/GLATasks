@@ -17,7 +17,12 @@ export function readFileAsBase64(file: File): Promise<string> {
       resolve(result.slice(result.indexOf(",") + 1));
     };
     reader.onerror = () =>
-      reject(reader.error ?? new Error("ファイルの読み込みに失敗しました"));
+      reject(
+        reader.error ??
+          new Error(
+            "ファイルの読み込みに失敗しました。ファイルを選び直して添付をやり直してください",
+          ),
+      );
     reader.readAsDataURL(file);
   });
 }

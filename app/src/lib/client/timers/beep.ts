@@ -15,7 +15,9 @@ async function beep(
   interval: number,
 ): Promise<void> {
   if (typeof AudioContext === "undefined") {
-    console.warn("AudioContext が利用できないためビープ音を再生できません");
+    console.warn(
+      "AudioContext が利用できないためビープ音を再生できません。タイマーの画面表示と通知は続きます。音を鳴らすにはAudioContextに対応したブラウザーで開いてください",
+    );
     return;
   }
   const ctx = new AudioContext();
@@ -64,7 +66,9 @@ const loopHandles = new Map<number, LoopHandle>();
 export function startLoopBeep(timerId: number, ringSeconds: number): void {
   if (loopHandles.has(timerId)) return;
   if (typeof AudioContext === "undefined") {
-    console.warn("AudioContext が利用できないためビープ音を再生できません");
+    console.warn(
+      "AudioContext が利用できないためビープ音を再生できません。タイマーの画面表示と通知は続きます。音を鳴らすにはAudioContextに対応したブラウザーで開いてください",
+    );
     return;
   }
   const ctx = new AudioContext();

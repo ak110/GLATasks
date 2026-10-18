@@ -6,6 +6,13 @@
     }
 
     let { data }: Props = $props();
+
+    /** 戻り先を検証できない失敗の理由。次の操作はどの失敗もMCPクライアントからの接続のやり直しである */
+    const errorReasons: Record<string, string> = {
+        unknown_client: "このクライアントは登録されていません。",
+        invalid_redirect_uri:
+            "戻り先のURLがクライアントの登録内容と一致しません。",
+    };
 </script>
 
 <div
@@ -15,7 +22,13 @@
         <h1 class="mb-4 text-xl font-semibold text-red-600 dark:text-red-400">
             認可リクエストエラー
         </h1>
-        <p class="text-gray-700 dark:text-gray-200">エラー: {data.error}</p>
+        <p class="text-gray-700 dark:text-gray-200">
+            {errorReasons[data.error] ?? "認可リクエストの内容が不正です。"}
+            MCPクライアントから接続をやり直してください。
+        </p>
+        <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
+            エラー: {data.error}
+        </p>
     {:else if data.params}
         <h1 class="mb-4 text-xl font-semibold text-gray-800 dark:text-gray-100">
             アクセスを許可しますか

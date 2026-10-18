@@ -104,7 +104,10 @@ export const UpdateTaskSchema = z
       data.moveTo !== undefined ||
       data.tags !== undefined ||
       data.kind !== undefined,
-    { message: "更新する項目が指定されていません" },
+    {
+      message:
+        "更新する項目が指定されていません。text・status・moveTo・tags・kindのいずれかを指定してください",
+    },
   );
 
 // ── リスト操作スキーマ ──

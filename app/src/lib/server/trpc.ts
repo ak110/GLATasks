@@ -69,7 +69,9 @@ const t = initTRPC.context<Context>().create({
       error.cause instanceof ZodError ? error.cause.issues : null;
     return {
       ...shape,
-      message: validationIssues ? "入力内容が不正です" : shape.message,
+      message: validationIssues
+        ? "入力内容が不正です。data.validationIssuesの各項目が示す値を直して送り直してください"
+        : shape.message,
       data: { ...shape.data, validationIssues },
     };
   },
@@ -84,7 +86,8 @@ const isAuthed = t.middleware(({ ctx, next }) => {
   if (!ctx.userId) {
     throw new TRPCError({
       code: "UNAUTHORIZED",
-      message: "ログインが必要です",
+      message:
+        "ログインが必要です。/auth/loginでログインしてから操作をやり直してください",
     });
   }
   return next({
@@ -118,7 +121,8 @@ const withEncryption = t.middleware(async ({ getRawInput, next }) => {
     } catch (error) {
       throw new TRPCError({
         code: "BAD_REQUEST",
-        message: "Failed to decrypt input",
+        message:
+          "送信内容を復号できませんでした。サーバーの暗号鍵が変わった可能性があります。ページを再読み込みして暗号鍵を取得し直し、操作をやり直してください",
         cause: error,
       });
     }

@@ -56,7 +56,7 @@ export async function processCalorieAutoRecords(
     } catch (error) {
       succeeded = false;
       console.error(
-        `[scheduler] カロリー自動記録 ${rule.id} の処理に失敗しました`,
+        `[scheduler] カロリー自動記録 ${rule.id} の処理に失敗しました。他の設定の処理は続け、この設定は次の周期で再試行します。続く例外とDBの状態を確認してください`,
         error,
       );
     }

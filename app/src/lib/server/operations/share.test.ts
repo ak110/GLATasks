@@ -20,7 +20,10 @@ describe("共有取り込みのエラー", () => {
     } as Parameters<typeof actions.default>[0]);
     expect(response).toMatchObject({
       status: 404,
-      data: { error: "対象が見つかりません" },
+      data: {
+        error:
+          "対象が見つかりません。一覧を取得し直し（画面では再読み込みし）、存在する対象を指定してください。",
+      },
     });
   });
 });

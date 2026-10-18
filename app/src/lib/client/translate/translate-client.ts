@@ -23,10 +23,19 @@ import {
   type TranslateEngine,
 } from "#lib/client/translate/translate.ts";
 
+/** 言語の組を変える操作。画面の入力欄の表示名で案内する */
+const CHANGE_LANGUAGE =
+  "「入力側の言語（母語）」か「母語のときの翻訳先」を別の言語へ変更してください";
+
+/** Translator APIを使えない場合の代わりの操作 */
+const USE_PROMPT_INSTEAD =
+  "翻訳エンジンでPrompt APIを選ぶか、Chrome 138以降のデスクトップ版で開いてください";
+
 export const MODEL_UNAVAILABLE = {
-  detector: "Language Detector APIを利用できません",
-  translator: "Translator APIを利用できません",
-  prompt: "Prompt APIを利用できません",
+  detector: `Language Detector APIを利用できません。${USE_PROMPT_INSTEAD}`,
+  translator: `Translator APIを利用できません。${USE_PROMPT_INSTEAD}`,
+  prompt:
+    "Prompt APIを利用できません。翻訳エンジンでTranslator APIを選ぶか、ブラウザ内蔵の言語モデルを使えるChromeのデスクトップ版で開いてください",
 } as const;
 
 export type TranslationDirectionChoice =
@@ -249,7 +258,7 @@ async function prepareTarget(
     throw new Error(
       target.kind === "prompt"
         ? MODEL_UNAVAILABLE.prompt
-        : `この言語ペア（${target.sourceLanguage}→${target.targetLanguage}）は翻訳できません`,
+        : `この言語ペア（${target.sourceLanguage}→${target.targetLanguage}）は翻訳できません。${CHANGE_LANGUAGE}`,
     );
   }
   if (target.kind === "translator") {
@@ -369,7 +378,7 @@ async function makeDirectionPreparations(
   if (availablePreparations.length === 0) {
     return {
       status: "unavailable",
-      message: `この言語設定（${nativeTag}↔${foreignTag}）は翻訳できません`,
+      message: `この言語設定（${nativeTag}↔${foreignTag}）は翻訳できません。${CHANGE_LANGUAGE}`,
     };
   }
   return { status: "prepare", preparation: availablePreparations };
@@ -447,7 +456,7 @@ export async function runTranslation(
   if (!getModelApi("translator") || !getModelApi("detector")) {
     return {
       status: "unavailable",
-      message: "このブラウザはTranslator APIに対応していません",
+      message: `このブラウザはTranslator APIに対応していません。${USE_PROMPT_INSTEAD}`,
     };
   }
   return directionChoice
@@ -577,7 +586,7 @@ async function runDirectedTranslation(
     if (availability === "unavailable") {
       return {
         status: "unavailable",
-        message: `この言語ペア（${direction.sourceLanguage}→${direction.targetLanguage}）は翻訳できません`,
+        message: `この言語ペア（${direction.sourceLanguage}→${direction.targetLanguage}）は翻訳できません。${CHANGE_LANGUAGE}`,
       };
     }
     if (availability === "downloadable") {
@@ -636,7 +645,7 @@ async function runDetectedTranslation(
     if (availability === "unavailable") {
       return {
         status: "unavailable",
-        message: "このブラウザはLanguage Detector APIに対応していません",
+        message: `このブラウザはLanguage Detector APIに対応していません。${USE_PROMPT_INSTEAD}`,
       };
     }
     if (availability === "downloadable") {
@@ -685,7 +694,7 @@ async function runDetectedTranslation(
     if (availability === "unavailable") {
       return {
         status: "unavailable",
-        message: `この言語ペア（${direction.sourceLanguage}→${direction.targetLanguage}）は翻訳できません`,
+        message: `この言語ペア（${direction.sourceLanguage}→${direction.targetLanguage}）は翻訳できません。${CHANGE_LANGUAGE}`,
       };
     }
     if (availability === "downloadable") {

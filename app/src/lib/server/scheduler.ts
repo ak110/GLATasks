@@ -223,7 +223,7 @@ export async function processSchedules(now: Date): Promise<boolean> {
     } catch (error) {
       succeeded = false;
       console.error(
-        `[scheduler] スケジュール ${schedule.id} の処理に失敗しました`,
+        `[scheduler] スケジュール ${schedule.id} の処理に失敗しました。他の予定の処理は続け、この予定は次の周期で再試行します。続く例外と、この予定のrruleとDBの状態を確認してください`,
         error,
       );
     }

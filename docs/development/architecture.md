@@ -128,6 +128,7 @@ DB接続と定期処理の状態を監視する場合は`GET /healthcheck/ready`
 - `scheduler.last_success_at`と`last_finished_at`はUTCのISO8601文字列で、
   対応する実行がまだ無ければ`null`となる。個別の定期TODOやカロリー自動記録に失敗した場合も、その周期を正常実行として扱わない。
   他の予定の処理は継続し、次の正常な周期で健全へ戻る
+- HTTP 503の応答は`next_action`に、DBの不健全を優先して状態ごとの確認先（`make ps`、`make logs`、`make logs-app`の`[scheduler]`行、`make restart-app`）を返す
 
 DBが不健全な場合はDBの稼働状況を、定期処理が不健全な場合はアプリの`[scheduler]`ログを確認する。
 運用監視による障害検知とコンテナーの生存確認を分け、DB障害だけでアプリの再起動を繰り返さない。

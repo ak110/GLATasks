@@ -30,11 +30,25 @@ export const POST: RequestHandler = async ({ request }) => {
   try {
     payload = await request.json();
   } catch {
-    return errorResponse("invalid_client_metadata", "JSONとして解析できません");
+    return errorResponse("invalid_client_metadata", {
+      reason: "The request body is not valid JSON.",
+      nextAction:
+        "Send the client metadata as a JSON object and retry the registration.",
+    });
   }
   const parsed = RegisterRequestSchema.safeParse(payload);
   if (!parsed.success) {
-    return errorResponse("invalid_client_metadata", parsed.error.message);
+    // Zodの文面は引用符と改行を含みerror_descriptionの文字種に収まらないため、項目名だけを返す
+    const fields = [
+      ...new Set(
+        parsed.error.issues.map((issue) => issue.path.join(".") || "(root)"),
+      ),
+    ].join(", ");
+    return errorResponse("invalid_client_metadata", {
+      reason: `Invalid client metadata: ${fields}.`,
+      nextAction:
+        "Send redirect_uris as a non-empty array of absolute URLs and the other fields as strings, then retry the registration.",
+    });
   }
   const metadata = parsed.data;
   const isPublic = metadata.token_endpoint_auth_method === "none";

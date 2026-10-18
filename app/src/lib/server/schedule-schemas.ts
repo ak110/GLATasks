@@ -48,7 +48,10 @@ export const UpdateScheduleSchema = z
       data.tags !== undefined ||
       data.rrule !== undefined ||
       data.enabled !== undefined,
-    { message: "更新する項目が指定されていません" },
+    {
+      message:
+        "更新する項目が指定されていません。title・tags・rrule・enabledのいずれかを指定してください",
+    },
   );
 
 export const DeleteScheduleSchema = z.object({

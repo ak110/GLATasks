@@ -10,6 +10,10 @@ import { z } from "zod";
 import { getClient, issueAuthorizationCode } from "#lib/server/mcp/store.ts";
 import type { Actions, PageServerLoad } from "./$types";
 import { OAUTH_PATHS } from "#lib/server/mcp/oauth-config.ts";
+import {
+  formatOAuthErrorDescription,
+  type OAuthErrorDescription,
+} from "#lib/server/mcp/oauth-response.ts";
 
 const RedirectTargetSchema = z.object({
   client_id: z.string().min(1),
@@ -30,10 +34,16 @@ const QuerySchema = z.object({
 
 type AuthorizeParams = z.infer<typeof QuerySchema>;
 
+/** 戻り先を検証できない失敗。画面に表示し、クライアントへは返さない */
+type UnverifiedTargetError =
+  "unknown_client" | "invalid_redirect_uri" | "invalid_request";
+
 function ensureRegisteredClient(url: URL) {
-  const params = RedirectTargetSchema.parse(
+  const parsed = RedirectTargetSchema.safeParse(
     Object.fromEntries(url.searchParams),
   );
+  if (!parsed.success) throw new Error("invalid_request");
+  const params = parsed.data;
   const client = getClient(params.client_id);
   if (!client) {
     throw new Error("unknown_client");
@@ -46,14 +56,34 @@ function ensureRegisteredClient(url: URL) {
 
 type ValidatedTarget = ReturnType<typeof ensureRegisteredClient>;
 
-/** 登録済みの戻り先だけへ認可結果を返し、未検証URIへの転送を防ぐ。 */
+/** 戻り先を検証できない失敗の分類を、画面に表示する値へそろえる。 */
+function unverifiedTargetError(error: unknown): UnverifiedTargetError {
+  return error instanceof Error &&
+    (error.message === "unknown_client" ||
+      error.message === "invalid_redirect_uri")
+    ? error.message
+    : "invalid_request";
+}
+
+/**
+ * 登録済みの戻り先だけへ認可結果を返し、未検証URIへの転送を防ぐ。
+ * 失敗は`error`と、理由と次の操作をつないだ`error_description`を返す。
+ */
 function respond(
   target: ValidatedTarget,
-  result: { code: string } | { error: string },
+  result:
+    { code: string } | { error: string; description: OAuthErrorDescription },
 ): never {
   const url = new URL(target.params.redirect_uri);
-  for (const [key, value] of Object.entries(result))
-    url.searchParams.set(key, value);
+  if ("code" in result) {
+    url.searchParams.set("code", result.code);
+  } else {
+    url.searchParams.set("error", result.error);
+    url.searchParams.set(
+      "error_description",
+      formatOAuthErrorDescription(result.description),
+    );
+  }
   if (target.params.state !== undefined)
     url.searchParams.set("state", target.params.state);
   redirect(302, url.toString(), { external: true });
@@ -62,12 +92,37 @@ function respond(
 function parseQuery(url: URL, target: ValidatedTarget): AuthorizeParams {
   const responseType = url.searchParams.get("response_type");
   if (responseType !== null && responseType !== "code")
-    respond(target, { error: "unsupported_response_type" });
+    respond(target, {
+      error: "unsupported_response_type",
+      description: {
+        reason: "Only response_type=code is supported.",
+        nextAction: "Send response_type=code and restart the authorization.",
+      },
+    });
   const resource = url.searchParams.get("resource");
   if (resource !== null && !z.string().url().safeParse(resource).success)
-    respond(target, { error: "invalid_target" });
+    respond(target, {
+      error: "invalid_target",
+      description: {
+        reason: "resource must be an absolute URL.",
+        nextAction:
+          "Send resource as an absolute URL such as the MCP endpoint URL, or omit it.",
+      },
+    });
   const parsed = QuerySchema.safeParse(Object.fromEntries(url.searchParams));
-  if (!parsed.success) respond(target, { error: "invalid_request" });
+  if (!parsed.success) {
+    const fields = [
+      ...new Set(parsed.error.issues.map((issue) => issue.path.join("."))),
+    ].join(", ");
+    respond(target, {
+      error: "invalid_request",
+      description: {
+        reason: `Invalid or missing parameters: ${fields}.`,
+        nextAction:
+          "Send client_id, redirect_uri, code_challenge of 43 to 128 characters and code_challenge_method=S256, then restart the authorization.",
+      },
+    });
+  }
   return parsed.data;
 }
 
@@ -77,7 +132,7 @@ export const load: PageServerLoad = async ({ url, locals }) => {
     target = ensureRegisteredClient(url);
   } catch (e) {
     return {
-      error: e instanceof Error ? e.message : "invalid_request",
+      error: unverifiedTargetError(e) as string | null,
       params: null,
       clientName: null,
     };
@@ -105,14 +160,19 @@ export const actions: Actions = {
     try {
       target = ensureRegisteredClient(url);
     } catch (e) {
-      return fail(400, {
-        error: e instanceof Error ? e.message : "invalid_request",
-      });
+      return fail(400, { error: unverifiedTargetError(e) });
     }
     const params = parseQuery(url, target);
     const form = await request.formData();
     if (form.get("decision") === "deny")
-      respond(target, { error: "access_denied" });
+      respond(target, {
+        error: "access_denied",
+        description: {
+          reason: "The user denied the access request.",
+          nextAction:
+            "To connect again, restart the authorization from the MCP client.",
+        },
+      });
     const code = issueAuthorizationCode({
       client_id: params.client_id,
       redirect_uri: params.redirect_uri,

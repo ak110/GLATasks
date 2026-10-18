@@ -22,7 +22,9 @@ import { SSE_EVENTS } from "#lib/sse-events.ts";
 export const GET: RequestHandler = async ({ locals, request, url }) => {
   const userId = locals.user_id;
   if (!userId) {
-    return new Response("Unauthorized", { status: 401 });
+    return new Response("Unauthorized: log in at /auth/login and reconnect.", {
+      status: 401,
+    });
   }
 
   const lastEventId = parseLastEventId(

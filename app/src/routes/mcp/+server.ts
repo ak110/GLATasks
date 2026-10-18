@@ -30,7 +30,8 @@ function unauthorized(originUrl: URL): Response {
   return new Response(
     JSON.stringify({
       error: "invalid_token",
-      error_description: "valid Bearer token required",
+      error_description:
+        "A valid Bearer token is required. Obtain an access token through the authorization server listed in the resource_metadata of the WWW-Authenticate header, then retry with Authorization: Bearer.",
     }),
     {
       status: 401,
@@ -101,7 +102,9 @@ export const POST: RequestHandler = async ({ request, url }) => {
     return new Response(
       JSON.stringify({
         error: "invalid_session",
-        error_description: "unknown session",
+        error_description: sessionId
+          ? "The session is unknown or has ended. Start a new session with an initialize request without the mcp-session-id header."
+          : "The request has no session. Send an initialize request first, then send the returned mcp-session-id header with later requests.",
       }),
       {
         status: sessionId ? 404 : 400,
@@ -118,7 +121,10 @@ export const GET: RequestHandler = async ({ request, url }) => {
   const sessionId = request.headers.get("mcp-session-id") ?? undefined;
   const transport = sessionId ? sessions.get(sessionId) : undefined;
   if (!transport) {
-    return new Response("session not found", { status: 404 });
+    return new Response(
+      "session not found: the session is unknown or has ended. Start a new session with an initialize request.",
+      { status: 404 },
+    );
   }
   return transport.handleRequest(request, { authInfo: auth });
 };

@@ -64,9 +64,10 @@ const encryptionLink: TRPCLink<AppRouter> = () => {
                 });
               } catch (error) {
                 observer.error(
-                  new Error("Failed to decrypt response", {
-                    cause: error,
-                  }) as never,
+                  new Error(
+                    "サーバーからの応答を復号できませんでした。サーバーの暗号鍵が変わった可能性があります。ページを再読み込みして暗号鍵を取得し直してください",
+                    { cause: error },
+                  ) as never,
                 );
               }
             } else {
@@ -139,7 +140,10 @@ async function encryptedFetch(
         };
       }
     } catch (error) {
-      console.error("Failed to encrypt request:", error);
+      console.error(
+        "送信内容を暗号化できなかったため、暗号化せずに送信しました。操作は続きます。繰り返し出力される場合はページを再読み込みしてください:",
+        error,
+      );
     }
   }
   return fetch(url, init);

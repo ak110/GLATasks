@@ -1,6 +1,6 @@
 include .env
 ifndef COMPOSE_PROFILE
-$(error COMPOSE_PROFILE が定義されていません)
+$(error COMPOSE_PROFILE が定義されていません。.envへCOMPOSE_PROFILE=development（開発）かCOMPOSE_PROFILE=production（本番）を書いてから再実行してください)
 endif
 
 # 個別ターゲットでの `--profile=$(COMPOSE_PROFILE)` 手書き重複を避けるため、
@@ -96,9 +96,13 @@ healthcheck:
 		if docker compose exec -T app node --input-type=module --eval="const res = await fetch('http://localhost:3000/healthcheck', {signal: AbortSignal.timeout(2000)}); const body = await res.text(); if (!res.ok) { console.error('HTTP ' + res.status); process.exit(1); } console.log(body);"; then \
 			exit 0; \
 		fi; \
-		if [ "$$attempt" -lt 30 ]; then sleep 2; fi; \
+		if [ "$$attempt" -lt 30 ]; then \
+			echo "healthcheck: 応答待ちのため2秒後に再試行します（残り$$((30 - attempt))回）" >&2; \
+			sleep 2; \
+		fi; \
 		attempt=$$((attempt + 1)); \
 	done; \
+	echo "healthcheck: 30回試行してもappの/healthcheckが成功しませんでした。make psでappの稼働を、make logs-appで起動時のエラーを確認してください" >&2; \
 	exit 1
 
 start-app:
@@ -131,7 +135,7 @@ update:
 
 # GitHub Actionsのアクションをハッシュピンで最新化（mise未導入時はスキップ）
 update-actions:
-	@command -v mise >/dev/null 2>&1 || { echo "mise未検出、スキップ"; exit 0; }; \
+	@command -v mise >/dev/null 2>&1 || { echo "mise未検出のため、GitHub Actionsのピン更新をスキップしました。他の更新は続きます。ピンも更新する場合はmiseを導入してからmake update-actionsを実行してください"; exit 0; }; \
 	GITHUB_TOKEN=$$(gh auth token) mise exec -- pinact run --update --min-age=1
 
 # pyfltrの推奨ガイドから意図して外れる指定。グローバルuv設定の公開待機（exclude-newer）は`uvx`にも適用され、

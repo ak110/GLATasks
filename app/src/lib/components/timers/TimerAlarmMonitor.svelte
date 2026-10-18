@@ -327,6 +327,8 @@
                 </a>
                 <button
                     class="cursor-pointer rounded p-1 pr-3 hover:bg-red-600"
+                    aria-label="タイマー完了の通知を閉じる"
+                    title="タイマー完了の通知を閉じる"
                     onclick={() => dismissAlarm(alarm.timerId)}
                 >
                     ✕

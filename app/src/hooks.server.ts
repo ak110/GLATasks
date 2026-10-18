@@ -25,7 +25,10 @@ export const handle: Handle = async ({ event, resolve }) => {
     isMutating &&
     event.url.pathname.startsWith("/api/")
   ) {
-    return new Response("Forbidden", { status: 403 });
+    return new Response(
+      "Forbidden: cross-site requests cannot change data. Send the request from the GLATasks page on the same origin.",
+      { status: 403 },
+    );
   }
 
   // セッション Cookie の検証（JWT/HS256）
@@ -36,7 +39,10 @@ export const handle: Handle = async ({ event, resolve }) => {
 
   if (!event.locals.user_id && !isPublicPath(event.url.pathname)) {
     if (event.url.pathname.startsWith("/api/")) {
-      return new Response("Unauthorized", { status: 401 });
+      return new Response(
+        "Unauthorized: log in at /auth/login and send the request again.",
+        { status: 401 },
+      );
     }
     redirect(302, "/auth/login");
   }

@@ -56,7 +56,7 @@ jobs:
           # 設定読み込み失敗等でpnpm-auditが無言スキップされた場合はrunが存在しない。
           if ! jq -e '.runs[] | select(.tool.driver.name == "pnpm-audit")' \
                "${RUNNER_TEMP}/audit.sarif" > /dev/null 2>&1; then
-            echo "::error::pnpm-audit が実行されませんでした（SARIFにpnpm-auditのrunが含まれていません）。"
+            echo "::error::pnpm-audit が実行されませんでした（SARIFにpnpm-auditのrunが含まれていません）。このステップのpyfltrの出力で設定の読み込みとpnpm-auditの起動を確認し、原因を直してからworkflowを再実行してください。"
             exit 1
           fi
           # pyfltrは全失敗をexit 1に正規化するため、終了コードだけでは脆弱性検出と
@@ -66,11 +66,11 @@ jobs:
                  "${RUNNER_TEMP}/audit.sarif" > /dev/null 2>&1; then
               # 脆弱性検出: SARIFをアップロードしCode Scanningに委ねる（次ステップ）。
               # ワークフローは成功扱いとする（Code Scanning側でアラートを管理するため）。
-              echo "脆弱性が検出されました。Code Scanningへアップロードします。"
+              echo "脆弱性が検出されました。Code Scanningへアップロードします。リポジトリのSecurity > Code scanningのアラートで対象の依存と修正版を確認し、依存更新で対応してください（このworkflowは成功として扱います）。"
             else
               # ツール異常: 空のSARIFをアップロードすると既存アラートが誤クローズされるため、
               # アップロードせずワークフローを失敗させる。
-              echo "::error::pnpm-audit の実行に失敗しました（SARIFに検出結果がありません）。"
+              echo "::error::pnpm-audit の実行に失敗しました（SARIFに検出結果がありません）。このステップのpyfltrの出力でpnpm auditのエラーを確認し、レジストリの一時障害であればworkflowを再実行してください。"
               exit 1
             fi
           fi

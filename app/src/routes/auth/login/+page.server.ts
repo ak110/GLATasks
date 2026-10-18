@@ -36,7 +36,10 @@ export const actions: Actions = {
 
     const userInfo = await api.validateCredentials(user, password);
     if (!userInfo) {
-      return fail(401, { error: "ユーザーIDまたはパスワードが異なります。" });
+      return fail(401, {
+        error:
+          "ユーザーIDまたはパスワードが異なります。入力を確かめてから、もう一度ログインしてください。",
+      });
     }
 
     const token = await createSessionToken(userInfo.id);

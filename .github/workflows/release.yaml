@@ -69,7 +69,7 @@ jobs:
                 echo "CI passed successfully"
                 exit 0
               fi
-              echo "Error: CI did not succeed (conclusion: ${conclusion})"
+              echo "Error: CI did not succeed (conclusion: ${conclusion}). Fix the failing CI run for this commit, then re-run the release workflow."
               exit 1
             fi
 
@@ -78,7 +78,7 @@ jobs:
             elapsed="$((elapsed + wait_interval))"
           done
 
-          echo "Error: Timeout waiting for CI to complete"
+          echo "Error: Timeout waiting for CI to complete. Check that the CI workflow for this commit has finished, then re-run the release workflow."
           exit 1
 
       - name: Calculate next version
@@ -89,7 +89,7 @@ jobs:
           # 再実行時の冪等性: HEAD を指すリリースタグが既にあれば再利用
           existing_tag="$(git tag --points-at=HEAD | grep -E '^v[0-9]+\.' | head -n1 || true)"
           if [ -n "${existing_tag}" ]; then
-            echo "Found existing tag ${existing_tag} on HEAD, reusing"
+            echo "Found existing tag ${existing_tag} on HEAD, reusing it. No action is needed (the release continues)."
             echo "next=${existing_tag}" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -110,7 +110,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           if git rev-parse "${{ steps.next.outputs.next }}" >/dev/null 2>&1; then
-            echo "Tag ${{ steps.next.outputs.next }} already exists, skipping"
+            echo "Tag ${{ steps.next.outputs.next }} already exists, skipping tag creation. No action is needed (the release continues)."
           else
             git tag "${{ steps.next.outputs.next }}"
             git push origin "${{ steps.next.outputs.next }}"
@@ -134,7 +134,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           if gh release view "${{ steps.next.outputs.next }}" >/dev/null 2>&1; then
-            echo "Release ${{ steps.next.outputs.next }} already exists, skipping"
+            echo "Release ${{ steps.next.outputs.next }} already exists, skipping release creation. No action is needed."
           else
             gh release create "${{ steps.next.outputs.next }}" \
               --title="${{ steps.next.outputs.next }}" --notes-file=CHANGES.md

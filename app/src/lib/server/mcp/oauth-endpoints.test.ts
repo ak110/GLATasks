@@ -42,6 +42,27 @@ function event(params: Record<string, string> = {}, decision = "allow") {
   } as Parameters<typeof load>[0];
 }
 
+/**
+ * `error_description`が理由と次の操作の2文を持ち、RFC 6749 5.2の文字種に収まることを確かめる。
+ * 次の操作は動詞で始まる2文目以降として現れる。
+ */
+function expectDescriptionWithNextAction(description: unknown) {
+  expect(typeof description).toBe("string");
+  const text = description as string;
+  expect(text).toMatch(/^[\x20-\x21\x23-\x5B\x5D-\x7E]+$/);
+  const sentences = text.split(/(?<=\.) /);
+  expect(sentences.length).toBeGreaterThanOrEqual(2);
+  expect(sentences.slice(1).join(" ")).toMatch(
+    /\b(Send|Restart|Register|Exchange|To connect again)\b/,
+  );
+}
+
+async function expectTokenFailure(response: Response, error: string) {
+  const body = await response.json();
+  expect(body).toMatchObject({ error });
+  expectDescriptionWithNextAction(body.error_description);
+}
+
 describe("OAuthの失敗応答", () => {
   beforeEach(() => vi.clearAllMocks());
 
@@ -58,8 +79,14 @@ describe("OAuthの失敗応答", () => {
         expect(
           location.searchParams.get(decision === "deny" ? "error" : "code"),
         ).toBe(decision === "deny" ? "access_denied" : "issued-code");
-        if (decision === "deny")
+        if (decision === "deny") {
           expect(issueAuthorizationCode).not.toHaveBeenCalled();
+          expectDescriptionWithNextAction(
+            location.searchParams.get("error_description"),
+          );
+        } else {
+          expect(location.searchParams.has("error_description")).toBe(false);
+        }
       }
     }
   });
@@ -70,10 +97,22 @@ describe("OAuthの失敗応答", () => {
       [{ response_type: "token" }, "unsupported_response_type"],
       [{ resource: "invalid" }, "invalid_target"],
     ] as const) {
-      await expect(load(event(params))).rejects.toMatchObject({
-        status: 302,
-        location: `https://client.example/callback?error=${expected}&state=`,
-      });
+      const redirected = await Promise.resolve(load(event(params))).then(
+        () => {
+          throw new Error("リダイレクトがありません");
+        },
+        (error: { status: number; location: string }) => error,
+      );
+      expect(redirected.status).toBe(302);
+      const location = new URL(redirected.location);
+      expect(`${location.origin}${location.pathname}`).toBe(
+        "https://client.example/callback",
+      );
+      expect(location.searchParams.get("error")).toBe(expected);
+      expect(location.searchParams.get("state")).toBe("");
+      expectDescriptionWithNextAction(
+        location.searchParams.get("error_description"),
+      );
       await expect(actions.default(event(params))).rejects.toMatchObject({
         status: 302,
       });
@@ -99,9 +138,7 @@ describe("OAuthの失敗応答", () => {
         expect(response.headers.get("Content-Type")).toContain(
           "application/json",
         );
-        expect(await response.json()).toMatchObject({
-          error: "invalid_client_metadata",
-        });
+        await expectTokenFailure(response, "invalid_client_metadata");
       }
     }
   });
@@ -124,10 +161,78 @@ describe("OAuthの失敗応答", () => {
         } as Parameters<typeof token>[0]);
         expect(response.status).toBe(401);
         expect(response.headers.get("WWW-Authenticate")).toBe("Basic");
-        expect(await response.json()).toMatchObject({
-          error: "invalid_client",
-        });
+        await expectTokenFailure(response, "invalid_client");
       }
+    }
+  });
+
+  it("トークンエンドポイントの要求不正と照合失敗は全てerror_descriptionに次の操作を持つ", async () => {
+    const post = (body: BodyInit, headers: Record<string, string> = {}) =>
+      Promise.resolve(
+        token({
+          request: new Request("http://localhost/oauth/token", {
+            method: "POST",
+            headers,
+            body,
+          }),
+        } as Parameters<typeof token>[0]),
+      );
+    const basic = { Authorization: `Basic ${btoa("registered:secret")}` };
+    const cases: [Promise<Response>, number, string][] = [
+      [
+        post("not a form", { "Content-Type": "multipart/form-data" }),
+        400,
+        "invalid_request",
+      ],
+      [
+        post(new URLSearchParams({ grant_type: "password" })),
+        400,
+        "unsupported_grant_type",
+      ],
+      [
+        post(new URLSearchParams({ grant_type: "authorization_code" })),
+        400,
+        "invalid_client",
+      ],
+      [
+        post(new URLSearchParams({ grant_type: "authorization_code" }), basic),
+        400,
+        "invalid_request",
+      ],
+      [
+        post(
+          new URLSearchParams({
+            grant_type: "authorization_code",
+            code: "unknown",
+            redirect_uri: "https://client.example/callback",
+            code_verifier: "v".repeat(43),
+          }),
+          basic,
+        ),
+        400,
+        "invalid_grant",
+      ],
+      [
+        post(new URLSearchParams({ grant_type: "refresh_token" }), basic),
+        400,
+        "invalid_request",
+      ],
+      [
+        post(
+          new URLSearchParams({
+            grant_type: "refresh_token",
+            refresh_token: "x",
+          }),
+          basic,
+        ),
+        400,
+        "invalid_grant",
+      ],
+    ];
+    for (const [pending, status, error] of cases) {
+      const response = await pending;
+      expect(response.status, error).toBe(status);
+      await expectTokenFailure(response, error);
     }
   });
 });

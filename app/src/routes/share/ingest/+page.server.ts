@@ -29,7 +29,10 @@ export const actions: Actions = {
 
     const parsed = CreateTaskSchema.safeParse({ listId, text });
     if (!parsed.success) {
-      return fail(400, { error: "入力内容が不正です。" });
+      return fail(400, {
+        error:
+          "入力内容が不正です。共有するテキストを1文字以上入力し、追加先のリストを選んでください。",
+      });
     }
 
     try {

@@ -2,6 +2,10 @@ import { processInterval, processState } from "../process-state";
 
 const SESSION_IDLE_MS = 24 * 60 * 60 * 1000;
 
+/** transportの終了に失敗したときのログ。表からは外しているため、利用者の対処は要らない */
+const CLOSE_FAILED_MESSAGE =
+  "MCP sessionの終了に失敗しました。sessionは表から外したため処理は続きます。対応不要です（繰り返す場合は続く例外を確認してください）";
+
 /** 無活動のtransportを回収する周期（ミリ秒） */
 const EXPIRE_INTERVAL_MS = 60 * 1000;
 
@@ -34,9 +38,7 @@ export class McpSessions<T extends { close(): Promise<void> }> {
       this.entries.delete(id);
       void entry.transport
         .close()
-        .catch((error) =>
-          console.error("MCP sessionの終了に失敗しました", error),
-        );
+        .catch((error) => console.error(CLOSE_FAILED_MESSAGE, error));
       return undefined;
     }
     entry.lastRequestAt = this.now();
@@ -55,7 +57,7 @@ export class McpSessions<T extends { close(): Promise<void> }> {
       try {
         await entry.transport.close();
       } catch (error) {
-        console.error("MCP sessionの終了に失敗しました", error);
+        console.error(CLOSE_FAILED_MESSAGE, error);
       }
     }
   }
@@ -67,7 +69,7 @@ export class McpSessions<T extends { close(): Promise<void> }> {
       try {
         await entry.transport.close();
       } catch (error) {
-        console.error("MCP sessionの終了に失敗しました", error);
+        console.error(CLOSE_FAILED_MESSAGE, error);
       }
     }
   }

@@ -42,7 +42,9 @@ export function createBlobUrlCache(): BlobUrlCache {
         (activeIdsSnapshot && !activeIdsSnapshot.has(attachmentId))
       ) {
         URL.revokeObjectURL(url);
-        throw new Error(`添付ID ${attachmentId} は取得中に削除されました`);
+        throw new Error(
+          `添付ID ${attachmentId} は取得中に削除されました。タスクを開き直して最新の添付ファイルを確認してください`,
+        );
       }
       cache.set(attachmentId, url);
       return url;

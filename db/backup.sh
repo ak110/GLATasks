@@ -29,7 +29,7 @@ else
     fi
     if [[ -z "$db_container" ]] ||
         [[ "$(docker inspect --format '{{.State.Running}}' "$db_container")" != true ]]; then
-        echo "DBコンテナが起動していません" >&2
+        echo "DBコンテナが起動していません。make startで起動してから再実行してください。別のコンテナから取得する場合はBACKUP_DB_CONTAINERを、DBダンプを省く場合はSKIP_DB_DUMP=1を指定してください" >&2
         exit 1
     fi
     : "${DB_CREDENTIAL:?make backupから実行するかDB_CREDENTIALを指定してください}"
@@ -49,7 +49,7 @@ done
 generation="$(date +%Y%m%d_%H%M%S)"
 destination="$backup_root/$generation"
 if [[ -e "$destination" || -L "$destination" ]]; then
-    echo "同じ時刻のバックアップが既に存在します: $destination" >&2
+    echo "同じ時刻のバックアップが既に存在します: $destination。1秒以上待ってから再実行してください" >&2
     exit 1
 fi
 mv -- "$staging" "$destination"

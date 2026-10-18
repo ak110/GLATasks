@@ -120,7 +120,9 @@ describe("withApiErrorsのエラーマッピング", () => {
       data: "aGVsbG8=",
     });
 
-    await expect(result).rejects.toThrow("ファイルサイズが上限を超えています");
+    await expect(result).rejects.toThrow(
+      "ファイルサイズが上限（10 MiB）を超えています。10 MiB以下のファイルを選んでください。",
+    );
     await expect(result).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
 

@@ -2,7 +2,7 @@
     /**
      * @fileoverview エラートースト通知コンポーネント
      *
-     * 画面右下に赤系のエラーメッセージを表示し、5秒後に自動消去する。
+     * 画面右下に赤系のエラーメッセージを表示し、文面の長さに応じた時間（最短5秒）の後に自動消去する。
      * TimerAlarmMonitor のトースト（top-14）と重ならないよう bottom-4 に配置。
      */
 
@@ -31,6 +31,8 @@
                 <span class="px-4 py-3 text-sm">{toast.message}</span>
                 <button
                     class="cursor-pointer rounded p-1 pr-3 hover:bg-red-200 dark:hover:bg-red-900/60"
+                    aria-label="エラー通知を閉じる"
+                    title="エラー通知を閉じる"
                     onclick={() => dismissToast(toast.id)}
                 >
                     ✕

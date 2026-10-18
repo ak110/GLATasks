@@ -2,9 +2,13 @@
  * @fileoverview tRPCエラーからユーザー向けメッセージを抽出する共通処理
  */
 
+/** 送出元が文面を持たない失敗の既定文 */
+const FALLBACK_MESSAGE =
+  "エラーが発生しました。ページを再読み込みしてから操作をやり直してください";
+
 /** tRPCエラーからユーザー向けメッセージを抽出する */
 export function extractErrorMessage(error: unknown): string {
-  if (!(error instanceof Error)) return "エラーが発生しました";
+  if (!(error instanceof Error)) return FALLBACK_MESSAGE;
 
   if (
     "data" in error &&
@@ -25,5 +29,5 @@ export function extractErrorMessage(error: unknown): string {
     }
   }
 
-  return error.message || "エラーが発生しました";
+  return error.message || FALLBACK_MESSAGE;
 }

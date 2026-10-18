@@ -25,10 +25,15 @@ export const actions: Actions = {
     });
     if (!parsed.success)
       return fail(400, {
-        error: parsed.error.issues[0]?.message ?? "入力内容が不正です。",
+        error:
+          parsed.error.issues[0]?.message ??
+          "入力内容が不正です。ユーザーIDを4～32文字の英数字で、パスワードを1文字以上で入力してください。",
       });
     if (parsed.data.password !== data.get("password_confirm")) {
-      return fail(400, { error: "パスワードが一致しません。" });
+      return fail(400, {
+        error:
+          "パスワードが一致しません。確認欄へパスワードと同じ値を入力してください。",
+      });
     }
 
     try {

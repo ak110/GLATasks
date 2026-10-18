@@ -60,6 +60,28 @@ async function start() {
 }
 
 describe("GET /healthcheck/ready", () => {
+  it("不健全な応答は状態ごとの確認先をnext_actionで返し、健全な応答は返さない", async () => {
+    const { GET } = await import("../../routes/healthcheck/ready/+server");
+    let body = await (await GET()).json();
+    expect(body.scheduler.status).toBe("starting");
+    expect(body.next_action).toContain("make logs-app");
+
+    await start();
+    body = await (await GET()).json();
+    expect(body.status).toBe("ok");
+    expect(body).not.toHaveProperty("next_action");
+
+    database.execute.mockRejectedValueOnce(new Error("接続できません"));
+    body = await (await GET()).json();
+    expect(body.database).toBe("error");
+    expect(body.next_action).toContain("make ps");
+
+    vi.setSystemTime(new Date("2026-01-01T00:02:01Z"));
+    body = await (await GET()).json();
+    expect(body.scheduler.status).toBe("stale");
+    expect(body.next_action).toContain("make restart-app");
+  });
+
   it("起動直後は503、正常実行後は200となり、停滞後は503になる", async () => {
     const { GET } = await import("../../routes/healthcheck/ready/+server");
     let response = await GET();

@@ -340,7 +340,7 @@ export function createTranslationController() {
             translatedText,
           };
           pendingPreparationStale = false;
-          statusMessage = `準備が必要です: ${result.preparation.map(describePreparationDirection).join("、")}`;
+          statusMessage = `準備が必要です: ${result.preparation.map(describePreparationDirection).join("、")}。「モデルを準備する」ボタンを押してください`;
           return;
         }
         if (result.status === "unavailable") {
