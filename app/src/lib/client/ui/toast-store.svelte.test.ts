@@ -18,7 +18,7 @@ describe("getToastDurationMs", () => {
     { length: 33, expected: 5000 },
     { length: 34, expected: 5100 },
     { length: 100, expected: 15000 },
-  ])("$length文字 → $expectedミリ秒", ({ length, expected }) => {
+  ])("$length 文字は $expected ミリ秒", ({ length, expected }) => {
     expect(getToastDurationMs("あ".repeat(length))).toBe(expected);
   });
 });
