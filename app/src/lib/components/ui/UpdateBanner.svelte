@@ -2,8 +2,9 @@
     /**
      * @fileoverview 新バージョン検知バナー
      *
-     * SvelteKitのversion.pollIntervalで新デプロイが検知されると
-     * $app/state の updated.current が true になる。本コンポーネントは
+     * SvelteKitのversion.pollIntervalによる定期確認か、画面遷移のデータ応答の
+     * x-sveltekit-versionで新デプロイが検知されると $app/state の updated.current が true になる
+     * （遷移ごとのデータ応答は +layout.server.ts がパスを参照することで発生する）。本コンポーネントは
      * その状態を購読し、画面上部で再読み込みを促すバナーを表示する。
      *
      * 長寿命 SPA セッションで新版 JS が読まれないまま古いコードで操作し続ける

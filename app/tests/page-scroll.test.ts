@@ -11,6 +11,10 @@ import {
   requireBoundingBox,
   verifyScrollAreaScrollsAlone,
 } from "./helpers/page-scroll";
+import {
+  expectStubbedPageReady,
+  installAiStubs,
+} from "./helpers/translate-page";
 
 test.describe("page scroll", () => {
   test("4画面で文書ルートが縦スクロールしない", async ({ page }) => {
@@ -44,11 +48,19 @@ test.describe("page scroll", () => {
       page,
     }) => {
       await page.setViewportSize(viewport);
-      await page.clock.install();
+      // 翻訳画面へ画面遷移で入るため、ブラウザー内蔵AIのスタブを最初の読み込みから注入しておく。
+      await installAiStubs(page);
       let unhealthy = false;
-      await page.route("**/version.json", (route) =>
-        route.fulfill({ json: { version: "e2e-banner-layout-new-version" } }),
-      );
+      // 更新案内は、画面遷移のデータ応答の`x-sveltekit-version`が読み込み時の版と異なると表示される。
+      // `version.json`の定期確認は開発サーバーで行われないため、両方の環境で働くデータ応答を使う。
+      const newVersion = "e2e-banner-layout-new-version";
+      await page.route("**/__data.json*", async (route) => {
+        const response = await route.fetch();
+        await route.fulfill({
+          response,
+          headers: { ...response.headers(), "x-sveltekit-version": newVersion },
+        });
+      });
       await page.route("**/healthcheck", (route) =>
         route.fulfill({
           status: unhealthy ? 503 : 200,
@@ -75,7 +87,17 @@ test.describe("page scroll", () => {
 
       for (const name of PAGE_NAMES) {
         unhealthy = false;
-        await openPage(page, name);
+        // 別の画面を読み込み直してから、ヘッダーの画面遷移で対象の画面へ入り、更新案内を表示させる。
+        await openPage(page, name === "tasks" ? "timers" : "tasks");
+        await Promise.all([
+          page.waitForResponse(
+            (response) =>
+              new URL(response.url()).pathname.endsWith("/__data.json") &&
+              response.headers()["x-sveltekit-version"] === newVersion,
+          ),
+          page.getByTestId(`header-nav-${name}`).click(),
+        ]);
+        if (name === "translate") await expectStubbedPageReady(page);
         const timerDialog = page.getByRole("dialog", {
           name: /^(?:一時)?タイマー追加$/,
         });
@@ -103,14 +125,6 @@ test.describe("page scroll", () => {
               response.status() === 503,
           ),
           page.evaluate(() => window.dispatchEvent(new Event("online"))),
-        ]);
-        await Promise.all([
-          page.waitForResponse(
-            (response) =>
-              new URL(response.url()).pathname.endsWith("/version.json") &&
-              response.status() === 200,
-          ),
-          page.clock.fastForward(300_001),
         ]);
         const update = page.getByTestId("update-banner");
         const connectivity = page.getByTestId("connectivity-recovery-banner");
