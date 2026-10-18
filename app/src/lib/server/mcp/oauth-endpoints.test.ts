@@ -1,4 +1,20 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
+
+// 更新トークンの検証は署名鍵をDATA_DIRへ作成する。make test-dbのようにDATABASE_URLがある実行で
+// 作業ツリーの既定の保存先へ書かないよう、ルートを読み込む前に一時ディレクトリを指定する
+const dataDir = fs.mkdtempSync(
+  path.join(os.tmpdir(), "glatasks-oauth-endpoints-"),
+);
+const savedDataDir = process.env.DATA_DIR;
+process.env.DATA_DIR = dataDir;
+afterAll(() => {
+  if (savedDataDir === undefined) delete process.env.DATA_DIR;
+  else process.env.DATA_DIR = savedDataDir;
+  fs.rmSync(dataDir, { recursive: true, force: true });
+});
 
 vi.mock("#lib/server/mcp/store.ts", () => ({
   getClient: vi.fn((id: string) =>
