@@ -126,6 +126,13 @@ describeDb("processSchedules", () => {
     // now=2026-01-01T00:00:00.000Z 自体が発火予定と一致するため、
     // rule.before(now, true) は now 自身を返す
     expect(rows[0]!.last_fired?.toISOString()).toBe("2026-01-01T00:00:00.000Z");
+
+    // rruleはDTSTARTから発火予定を走査するため、2000年開始の予定は1回の処理に数秒かかる。
+    // 後続の試験のprocessSchedulesが毎回この走査を繰り返さないよう無効化する
+    await db
+      .update(schedules)
+      .set({ enabled: 0 })
+      .where(eq(schedules.id, scheduleId));
   });
 
   it("同一 now での2回目の呼び出しは重複発火しない", async () => {
