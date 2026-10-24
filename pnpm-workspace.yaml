@@ -19,15 +19,16 @@ ignoredBuiltDependencies:
 # 引き上げ後の陳腐化（新たな脆弱性の再出現）は.github/workflows/audit.yamlの定期監査で検知する。
 overrides:
   "@hono/node-server@<2.0.5": ^2.0.5
-  body-parser@<2.3.0: ^2.3.0
+  body-parser@<2.4.0: ^2.4.0
   brace-expansion@<5.0.8: ^5.0.8
   cookie@<0.7.0: ^0.7.0
   esbuild@<0.28.1: ^0.28.1
-  fast-uri@<3.1.4: ^3.1.4
+  fast-uri@<3.1.9: ^3.1.9
   hono@<4.12.34: ^4.12.34
   js-yaml@<4.3.0: ^4.3.0
   linkify-it@<5.0.2: ^5.0.2
-  markdown-it@<14.2.0: ^14.2.0
+  markdown-it@<14.3.3: ^14.3.3
+  markdown-it@>=15.0.0 <15.0.3: ^15.0.3
   # GHSA-238p-pmpm-9mq7: micromark-extension-math 3.1.0の要求範囲katex ^0.16.0では修正版0.18.2へ到達しない。
   # micromark-extension-mathが修正版を要求するようになったら撤去できる。
   "micromark-extension-math@3.1.0>katex": 0.18.2
