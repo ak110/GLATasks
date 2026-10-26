@@ -1,5 +1,18 @@
 # 開発手順
 
+## エージェントの共通品質基準
+
+Claude Codeでは`claude plugin marketplace add ak110/dotfiles`の後に
+`claude plugin install agent-basics@ak110-dotfiles`で共通品質スキルを導入する。
+Codexでは`codex plugin marketplace add ak110/dotfiles`を実行し、`/plugins`から
+`agent-basics@ak110-dotfiles`をインストールする。
+リポジトリの`.claude/settings.json`と`.codex/config.toml`は導入済みプラグインを有効化する共有設定である。
+Codexでは信頼したプロジェクトの設定が読み込まれる。
+AGENTS.mdが指定する`writing-standards`・`review-standards`と該当するreferencesを読む。
+個人用のagent-toolkitは任意で利用できる。
+導入仕様は[Claude Code](https://code.claude.com/docs/en/discover-plugins)と
+[Codex](https://developers.openai.com/plugins/build/plugins)の公式資料を参照する。
+
 ## 開発環境の構築手順
 
 ### 必要環境

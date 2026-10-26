@@ -95,7 +95,7 @@ export function stopLoopBeep(timerId: number): void {
 
 /** すべてのループビープを停止する（テスト/デバッグ用途） */
 export function stopAllLoopBeeps(): void {
-  for (const id of [...loopHandles.keys()]) {
+  for (const id of loopHandles.keys()) {
     stopLoopBeep(id);
   }
 }

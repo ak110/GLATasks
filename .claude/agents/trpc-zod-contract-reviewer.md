@@ -6,7 +6,7 @@ description: >-
 # 契約のレビューに専念し、実装を変更しない。
 tools: Read, Grep, Glob, Bash, mcp__plugin_context7_context7__resolve-library-id, mcp__plugin_context7_context7__query-docs
 skills:
-  - agent-toolkit:review-standards
+  - agent-basics:review-standards
 ---
 
 # tRPCとZodの契約レビュー
@@ -14,7 +14,7 @@ skills:
 入力、DB操作、応答、通知、画面の再取得を縦断してレビューする。
 実装の変更は担当しない。
 最初に共通規約と対象差分を読み、直接消費側とテストまで確認する。
-レビューの指摘確定基準は`agent-toolkit:review-standards`に従う。
+レビューの指摘確定基準は`agent-basics:review-standards`に従う。
 
 ## 入力
 
@@ -42,5 +42,5 @@ operations、api、MCP、クエリー定義、SSEの消費側も対象に含め�
 
 ## 出力
 
-日本語で、`agent-toolkit:review-standards`の基準に従って指摘と根拠を返す。
+日本語で、`agent-basics:review-standards`の基準に従って指摘と根拠を返す。
 問題が無い場合は指摘0件と返す。

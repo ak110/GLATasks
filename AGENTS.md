@@ -3,6 +3,12 @@
 タスク管理・タイマー・アラーム・翻訳・カロリーを統合したWeb/PWAアプリ。
 SvelteKit、tRPC、Drizzleで構築し、Docker Composeで運用する。
 
+## 共通品質基準
+
+設計・コード・テスト・文書の作成と修正では`agent-basics:writing-standards`を起動し、変更対象に該当するreferencesを読む。
+レビューと指摘の採否判断では`agent-basics:review-standards`を起動する。
+導入方法は[開発ガイド](docs/development/development.md)を参照する。本書の固有規約も併用する。
+
 ## 開発手順
 
 セットアップ、コマンド、依存更新とDB運用は[開発手順](docs/development/development.md)を参照。
