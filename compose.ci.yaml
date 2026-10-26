@@ -1,0 +1,5 @@
+---
+services:
+  web:
+    # CIの疎通とE2EはComposeネットワーク内のwebへ接続する。
+    ports: !reset []
