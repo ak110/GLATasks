@@ -71,6 +71,9 @@
     let conversion = $state<
         { itemKcal: number; quantity: number; kcal: number } | undefined
     >();
+    let regularConversion = $state<
+        { item: Item; previousKcal: number; quantity: number } | undefined
+    >();
     const visibleRecords = $derived(
         records.filter((record) => {
             const name = record.itemName.toLowerCase();
@@ -113,6 +116,7 @@
         quantity = "1";
         keepTemporary = false;
         conversion = undefined;
+        regularConversion = undefined;
     }
 
     function setItemName(value: string) {
@@ -192,6 +196,30 @@
             consumedAt: consumedAt,
             temporaryName: itemName.trim(),
             quantity: conversion.kcal,
+            tzOffsetMinutes: getUtcOffsetMinutes(),
+        });
+        resetForm();
+    }
+
+    function requestRegularConversion() {
+        const kcal = parseQuantity();
+        if (!editForm?.reportValidity() || !matchedItem || kcal === undefined)
+            return;
+        regularConversion = {
+            item: matchedItem,
+            previousKcal: kcal,
+            quantity: 1,
+        };
+    }
+
+    async function confirmRegularConversion(event: SubmitEvent) {
+        event.preventDefault();
+        if (!regularConversion || editingId === undefined) return;
+        await onUpdate({
+            recordId: editingId,
+            consumedAt,
+            itemId: regularConversion.item.id,
+            quantity: regularConversion.quantity,
             tzOffsetMinutes: getUtcOffsetMinutes(),
         });
         resetForm();
@@ -341,6 +369,13 @@
                 </div>
                 {#if temporary}
                     <div class="mt-3">{@render temporaryNotice(true)}</div>
+                    {#if keepTemporary && !matchedItem}
+                        <p
+                            class="mt-2 text-sm text-gray-600 dark:text-gray-300"
+                        >
+                            通常項目に変換するには、品目表にある名前を選択してください。
+                        </p>
+                    {/if}
                 {/if}
                 <div class="mt-5 flex items-center gap-2">
                     {#if convertible}
@@ -348,6 +383,12 @@
                             type="button"
                             onclick={requestConversion}
                             class={grayButtonClass}>一時項目に変換</button
+                        >
+                    {:else if keepTemporary && matchedItem}
+                        <button
+                            type="button"
+                            onclick={requestRegularConversion}
+                            class={grayButtonClass}>通常項目に変換</button
                         >
                     {/if}
                     <button
@@ -369,6 +410,50 @@
                 onConfirm={confirmConversion}
                 onCancel={() => (conversion = undefined)}
             />
+            {#if regularConversion}
+                <Dialog
+                    title="通常項目への変換"
+                    onClose={() => (regularConversion = undefined)}
+                >
+                    <form class="p-6" onsubmit={confirmRegularConversion}>
+                        <p class="mb-4 text-gray-700 dark:text-gray-200">
+                            「{regularConversion.item
+                                .name}」（1個当たり{regularConversion.item.kcal}
+                            kcal）の数量を指定してください。変換後は品目のkcalの変更が、この記録にも反映されます。
+                        </p>
+                        <label
+                            for="calorie-conversion-quantity"
+                            class="text-sm text-gray-700 dark:text-gray-200"
+                            >数量</label
+                        >
+                        <input
+                            id="calorie-conversion-quantity"
+                            type="number"
+                            min="0"
+                            step="1"
+                            required
+                            bind:value={regularConversion.quantity}
+                            class={inputClass}
+                        />
+                        <p class="mt-4 text-gray-700 dark:text-gray-200">
+                            {regularConversion.previousKcal} kcal → {regularConversion
+                                .item.kcal * (regularConversion.quantity ?? 0)} kcal
+                        </p>
+                        <div class="mt-6 flex justify-end gap-2">
+                            <button
+                                type="button"
+                                onclick={() => (regularConversion = undefined)}
+                                class={grayButtonClass}>キャンセル</button
+                            >
+                            <button
+                                type="submit"
+                                class="cursor-pointer rounded bg-blue-600 px-6 py-2 text-white hover:bg-blue-700"
+                                >変換</button
+                            >
+                        </div>
+                    </form>
+                </Dialog>
+            {/if}
         </Dialog>
     {/if}
 

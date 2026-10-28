@@ -10,11 +10,14 @@ import CalorieSummary from "./CalorieSummary.svelte";
 describe("CalorieSummary", () => {
   it.each([
     [1515, "bg-emerald-50"],
-    [1516, "bg-white"],
+    [1516, "bg-emerald-50"],
+    [1614, "bg-emerald-50"],
+    [1615, "bg-emerald-50"],
+    [1616, "bg-white"],
     [1714, "bg-white"],
     [1715, "bg-amber-50"],
   ] as const)(
-    "平均 %s kcal は目標との差が1日当たり100 kcal以上の場合だけ色を変える",
+    "平均 %s kcal は目標以下なら緑、100 kcal以上の超過なら注意色にする",
     (dailyKcal, color) => {
       const { getByTestId } = render(CalorieSummary, {
         periods: [

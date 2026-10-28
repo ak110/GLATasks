@@ -208,6 +208,58 @@ test.describe("calories temporary items", () => {
       await itemResponse;
       await expect(itemRow).toContainText("300");
       await expect(row.locator("td").nth(3)).toHaveText("240");
+
+      await openRecordMenu(row);
+      await row.getByRole("menuitem", { name: "編集" }).click();
+      const regularButton = recordDialog.getByRole("button", {
+        name: "通常項目に変換",
+        exact: true,
+      });
+      await regularButton.click();
+      const regularDialog = page.getByRole("dialog", {
+        name: "通常項目への変換",
+        exact: true,
+      });
+      await expect(regularDialog).toContainText("240 kcal → 300 kcal");
+      await regularDialog.getByRole("button", { name: "キャンセル" }).click();
+      await expect(regularDialog).toHaveCount(0);
+      await expect(recordDialog).toBeVisible();
+      await expect(
+        recordDialog.getByLabel("kcal", { exact: true }),
+      ).toHaveValue("240");
+
+      await regularButton.click();
+      await page.keyboard.press("Escape");
+      await expect(regularDialog).toHaveCount(0);
+      await expect(recordDialog).toBeVisible();
+
+      await itemInput.fill("未登録の品目");
+      await expect(regularButton).toHaveCount(0);
+      await expect(recordDialog).toContainText(
+        "品目表にある名前を選択してください",
+      );
+      await itemInput.fill(name);
+      await regularButton.click();
+      const regularQuantity = regularDialog.getByLabel("数量", { exact: true });
+      await regularQuantity.fill("0");
+      await expect(regularDialog).toContainText("240 kcal → 0 kcal");
+      await regularQuantity.fill("2");
+      await expect(regularDialog).toContainText("240 kcal → 600 kcal");
+      const regularResponse = waitForSuccessfulMutationResponse(
+        page,
+        "calories.updateRecord",
+      );
+      await regularDialog
+        .getByRole("button", { name: "変換", exact: true })
+        .click();
+      await regularResponse;
+      await expect(recordDialog).toHaveCount(0);
+      await expect(row.locator("td").nth(2)).toHaveText("2");
+      await expect(row.locator("td").nth(3)).toHaveText("600");
+
+      await page.reload();
+      await expect(row.locator("td").nth(2)).toHaveText("2");
+      await expect(row.locator("td").nth(3)).toHaveText("600");
     } finally {
       await context.close();
     }

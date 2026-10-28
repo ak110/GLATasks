@@ -40,13 +40,13 @@
         dailyPeriod ? Math.min(Math.max(dailyPeriod.percentage, 0), 100) : 0,
     );
 
-    /** 1食分の目安。配色の境目はすべてこの量から決める */
+    /** 1食分の目安。ペースの緑と平均の注意色の境目に使う */
     const MEAL_KCAL = 700;
     /** 平均が目標から離れたとみなす幅。1週間に1食分の差を1日当たりへ換算した値 */
     const AVERAGE_MARGIN_KCAL = MEAL_KCAL / 7;
 
     // 緑系は達成状況と同じ「目標内」の色とする。
-    // 目標の前後の細かい揺れでは色を変えないよう、1食分に満たない差は通常の色にする
+    // 平均が目標内なら緑系とし、小さな超過は通常の色にする
     const toneClasses = {
         good: "border-emerald-300 bg-emerald-50 text-emerald-950 dark:border-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-100",
         neutral:
@@ -64,7 +64,7 @@
 
     function averageColorClass(dailyKcal: number): string {
         const diff = dailyKcal - goalKcal;
-        if (diff <= -AVERAGE_MARGIN_KCAL) return toneClasses.good;
+        if (diff <= 0) return toneClasses.good;
         if (diff >= AVERAGE_MARGIN_KCAL) return toneClasses.caution;
         return toneClasses.neutral;
     }
