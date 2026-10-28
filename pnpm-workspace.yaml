@@ -41,3 +41,7 @@ overrides:
 # bracesが修正版を公開したら、版を更新してパッチとこの指定を撤去できる。
 patchedDependencies:
   braces@3.0.3: patches/braces@3.0.3.patch
+  # GHSA-gcqx-w48m-w2h4: Viteプラグインの設定マージで使うdeepmergeに修正版が未公開。
+  # target・source双方から__proto__を除き、返却オブジェクトのプロトタイプ変更を防ぐ。
+  # 版番号による監査警告は残す。上流の修正版へ更新できたらパッチを撤去する。
+  deepmerge@4.3.1: patches/deepmerge@4.3.1.patch
