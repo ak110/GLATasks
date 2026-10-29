@@ -1,5 +1,5 @@
 /**
- * @fileoverview MCP公開ツールの利用者設定契約テスト
+ * @fileoverview MCP公開ツールの一覧と呼び出しの契約テスト
  */
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -24,6 +24,7 @@ vi.mock("../api", async (importOriginal) => {
     ),
     getCalorieSummary: vi.fn(async () => ({ goalKcal: 1615 })),
     mergeLists: vi.fn(async () => {}),
+    listLists: vi.fn(async () => [{ id: 1, title: "仕事" }]),
     createTask: vi.fn(async () => {
       throw new ApiError("not_found_or_forbidden");
     }),
@@ -36,33 +37,34 @@ vi.mock("../sse", async (importOriginal) => {
 });
 
 const { createMcpServer } = await import("./server");
-const { getCalorieSummary, getUserPreferences, updateUserPreferences } =
-  await import("../api");
+const {
+  getCalorieSummary,
+  getUserPreferences,
+  listLists,
+  updateUserPreferences,
+} = await import("../api");
 const { sendEvent } = await import("../sse");
 
-const TOOL_CONTRACTS: Record<string, readonly [string, readonly string[]]> = {
-  "lists.list": ["リスト一覧を取得する", []],
-  "lists.create": ["新規リストを作成する", ["title"]],
-  "lists.rename": ["リスト名を変更する", ["listId", "title"]],
-  "lists.delete": ["リストとその全タスクを削除する", ["listId"]],
-  "lists.archive": ["リストをアーカイブする", ["listId"]],
-  "lists.unarchive": ["アーカイブ済みリストを active に戻す", ["listId"]],
-  "lists.clear": ["リスト内の完了済みタスクをアーカイブする", ["listId"]],
-  "lists.merge": [
-    "リスト同士を統合する（source の全タスクを target に移動）",
-    ["sourceListId", "targetListId"],
-  ],
-  "tasks.list": [
-    "指定リスト内のタスクを取得する",
-    ["ifModifiedSince", "listId", "showType"],
-  ],
-  "tasks.listActive": [
-    "ユーザーの全アクティブタスクを取得する（差分sync対応）",
-    ["since"],
-  ],
-  "tasks.create": ["新規タスクを追加する", ["kind", "listId", "tags", "text"]],
+type ToolKind = "readOnly" | "additive" | "destructive";
+
+/**
+ * ツール名ごとの注釈の区分と入力プロパティ。
+ * 区分は参照だけのツールを readOnly、追加だけのツールを additive、既存の状態を上書き・削除するツールを destructive とする。
+ */
+const TOOL_CONTRACTS: Record<string, readonly [ToolKind, readonly string[]]> = {
+  "lists.list": ["readOnly", ["showType"]],
+  "lists.create": ["additive", ["title"]],
+  "lists.rename": ["destructive", ["listId", "title"]],
+  "lists.delete": ["destructive", ["listId"]],
+  "lists.archive": ["destructive", ["listId"]],
+  "lists.unarchive": ["destructive", ["listId"]],
+  "lists.clear": ["destructive", ["listId"]],
+  "lists.merge": ["destructive", ["sourceListId", "targetListId"]],
+  "tasks.list": ["readOnly", ["ifModifiedSince", "listId", "showType"]],
+  "tasks.listActive": ["readOnly", ["since"]],
+  "tasks.create": ["additive", ["kind", "listId", "tags", "text"]],
   "tasks.update": [
-    "既存タスクを更新する（テキスト・ステータス・タグ・移動）",
+    "destructive",
     [
       "completed",
       "keepOrder",
@@ -75,14 +77,11 @@ const TOOL_CONTRACTS: Record<string, readonly [string, readonly string[]]> = {
       "text",
     ],
   ],
-  "tasks.search": [
-    "全タスクを全文検索する（query は1～255文字、showType の既定値は active）",
-    ["query", "showType"],
-  ],
-  "tasks.reorder": ["リスト内のタスク並び順を更新する", ["listId", "taskIds"]],
-  "timers.list": ["タイマー一覧を取得する", []],
+  "tasks.search": ["readOnly", ["query", "showType"]],
+  "tasks.reorder": ["destructive", ["listId", "taskIds"]],
+  "timers.list": ["readOnly", []],
   "timers.create": [
-    "タイマーを新規作成する",
+    "additive",
     [
       "adjustMinutes",
       "baseSeconds",
@@ -95,7 +94,7 @@ const TOOL_CONTRACTS: Record<string, readonly [string, readonly string[]]> = {
     ],
   ],
   "timers.update": [
-    "タイマー設定を更新する",
+    "destructive",
     [
       "adjustMinutes",
       "baseSeconds",
@@ -107,49 +106,55 @@ const TOOL_CONTRACTS: Record<string, readonly [string, readonly string[]]> = {
       "tzOffsetMinutes",
     ],
   ],
-  "timers.delete": ["タイマーを削除する", ["timerId"]],
-  "timers.start": [
-    "タイマーを開始する（アラーム時はクライアントのTZオフセットを渡す）",
-    ["timerId", "tzOffsetMinutes"],
-  ],
-  "timers.pause": ["実行中タイマーを一時停止する", ["timerId"]],
-  "timers.reset": [
-    "タイマーを初期状態にリセットする",
-    ["timerId", "tzOffsetMinutes"],
-  ],
-  "timers.adjust": [
-    "タイマーの残り時間を加算・減算する（minutes は正負の整数）",
-    ["minutes", "timerId"],
-  ],
+  "timers.delete": ["destructive", ["timerId"]],
+  "timers.start": ["destructive", ["timerId", "tzOffsetMinutes"]],
+  "timers.pause": ["destructive", ["timerId"]],
+  "timers.reset": ["destructive", ["timerId", "tzOffsetMinutes"]],
+  "timers.adjust": ["destructive", ["minutes", "timerId"]],
   "timers.setTime": [
-    "タイマーのベース時間・目標時刻を上書きする",
+    "destructive",
     ["seconds", "targetMinutes", "timerId", "tzOffsetMinutes"],
   ],
-  "timers.stop": [
-    "鳴っているタイマーを止める（startedAt の不変条件を確認）",
-    ["startedAt", "timerId"],
-  ],
-  "timers.reorder": ["タイマー並び順を更新する", ["timerIds"]],
-  "calories.summary": [
-    "カロリーの集計（1日当たりペース・7日間平均・28日間平均・達成状況）を取得する（tzOffsetMinutes はUTCからの時差の分数で、日本時間は540）",
-    ["tzOffsetMinutes"],
-  ],
-  "calories.listRecords": [
-    "カロリーの摂取記録を30日単位で新しい順に取得する（windowOffset は0で今日までの30日、1でその前の30日。tzOffsetMinutes はUTCからの時差の分数で、日本時間は540。品目表へ登録しない一時項目の記録は temporary が true で、quantity がkcal）",
-    ["tzOffsetMinutes", "windowOffset"],
-  ],
-  "calories.listItems": [
-    "カロリーの品目（名前・1個当たりのkcal・備考）を取得する",
-    [],
-  ],
-  "users.getPreferences": [
-    "利用者の新規タイマーデフォルト値とカロリー目標値を取得する",
-    [],
-  ],
+  "timers.stop": ["destructive", ["startedAt", "timerId"]],
+  "timers.reorder": ["destructive", ["timerIds"]],
+  "calories.summary": ["readOnly", ["tzOffsetMinutes"]],
+  "calories.listRecords": ["readOnly", ["tzOffsetMinutes", "windowOffset"]],
+  "calories.listItems": ["readOnly", []],
+  "users.getPreferences": ["readOnly", []],
   "users.updatePreferences": [
-    "利用者の新規タイマーデフォルト値とカロリー目標値のうち、指定した項目だけを更新する",
+    "destructive",
     ["adjustMinutes", "baseSeconds", "calorieGoalKcal", "mode", "ringSeconds"],
   ],
+};
+
+const EXPECTED_ANNOTATIONS: Record<ToolKind, Record<string, boolean>> = {
+  readOnly: { readOnlyHint: true },
+  additive: { readOnlyHint: false, destructiveHint: false },
+  destructive: { readOnlyHint: false, destructiveHint: true },
+};
+
+/** 用途が近く取り違えやすいため、説明で互いを名指しして使い分けを示すツールの組。 */
+const SIBLING_GROUPS = [
+  ["tasks.list", "tasks.listActive", "tasks.search"],
+  ["lists.archive", "lists.clear", "lists.delete", "lists.merge"],
+  [
+    "timers.pause",
+    "timers.stop",
+    "timers.reset",
+    "timers.setTime",
+    "timers.adjust",
+  ],
+  ["calories.summary", "calories.listRecords", "calories.listItems"],
+] as const;
+
+/** Claude Codeが初期送信でツール説明とinstructionsを切り詰める文字数。 */
+const MAX_DESCRIPTION_LENGTH = 4096;
+
+const AUTH_INFO: AuthInfo = {
+  token: "test-token",
+  clientId: "test-client",
+  scopes: [],
+  extra: { userId: 42 },
 };
 
 async function createClient(authInfo?: AuthInfo) {
@@ -167,27 +172,91 @@ async function createClient(authInfo?: AuthInfo) {
   return { client, server };
 }
 
-describe("利用者設定MCPツール", () => {
+describe("MCPツール", () => {
   beforeEach(() => {
     preferences = {};
     vi.clearAllMocks();
   });
 
-  it("全ツールの名前・説明・入力プロパティを公開する", async () => {
+  it("全ツールが説明・タイトル・注釈・引数説明を公開する", async () => {
     const { client, server } = await createClient();
     try {
       const { tools } = await client.listTools();
-      expect(tools.map((tool) => tool.name).sort()).toEqual(
-        Object.keys(TOOL_CONTRACTS).sort(),
+      const toolNames = new Set(tools.map((tool) => tool.name));
+      expect([...toolNames].sort()).toEqual(Object.keys(TOOL_CONTRACTS).sort());
+
+      const instructions = client.getInstructions() ?? "";
+      expect(instructions).not.toBe("");
+      expect(instructions.length).toBeLessThanOrEqual(MAX_DESCRIPTION_LENGTH);
+
+      const namespaces = [
+        ...new Set([...toolNames].map((name) => name.split(".")[0])),
+      ];
+      const toolReference = new RegExp(
+        `\\b(?:${namespaces.join("|")})\\.[A-Za-z]+\\b`,
+        "g",
       );
       for (const tool of tools) {
-        const [description, properties] = TOOL_CONTRACTS[tool.name];
-        expect(tool.description, tool.name).toBe(description);
-        expect(
-          Object.keys(tool.inputSchema.properties ?? {}).sort(),
-          tool.name,
-        ).toEqual([...properties].sort());
+        const [kind, properties] = TOOL_CONTRACTS[tool.name];
+        const description = tool.description ?? "";
+        expect(description, tool.name).not.toBe("");
+        expect(description.length, tool.name).toBeLessThanOrEqual(
+          MAX_DESCRIPTION_LENGTH,
+        );
+        expect(tool.title, tool.name).toMatch(/\S/);
+        expect(tool.annotations, tool.name).toEqual(EXPECTED_ANNOTATIONS[kind]);
+        for (const reference of [
+          ...description.matchAll(toolReference),
+          ...instructions.matchAll(toolReference),
+        ]) {
+          expect(toolNames, `${tool.name}: ${reference[0]}`).toContain(
+            reference[0],
+          );
+        }
+
+        const inputProperties = (tool.inputSchema.properties ?? {}) as Record<
+          string,
+          { description?: string }
+        >;
+        expect(Object.keys(inputProperties).sort(), tool.name).toEqual(
+          [...properties].sort(),
+        );
+        for (const [property, schema] of Object.entries(inputProperties)) {
+          expect(schema.description, `${tool.name}.${property}`).toMatch(/\S/);
+        }
       }
+
+      const descriptions = new Map(
+        tools.map((tool) => [tool.name, tool.description ?? ""]),
+      );
+      for (const group of SIBLING_GROUPS) {
+        for (const name of group) {
+          for (const sibling of group.filter((other) => other !== name)) {
+            expect(descriptions.get(name), name).toContain(sibling);
+          }
+        }
+      }
+    } finally {
+      await client.close();
+      await server.close();
+    }
+  });
+
+  it("リスト一覧は指定した表示範囲で取得する", async () => {
+    const { client, server } = await createClient(AUTH_INFO);
+    try {
+      const result = await client.callTool({
+        name: "lists.list",
+        arguments: { showType: "archived" },
+      });
+      expect(result.isError).toBeFalsy();
+      expect(listLists).toHaveBeenCalledWith(42, "archived");
+      expect(result.content).toEqual([
+        {
+          type: "text",
+          text: JSON.stringify([{ id: 1, title: "仕事" }], null, 2),
+        },
+      ]);
     } finally {
       await client.close();
       await server.close();
