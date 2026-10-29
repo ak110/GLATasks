@@ -120,7 +120,7 @@ export const UpdateTaskSchema = z
       .nullable()
       .optional()
       .describe(
-        "完了日時（ISO 8601形式のUTC）を上書きする。null で消去する。省略時は status の変更に従う",
+        "完了日時（ISO 8601形式のUTC）を上書きする。null で消去する。省略時は status の変更に従う。単独では指定できず、text・status・moveTo・tags・kind のいずれかと一緒に渡す",
       ),
     moveTo: z
       .number()
@@ -484,10 +484,10 @@ export const UpdateTimerSchema = z
       .optional()
       .describe("新しいタイマー名（255文字以内）"),
     mode: TimerModeSchema.optional().describe(
-      "新しいモード。alarm へ変える場合は targetMinutes と tzOffsetMinutes、countdown へ変える場合は baseSeconds も指定する",
+      "新しいモード。alarm を指定する場合は targetMinutes と tzOffsetMinutes、countdown を指定する場合は baseSeconds も必須。モードを変えると残り時間も新しいモードの値に置き換わる",
     ),
     baseSeconds: TimerSecondsSchema.optional().describe(
-      "カウントダウンの時間（秒、0～359999）。リセット時に戻る時間を変え、現在の残り時間は変えない",
+      "カウントダウンの時間（秒、0～359999）。モードを変えない場合はリセット時に戻る時間だけを変え、現在の残り時間は変えない。alarm から countdown へ変える場合は残り時間もこの値にする",
     ),
     targetMinutes: z
       .number()
@@ -499,7 +499,7 @@ export const UpdateTimerSchema = z
         "アラームの目標時刻を0時からの分数で表す（0～1439。7時30分は450）",
       ),
     tzOffsetMinutes: TimezoneOffsetSchema.optional().describe(
-      "目標時刻を解釈するUTCからの時差（分）。日本時間は540。targetMinutes を指定する場合に渡す",
+      "目標時刻を解釈するUTCからの時差（分）。日本時間は540。アラームで targetMinutes と一緒に渡すと、残り時間を新しい目標時刻から計算し直す",
     ),
     adjustMinutes: TimerAdjustMinutesSchema.optional().describe(
       "画面の延長・短縮ボタン1回分の分数（1～999）",

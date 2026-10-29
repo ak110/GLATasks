@@ -144,7 +144,8 @@ export function createMcpServer(): McpServer {
     "lists.rename",
     {
       title: "リスト名の変更",
-      description: "指定したリストの名前を変更する。",
+      description:
+        "指定したリストの名前を変更する。成功すると success: true だけを返す。",
       inputSchema: UpdateListSchema,
       annotations: DESTRUCTIVE,
     },
@@ -163,7 +164,7 @@ export function createMcpServer(): McpServer {
         "リストと、そのリストの全タスク・添付ファイル・定期TODOを削除する。削除したものは元に戻せない。" +
         "存在しないリストを指定しても成功し、何も変えない。" +
         "リストを残して一覧から外すには lists.archive、完了済みタスクだけを片付けるには lists.clear、" +
-        "タスクを別のリストへ移してから元のリストを消すには lists.merge を使う。",
+        "タスクを別のリストへ移してから元のリストを消すには lists.merge を使う。成功すると success: true だけを返す。",
       inputSchema: UpdateListSchema.pick({ listId: true }),
       annotations: DESTRUCTIVE,
     },
@@ -182,7 +183,7 @@ export function createMcpServer(): McpServer {
         "リストをアーカイブ済みにし、使用中のリストの一覧と tasks.listActive の対象から外す。" +
         "タスクは削除せず、lists.unarchive で使用中に戻せる。" +
         "リスト内の完了済みタスクだけをアーカイブするには lists.clear、リストごと削除するには lists.delete、" +
-        "タスクを別のリストへ統合するには lists.merge を使う。",
+        "タスクを別のリストへ統合するには lists.merge を使う。成功すると success: true だけを返す。",
       inputSchema: UpdateListSchema.pick({ listId: true }),
       annotations: DESTRUCTIVE,
     },
@@ -197,7 +198,8 @@ export function createMcpServer(): McpServer {
     "lists.unarchive",
     {
       title: "リストのアーカイブ解除",
-      description: "アーカイブ済みのリストを使用中（active）に戻す。",
+      description:
+        "アーカイブ済みのリストを使用中（active）に戻す。成功すると success: true だけを返す。",
       inputSchema: UpdateListSchema.pick({ listId: true }),
       annotations: DESTRUCTIVE,
     },
@@ -216,7 +218,7 @@ export function createMcpServer(): McpServer {
         "リスト内の完了済み（completed）タスクをまとめてアーカイブし、リストと未完了のタスクは残す。" +
         "アーカイブしたタスクは tasks.list の showType を archived にすると取得できる。" +
         "リスト自体をアーカイブするには lists.archive、リストを削除するには lists.delete、" +
-        "別のリストへ統合するには lists.merge を使う。",
+        "別のリストへ統合するには lists.merge を使う。成功すると success: true だけを返す。",
       inputSchema: UpdateListSchema.pick({ listId: true }),
       annotations: DESTRUCTIVE,
     },
@@ -236,7 +238,7 @@ export function createMcpServer(): McpServer {
         "両方とも使用中（active）のリストである必要がある。" +
         "統合後のタスクは各リスト内の順序を保ち、更新日時の新しい順に交互に並ぶ。" +
         "タスクを移さずにリストを消すには lists.delete、リストを残して一覧から外すには lists.archive、" +
-        "完了済みタスクの片付けには lists.clear を使う。",
+        "完了済みタスクの片付けには lists.clear を使う。成功すると success: true だけを返す。",
       inputSchema: MergeListSchema,
       annotations: DESTRUCTIVE,
     },
@@ -314,7 +316,7 @@ export function createMcpServer(): McpServer {
       description:
         "既存タスクの本文・状態・完了日時・タグ・種別を変更するか、別のリストへ移動する。指定した項目だけを更新する。" +
         "status を completed にすると完了日時を記録する。" +
-        "MCPからタスクは削除できないため、不要なタスクは status を archived にする。",
+        "MCPからタスクは削除できないため、不要なタスクは status を archived にする。成功すると success: true だけを返す。",
       inputSchema: UpdateTaskSchema,
       annotations: DESTRUCTIVE,
     },
@@ -351,7 +353,7 @@ export function createMcpServer(): McpServer {
       title: "タスクの並べ替え",
       description:
         "taskIds に並べた順で、リスト内のタスクの並び順を付け直す。" +
-        "通常はリスト内の全タスクのIDを指定する。他のリストのタスクのIDは無視する。",
+        "通常はリスト内の全タスクのIDを指定する。他のリストのタスクのIDは無視する。成功すると success: true だけを返す。",
       inputSchema: ReorderTasksSchema,
       annotations: DESTRUCTIVE,
     },
@@ -390,7 +392,7 @@ export function createMcpServer(): McpServer {
       description:
         "カウントダウンタイマー（mode: countdown）またはアラーム（mode: alarm）を一覧の末尾に作成する。" +
         "アラームと1回限りのタイマー（ephemeral: true）は作成と同時に開始し、それ以外は停止状態で作成する。" +
-        "作成したタイマーのIDは返さないため、timers.list で取得する。",
+        "成功すると success: true だけを返し、作成したタイマーのIDは含まないため、IDは timers.list で取得する。",
       inputSchema: CreateTimerSchema,
       annotations: ADDITIVE,
     },
@@ -408,7 +410,7 @@ export function createMcpServer(): McpServer {
       description:
         "タイマーの名前・モード・時間・延長幅・鳴動時間を変更する。指定した項目だけを更新する。" +
         "モードの変更は停止中だけ受け付ける。" +
-        "今回の残り時間だけを変えるには timers.setTime または timers.adjust を使う。",
+        "今回の残り時間だけを変えるには timers.setTime または timers.adjust を使う。成功すると success: true だけを返す。",
       inputSchema: UpdateTimerSchema,
       annotations: DESTRUCTIVE,
     },
@@ -423,7 +425,8 @@ export function createMcpServer(): McpServer {
     "timers.delete",
     {
       title: "タイマーの削除",
-      description: "指定したタイマーを削除する。",
+      description:
+        "指定したタイマーを削除する。成功すると success: true だけを返す。",
       inputSchema: TimerIdSchema,
       annotations: DESTRUCTIVE,
     },
@@ -441,7 +444,7 @@ export function createMcpServer(): McpServer {
       description:
         "停止中のタイマーを現在の残り時間から開始する。" +
         "アラームは開始時に目標時刻までの秒数を計算し直すため tzOffsetMinutes が必要になる。" +
-        "実行中のタイマーと残り0秒のカウントダウンには何もしない。",
+        "実行中のタイマーと残り0秒のカウントダウンには何もしない。成功すると success: true だけを返す。",
       inputSchema: StartTimerSchema,
       annotations: DESTRUCTIVE,
     },
@@ -459,7 +462,7 @@ export function createMcpServer(): McpServer {
       description:
         "実行中のタイマーを一時停止し、その時点の残り時間を保つ。timers.start で再開できる。" +
         "残り0秒の満了状態にして止めるには timers.stop、初期の時間へ戻すには timers.reset、" +
-        "残り時間を指定した値にするには timers.setTime、分単位で増減するには timers.adjust を使う。",
+        "残り時間を指定した値にするには timers.setTime、分単位で増減するには timers.adjust を使う。成功すると success: true だけを返す。",
       inputSchema: TimerIdSchema,
       annotations: DESTRUCTIVE,
     },
@@ -479,7 +482,7 @@ export function createMcpServer(): McpServer {
         "カウントダウンは baseSeconds に戻し、停止中で既に baseSeconds と同じなら0秒にする（交互に切り替わる）。" +
         "アラームは次の目標時刻までの秒数に戻すため tzOffsetMinutes が必要になる。" +
         "残り時間を保って止めるには timers.pause、満了状態にして止めるには timers.stop、" +
-        "残り時間を指定した値にするには timers.setTime、分単位で増減するには timers.adjust を使う。",
+        "残り時間を指定した値にするには timers.setTime、分単位で増減するには timers.adjust を使う。成功すると success: true だけを返す。",
       inputSchema: ResetTimerSchema,
       annotations: DESTRUCTIVE,
     },
@@ -498,7 +501,7 @@ export function createMcpServer(): McpServer {
         "タイマーの残り時間を minutes 分だけ増減する。実行中でも使え、残り時間は0秒未満にならない。" +
         "アラームでは目標時刻も同じ分だけずらす。" +
         "残り時間を指定した値にするには timers.setTime、初期の時間へ戻すには timers.reset、" +
-        "一時停止には timers.pause、満了状態にして止めるには timers.stop を使う。",
+        "一時停止には timers.pause、満了状態にして止めるには timers.stop を使う。成功すると success: true だけを返す。",
       inputSchema: AdjustTimerSchema,
       annotations: DESTRUCTIVE,
     },
@@ -518,7 +521,7 @@ export function createMcpServer(): McpServer {
         "アラームで targetMinutes と tzOffsetMinutes を渡すと、目標時刻を変えて残り時間をその時刻から計算する。" +
         "実行中のタイマーには使えない。" +
         "現在の残り時間から増減するには timers.adjust、初期の時間へ戻すには timers.reset、" +
-        "一時停止には timers.pause、満了状態にして止めるには timers.stop を使う。",
+        "一時停止には timers.pause、満了状態にして止めるには timers.stop を使う。成功すると success: true だけを返す。",
       inputSchema: SetTimerTimeSchema,
       annotations: DESTRUCTIVE,
     },
@@ -537,7 +540,7 @@ export function createMcpServer(): McpServer {
         "実行中のタイマーを残り0秒の満了状態（expired: true）にして止める。" +
         "画面が残り0秒に達したタイマーへ使う操作で、停止中のタイマーには何もしない。" +
         "残り時間を保って止めるには timers.pause、初期の時間へ戻すには timers.reset を使い、" +
-        "残り時間を変えるには timers.setTime か timers.adjust を使う。",
+        "残り時間を変えるには timers.setTime か timers.adjust を使う。成功すると success: true だけを返す。",
       inputSchema: TimerStopSchema,
       annotations: DESTRUCTIVE,
     },
@@ -553,7 +556,7 @@ export function createMcpServer(): McpServer {
     {
       title: "タイマーの並べ替え",
       description:
-        "timerIds に並べた順でタイマーを並べ替える。利用者の全タイマーのIDを過不足なく指定する。",
+        "timerIds に並べた順でタイマーを並べ替える。利用者の全タイマーのIDを過不足なく指定する。成功すると success: true だけを返す。",
       inputSchema: ReorderTimersSchema,
       annotations: DESTRUCTIVE,
     },
@@ -644,7 +647,7 @@ export function createMcpServer(): McpServer {
     {
       title: "利用者設定の更新",
       description:
-        "新規タイマーの既定値とカロリーの1日の目標値のうち、指定した項目だけを更新する。省略した項目は現在の値を保つ。",
+        "新規タイマーの既定値とカロリーの1日の目標値のうち、指定した項目だけを更新する。省略した項目は現在の値を保つ。成功すると success: true だけを返す。",
       inputSchema: UserPreferencesSchema,
       annotations: DESTRUCTIVE,
     },
