@@ -1,4 +1,5 @@
 [tools]
+pinact = "latest"
 typos = "latest"
 
 # actionlintの配布物はインストールrootへ実行ファイルと並んで`man`・`docs`のディレクトリを展開する。
