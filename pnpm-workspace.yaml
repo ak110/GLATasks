@@ -34,6 +34,9 @@ overrides:
   "micromark-extension-math@3.1.0>katex": 0.18.2
   nanoid@<3.3.18: ^3.3.18
   postcss@<8.5.18: ^8.5.18
+  # GHSA-gg6h-894w-4m9c: markdownlintがre2jsの脆弱な版を完全固定しているため上書きする。
+  # markdownlintが修正版を要求するようになったら撤去できる。
+  re2js@>=2.2.0 <2.8.7: ^2.8.7
   smol-toml@<1.9.0: ^1.9.0
 # GHSA-vfj7-8cjw-p6xm: braces 3.0.3（文書lintのmarkdownlint-cli2・globby・fast-glob経由）は
 # ASTと入れ子配列を再帰で走査し、深い入れ子で呼出スタックを使い果たす。修正版が未公開のため、
