@@ -24,6 +24,9 @@ overrides:
   cookie@<0.7.0: ^0.7.0
   esbuild@<0.28.1: ^0.28.1
   fast-uri@<3.1.9: ^3.1.9
+  # GHSA-3g3m-2fjr-6pw4: textlintのglob検索・除外を回帰テストで確認済み。
+  # textlintが修正版を要求するようになったら撤去できる。
+  glob@>=9.0.0 <=14.0.1: ^14.0.2
   hono@<4.12.34: ^4.12.34
   js-yaml@<4.3.0: ^4.3.0
   linkify-it@<5.0.2: ^5.0.2
@@ -32,6 +35,9 @@ overrides:
   # GHSA-238p-pmpm-9mq7: micromark-extension-math 3.1.0の要求範囲katex ^0.16.0では修正版0.18.2へ到達しない。
   # micromark-extension-mathが修正版を要求するようになったら撤去できる。
   "micromark-extension-math@3.1.0>katex": 0.18.2
+  # GHSA-g3hv-75wg-m249: ESLint・typescript-estreeの利用APIは11系にも残る。
+  # 依存元が修正版を要求するようになったら撤去できる。globも対応する14系へ更新する。
+  minimatch@<11.0.1: ^11.0.1
   nanoid@<3.3.18: ^3.3.18
   postcss@<8.5.18: ^8.5.18
   # GHSA-gg6h-894w-4m9c: markdownlintがre2jsの脆弱な版を完全固定しているため上書きする。
