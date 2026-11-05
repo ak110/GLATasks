@@ -30,6 +30,7 @@
     import { groupSearchResultsByList } from "#lib/client/search/search-grouping.ts";
     import { compareTagName } from "#lib/tag-sort.ts";
     import Header from "#lib/components/layout/Header.svelte";
+    import { grayButtonClass } from "#lib/components/ui/styles.ts";
     import ListSidebar from "#lib/components/lists/ListSidebar.svelte";
     import TaskList from "#lib/components/tasks/TaskList.svelte";
     import TaskAddForm from "#lib/components/tasks/TaskAddForm.svelte";
@@ -126,6 +127,9 @@
             (state.showType === "archived" && archivedTasksQuery.isLoading),
     );
     const isSearching = $derived(state.debouncedQuery.length > 0);
+    const displayedTasksQuery = $derived(
+        state.showType === "archived" ? archivedTasksQuery : tasksQuery,
+    );
     const searchResults = $derived(searchResultsQuery.data ?? []);
     // 検索結果をリスト名でグループ化
     const searchResultsByList = $derived.by(() => {
@@ -136,6 +140,7 @@
         queryClient,
         state,
         () => lists,
+        () => listsQuery.isSuccess,
     );
 
     async function addList() {
@@ -215,23 +220,25 @@
     function openEditDialog(task: TaskListItem) {
         const text = task.notes ? `${task.title}\n\n${task.notes}` : task.title;
         state.dialogs.editDialog = {
+            sessionId: state.dialogs.editDialog.sessionId + 1,
             open: true,
             listId: state.selectedListId!,
             taskId: task.id,
             text,
             moveTo: String(state.selectedListId!),
             completed: task.status === "completed",
+            savedCompleted: task.status === "completed",
             tags: task.tags,
             kind: task.kind,
         };
     }
 
-    async function submitTaskEdit(data: TaskEditSubmission) {
-        const {
-            listId,
-            taskId,
-            completed: wasCompleted,
-        } = state.dialogs.editDialog;
+    async function submitTaskEdit(
+        data: TaskEditSubmission,
+        isCurrent: () => boolean,
+    ) {
+        const session = state.dialogs.editDialog;
+        const { listId, taskId, savedCompleted: wasCompleted } = session;
 
         // 完了状態の変更（toggleTask と同じロジック）
         const statusChange =
@@ -257,24 +264,30 @@
                 ...statusChange,
             });
 
-            if (data.closeAfter) {
-                state.dialogs.editDialog.open = false;
-            } else {
-                // 保存後もダイアログを開いたままにする経路では、後続保存時の statusChange 判定や
-                // 対象リスト判定が古い値で行われないよう、保持値を保存後の値へ同期する
-                state.dialogs.editDialog.listId = Number(data.moveTo);
-                state.dialogs.editDialog.completed = data.completed;
-                state.dialogs.editDialog.text = data.text;
-                state.dialogs.editDialog.moveTo = data.moveTo;
-                state.dialogs.editDialog.tags = data.tags;
-                state.dialogs.editDialog.kind = data.kind;
+            if (state.dialogs.editDialog === session && session.open) {
+                // 次の更新は直前の保存先と完了状態へ送る。入力のbaselineとは寿命が異なる。
+                session.listId = Number(data.moveTo);
+                session.savedCompleted = data.completed;
+            }
+            if (
+                state.dialogs.editDialog === session &&
+                session.open &&
+                isCurrent()
+            ) {
+                session.completed = data.completed;
+                session.text = data.text;
+                session.moveTo = data.moveTo;
+                session.tags = data.tags;
+                session.kind = data.kind;
             }
 
             if (Number(data.moveTo) !== listId) {
                 queryClient.invalidateQueries({ queryKey: queryKeys.lists });
             }
+            return true;
         } catch {
             // グローバルエラーハンドラがトースト表示を担当
+            return false;
         }
     }
 
@@ -349,6 +362,7 @@
         const count =
             cache?.tasks.filter((t) => t.listId === listId).length ?? 0;
         state.dialogs.mergeDialog = {
+            pending: false,
             open: true,
             sourceListId: listId,
             sourceTitle: list.title,
@@ -356,17 +370,27 @@
         };
     }
 
-    async function submitMerge(targetListId: number) {
+    async function submitMerge(targetListId: number, isCurrent: () => boolean) {
+        const session = state.dialogs.mergeDialog;
+        if (session.pending) return;
+        session.pending = true;
         try {
             await mergeListMutation.mutateAsync({
-                sourceListId: state.dialogs.mergeDialog.sourceListId,
+                sourceListId: session.sourceListId,
                 targetListId,
             });
-            state.dialogs.mergeDialog.open = false;
-            // 統合先リストを自動選択
-            selectList(targetListId);
+            if (
+                state.dialogs.mergeDialog === session &&
+                session.open &&
+                isCurrent()
+            ) {
+                session.open = false;
+                selectList(targetListId);
+            }
         } catch {
             // グローバルエラーハンドラがトースト表示を担当
+        } finally {
+            session.pending = false;
         }
     }
 
@@ -437,6 +461,17 @@
     onSearchChange={(q) => (state.searchQuery = q)}
 />
 
+{#if listsQuery.isError && listsQuery.data === undefined}
+    <div role="alert" class="p-4 text-red-600 dark:text-red-400">
+        <p>リストを取得できませんでした。</p>
+        <button
+            type="button"
+            class={grayButtonClass}
+            onclick={() => void listsQuery.refetch()}>再試行</button
+        >
+    </div>
+{/if}
+
 <!-- ボディ: サイドバー + メインコンテンツ -->
 <!--
     レスポンシブ幅はbootstrapのcontainer風に各ブレークポイントで細かく刻む方法もあるが、
@@ -479,9 +514,14 @@
                 query={state.debouncedQuery}
                 {searchResultsByList}
                 isLoading={searchResultsQuery.isLoading}
+                error={searchResultsQuery.isError &&
+                searchResultsQuery.data === undefined
+                    ? "検索結果を取得できませんでした。"
+                    : undefined}
+                onRetry={() => void searchResultsQuery.refetch()}
                 onGoToResult={goToSearchResult}
             />
-        {:else if state.selectedListId !== null}
+        {:else if state.selectedListId !== null && lists.some((list) => list.id === state.selectedListId)}
             {@const selectedList = lists.find(
                 (l) => l.id === state.selectedListId,
             )}
@@ -502,7 +542,12 @@
             <TaskList
                 bind:this={state.taskList}
                 {tasks}
-                isLoading={tasksQuery.isLoading}
+                isLoading={displayedTasksQuery.isLoading}
+                error={displayedTasksQuery.isError &&
+                displayedTasksQuery.data === undefined
+                    ? "タスクを取得できませんでした。"
+                    : undefined}
+                onRetry={() => void displayedTasksQuery.refetch()}
                 onToggle={toggleTask}
                 onEdit={openEditDialog}
                 onReorder={handleReorderTasks}
@@ -523,6 +568,7 @@
 <TaskEditDialog
     {lists}
     open={state.dialogs.editDialog.open}
+    sessionId={state.dialogs.editDialog.sessionId}
     text={state.dialogs.editDialog.text}
     moveTo={state.dialogs.editDialog.moveTo}
     completed={state.dialogs.editDialog.completed}
@@ -543,6 +589,7 @@
 />
 
 <MergeListDialog
+    session={state.dialogs.mergeDialog}
     open={state.dialogs.mergeDialog.open}
     sourceList={{
         id: state.dialogs.mergeDialog.sourceListId,
@@ -550,6 +597,7 @@
     }}
     allLists={lists}
     taskCount={state.dialogs.mergeDialog.taskCount}
+    submitting={state.dialogs.mergeDialog.pending}
     onSubmit={submitMerge}
     onClose={() => (state.dialogs.mergeDialog.open = false)}
 />

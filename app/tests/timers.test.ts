@@ -39,6 +39,191 @@ test.describe("timers", () => {
     await expect(page.locator('[data-testid="timer-add-btn"]')).toBeVisible();
   });
 
+  test("タイマー状態回帰: 別タイマーの実行中も再満了を通知する", async ({
+    page,
+  }) => {
+    const names = [uniqueTestName("通知再実行"), uniqueTestName("実行継続")];
+    const cards = names.map((name) =>
+      page.getByTestId("timer-card").filter({ hasText: name }),
+    );
+    try {
+      for (const [index, name] of names.entries()) {
+        await page.getByTestId("timer-add-btn").click();
+        await page.getByTestId("timer-name-input").fill(name);
+        await page
+          .getByTestId("timer-base-time-input")
+          .fill(index === 0 ? "00:00:02" : "00:10:00");
+        await page.getByTestId("timer-adjust-input").fill("1");
+        await page.getByTestId("timer-ring-seconds-input").fill("1");
+        await page.getByTestId("timer-submit-btn").click();
+        await expect(cards[index]).toBeVisible();
+      }
+      await cards[1].getByTestId("timer-start-btn").click();
+      await expect(cards[1].getByTestId("timer-pause-btn")).toBeVisible();
+      await cards[0].getByTestId("timer-start-btn").click();
+      const toast = page.getByText(`${names[0]} 完了`, { exact: true });
+      await expect(toast).toBeVisible({ timeout: 10000 });
+      await toast
+        .locator("..")
+        .getByRole("button", { name: "タイマー完了の通知を閉じる" })
+        .click();
+      await expect(toast).not.toBeVisible();
+      await cards[0].getByTestId("timer-reset-btn").click();
+      await expect(cards[0].getByTestId("timer-display")).toHaveText(
+        "00:00:02",
+      );
+      await cards[0].getByTestId("timer-start-btn").click();
+      await expect(toast).toBeVisible({ timeout: 10000 });
+      await expect(cards[1].getByTestId("timer-pause-btn")).toBeVisible();
+    } finally {
+      for (const card of cards)
+        if (await card.count()) await deleteTimerCard(page, card);
+    }
+  });
+
+  test("タイマー状態回帰: 保存応答は新しい編集セッションを閉じない", async ({
+    page,
+  }) => {
+    const names = [uniqueTestName("編集A"), uniqueTestName("編集B")];
+    const cards = names.map((name) =>
+      page.getByTestId("timer-card").filter({ hasText: name }),
+    );
+    let release = () => {};
+    try {
+      for (const [index, name] of names.entries()) {
+        await page.getByTestId("timer-add-btn").click();
+        await page.getByTestId("timer-name-input").fill(name);
+        await page.getByTestId("timer-base-time-input").fill("00:05:00");
+        await page.getByTestId("timer-adjust-input").fill("1");
+        await page.getByTestId("timer-submit-btn").click();
+        await expect(cards[index]).toBeVisible();
+      }
+      const held = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      let received = () => {};
+      const started = new Promise<void>((resolve) => {
+        received = resolve;
+      });
+      await page.route("**/api/trpc/**", async (route) => {
+        if (
+          route.request().method() !== "POST" ||
+          !route.request().url().includes("timers.update")
+        )
+          return route.continue();
+        const response = await route.fetch();
+        received();
+        await held;
+        await route.fulfill({ response });
+      });
+      await cards[0].getByTestId("timer-edit-btn").click();
+      await page.getByTestId("timer-submit-btn").click();
+      await started;
+      await page.keyboard.press("Escape");
+      await cards[1].getByTestId("timer-edit-btn").click();
+      await expect(page.getByTestId("timer-name-input")).toHaveValue(names[1]);
+      const completed = page.waitForResponse(
+        (response) =>
+          response.url().includes("timers.update") &&
+          response.request().method() === "POST",
+      );
+      release();
+      await completed;
+      await expect(
+        page.getByRole("dialog", { name: "タイマー編集" }),
+      ).toBeVisible();
+      await expect(page.getByTestId("timer-name-input")).toHaveValue(names[1]);
+    } finally {
+      release();
+      await page.unroute("**/api/trpc/**");
+      await page.keyboard.press("Escape");
+      for (const card of cards)
+        if (await card.count()) await deleteTimerCard(page, card);
+    }
+  });
+
+  test("タイマー状態回帰: 初回取得エラーから再試行できる", async ({ page }) => {
+    await page.route("**/api/trpc/**", async (route) => {
+      if (route.request().url().includes("timers.list"))
+        return route.fulfill({ status: 500 });
+      return route.continue();
+    });
+    await page.reload();
+    const retry = page.getByRole("button", { name: "再試行" });
+    await expect(retry).toBeVisible({ timeout: 15000 });
+    await expect(
+      page.getByText("タイマーがありません", { exact: true }),
+    ).not.toBeVisible();
+    await page.unroute("**/api/trpc/**");
+    await retry.click();
+    await expect(retry).not.toBeVisible();
+  });
+
+  test("タイマー入力回帰: 保存中の新入力を保持し二重送信を防ぐ", async ({
+    page,
+  }) => {
+    const name = uniqueTestName("入力保持");
+    const card = page.getByTestId("timer-card").filter({ hasText: name });
+    let release = () => {};
+    try {
+      await page.getByTestId("timer-add-btn").click();
+      await page.getByTestId("timer-name-input").fill(name);
+      await page.getByTestId("timer-base-time-input").fill("00:05:00");
+      await page.getByTestId("timer-adjust-input").fill("1");
+      await page.getByTestId("timer-submit-btn").click();
+      await expect(card).toBeVisible();
+      const held = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      let received = () => {};
+      const started = new Promise<void>((resolve) => {
+        received = resolve;
+      });
+      let mutationCount = 0;
+      await page.route("**/api/trpc/**", async (route) => {
+        if (
+          route.request().method() !== "POST" ||
+          !route.request().url().includes("timers.update")
+        )
+          return route.continue();
+        mutationCount++;
+        const response = await route.fetch();
+        received();
+        await held;
+        await route.fulfill({ response });
+      });
+      await card.getByTestId("timer-edit-btn").click();
+      await page.getByTestId("timer-submit-btn").click();
+      await started;
+      await expect(page.getByTestId("timer-submit-btn")).toBeDisabled();
+      await page.getByTestId("timer-name-input").fill("保存完了前の新入力");
+      await page
+        .getByTestId("timer-submit-btn")
+        .evaluate((button: HTMLButtonElement) =>
+          button.form?.dispatchEvent(
+            new Event("submit", { bubbles: true, cancelable: true }),
+          ),
+        );
+      const completed = page.waitForResponse(
+        (response) =>
+          response.url().includes("timers.update") &&
+          response.request().method() === "POST",
+      );
+      release();
+      await completed;
+      await expect(page.getByTestId("timer-name-input")).toHaveValue(
+        "保存完了前の新入力",
+      );
+      await expect(page.getByTestId("timer-submit-btn")).toBeEnabled();
+      expect(mutationCount).toBe(1);
+    } finally {
+      release();
+      await page.unroute("**/api/trpc/**");
+      await page.keyboard.press("Escape");
+      if (await card.count()) await deleteTimerCard(page, card);
+    }
+  });
+
   test("タイマーを追加すると一覧に表示される", async ({ page }) => {
     const timerName = `テスト_${uniqueTestName("e2e")}`;
 

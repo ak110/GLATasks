@@ -54,7 +54,43 @@
         filterKeywords,
         onClearFilter,
     }: Props = $props();
-    let editingId = $state<number | undefined>();
+    type Editing = {
+        session: symbol;
+        recordId: number;
+        keepTemporary: boolean;
+    };
+    type FormState =
+        | { kind: "add"; session: symbol; keepTemporary: boolean }
+        | (Editing & { kind: "edit" })
+        | (Editing & {
+              kind: "temporary";
+              conversion: { itemKcal: number; quantity: number; kcal: number };
+          })
+        | (Editing & {
+              kind: "regular";
+              conversion: {
+                  item: Item;
+                  previousKcal: number;
+                  quantity: number;
+              };
+          });
+    let form = $state<FormState>({
+        kind: "add",
+        session: Symbol(),
+        keepTemporary: false,
+    });
+    const editingId = $derived(form.kind === "add" ? undefined : form.recordId);
+    // 同名の品目があっても、編集・コピー元が一時項目ならその扱いを保持する
+    const keepTemporary = $derived(form.keepTemporary);
+    const conversion = $derived(
+        form.kind === "temporary" ? form.conversion : undefined,
+    );
+    const regularConversion = $derived(
+        form.kind === "regular" ? form.conversion : undefined,
+    );
+    let sending = $state<
+        { id: symbol; session: symbol; snapshot: string } | undefined
+    >();
     let openMenuId = $state<number | undefined>();
     let consumedAt = $state(formatLocalMinute(new Date()));
     // 追加欄の日時は現在時刻へ追従させ、手で修正した後は追加か取消までその値を保つ
@@ -65,15 +101,7 @@
         editingId === undefined ? addItemName : editItemName,
     );
     let quantity = $state("1");
-    // 一時項目の記録を編集・コピーした間は、同名の品目があっても一時項目のまま扱う
-    let keepTemporary = $state(false);
     let editForm = $state<HTMLFormElement | undefined>();
-    let conversion = $state<
-        { itemKcal: number; quantity: number; kcal: number } | undefined
-    >();
-    let regularConversion = $state<
-        { item: Item; previousKcal: number; quantity: number } | undefined
-    >();
     const visibleRecords = $derived(
         records.filter((record) => {
             const name = record.itemName.toLowerCase();
@@ -108,15 +136,12 @@
     }
 
     function resetForm() {
-        editingId = undefined;
+        form = { kind: "add", session: Symbol(), keepTemporary: false };
         consumedAt = formatLocalMinute(new Date());
         consumedAtEdited = false;
         addItemName = "";
         editItemName = "";
         quantity = "1";
-        keepTemporary = false;
-        conversion = undefined;
-        regularConversion = undefined;
     }
 
     function setItemName(value: string) {
@@ -126,22 +151,29 @@
 
     function edit(record: RecordRow) {
         openMenuId = undefined;
-        editingId = record.id;
+        form = {
+            kind: "edit",
+            session: Symbol(),
+            recordId: record.id,
+            keepTemporary: record.temporary,
+        };
         consumedAt = formatLocalMinute(new Date(record.consumedAt));
         // 編集の開始で追加フォームの入力を破棄するため、検索も解除される
         addItemName = "";
         editItemName = record.itemName;
         quantity = String(record.quantity);
-        keepTemporary = record.temporary;
     }
 
     function copy(record: RecordRow) {
         openMenuId = undefined;
-        editingId = undefined;
+        form = {
+            kind: "add",
+            session: Symbol(),
+            keepTemporary: record.temporary,
+        };
         consumedAt = formatLocalMinute(new Date());
         addItemName = record.itemName;
         quantity = String(record.quantity);
-        keepTemporary = record.temporary;
     }
 
     function remove(record: RecordRow) {
@@ -168,9 +200,44 @@
             quantity: numericQuantity,
             tzOffsetMinutes: getUtcOffsetMinutes(),
         };
-        if (editingId === undefined) await onCreate(input);
-        else await onUpdate({ recordId: editingId, ...input });
-        resetForm();
+        await saveRecord(input);
+    }
+
+    function snapshot() {
+        return JSON.stringify([form, consumedAt, itemName, quantity]);
+    }
+
+    async function saveRecord(input: RecordInput) {
+        if (sending) return;
+        const request = {
+            id: Symbol(),
+            session: form.session,
+            snapshot: snapshot(),
+        };
+        const recordId = editingId;
+        sending = request;
+        try {
+            if (recordId === undefined) await onCreate(input);
+            else await onUpdate({ recordId, ...input });
+            if (
+                form.session === request.session &&
+                snapshot() === request.snapshot
+            )
+                resetForm();
+        } finally {
+            if (sending?.id === request.id) sending = undefined;
+        }
+    }
+
+    function cancelConversion() {
+        if (form.kind === "temporary" || form.kind === "regular") {
+            form = {
+                kind: "edit",
+                session: form.session,
+                recordId: form.recordId,
+                keepTemporary: form.keepTemporary,
+            };
+        }
     }
 
     /** 入力中の品目と数量から変換後のkcalを求め、確認ダイアログを開く */
@@ -182,47 +249,53 @@
             numericQuantity === undefined
         )
             return;
-        conversion = {
-            itemKcal: matchedItem.kcal,
-            quantity: numericQuantity,
-            kcal: matchedItem.kcal * numericQuantity,
+        if (form.kind === "add" || sending) return;
+        form = {
+            ...form,
+            kind: "temporary",
+            conversion: {
+                itemKcal: matchedItem.kcal,
+                quantity: numericQuantity,
+                kcal: matchedItem.kcal * numericQuantity,
+            },
         };
     }
 
     async function confirmConversion() {
         if (!conversion || editingId === undefined) return;
-        await onUpdate({
-            recordId: editingId,
+        await saveRecord({
             consumedAt: consumedAt,
             temporaryName: itemName.trim(),
             quantity: conversion.kcal,
             tzOffsetMinutes: getUtcOffsetMinutes(),
         });
-        resetForm();
     }
 
     function requestRegularConversion() {
         const kcal = parseQuantity();
         if (!editForm?.reportValidity() || !matchedItem || kcal === undefined)
             return;
-        regularConversion = {
-            item: matchedItem,
-            previousKcal: kcal,
-            quantity: 1,
+        if (form.kind === "add" || sending) return;
+        form = {
+            ...form,
+            kind: "regular",
+            conversion: {
+                item: matchedItem,
+                previousKcal: kcal,
+                quantity: 1,
+            },
         };
     }
 
     async function confirmRegularConversion(event: SubmitEvent) {
         event.preventDefault();
         if (!regularConversion || editingId === undefined) return;
-        await onUpdate({
-            recordId: editingId,
+        await saveRecord({
             consumedAt,
             itemId: regularConversion.item.id,
             quantity: regularConversion.quantity,
             tzOffsetMinutes: getUtcOffsetMinutes(),
         });
-        resetForm();
     }
 </script>
 
@@ -320,6 +393,7 @@
             <div class="flex gap-1">
                 <button
                     type="submit"
+                    disabled={sending !== undefined}
                     class="cursor-pointer rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700"
                     >追加</button
                 >
@@ -393,6 +467,7 @@
                     {/if}
                     <button
                         type="submit"
+                        disabled={sending !== undefined}
                         class="ml-auto cursor-pointer rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700"
                         >変更</button
                     >
@@ -408,13 +483,11 @@
                 confirmLabel="変換"
                 variant="danger"
                 onConfirm={confirmConversion}
-                onCancel={() => (conversion = undefined)}
+                onCancel={cancelConversion}
+                confirmDisabled={sending !== undefined}
             />
             {#if regularConversion}
-                <Dialog
-                    title="通常項目への変換"
-                    onClose={() => (regularConversion = undefined)}
-                >
+                <Dialog title="通常項目への変換" onClose={cancelConversion}>
                     <form class="p-6" onsubmit={confirmRegularConversion}>
                         <p class="mb-4 text-gray-700 dark:text-gray-200">
                             「{regularConversion.item
@@ -442,11 +515,12 @@
                         <div class="mt-6 flex justify-end gap-2">
                             <button
                                 type="button"
-                                onclick={() => (regularConversion = undefined)}
+                                onclick={cancelConversion}
                                 class={grayButtonClass}>キャンセル</button
                             >
                             <button
                                 type="submit"
+                                disabled={sending !== undefined}
                                 class="cursor-pointer rounded bg-blue-600 px-6 py-2 text-white hover:bg-blue-700"
                                 >変換</button
                             >
@@ -457,6 +531,7 @@
         </Dialog>
     {/if}
 
+    {#if sending}<p role="status">保存中…</p>{/if}
     <CalorieFilterStatus keywords={filterKeywords} onClear={onClearFilter} />
     <table class="w-full table-fixed text-left text-sm">
         <!-- 狭い画面でも品目の列幅を残すため、日時を2行にし、数値の列を詰める -->

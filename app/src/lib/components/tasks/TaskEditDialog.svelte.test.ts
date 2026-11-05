@@ -37,6 +37,7 @@ function makeDefaultProps() {
     listTagCandidates: [],
     lists: [{ id: 1, title: "テストリスト" }],
     taskId: 42,
+    sessionId: 1,
     attachments: [],
     onAttachmentChange: vi.fn(),
     onSubmit: vi.fn(),
@@ -46,9 +47,87 @@ function makeDefaultProps() {
 
 describe("TaskEditDialog", () => {
   beforeEach(() => {
-    createMutateMock.mockClear();
-    deleteMutateMock.mockClear();
+    createMutateMock.mockReset().mockResolvedValue({ success: true });
+    deleteMutateMock.mockReset().mockResolvedValue({ success: true });
   });
+
+  it("複数添付の途中で対象が切り替わっても全ファイルを開始時のタスクへ送る", async () => {
+    const props = makeDefaultProps();
+    const upload = Promise.withResolvers<{ success: boolean }>();
+    createMutateMock.mockReturnValueOnce(upload.promise);
+    const view = render(TaskEditDialog, { props });
+    const files = [new File(["a"], "a.txt"), new File(["b"], "b.txt")];
+    await fireEvent.change(document.querySelector('input[type="file"]')!, {
+      target: { files },
+    });
+    await waitFor(() => expect(createMutateMock).toHaveBeenCalledTimes(1));
+    await view.rerender({
+      ...props,
+      taskId: 99,
+      sessionId: 2,
+      text: "別タスク",
+    });
+    upload.resolve({ success: true });
+    await waitFor(() => expect(createMutateMock).toHaveBeenCalledTimes(2));
+    expect(createMutateMock.mock.calls.map((call) => call[0].taskId)).toEqual([
+      42, 42,
+    ]);
+    expect(screen.getByRole("textbox", { name: "内容" })).toHaveValue(
+      "別タスク",
+    );
+    expect(props.onAttachmentChange).not.toHaveBeenCalled();
+  });
+
+  it("保存待機中の再送を防ぎ、新入力を成功応答で閉じない", async () => {
+    const props = makeDefaultProps();
+    const save = Promise.withResolvers<boolean>();
+    props.onSubmit.mockReturnValue(save.promise);
+    render(TaskEditDialog, { props });
+    const button = screen.getByRole("button", { name: "保存して閉じる" });
+    await fireEvent.click(button);
+    await fireEvent.click(button);
+    expect(props.onSubmit).toHaveBeenCalledTimes(1);
+    await fireEvent.input(screen.getByRole("textbox", { name: "内容" }), {
+      target: { value: "保存後の新入力" },
+    });
+    save.resolve(true);
+    await waitFor(() => expect(button).not.toBeDisabled());
+    expect(props.onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole("textbox", { name: "内容" })).toHaveValue(
+      "保存後の新入力",
+    );
+  });
+
+  it("保存中に同じタスクを別セッションで開くと入力を初期化し古い成功で閉じない", async () => {
+    const props = makeDefaultProps();
+    const save = Promise.withResolvers<boolean>();
+    props.onSubmit.mockReturnValue(save.promise);
+    const view = render(TaskEditDialog, { props });
+    await fireEvent.click(
+      screen.getByRole("button", { name: "保存して閉じる" }),
+    );
+    await view.rerender({ ...props, sessionId: 2, text: "新セッション" });
+    save.resolve(true);
+    await waitFor(() =>
+      expect(screen.getByRole("textbox", { name: "内容" })).toHaveValue(
+        "新セッション",
+      ),
+    );
+    expect(props.onClose).not.toHaveBeenCalled();
+  });
+
+  it.each([true, false])(
+    "同じ入力の保存結果%sに応じて閉じる",
+    async (success) => {
+      const props = makeDefaultProps();
+      props.onSubmit.mockResolvedValue(success);
+      render(TaskEditDialog, { props });
+      const button = screen.getByRole("button", { name: "保存して閉じる" });
+      await fireEvent.click(button);
+      await waitFor(() => expect(button).not.toBeDisabled());
+      expect(props.onClose).toHaveBeenCalledTimes(success ? 1 : 0);
+    },
+  );
 
   it("open=true のときダイアログのヘッダーが表示される", () => {
     render(TaskEditDialog, { props: makeDefaultProps() });

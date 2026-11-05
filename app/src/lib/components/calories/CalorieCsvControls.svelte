@@ -27,16 +27,32 @@
 
     let { items, onExportRecords, onImportItems, onImportRecords }: Props =
         $props();
-    let pendingRecords = $state<
-        RouterInputs["calories"]["importRecords"]["rows"] | undefined
-    >();
-    let resultMessage = $state("");
+    type Rows = RouterInputs["calories"]["importRecords"]["rows"];
+    type ImportState =
+        | { kind: "idle" }
+        | { kind: "reading"; id: symbol }
+        | { kind: "confirm"; id: symbol; rows: Rows }
+        | { kind: "sendingItems"; id: symbol }
+        | { kind: "sendingRecords"; id: symbol; rows: Rows }
+        | { kind: "success" | "failure"; message: string };
+    let state = $state<ImportState>({ kind: "idle" });
+    const busy = $derived(
+        state.kind === "sendingItems" || state.kind === "sendingRecords",
+    );
+    const resultMessage = $derived(
+        state.kind === "success" || state.kind === "failure"
+            ? state.message
+            : "",
+    );
 
     function showError(error: unknown) {
-        resultMessage =
-            error instanceof Error
-                ? error.message
-                : "CSVを解析できません。CSVファイルを選び直して取り込み直してください";
+        state = {
+            kind: "failure",
+            message:
+                error instanceof Error
+                    ? error.message
+                    : "CSVを解析できません。CSVファイルを選び直して取り込み直してください",
+        };
     }
 
     function download(csv: string, filename: string) {
@@ -53,13 +69,17 @@
     async function importItems(event: Event) {
         const input = event.currentTarget as HTMLInputElement;
         const file = input.files?.[0];
-        if (!file) return;
-        resultMessage = "";
+        if (!file || busy) return;
+        const id = Symbol();
+        state = { kind: "sendingItems", id };
         try {
             const result = await onImportItems(
                 parseCalorieItemsCsv(await file.text()),
             );
-            resultMessage = `品目を${result.added}件追加し、${result.updated}件更新しました。`;
+            state = {
+                kind: "success",
+                message: `品目を${result.added}件追加し、${result.updated}件更新しました。`,
+            };
         } catch (error) {
             showError(error);
         } finally {
@@ -70,25 +90,36 @@
     async function chooseRecords(event: Event) {
         const input = event.currentTarget as HTMLInputElement;
         const file = input.files?.[0];
-        if (!file) return;
-        pendingRecords = undefined;
-        resultMessage = "";
+        if (!file || busy) return;
+        const id = Symbol();
+        state = { kind: "reading", id };
         try {
-            pendingRecords = parseCalorieRecordsCsv(await file.text());
+            const rows = parseCalorieRecordsCsv(await file.text());
+            if (state.kind === "reading" && state.id === id)
+                state = { kind: "confirm", id, rows };
         } catch (error) {
-            showError(error);
+            if (state.kind === "reading" && state.id === id) showError(error);
         } finally {
             input.value = "";
         }
     }
 
     async function confirmRecords() {
-        if (!pendingRecords) return;
-        const result = await onImportRecords(pendingRecords);
-        pendingRecords = undefined;
-        resultMessage = `記録を${result.added}件追加しました。`;
+        if (state.kind !== "confirm") return;
+        const request = { ...state, kind: "sendingRecords" as const };
+        state = request;
+        try {
+            const result = await onImportRecords(request.rows);
+            state = {
+                kind: "success",
+                message: `記録を${result.added}件追加しました。`,
+            };
+        } catch (error) {
+            showError(error);
+        }
     }
     async function exportRecords() {
+        const startedState = state;
         try {
             const records = await onExportRecords();
             download(
@@ -103,10 +134,14 @@
                 "カロリー記録.csv",
             );
         } catch (error) {
-            resultMessage =
-                error instanceof Error
-                    ? error.message
-                    : "CSVの取得に失敗しました。時間をおいてからエクスポートをやり直してください";
+            if (state === startedState)
+                state = {
+                    kind: "failure",
+                    message:
+                        error instanceof Error
+                            ? error.message
+                            : "CSVの取得に失敗しました。時間をおいてからエクスポートをやり直してください",
+                };
         }
     }
 </script>
@@ -138,6 +173,7 @@
             品目をインポート
             <input
                 type="file"
+                disabled={busy}
                 accept=".csv,text/csv"
                 onchange={importItems}
                 class="sr-only"
@@ -148,6 +184,7 @@
             記録をインポート
             <input
                 type="file"
+                disabled={busy}
                 accept=".csv,text/csv"
                 onchange={chooseRecords}
                 class="sr-only"
@@ -155,6 +192,7 @@
             />
         </label>
     </div>
+    {#if busy}<p role="status">取り込み中…</p>{/if}
     {#if resultMessage}<p
             class="mt-3 text-sm text-gray-700 dark:text-gray-200"
             role="status"
@@ -164,10 +202,13 @@
 </section>
 
 <ConfirmDialog
-    open={pendingRecords !== undefined}
+    open={state.kind === "confirm"}
+    confirmDisabled={busy}
     title="記録CSVのインポート"
     message="記録CSVは既存の記録へ追記されます。同じCSVを再度取り込むと記録が重複します。取り込みますか？"
     confirmLabel="取り込む"
     onConfirm={confirmRecords}
-    onCancel={() => (pendingRecords = undefined)}
+    onCancel={() => {
+        if (state.kind === "confirm") state = { kind: "idle" };
+    }}
 />

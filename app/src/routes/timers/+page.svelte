@@ -1,5 +1,6 @@
 <script lang="ts">
     import { subscribeQueryEvents } from "#lib/client/query-sync.ts";
+    import { onMount } from "svelte";
     import {
         timersOptions,
         preferencesOptions,
@@ -27,6 +28,7 @@
     import { SSE_EVENTS } from "#lib/sse-events.ts";
     import type { TimerInfo, TimersResult } from "#lib/types.ts";
     import Header from "#lib/components/layout/Header.svelte";
+    import { grayButtonClass } from "#lib/components/ui/styles.ts";
     import PageScrollArea from "#lib/components/layout/PageScrollArea.svelte";
     import TimerCard from "#lib/components/timers/TimerCard.svelte";
     import TimerEditDialog from "#lib/components/timers/TimerEditDialog.svelte";
@@ -36,6 +38,7 @@
 
     // ダイアログ状態
     type DialogState = {
+        session: number;
         open: boolean;
         mode: "create" | "edit";
         ephemeral: boolean;
@@ -48,6 +51,7 @@
         ringSeconds: number;
     };
     let dialog = $state<DialogState>({
+        session: 0,
         open: false,
         mode: "create",
         ephemeral: false,
@@ -59,6 +63,9 @@
         adjustMinutes: TIMER_DEFAULT_ADJUST_MINUTES,
         ringSeconds: TIMER_DEFAULT_RING_SECONDS,
     });
+    let nextSession = 0;
+    let inputSnapshot = "";
+    let saving = $state.raw<{ session: number; snapshot: string }>();
 
     // タイマー削除確認ダイアログの状態
     // open=true の場合のみ timer が有効な値を持つ前提で管理する
@@ -168,6 +175,7 @@
 
     // D&D 状態管理（createDragReorder は派生状態 timersList を参照するためゲッター関数で渡す）
     const dnd = createDragReorder(() => timersList, handleReorderTimers);
+    onMount(() => () => dnd.dispose());
 
     /** タイマーの並び替え（楽観的更新 + API呼出） */
     function handleReorderTimers(timerIds: number[]) {
@@ -194,6 +202,7 @@
     function openCreateDialog(ephemeral: boolean = false) {
         const prefs = preferencesQuery.data ?? {};
         dialog = {
+            session: ++nextSession,
             open: true,
             mode: "create",
             ephemeral,
@@ -209,6 +218,7 @@
 
     function openEditDialog(timer: TimerInfo) {
         dialog = {
+            session: ++nextSession,
             open: true,
             mode: "edit",
             ephemeral: timer.ephemeral,
@@ -229,8 +239,16 @@
     }
 
     async function handleDialogSubmit(data: TimerFormSubmission) {
+        if (saving?.session === dialog.session) return;
+        const request = {
+            session: dialog.session,
+            snapshot: JSON.stringify(data),
+        };
+        const target = { ...dialog };
+        saving = request;
+        inputSnapshot = request.snapshot;
         try {
-            if (dialog.mode === "create") {
+            if (target.mode === "create") {
                 await createTimerMutation.mutateAsync({
                     name: data.name,
                     mode: data.mode,
@@ -238,12 +256,12 @@
                     targetMinutes: data.targetMinutes ?? undefined,
                     tzOffsetMinutes: data.tzOffsetMinutes ?? undefined,
                     adjustMinutes: data.adjustMinutes,
-                    ephemeral: dialog.ephemeral,
+                    ephemeral: target.ephemeral,
                     ringSeconds: data.ringSeconds,
                 });
             } else {
                 await updateTimerMutation.mutateAsync({
-                    timerId: dialog.timerId,
+                    timerId: target.timerId,
                     name: data.name,
                     mode: data.mode,
                     baseSeconds: data.baseSeconds,
@@ -253,9 +271,15 @@
                     ringSeconds: data.ringSeconds,
                 });
             }
-            dialog.open = false;
+            if (
+                dialog.session === request.session &&
+                inputSnapshot === request.snapshot
+            )
+                dialog.open = false;
         } catch {
             // グローバルエラーハンドラがトースト表示を担当
+        } finally {
+            if (saving === request) saving = undefined;
         }
     }
 
@@ -304,7 +328,18 @@
             </div>
         </div>
 
-        {#if timersList.length === 0 && !isLoading}
+        {#if timersQuery.isError}
+            <div role="alert" class="py-8 text-center">
+                <p class="mb-4 text-red-600 dark:text-red-400">
+                    タイマーを取得できませんでした
+                </p>
+                <button
+                    class="{grayButtonClass} disabled:cursor-not-allowed disabled:opacity-50"
+                    onclick={() => timersQuery.refetch()}
+                    disabled={timersQuery.isFetching}>再試行</button
+                >
+            </div>
+        {:else if timersList.length === 0 && !isLoading}
             <div class="flex flex-col items-center justify-center py-16">
                 <p class="mb-4 text-gray-400 dark:text-gray-500">
                     タイマーがありません
@@ -359,6 +394,7 @@
 </PageScrollArea>
 
 <TimerEditDialog
+    session={dialog.session}
     open={dialog.open}
     mode={dialog.mode}
     ephemeral={dialog.ephemeral}
@@ -369,6 +405,10 @@
     adjustMinutes={dialog.adjustMinutes}
     ringSeconds={dialog.ringSeconds}
     onSubmit={handleDialogSubmit}
+    submitting={saving?.session === dialog.session}
+    onInputChange={(data) => {
+        inputSnapshot = JSON.stringify(data) ?? "";
+    }}
     onClose={() => (dialog.open = false)}
     onSaveAsDefault={dialog.mode === "create" ? handleSaveAsDefault : undefined}
 />

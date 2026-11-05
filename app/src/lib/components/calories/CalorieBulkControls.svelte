@@ -34,8 +34,29 @@
     let deleteStart = $state("");
     let deleteEnd = $state("");
     let deleteItemName = $state("");
-    let pendingDelete = $state<BulkDeleteInput | undefined>();
-    let statusMessage = $state("");
+    type ResultState =
+        { kind: "idle" } | { kind: "success" | "failure"; message: string };
+    type DeleteRequest = { input: BulkDeleteInput; itemName: string };
+    let createState = $state<
+        ResultState | { kind: "sending"; id: symbol; input: BulkCreateInput }
+    >({ kind: "idle" });
+    let deleteState = $state<
+        ResultState | ({ kind: "confirm" | "sending" } & DeleteRequest)
+    >({ kind: "idle" });
+    const pendingDelete = $derived(
+        deleteState.kind === "confirm" || deleteState.kind === "sending"
+            ? deleteState
+            : undefined,
+    );
+    const statusMessage = $derived(
+        [createState, deleteState]
+            .flatMap((state) =>
+                state.kind === "success" || state.kind === "failure"
+                    ? [state.message]
+                    : [],
+            )
+            .join("。"),
+    );
 
     /** `<input type="date">`の値（yyyy-MM-dd）をAPIの日付形式（yyyy/MM/dd）へ変換する */
     function toApiDate(value: string): string {
@@ -48,37 +69,86 @@
 
     async function submitCreate(event: SubmitEvent) {
         event.preventDefault();
+        if (createState.kind === "sending") return;
         const item = findItem(createItemName);
         const quantity = Number(createQuantity);
         if (!item || !Number.isInteger(quantity) || quantity < 0) return;
-        const result = await onBulkCreate({
+        const input = {
             startDate: toApiDate(createStart),
             endDate: toApiDate(createEnd),
             timeOfDay: createTime,
             itemId: item.id,
             quantity,
             tzOffsetMinutes: getUtcOffsetMinutes(),
-        });
-        statusMessage = `${result.added}件の記録を追加しました`;
+        };
+        createState = { kind: "sending", id: Symbol(), input };
+        try {
+            const result = await onBulkCreate(input);
+            createState = {
+                kind: "success",
+                message: `${result.added}件の記録を追加しました`,
+            };
+        } catch (error) {
+            createState = {
+                kind: "failure",
+                message:
+                    error instanceof Error
+                        ? error.message
+                        : "一括追加に失敗しました。再試行してください",
+            };
+        } finally {
+            if (
+                deleteState.kind === "success" ||
+                deleteState.kind === "failure"
+            ) {
+                deleteState = { kind: "idle" };
+            }
+        }
     }
 
     function submitDelete(event: SubmitEvent) {
         event.preventDefault();
+        if (deleteState.kind === "sending") return;
         const item = findItem(deleteItemName);
         if (!item) return;
-        pendingDelete = {
-            startDate: toApiDate(deleteStart),
-            endDate: toApiDate(deleteEnd),
-            itemId: item.id,
-            tzOffsetMinutes: getUtcOffsetMinutes(),
+        deleteState = {
+            kind: "confirm",
+            itemName: deleteItemName,
+            input: {
+                startDate: toApiDate(deleteStart),
+                endDate: toApiDate(deleteEnd),
+                itemId: item.id,
+                tzOffsetMinutes: getUtcOffsetMinutes(),
+            },
         };
     }
 
     async function confirmDelete() {
-        if (!pendingDelete) return;
-        const result = await onBulkDelete(pendingDelete);
-        pendingDelete = undefined;
-        statusMessage = `${result.deleted}件の記録を削除しました`;
+        if (deleteState.kind !== "confirm") return;
+        const request = deleteState;
+        deleteState = { ...request, kind: "sending" };
+        try {
+            const result = await onBulkDelete(request.input);
+            deleteState = {
+                kind: "success",
+                message: `${result.deleted}件の記録を削除しました`,
+            };
+        } catch (error) {
+            deleteState = {
+                kind: "failure",
+                message:
+                    error instanceof Error
+                        ? error.message
+                        : "一括削除に失敗しました。再試行してください",
+            };
+        } finally {
+            if (
+                createState.kind === "success" ||
+                createState.kind === "failure"
+            ) {
+                createState = { kind: "idle" };
+            }
+        }
     }
 </script>
 
@@ -157,7 +227,10 @@
             <button
                 type="submit"
                 class="cursor-pointer rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700"
-                >一括追加</button
+                disabled={createState.kind === "sending"}
+                >{createState.kind === "sending"
+                    ? "追加中…"
+                    : "一括追加"}</button
             >
         </div>
     </form>
@@ -202,11 +275,12 @@
             <button
                 type="submit"
                 class="cursor-pointer rounded bg-red-600 px-3 py-1.5 text-sm text-white hover:bg-red-700"
-                >一括削除</button
+                disabled={deleteState.kind === "sending"}>一括削除</button
             >
         </div>
     </form>
 
+    {#if deleteState.kind === "sending"}<p role="status">削除中…</p>{/if}
     {#if statusMessage}
         <p
             class="mt-3 text-sm text-gray-600 dark:text-gray-300"
@@ -219,13 +293,16 @@
 </section>
 
 <ConfirmDialog
-    open={pendingDelete !== undefined}
+    open={deleteState.kind === "confirm"}
     title="記録の一括削除"
     message={pendingDelete
-        ? `${pendingDelete.startDate}から${pendingDelete.endDate}までの「${deleteItemName}」の記録を削除しますか？`
+        ? `${pendingDelete.input.startDate}から${pendingDelete.input.endDate}までの「${pendingDelete.itemName}」の記録を削除しますか？`
         : ""}
     confirmLabel="削除"
     variant="danger"
+    confirmDisabled={deleteState.kind === "sending"}
     onConfirm={confirmDelete}
-    onCancel={() => (pendingDelete = undefined)}
+    onCancel={() => {
+        if (deleteState.kind === "confirm") deleteState = { kind: "idle" };
+    }}
 />

@@ -16,6 +16,7 @@
         message: string;
         confirmLabel?: string;
         cancelLabel?: string;
+        confirmDisabled?: boolean;
         /** "danger" を指定すると確認ボタンが赤系になる */
         variant?: "default" | "danger";
         onConfirm: () => void | Promise<void>;
@@ -28,6 +29,7 @@
         message,
         confirmLabel = "OK",
         cancelLabel = "キャンセル",
+        confirmDisabled = false,
         variant = "default",
         onConfirm,
         onCancel,
@@ -70,7 +72,11 @@
             >
                 {cancelLabel}
             </button>
-            <button onclick={onConfirm} class={confirmClass}>
+            <button
+                onclick={onConfirm}
+                disabled={confirmDisabled}
+                class="{confirmClass} disabled:cursor-not-allowed disabled:opacity-50"
+            >
                 {confirmLabel}
             </button>
         </div>

@@ -21,25 +21,48 @@
     import { subscribeOnMount } from "#lib/client/sse/sse-subscribe.ts";
     import type { TimerInfo } from "#lib/types.ts";
     import { calcTimerRemainingMs } from "#lib/timer-utils.ts";
-    import { TIMER_DEFAULT_RING_SECONDS } from "#lib/schemas.ts";
-    import { onMount } from "svelte";
+    import { onMount, onDestroy, untrack } from "svelte";
     import { resolve } from "$app/paths";
 
-    type AlarmInfo = {
+    type AlarmRun = {
         timerId: TimerInfo["id"];
         timerName: TimerInfo["name"];
-    };
+        startedAt: string | null;
+    } & (
+        | { kind: "reserved"; timeout: ReturnType<typeof setTimeout> }
+        | { kind: "checking" }
+        | { kind: "notifying" }
+        | { kind: "dismissed" }
+    );
 
     const queryClient = useQueryClient();
 
     // 共有オフセットのローカルミラー（$effect の依存追跡用）
     let localOffset = $state(getServerOffset());
 
-    // アラーム再生済みタイマーIDのセット（二重再生防止）
-    let alarmedIds = $state(new Set<number>());
+    let runs = $state.raw<AlarmRun[]>([]);
+    const alarms = $derived(runs.filter((run) => run.kind === "notifying"));
+    let disposed = false;
 
-    // トースト通知用のアラーム一覧（✕で手動クリアのみ）
-    let alarms = $state<AlarmInfo[]>([]);
+    function isCurrent(run: AlarmRun) {
+        return !disposed && runs.includes(run);
+    }
+
+    function replaceRun(run: AlarmRun, next?: AlarmRun) {
+        if (run.kind === "reserved") clearTimeout(run.timeout);
+        runs = runs.flatMap((current) =>
+            current === run ? (next ? [next] : []) : [current],
+        );
+    }
+
+    onDestroy(() => {
+        disposed = true;
+        for (const run of runs) {
+            if (run.kind === "reserved") clearTimeout(run.timeout);
+            stopLoopBeepFor(run.timerId);
+        }
+        runs = [];
+    });
 
     // favicon の元画像（onMount で読み込み）
     let originalFaviconImg: HTMLImageElement | null = null;
@@ -118,41 +141,25 @@
         }
     });
 
-    // タイマーがリセットされたらトーストを自動消去
-    // expired が解除された/タイマーが消滅したものはループビープも止める
-    $effect(() => {
-        const timers = timersQuery.data?.timers ?? [];
-        if (alarms.length === 0) return;
-        const filtered = alarms.filter((alarm) => {
-            const timer = timers.find((t) => t.id === alarm.timerId);
-            if (!timer) {
-                stopLoopBeepFor(alarm.timerId);
-                return false;
-            }
-            // まだ running（stop 完了待ち）→ 維持
-            // expired（自然期限切れ）→ 維持
-            // リセット済み or 手動で0にした（expired=false）→ 除去
-            const keep = timer.running || timer.expired;
-            if (!keep) stopLoopBeepFor(alarm.timerId);
-            return keep;
-        });
-        // 新しい配列参照を毎回生成すると Svelte が変更検知して無限ループするため、変化があるときだけ更新
-        if (filtered.length !== alarms.length) {
-            alarms = filtered;
-        }
-    });
-
     /** ループビープが回っていれば停止する（動的 import で SSR 安全） */
     function stopLoopBeepFor(timerId: number) {
-        import("#lib/client/timers/beep.ts").then((m) =>
-            m.stopLoopBeep(timerId),
-        );
+        void import("#lib/client/timers/beep.ts").then((m) => {
+            // 同じIDの次の実行が鳴動を開始していたら、その音は止めない。
+            if (
+                !runs.some(
+                    (run) =>
+                        run.timerId === timerId && run.kind === "notifying",
+                )
+            )
+                m.stopLoopBeep(timerId);
+        });
     }
 
     /** トースト通知を閉じる（ループビープも合わせて停止） */
-    function dismissAlarm(timerId: number) {
-        stopLoopBeepFor(timerId);
-        alarms = alarms.filter((a) => a.timerId !== timerId);
+    function dismissAlarm(run: AlarmRun) {
+        if (!isCurrent(run)) return;
+        replaceRun(run, { ...run, kind: "dismissed" });
+        stopLoopBeepFor(run.timerId);
     }
 
     // タイマー一覧取得（/timers ページとキャッシュ共有）
@@ -191,11 +198,10 @@
      * まだ running ならアラームを発火する。
      * 別端末でリセット/停止された場合の誤アラームを防ぐ。
      */
-    async function checkAndAlarm(
-        timerId: number,
-        timerName: string,
-        startedAt: string | null,
-    ) {
+    async function checkAndAlarm(reserved: AlarmRun) {
+        if (!isCurrent(reserved)) return;
+        const run: AlarmRun = { ...reserved, kind: "checking" };
+        replaceRun(reserved, run);
         // サーバーから最新状態を取得
         try {
             await queryClient.refetchQueries(
@@ -205,105 +211,118 @@
         } catch {
             // サーバー確認できない場合はアラームしない
             // （refetchOnWindowFocus / refetchInterval で最新データ取得後に再スケジュールされる）
+            if (isCurrent(run)) replaceRun(run);
             return;
         }
+        if (!isCurrent(run)) return;
         const data = queryClient.getQueryData<RouterOutputs["timers"]["list"]>(
             queryKeys.timers,
         );
-        const timer = data?.timers?.find((t) => t.id === timerId);
-        if (!timer) return;
+        const timer = data?.timers?.find((t) => t.id === run.timerId);
+        if (!timer) {
+            replaceRun(run);
+            return;
+        }
         // autoStopIfExpired で停止済み（expired=true）→ 完了として扱う
         const isCompleted = timer.expired && !timer.running;
         // まだ running で startedAt が一致 → 完了直前
         const isAboutToComplete =
-            timer.running && timer.startedAt === startedAt;
+            timer.running &&
+            timer.startedAt === run.startedAt &&
+            calcRemainingMs(timer) <= 0;
         // リセット（remaining > 0）や再開（startedAt 変更）はスキップ
-        if (!isCompleted && !isAboutToComplete) return;
-        handleAlarm(timerId, timerName, startedAt);
+        if (!isCompleted && !isAboutToComplete) {
+            replaceRun(run);
+            return;
+        }
+        handleAlarm(run, timer.ringSeconds);
     }
 
     /** タイマー完了時の処理 */
-    function handleAlarm(
-        timerId: number,
-        timerName: string,
-        startedAt: string | null,
-    ) {
-        if (alarmedIds.has(timerId)) return;
-        alarmedIds = new Set([...alarmedIds, timerId]);
-
-        // アラーム対象のタイマーに設定された ringSeconds 秒だけビープをループ再生する
-        const timers = timersQuery.data?.timers ?? [];
-        const timer = timers.find((t) => t.id === timerId);
-        const ringSeconds = timer?.ringSeconds ?? TIMER_DEFAULT_RING_SECONDS;
+    function handleAlarm(checking: AlarmRun, ringSeconds: number) {
+        if (!isCurrent(checking)) return;
+        const run: AlarmRun = { ...checking, kind: "notifying" };
+        replaceRun(checking, run);
 
         // ビープ音 + ブラウザ通知 + トースト
-        import("#lib/client/timers/beep.ts").then((m) => {
-            m.startLoopBeep(timerId, ringSeconds);
+        void import("#lib/client/timers/beep.ts").then((m) => {
+            if (isCurrent(run)) m.startLoopBeep(run.timerId, ringSeconds);
         });
-        showNotification(timerName);
-        alarms = [...alarms, { timerId, timerName }];
+        showNotification(run.timerName);
 
         // サーバーに停止報告（startedAt でリセット/再開されていないことを確認）
-        trpc.timers.stop
-            .mutate({ timerId, startedAt: startedAt })
+        void trpc.timers.stop
+            .mutate({ timerId: run.timerId, startedAt: run.startedAt })
             .then(() =>
                 queryClient.invalidateQueries({ queryKey: queryKeys.timers }),
             )
             .catch(() => {
-                alarmedIds = new Set(
-                    [...alarmedIds].filter((id) => id !== timerId),
-                );
+                // 通知済み状態は保持し、次の取得による同期へ委ねる。
+                // stop失敗によって同じ実行の音と通知を重複させない。
             });
     }
 
     // running タイマーを監視し、setTimeout で正確なアラームをスケジュール
     // localOffset を参照してオフセット変更時にも再スケジュールする
     $effect(() => {
-        void localOffset; // 依存追跡用: オフセット変更時に再スケジュール
+        void localOffset;
+        const timers = timersQuery.data?.timers;
+        const updatedAt = timersQuery.dataUpdatedAt;
+        if (!timers) return;
+        untrack(() => syncRuns(timers, updatedAt));
+    });
+
+    function syncRuns(timers: TimerInfo[], updatedAt: number) {
+        for (const run of runs) {
+            const timer = timers.find((timer) => timer.id === run.timerId);
+            const keep =
+                timer &&
+                (timer.running
+                    ? timer.startedAt === run.startedAt
+                    : timer.expired);
+            if (!keep) {
+                replaceRun(run);
+                stopLoopBeepFor(run.timerId);
+            } else if (run.kind === "reserved" && timer.running) {
+                replaceRun(run);
+            }
+        }
 
         // キャッシュが古すぎる場合はスケジュールしない
         // （refetchOnWindowFocus 完了後に dataUpdatedAt が更新され $effect が再発火する）
-        const dataAge = Date.now() - (timersQuery.dataUpdatedAt ?? 0);
+        const dataAge = Date.now() - (updatedAt ?? 0);
         if (dataAge > 5 * 60 * 1000) return;
 
-        const timers = timersQuery.data?.timers ?? [];
         const runningTimers = timers.filter((t) => t.running);
 
-        // running タイマーがなければ alarmedIds をリセット
-        // 新しい Set 参照を毎回生成すると Svelte が変更検知して無限ループするため、空でないときだけ更新
-        if (runningTimers.length === 0) {
-            if (alarmedIds.size > 0) {
-                alarmedIds = new Set();
-            }
-            return;
-        }
-
         // 各 running タイマーに setTimeout をスケジュール
-        const timeoutIds: ReturnType<typeof setTimeout>[] = [];
         for (const timer of runningTimers) {
-            if (alarmedIds.has(timer.id)) continue;
+            if (
+                runs.some(
+                    (run) =>
+                        run.timerId === timer.id &&
+                        run.startedAt === timer.startedAt,
+                )
+            )
+                continue;
 
             const remainingMs = calcRemainingMs(timer);
             // startedAt をキャプチャしてリセット/再開の検出に使用
-            const startedAt = timer.startedAt;
-            if (remainingMs <= 0) {
-                // 既に満了済み → サーバー確認してからアラーム
-                checkAndAlarm(timer.id, timer.name, startedAt);
-            } else {
-                const id = setTimeout(
-                    () => checkAndAlarm(timer.id, timer.name, startedAt),
-                    remainingMs,
-                );
-                timeoutIds.push(id);
-            }
+            const run: AlarmRun = {
+                timerId: timer.id,
+                timerName: timer.name,
+                startedAt: timer.startedAt,
+                kind: "reserved",
+                timeout: setTimeout(
+                    () => {
+                        void checkAndAlarm(run);
+                    },
+                    Math.max(0, remainingMs),
+                ),
+            };
+            runs = [...runs, run];
         }
-
-        return () => {
-            for (const id of timeoutIds) {
-                clearTimeout(id);
-            }
-        };
-    });
+    }
 </script>
 
 <!-- タイマー完了トースト通知 -->
@@ -329,7 +348,7 @@
                     class="cursor-pointer rounded p-1 pr-3 hover:bg-red-600"
                     aria-label="タイマー完了の通知を閉じる"
                     title="タイマー完了の通知を閉じる"
-                    onclick={() => dismissAlarm(alarm.timerId)}
+                    onclick={() => dismissAlarm(alarm)}
                 >
                     ✕
                 </button>

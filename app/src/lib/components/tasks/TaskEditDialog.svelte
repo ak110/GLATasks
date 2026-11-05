@@ -35,9 +35,13 @@
         listTagCandidates: TagInfo[];
         lists: Pick<RouterOutputs["lists"]["list"][number], "id" | "title">[];
         taskId: number;
+        sessionId: number;
         attachments: AttachmentMeta[];
         onAttachmentChange: () => void;
-        onSubmit: (data: TaskEditSubmission) => void;
+        onSubmit: (
+            data: TaskEditSubmission,
+            isCurrent: () => boolean,
+        ) => Promise<boolean> | void;
         onClose: () => void;
     }
 
@@ -51,6 +55,7 @@
         listTagCandidates,
         lists,
         taskId,
+        sessionId,
         attachments,
         onAttachmentChange,
         onSubmit,
@@ -65,6 +70,12 @@
     let textareaEl = $state<HTMLTextAreaElement | null>(null);
     // 未保存変更がある状態で閉じようとしたときの確認ダイアログ
     let confirmCloseOpen = $state(false);
+    let saving = $state<{
+        sessionId: number;
+        taskId: number;
+        snapshot: string;
+    }>();
+    let attachmentOperations = $state(0);
     // ダイアログ本体へのファイルドラッグアンドドロップ中かどうか
     const attachmentInput = createAttachmentInput(handleAddAttachments);
 
@@ -94,20 +105,29 @@
             localKind !== baselineKind,
     );
 
-    // open が偽から真へ遷移した瞬間のみローカル状態を初期化する
-    // （open=true のまま親が値を同期してきた場合に編集中の値を巻き戻さないため）
     let prevOpen = false;
+    let prevSessionId: number | undefined;
+    let prevTaskId: number | undefined;
     $effect(() => {
-        if (open && !prevOpen) {
+        if (
+            open &&
+            (!prevOpen || prevSessionId !== sessionId || prevTaskId !== taskId)
+        ) {
             localText = text;
             localMoveTo = moveTo;
             localCompleted = completed;
             localTags = [...tags];
             localKind = kind;
+            confirmCloseOpen = false;
+            saving = undefined;
+            attachmentOperations = 0;
+            thumbnails.close();
             // tick 後にフォーカス
             queueMicrotask(() => textareaEl?.focus());
         }
         prevOpen = open;
+        prevSessionId = sessionId;
+        prevTaskId = taskId;
     });
 
     // 開いた瞬間と、open のまま親が保存後の値を同期してきたタイミングで baseline を取り直す。
@@ -121,32 +141,98 @@
         baselineKind = kind;
     });
 
-    function handleSubmit(closeAfter: boolean) {
+    function inputSnapshot() {
+        return JSON.stringify([
+            localText,
+            localMoveTo,
+            localCompleted,
+            localTags,
+            localKind,
+        ]);
+    }
+
+    async function handleSubmit(closeAfter: boolean) {
+        if (saving || !open) return;
         // 保存ボタンの役割分担:
         // - 「保存」（closeAfter=false）: 編集続行用。同一リスト内編集では並び順を維持する
         // - 「保存して閉じる」（closeAfter=true）: 同一リスト内編集では並び順を更新して閉じる
         // リスト変更を伴う場合は両ボタンとも移動先リストの先頭へ配置される（サーバー仕様）。
         // keepOrder の値は呼び出し側で closeAfter から決定する
-        onSubmit({
+        const request = { sessionId, taskId, snapshot: inputSnapshot() };
+        saving = request;
+        const data: TaskEditSubmission = {
             text: localText,
             moveTo: localMoveTo,
             completed: localCompleted,
-            tags: localTags,
+            tags: localTags.map((tag) => ({ ...tag })),
             kind: localKind,
             closeAfter,
-        });
+        };
+        try {
+            const success = await onSubmit(
+                data,
+                () =>
+                    open &&
+                    sessionId === request.sessionId &&
+                    taskId === request.taskId &&
+                    inputSnapshot() === request.snapshot,
+            );
+            if (
+                success &&
+                closeAfter &&
+                open &&
+                sessionId === request.sessionId &&
+                taskId === request.taskId &&
+                inputSnapshot() === request.snapshot
+            ) {
+                onClose();
+            }
+        } catch (error) {
+            if (
+                open &&
+                sessionId === request.sessionId &&
+                taskId === request.taskId
+            )
+                showErrorToast(extractErrorMessage(error));
+        } finally {
+            if (
+                saving?.sessionId === request.sessionId &&
+                saving.taskId === request.taskId &&
+                saving.snapshot === request.snapshot
+            )
+                saving = undefined;
+        }
     }
 
     /** ファイル群を順次アップロードする（`<input type="file">`経路とドラッグアンドドロップ経路の共通処理） */
     async function uploadFiles(files: FileList | File[]) {
-        // 複数ファイル選択時は順次アップロードする（並列は不要）
-        for (const file of Array.from(files)) {
-            try {
-                await uploadAttachment(taskId, file);
-                onAttachmentChange();
-            } catch (error) {
-                showErrorToast(extractErrorMessage(error));
+        const targetTaskId = taskId;
+        const targetSessionId = sessionId;
+        const attachmentChange = onAttachmentChange;
+        attachmentOperations += 1;
+        try {
+            // 複数ファイル選択時は順次アップロードする（並列は不要）
+            for (const file of Array.from(files)) {
+                try {
+                    await uploadAttachment(targetTaskId, file);
+                    if (
+                        open &&
+                        sessionId === targetSessionId &&
+                        taskId === targetTaskId
+                    )
+                        attachmentChange();
+                } catch (error) {
+                    if (
+                        open &&
+                        sessionId === targetSessionId &&
+                        taskId === targetTaskId
+                    )
+                        showErrorToast(extractErrorMessage(error));
+                }
             }
+        } finally {
+            if (sessionId === targetSessionId && taskId === targetTaskId)
+                attachmentOperations -= 1;
         }
     }
 
@@ -157,11 +243,28 @@
     async function handleDeleteAttachment(
         attachmentId: RouterInputs["attachments"]["delete"]["attachmentId"],
     ) {
+        const targetTaskId = taskId;
+        const targetSessionId = sessionId;
+        const attachmentChange = onAttachmentChange;
+        attachmentOperations += 1;
         try {
             await trpc.attachments.delete.mutate({ attachmentId });
-            onAttachmentChange();
+            if (
+                open &&
+                sessionId === targetSessionId &&
+                taskId === targetTaskId
+            )
+                attachmentChange();
         } catch (error) {
-            showErrorToast(extractErrorMessage(error));
+            if (
+                open &&
+                sessionId === targetSessionId &&
+                taskId === targetTaskId
+            )
+                showErrorToast(extractErrorMessage(error));
+        } finally {
+            if (sessionId === targetSessionId && taskId === targetTaskId)
+                attachmentOperations -= 1;
         }
     }
 
@@ -180,7 +283,7 @@
     function handleDialogKeydown(e: KeyboardEvent) {
         if ((e.ctrlKey || e.metaKey) && e.key === "s") {
             e.preventDefault();
-            handleSubmit(false);
+            void handleSubmit(false);
         }
     }
 </script>
@@ -261,6 +364,9 @@
                 />
             </div>
             <div class="mb-4" role="group" aria-label="添付ファイル">
+                {#if attachmentOperations > 0}
+                    <p role="status">添付ファイルを更新中…</p>
+                {/if}
                 {#if localAttachments.length > 0}
                     <ul class="mb-2 flex flex-col gap-1">
                         {#each localAttachments as attachment (attachment.id)}
@@ -324,14 +430,19 @@
                 </select>
             </div>
             <div class="mt-6 flex justify-end gap-2">
+                {#if saving}
+                    <p role="status">保存中…</p>
+                {/if}
                 <button
                     onclick={() => handleSubmit(false)}
+                    disabled={!!saving}
                     class="cursor-pointer rounded bg-gray-100 px-6 py-2 text-gray-700 hover:bg-gray-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
                     data-testid="task-edit-save-btn"
                     title="Ctrl+S">保存</button
                 >
                 <button
                     onclick={() => handleSubmit(true)}
+                    disabled={!!saving}
                     class="cursor-pointer rounded bg-blue-600 px-6 py-2 text-white hover:bg-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
                     data-testid="task-edit-save-close-btn"
                     >保存して閉じる</button

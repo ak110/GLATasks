@@ -1,6 +1,7 @@
 <script lang="ts">
     import { taskTextColor } from "#lib/task-colors.ts";
     import NotesExpandButton from "#lib/components/tasks/NotesExpandButton.svelte";
+    import { grayButtonClass } from "#lib/components/ui/styles.ts";
     /**
      * @fileoverview 検索結果表示コンポーネント
      *
@@ -23,12 +24,20 @@
         >;
         /** 検索クエリ実行中フラグ */
         isLoading: boolean;
+        error?: string;
+        onRetry?: () => void;
         /** 検索結果のタスクをクリックしたときのコールバック */
         onGoToResult: (listId: number) => void;
     }
 
-    let { query, searchResultsByList, isLoading, onGoToResult }: Props =
-        $props();
+    let {
+        query,
+        searchResultsByList,
+        isLoading,
+        error,
+        onRetry,
+        onGoToResult,
+    }: Props = $props();
 
     // notes のクランプ状態（scrollHeight > clientHeight になっている id セット）
     let clampedNotes = new SvelteSet<number>();
@@ -60,6 +69,13 @@
 
 {#if isLoading}
     <p class="p-4 text-gray-400 dark:text-gray-500">検索中...</p>
+{:else if error}
+    <div role="alert" class="p-4 text-red-600 dark:text-red-400">
+        <p>{error}</p>
+        <button type="button" onclick={onRetry} class={grayButtonClass}
+            >再試行</button
+        >
+    </div>
 {:else if searchResultsByList.size === 0}
     <p class="p-4 text-gray-400 dark:text-gray-500">
         該当するタスクがありません

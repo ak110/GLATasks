@@ -1,7 +1,10 @@
 <script lang="ts">
     import { queryKeys } from "#lib/client/query-options.ts";
     import { schedulesOptions } from "#lib/client/query-options.ts";
-    import { dialogInputClass } from "#lib/components/ui/styles.ts";
+    import {
+        dialogInputClass,
+        grayButtonClass,
+    } from "#lib/components/ui/styles.ts";
     import Dialog from "#lib/components/dialogs/Dialog.svelte";
     /**
      * @fileoverview 定期TODOスケジュール管理ダイアログ
@@ -43,12 +46,22 @@
     let formTarget = $state<ScheduleInfo | "new" | null>(null);
     let formTitle = $state("");
     let formTags = $state<TagInfo[]>([]);
+    let formSession = 0;
+    let pending = $state(false);
+
+    $effect(() => {
+        void listId;
+        void open;
+        formSession++;
+        formTarget = null;
+        confirmDeleteTarget = null;
+    });
 
     let confirmDeleteTarget = $state<ScheduleInfo | null>(null);
 
     function invalidate() {
         queryClient.invalidateQueries({
-            queryKey: queryKeys.listSchedules(listId),
+            queryKey: queryKeys.schedules,
         });
     }
 
@@ -72,45 +85,64 @@
     }));
 
     function openNewForm() {
+        formSession++;
         formTarget = "new";
         formTitle = "";
         formTags = [];
     }
 
     function openEditForm(schedule: ScheduleInfo) {
+        formSession++;
         formTarget = schedule;
         formTitle = schedule.title;
         formTags = schedule.tags;
     }
 
     function closeForm() {
+        formSession++;
         formTarget = null;
     }
 
     async function handleRecurrenceSubmit(
         input: Pick<RouterInputs["schedules"]["create"], "rrule">,
+        isCurrent: () => boolean,
     ) {
         const title = formTitle.trim();
-        if (!title || listId === null) return;
+        if (!title || listId === null || formTarget === null || pending) return;
+        const session = formSession;
+        const snapshot = JSON.stringify([formTitle, formTags, formTarget]);
+        const target = formTarget;
+        const targetListId = listId;
+        const tags = formTags.map((tag) => ({ ...tag }));
+        pending = true;
         try {
-            if (formTarget === "new") {
+            if (target === "new") {
                 await createMut.mutateAsync({
-                    listId,
+                    listId: targetListId,
                     title,
-                    tags: formTags,
+                    tags,
                     rrule: input.rrule,
                 });
-            } else if (formTarget) {
+            } else {
                 await updateMut.mutateAsync({
-                    scheduleId: formTarget.id,
+                    scheduleId: target.id,
                     title,
-                    tags: formTags,
+                    tags,
                     rrule: input.rrule,
                 });
             }
-            closeForm();
+            if (
+                session === formSession &&
+                open &&
+                targetListId === listId &&
+                isCurrent() &&
+                snapshot === JSON.stringify([formTitle, formTags, formTarget])
+            )
+                closeForm();
         } catch (error) {
             showErrorToast(extractErrorMessage(error));
+        } finally {
+            pending = false;
         }
     }
 
@@ -159,6 +191,7 @@
     testId="schedule-dialog"
 >
     <div class="max-h-[70vh] overflow-y-auto p-6">
+        {#if pending}<p role="status">保存中...</p>{/if}
         {#if formTarget !== null}
             <div class="mb-4">
                 <label
@@ -181,17 +214,32 @@
                 <TagEditor bind:tags={formTags} candidates={[]} />
             </div>
             <RecurrenceEditor
+                {pending}
                 value={formTarget === "new" ? null : formTarget}
                 onSubmit={handleRecurrenceSubmit}
                 onCancel={closeForm}
             />
         {:else}
-            <ScheduleList
-                {schedules}
-                onEdit={openEditForm}
-                onToggle={handleToggle}
-                onDelete={requestDelete}
-            />
+            {#if schedulesQuery.isPending}
+                <p>読み込み中...</p>
+            {:else if schedulesQuery.isError && schedulesQuery.data === undefined}
+                <div role="alert">
+                    <p>定期TODOを取得できませんでした。</p>
+                    <button
+                        type="button"
+                        class={grayButtonClass}
+                        onclick={() => void schedulesQuery.refetch()}
+                        >再試行</button
+                    >
+                </div>
+            {:else}
+                <ScheduleList
+                    {schedules}
+                    onEdit={openEditForm}
+                    onToggle={handleToggle}
+                    onDelete={requestDelete}
+                />
+            {/if}
             <button
                 onclick={openNewForm}
                 class="mt-4 w-full cursor-pointer rounded bg-blue-100 px-4 py-2 text-blue-600 hover:bg-blue-200 dark:bg-blue-900/40 dark:text-blue-400 dark:hover:bg-blue-900/60"

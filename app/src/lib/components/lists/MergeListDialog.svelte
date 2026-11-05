@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { untrack } from "svelte";
     import { dialogInputClass } from "#lib/components/ui/styles.ts";
     import Dialog from "#lib/components/dialogs/Dialog.svelte";
     /**
@@ -8,37 +9,54 @@
     import type { ListInfo } from "#lib/types.ts";
 
     interface Props {
+        session: object;
         open: boolean;
         sourceList: Pick<ListInfo, "id" | "title">;
         allLists: ListInfo[];
         taskCount: number;
-        onSubmit: (targetListId: number) => void;
+        submitting?: boolean;
+        onSubmit: (targetListId: number, isCurrent: () => boolean) => void;
         onClose: () => void;
     }
 
-    let { open, sourceList, allLists, taskCount, onSubmit, onClose }: Props =
-        $props();
+    let {
+        session,
+        open,
+        sourceList,
+        allLists,
+        taskCount,
+        submitting = false,
+        onSubmit,
+        onClose,
+    }: Props = $props();
 
     let selectedTargetId = $state("");
+    const dialogSession = $derived(session);
+    const sourceId = $derived(sourceList.id);
+    const dialogOpen = $derived(open);
 
     // 統合先の候補: アクティブなリスト（自分自身を除く）
     let targetCandidates = $derived(
         allLists.filter((l) => l.status === "active" && l.id !== sourceList.id),
     );
 
-    // ダイアログが開くたびに選択をリセット
+    // 候補の再取得は編集中の選択や送信snapshotを変更しない。
     $effect(() => {
-        if (open) {
-            selectedTargetId =
+        void dialogSession;
+        void sourceId;
+        if (dialogOpen) {
+            selectedTargetId = untrack(() =>
                 targetCandidates.length > 0
                     ? String(targetCandidates[0].id)
-                    : "";
+                    : "",
+            );
         }
     });
 
     function handleSubmit() {
-        if (selectedTargetId) {
-            onSubmit(Number(selectedTargetId));
+        if (selectedTargetId && !submitting) {
+            const target = selectedTargetId;
+            onSubmit(Number(target), () => selectedTargetId === target);
         }
     }
 </script>
@@ -70,9 +88,10 @@
         </p>
 
         <div class="flex justify-end">
+            {#if submitting}<p role="status">統合中...</p>{/if}
             <button
                 onclick={handleSubmit}
-                disabled={!selectedTargetId}
+                disabled={!selectedTargetId || submitting}
                 class="cursor-pointer rounded bg-red-600 px-6 py-2 text-white hover:bg-red-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
                 >統合</button
             >

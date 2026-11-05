@@ -18,13 +18,15 @@
 
     interface Props {
         value: ScheduleInfo | null;
+        pending?: boolean;
         onSubmit: (
             input: Pick<RouterInputs["schedules"]["create"], "rrule">,
+            isCurrent: () => boolean,
         ) => void;
         onCancel: () => void;
     }
 
-    let { value, onSubmit, onCancel }: Props = $props();
+    let { value, pending = false, onSubmit, onCancel }: Props = $props();
 
     type FreqOption = "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY";
     type EndCondition = "never" | "count" | "until";
@@ -218,7 +220,9 @@
 
     function handleSubmit(e: Event) {
         e.preventDefault();
-        onSubmit({ rrule: buildRruleString() });
+        if (pending) return;
+        const rrule = buildRruleString();
+        onSubmit({ rrule }, () => rrule === buildRruleString());
     }
 </script>
 
@@ -358,6 +362,7 @@
         </button>
         <button
             type="submit"
+            disabled={pending}
             class="cursor-pointer rounded bg-blue-600 px-4 py-1.5 text-white hover:bg-blue-700"
             data-testid="recur-submit-btn"
         >

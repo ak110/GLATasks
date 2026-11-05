@@ -38,6 +38,10 @@
     }: Props = $props();
     let editingId = $state<number | undefined>();
     let openMenuId = $state<number | undefined>();
+    let session = Symbol();
+    let sending = $state<symbol | undefined>();
+    let deleting = $state<symbol | undefined>();
+
     let deleteTarget = $state<Item | undefined>();
     // 編集ダイアログの品目名欄は追加フォームと別に持ち、編集中の名前を検索語にしない
     let editName = $state("");
@@ -71,12 +75,20 @@
     }
 
     async function confirmDelete() {
-        if (!deleteTarget) return;
-        await onDelete(deleteTarget.id);
-        deleteTarget = undefined;
+        if (!deleteTarget || deleting) return;
+        const target = deleteTarget;
+        const request = Symbol();
+        deleting = request;
+        try {
+            await onDelete(target.id);
+            if (deleteTarget === target) deleteTarget = undefined;
+        } finally {
+            if (deleting === request) deleting = undefined;
+        }
     }
 
     function clearForm() {
+        session = Symbol();
         editingId = undefined;
         addName = "";
         editName = "";
@@ -90,6 +102,7 @@
     }
 
     function edit(item: Item) {
+        session = Symbol();
         openMenuId = undefined;
         editingId = item.id;
         // 編集の開始で追加フォームの入力を破棄するため、検索も解除される
@@ -101,6 +114,7 @@
 
     async function submit(event: SubmitEvent) {
         event.preventDefault();
+        if (sending) return;
         const input = { name, kcal: Number(kcal), note };
         if (
             !input.name.trim() ||
@@ -108,9 +122,22 @@
             input.kcal <= 0
         )
             return;
-        if (editingId === undefined) await onCreate(input);
-        else await onUpdate({ itemId: editingId, ...input });
-        clearForm();
+        const request = Symbol();
+        const startedSession = session;
+        const snapshot = JSON.stringify([editingId, name, kcal, note]);
+        const itemId = editingId;
+        sending = request;
+        try {
+            if (itemId === undefined) await onCreate(input);
+            else await onUpdate({ itemId, ...input });
+            if (
+                session === startedSession &&
+                snapshot === JSON.stringify([editingId, name, kcal, note])
+            )
+                clearForm();
+        } finally {
+            if (sending === request) sending = undefined;
+        }
     }
 </script>
 
@@ -170,6 +197,7 @@
             <div class="flex gap-1">
                 <button
                     type="submit"
+                    disabled={sending !== undefined}
                     class="cursor-pointer rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700"
                 >
                     追加
@@ -211,6 +239,7 @@
                 <div class="mt-5 flex justify-end">
                     <button
                         type="submit"
+                        disabled={sending !== undefined}
                         class="cursor-pointer rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700"
                         >変更</button
                     >
@@ -219,6 +248,7 @@
         </Dialog>
     {/if}
 
+    {#if sending}<p role="status">保存中…</p>{/if}
     <!-- 横スクロールの要素で囲むと、最後の行の「⋯」メニューが表の下端で切り取られるため囲まない -->
     <CalorieFilterStatus keywords={filterKeywords} onClear={onClearFilter} />
     <table class="w-full table-fixed text-left text-sm">
@@ -288,7 +318,7 @@
                                         disabled={inUse !== undefined}
                                         onclick={() => {
                                             openMenuId = undefined;
-                                            deleteTarget = item;
+                                            deleteTarget = { ...item };
                                         }}
                                         class={menuDangerItemClass}
                                         role="menuitem"
@@ -323,6 +353,7 @@
     message={deleteTarget ? `「${deleteTarget.name}」を削除しますか？` : ""}
     confirmLabel="削除"
     variant="danger"
+    confirmDisabled={deleting !== undefined}
     onConfirm={confirmDelete}
     onCancel={() => (deleteTarget = undefined)}
 />

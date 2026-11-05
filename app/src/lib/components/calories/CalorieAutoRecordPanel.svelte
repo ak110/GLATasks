@@ -34,6 +34,10 @@
     let editing = $state<AutoRecord | undefined>();
     let deleteTarget = $state<AutoRecord | undefined>();
     let openMenuId = $state<number | undefined>();
+    let session = Symbol();
+    let sending = $state<symbol | undefined>();
+    let deleting = $state<symbol | undefined>();
+
     let timeOfDay = $state("");
     let itemName = $state("");
     let quantity = $state("1");
@@ -43,6 +47,7 @@
     }
 
     function resetForm() {
+        session = Symbol();
         editing = undefined;
         timeOfDay = "";
         itemName = "";
@@ -50,6 +55,7 @@
     }
 
     function edit(autoRecord: AutoRecord) {
+        session = Symbol();
         openMenuId = undefined;
         editing = autoRecord;
         timeOfDay = autoRecord.timeOfDay;
@@ -70,6 +76,7 @@
 
     async function submit(event: SubmitEvent) {
         event.preventDefault();
+        if (sending) return;
         const item = items.find((candidate) => candidate.name === itemName);
         const numericQuantity = Number(quantity);
         if (!item || !Number.isInteger(numericQuantity) || numericQuantity < 0)
@@ -81,15 +88,41 @@
             enabled: editing?.enabled ?? true,
             tzOffsetMinutes: tzOffsetMinutes(),
         };
-        if (editing === undefined) await onCreate(input);
-        else await onUpdate({ autoRecordId: editing.id, ...input });
-        resetForm();
+        const request = Symbol();
+        const startedSession = session;
+        const snapshot = JSON.stringify([
+            editing?.id,
+            timeOfDay,
+            itemName,
+            quantity,
+        ]);
+        const autoRecordId = editing?.id;
+        sending = request;
+        try {
+            if (autoRecordId === undefined) await onCreate(input);
+            else await onUpdate({ autoRecordId, ...input });
+            if (
+                session === startedSession &&
+                snapshot ===
+                    JSON.stringify([editing?.id, timeOfDay, itemName, quantity])
+            )
+                resetForm();
+        } finally {
+            if (sending === request) sending = undefined;
+        }
     }
 
     async function confirmDelete() {
-        if (!deleteTarget) return;
-        await onDelete(deleteTarget.id);
-        deleteTarget = undefined;
+        if (!deleteTarget || deleting) return;
+        const target = deleteTarget;
+        const request = Symbol();
+        deleting = request;
+        try {
+            await onDelete(target.id);
+            if (deleteTarget === target) deleteTarget = undefined;
+        } finally {
+            if (deleting === request) deleting = undefined;
+        }
     }
 </script>
 
@@ -149,6 +182,7 @@
             />
             <button
                 type="submit"
+                disabled={sending !== undefined}
                 class="cursor-pointer rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700"
                 >{editing === undefined ? "追加" : "変更"}</button
             >
@@ -166,6 +200,7 @@
         {@render autoRecordForm()}
     {/if}
 
+    {#if sending}<p role="status">保存中…</p>{/if}
     <!-- 狭い画面でも品目の列幅を残すため、行の操作は「⋯」メニューへまとめる -->
     <table class="w-full table-fixed text-left text-sm">
         <colgroup
@@ -242,7 +277,7 @@
                                         type="button"
                                         onclick={() => {
                                             openMenuId = undefined;
-                                            deleteTarget = autoRecord;
+                                            deleteTarget = { ...autoRecord };
                                         }}
                                         class={menuDangerItemClass}
                                         role="menuitem">削除</button
@@ -273,6 +308,7 @@
         : ""}
     confirmLabel="削除"
     variant="danger"
+    confirmDisabled={deleting !== undefined}
     onConfirm={confirmDelete}
     onCancel={() => (deleteTarget = undefined)}
 />

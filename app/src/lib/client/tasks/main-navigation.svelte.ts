@@ -8,7 +8,32 @@ export function createMainNavigation(
   queryClient: QueryClient,
   state: MainState,
   getLists: () => RouterOutputs["lists"]["list"],
+  isListsReady: () => boolean,
 ) {
+  let initialized = false;
+
+  function clearSelection() {
+    state.selectedListId = null;
+    state.hasHash = false;
+    state.addTaskText = "";
+    state.updatedTaskIds.clear();
+    localStorage.removeItem("selectedList");
+    history.replaceState(
+      {},
+      "",
+      window.location.pathname + window.location.search,
+    );
+  }
+
+  function normalize() {
+    if (!isListsReady()) return;
+    if (
+      state.selectedListId !== null &&
+      !getLists().some((list) => list.id === state.selectedListId)
+    ) {
+      clearSelection();
+    }
+  }
   // URLハッシュからリストIDを解析
   function parseHashListId(): number | null {
     const hash = window.location.hash;
@@ -27,6 +52,7 @@ export function createMainNavigation(
         state.selectedListId = hashId;
         localStorage.setItem("selectedList", String(hashId));
       }
+      normalize();
     }
     window.addEventListener("hashchange", onHashChange);
     return () => window.removeEventListener("hashchange", onHashChange);
@@ -36,9 +62,19 @@ export function createMainNavigation(
   // URLハッシュ > URL パラメータ `list` > localStorage の優先順
   // SSR ではなく $effect で行う理由: window/localStorage/location はブラウザ専用 API のため
   $effect(() => {
-    if (getLists().length > 0 && state.selectedListId === null) {
+    if (!isListsReady()) return;
+    if (!initialized) {
+      initialized = true;
       // URLハッシュ（ブックマーク・直接アクセス等）
       const hashId = parseHashListId();
+      if (getLists().length === 0) {
+        clearSelection();
+        return;
+      }
+      if (hashId !== null && !getLists().some((list) => list.id === hashId)) {
+        clearSelection();
+        return;
+      }
       if (hashId && getLists().some((l) => l.id === hashId)) {
         state.selectedListId = hashId;
         state.hasHash = true;
@@ -74,20 +110,17 @@ export function createMainNavigation(
     }
 
     // 無効なハッシュ対策: リストデータにハッシュのIDが存在しなければハッシュを除去
-    if (getLists().length > 0 && state.hasHash) {
+    if (state.hasHash) {
       const hashId = parseHashListId();
       if (hashId && !getLists().some((l) => l.id === hashId)) {
-        state.hasHash = false;
-        history.replaceState(
-          {},
-          "",
-          window.location.pathname + window.location.search,
-        );
+        clearSelection();
       }
     }
+    normalize();
   });
 
   function selectList(listId: number) {
+    if (!getLists().some((list) => list.id === listId)) return;
     state.selectedListId = listId;
     state.addTaskText = "";
     state.updatedTaskIds.clear();
@@ -99,11 +132,7 @@ export function createMainNavigation(
     state.showType = type;
     state.updatedTaskIds.clear();
     await queryClient.invalidateQueries({ queryKey: queryKeys.lists });
-    if (!getLists().some((l) => l.id === state.selectedListId)) {
-      const first = getLists()[0];
-      if (first) selectList(first.id);
-      else state.selectedListId = null;
-    }
+    normalize();
   }
 
   return { selectList, changeShowType };

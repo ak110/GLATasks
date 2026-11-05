@@ -51,6 +51,42 @@ describe("createBlobUrlCache", () => {
     vi.restoreAllMocks();
   });
 
+  it("同じ添付の並行取得はURLを共有しclearですべて回収する", async () => {
+    const spies = installUrlSpies();
+    const download =
+      Promise.withResolvers<ReturnType<typeof makeDownloadResponse>>();
+    downloadQueryMock.mockReturnValue(download.promise);
+    const cache = createBlobUrlCache();
+    const first = cache.ensure(1);
+    const second = cache.ensure(1);
+    download.resolve(makeDownloadResponse(1));
+    const urls = await Promise.all([first, second]);
+    expect(urls).toEqual(["blob:mock-1", "blob:mock-1"]);
+    expect(downloadQueryMock).toHaveBeenCalledTimes(1);
+    cache.clear();
+    expect(spies.revoked).toEqual(["blob:mock-1"]);
+  });
+
+  it("取得中に除外して同じIDを再追加しても古い取得を再登録しない", async () => {
+    const spies = installUrlSpies();
+    const oldDownload =
+      Promise.withResolvers<ReturnType<typeof makeDownloadResponse>>();
+    downloadQueryMock
+      .mockReturnValueOnce(oldDownload.promise)
+      .mockResolvedValue(makeDownloadResponse(1));
+    const cache = createBlobUrlCache();
+    const old = cache.ensure(1);
+    const rejected = expect(old).rejects.toThrow(/取得中に削除されました/);
+    cache.syncWith([]);
+    cache.syncWith([1]);
+    const current = await cache.ensure(1);
+    oldDownload.resolve(makeDownloadResponse(1));
+    await rejected;
+    expect(await cache.ensure(1)).toBe(current);
+    cache.clear();
+    expect(spies.revoked.sort()).toEqual(["blob:mock-1", "blob:mock-2"]);
+  });
+
   it("初回ensureはサーバーへ問い合わせBlob URLを返す", async () => {
     const { createSpy } = installUrlSpies();
     downloadQueryMock.mockResolvedValue(makeDownloadResponse(1));

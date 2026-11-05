@@ -82,6 +82,26 @@ describe("createDragReorder", () => {
     vi.restoreAllMocks();
   });
 
+  it("次の押下前に以前の捕捉を解除し、古いハンドルのイベントを無効にする", () => {
+    const onReorder = vi.fn();
+    const dnd = createDragReorder(() => makeItems([1, 2, 3]), onReorder);
+    const first = document.createElement("span");
+    const second = document.createElement("span");
+    const release = vi.fn();
+    first.releasePointerCapture = release;
+    first.hasPointerCapture = () => true;
+    vi.spyOn(document, "elementFromPoint").mockReturnValue(makeRowElement(3));
+    dnd.handleDragStart(1, makeStartEvent(first, 0, 0, 1));
+    dispatchPointerMove(20, 110, 1);
+    dnd.handleDragStart(2, makeStartEvent(second, 0, 0, 2));
+    const released = release.mock.calls;
+    first.dispatchEvent(new Event("lostpointercapture"));
+    dispatchPointerMove(20, 160, 2);
+    dispatchPointerUp(2);
+    expect(released).toEqual([[1]]);
+    expect(onReorder).toHaveBeenCalledExactlyOnceWith([1, 3, 2]);
+  });
+
   it("初期状態では draggedId / isActive / dropTargetId / dropPosition がリセット済み", () => {
     const dnd = createDragReorder(() => makeItems([1, 2, 3]), vi.fn());
     expect(dnd.draggedId).toBeNull();
@@ -553,5 +573,28 @@ describe("createDragReorder の自動スクロール", () => {
     dispatchPointerCancel(2);
     expect(frames.size).toBe(0);
     expect(container.scrollTop).toBe(0);
+  });
+
+  it("disposeで捕捉・イベント・予約済みスクロールをすべて回収する", () => {
+    mockAnimationFrame();
+    const { container, handle } = setupScrollContainer();
+    const onReorder = vi.fn();
+    const dnd = createDragReorder(() => makeItems([1, 2, 3]), onReorder);
+    const release = vi.fn();
+    handle.hasPointerCapture = () => true;
+    handle.releasePointerCapture = release;
+    vi.spyOn(document, "elementFromPoint").mockReturnValue(makeRowElement(2));
+    dnd.handleDragStart(1, makeStartEvent(handle, 100, 10));
+    dispatchPointerMove(100, 390);
+    expect(frames.size).toBe(1);
+    dnd.dispose();
+    expect(release).toHaveBeenCalledWith(1);
+    expect(frames.size).toBe(0);
+    dispatchPointerMove(100, 390);
+    dispatchPointerUp();
+    runFrames(2);
+    expect(container.scrollTop).toBe(0);
+    expect(dnd.draggedId).toBeNull();
+    expect(onReorder).not.toHaveBeenCalled();
   });
 });

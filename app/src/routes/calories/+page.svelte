@@ -23,6 +23,7 @@
     } from "@tanstack/svelte-query";
 
     import Header from "#lib/components/layout/Header.svelte";
+    import { grayButtonClass } from "#lib/components/ui/styles.ts";
     import PageScrollArea from "#lib/components/layout/PageScrollArea.svelte";
     import CalorieAchievement from "#lib/components/calories/CalorieAchievement.svelte";
     import CalorieAutoRecordPanel from "#lib/components/calories/CalorieAutoRecordPanel.svelte";
@@ -45,6 +46,7 @@
     const queryClient = useQueryClient();
     let windowOffset = $state(0);
     let deleteTarget = $state<RecordRow | undefined>();
+    let deleting = $state<symbol | undefined>();
     // 記録と品目の追加フォームへの入力を、両表の検索語として共有する
     let recordAddItemName = $state("");
     let itemAddName = $state("");
@@ -174,23 +176,62 @@
     const isLoading = $derived(
         itemsQuery.isLoading ||
             recordsQuery.isLoading ||
-            summaryQuery.isLoading,
+            summaryQuery.isLoading ||
+            autoRecordsQuery.isLoading,
     );
 
     async function confirmDelete() {
-        if (!deleteTarget) return;
-        await deleteRecordMutation.mutateAsync(deleteTarget.id);
-        deleteTarget = undefined;
+        if (!deleteTarget || deleting) return;
+        const target = deleteTarget;
+        const request = Symbol();
+        deleting = request;
+        try {
+            await deleteRecordMutation.mutateAsync(target.id);
+            if (deleteTarget === target) deleteTarget = undefined;
+        } finally {
+            if (deleting === request) deleting = undefined;
+        }
     }
 </script>
 
 <Header page="calories" {isLoading} />
+
+{#snippet queryStatus(
+    label: string,
+    query: {
+        isPending: boolean;
+        error: Error | null;
+        isFetching: boolean;
+        refetch: () => Promise<unknown>;
+    },
+)}
+    {#if query.error}
+        <div
+            role="alert"
+            class="mb-3 rounded border border-red-300 p-3 text-red-700 dark:border-red-700 dark:text-red-300"
+        >
+            <p>{label}の取得に失敗しました: {query.error.message}</p>
+            <button
+                type="button"
+                disabled={query.isFetching}
+                onclick={() => {
+                    void query.refetch();
+                }}
+                class="mt-2 {grayButtonClass} disabled:cursor-not-allowed disabled:opacity-50"
+                >再試行</button
+            >
+        </div>
+    {:else if query.isPending}
+        <p role="status">{label}を取得中…</p>
+    {/if}
+{/snippet}
 
 <PageScrollArea>
     <main class="mx-auto w-full min-w-0 px-3 py-4 sm:px-4 sm:py-6 xl:max-w-285">
         <h1 class="mb-5 text-2xl font-bold text-gray-800 dark:text-gray-100">
             カロリー計算
         </h1>
+        {@render queryStatus("カロリー集計", summaryQuery)}
         {#if summaryQuery.data}
             <CalorieSummary
                 periods={summaryQuery.data.periods}
@@ -200,53 +241,80 @@
             <CalorieAchievement achievement={summaryQuery.data.achievement} />
         {/if}
         <div class="mt-5 grid gap-5 lg:grid-cols-[1.4fr_1fr]">
-            <CalorieRecordTable
-                {items}
-                {records}
-                {windowOffset}
-                onWindowChange={(offset) => (windowOffset = offset)}
-                onCreate={(input) => createRecordMutation.mutateAsync(input)}
-                onUpdate={(input) => updateRecordMutation.mutateAsync(input)}
-                onDelete={(record) => (deleteTarget = record)}
-                bind:addItemName={recordAddItemName}
-                {filterKeywords}
-                onClearFilter={clearFilter}
-            />
-            <CalorieItemTable
-                {items}
-                onCreate={(input) => createItemMutation.mutateAsync(input)}
-                onUpdate={(input) => updateItemMutation.mutateAsync(input)}
-                onDelete={(itemId) => deleteItemMutation.mutateAsync(itemId)}
-                bind:addName={itemAddName}
-                {filterKeywords}
-                onClearFilter={clearFilter}
-            />
+            <div>
+                {@render queryStatus("記録", recordsQuery)}
+                {#if recordsQuery.data && itemsQuery.data}
+                    <CalorieRecordTable
+                        {items}
+                        {records}
+                        {windowOffset}
+                        onWindowChange={(offset) => (windowOffset = offset)}
+                        onCreate={(input) =>
+                            createRecordMutation.mutateAsync(input)}
+                        onUpdate={(input) =>
+                            updateRecordMutation.mutateAsync(input)}
+                        onDelete={(record) => (deleteTarget = { ...record })}
+                        bind:addItemName={recordAddItemName}
+                        {filterKeywords}
+                        onClearFilter={clearFilter}
+                    />
+                {/if}
+            </div>
+            <div>
+                {@render queryStatus("品目", itemsQuery)}
+                {#if itemsQuery.data}
+                    <CalorieItemTable
+                        {items}
+                        onCreate={(input) =>
+                            createItemMutation.mutateAsync(input)}
+                        onUpdate={(input) =>
+                            updateItemMutation.mutateAsync(input)}
+                        onDelete={(itemId) =>
+                            deleteItemMutation.mutateAsync(itemId)}
+                        bind:addName={itemAddName}
+                        {filterKeywords}
+                        onClearFilter={clearFilter}
+                    />
+                {/if}
+            </div>
         </div>
         <div class="mt-5 grid gap-5 lg:grid-cols-2">
-            <CalorieAutoRecordPanel
-                {items}
-                {autoRecords}
-                onCreate={(input) =>
-                    createAutoRecordMutation.mutateAsync(input)}
-                onUpdate={(input) =>
-                    updateAutoRecordMutation.mutateAsync(input)}
-                onDelete={(autoRecordId) =>
-                    deleteAutoRecordMutation.mutateAsync(autoRecordId)}
-            />
-            <CalorieBulkControls
-                {items}
-                onBulkCreate={(input) => bulkCreateMutation.mutateAsync(input)}
-                onBulkDelete={(input) => bulkDeleteMutation.mutateAsync(input)}
-            />
+            <div>
+                {@render queryStatus("自動記録", autoRecordsQuery)}
+                {#if autoRecordsQuery.data && itemsQuery.data}
+                    <CalorieAutoRecordPanel
+                        {items}
+                        {autoRecords}
+                        onCreate={(input) =>
+                            createAutoRecordMutation.mutateAsync(input)}
+                        onUpdate={(input) =>
+                            updateAutoRecordMutation.mutateAsync(input)}
+                        onDelete={(autoRecordId) =>
+                            deleteAutoRecordMutation.mutateAsync(autoRecordId)}
+                    />
+                {/if}
+            </div>
+            {#if itemsQuery.data}
+                <CalorieBulkControls
+                    {items}
+                    onBulkCreate={(input) =>
+                        bulkCreateMutation.mutateAsync(input)}
+                    onBulkDelete={(input) =>
+                        bulkDeleteMutation.mutateAsync(input)}
+                />
+            {/if}
         </div>
         <div class="mt-5">
-            <CalorieCsvControls
-                {items}
-                onExportRecords={() => trpc.calories.allRecords.query()}
-                onImportItems={(rows) => importItemsMutation.mutateAsync(rows)}
-                onImportRecords={(rows) =>
-                    importRecordsMutation.mutateAsync(rows)}
-            />
+            {#if itemsQuery.data}
+                <CalorieCsvControls
+                    {items}
+                    onExportRecords={() => trpc.calories.allRecords.query()}
+                    onImportItems={(rows) =>
+                        importItemsMutation.mutateAsync(rows)}
+                    onImportRecords={(rows) =>
+                        importRecordsMutation.mutateAsync(rows)}
+                />
+            {/if}
         </div>
     </main>
 </PageScrollArea>
@@ -257,6 +325,7 @@
     message="この記録を削除しますか？"
     confirmLabel="削除"
     variant="danger"
+    confirmDisabled={deleting !== undefined}
     onConfirm={confirmDelete}
     onCancel={() => (deleteTarget = undefined)}
 />

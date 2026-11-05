@@ -93,12 +93,23 @@ export function createDragReorder<T extends Orderable>(
   const externalDropTargetIdAttribute =
     options?.externalDropTargetIdAttribute ?? "dropTargetId";
 
-  // D&D 状態（Svelte 5 $state rune）
-  let draggedId = $state<number | null>(null);
-  let isActive = $state(false);
-  let dropTargetId = $state<number | null>(null);
-  let dropPosition = $state<"before" | "after" | null>(null);
-  let externalDropTargetId = $state<number | null>(null);
+  type DragState =
+    { phase: "idle" } | { phase: "pressed" | "dragging"; id: number };
+  type DropTarget =
+    | { kind: "none" }
+    | { kind: "internal"; id: number; position: "before" | "after" }
+    | { kind: "external"; id: number };
+  let drag = $state<DragState>({ phase: "idle" });
+  let target = $state<DropTarget>({ kind: "none" });
+  const draggedId = $derived(drag.phase === "idle" ? null : drag.id);
+  const isActive = $derived(drag.phase === "dragging");
+  const dropTargetId = $derived(target.kind === "internal" ? target.id : null);
+  const dropPosition = $derived(
+    target.kind === "internal" ? target.position : null,
+  );
+  const externalDropTargetId = $derived(
+    target.kind === "external" ? target.id : null,
+  );
 
   // 内部状態（reactivity 不要のため通常変数）
   let startX = 0;
@@ -117,11 +128,8 @@ export function createDragReorder<T extends Orderable>(
    * これにより指やマウスがハンドル要素から離れても以降のイベントを受け取れる。
    */
   function handleDragStart(itemId: number, event: PointerEvent) {
-    draggedId = itemId;
-    isActive = false;
-    dropTargetId = null;
-    dropPosition = null;
-    updateExternalDropTarget(null);
+    dispose();
+    drag = { phase: "pressed", id: itemId };
     startX = event.clientX;
     startY = event.clientY;
     activePointerId = event.pointerId;
@@ -159,7 +167,7 @@ export function createDragReorder<T extends Orderable>(
       const dx = event.clientX - startX;
       const dy = event.clientY - startY;
       if (dx * dx + dy * dy < threshold * threshold) return;
-      isActive = true;
+      drag = { phase: "dragging", id: draggedId };
     }
 
     lastX = event.clientX;
@@ -186,9 +194,7 @@ export function createDragReorder<T extends Orderable>(
       externalDropTargetIdAttribute,
     );
     if (externalTarget !== null) {
-      dropTargetId = null;
-      dropPosition = null;
-      updateExternalDropTarget(externalTarget.id);
+      updateTarget({ kind: "external", id: externalTarget.id });
       return;
     }
 
@@ -197,11 +203,13 @@ export function createDragReorder<T extends Orderable>(
       clearDropCandidates();
       return;
     }
-    updateExternalDropTarget(null);
     const rect = target.element.getBoundingClientRect();
     const midY = rect.top + rect.height / 2;
-    dropTargetId = target.id;
-    dropPosition = y < midY ? "before" : "after";
+    updateTarget({
+      kind: "internal",
+      id: target.id,
+      position: y < midY ? "before" : "after",
+    });
   }
 
   /**
@@ -322,6 +330,7 @@ export function createDragReorder<T extends Orderable>(
 
   /** window へ登録した pointer 系リスナーを撤去する。 */
   function cleanupPointerListeners() {
+    if (activePointerId === null) return;
     stopAutoScroll();
     window.removeEventListener("pointermove", handlePointerMove);
     window.removeEventListener("pointerup", handlePointerUp);
@@ -330,6 +339,12 @@ export function createDragReorder<T extends Orderable>(
       "lostpointercapture",
       handleLostPointerCapture,
     );
+    if (
+      activePointerId !== null &&
+      captureElement?.hasPointerCapture(activePointerId)
+    ) {
+      captureElement.releasePointerCapture(activePointerId);
+    }
     captureElement = null;
     activePointerId = null;
   }
@@ -357,23 +372,27 @@ export function createDragReorder<T extends Orderable>(
 
   /** 候補を排他的に消去する。 */
   function clearDropCandidates() {
-    dropTargetId = null;
-    dropPosition = null;
-    updateExternalDropTarget(null);
+    updateTarget({ kind: "none" });
   }
 
   /** 外部ドロップ先候補を更新し、表示側へ通知する。 */
-  function updateExternalDropTarget(targetId: number | null) {
-    if (externalDropTargetId === targetId) return;
-    externalDropTargetId = targetId;
-    options?.onExternalDropTargetChange?.(targetId);
+  function updateTarget(next: DropTarget) {
+    const previousExternalId = externalDropTargetId;
+    target = next;
+    const nextExternalId = next.kind === "external" ? next.id : null;
+    if (previousExternalId !== nextExternalId)
+      options?.onExternalDropTargetChange?.(nextExternalId);
   }
 
   /** ドラッグ終了・キャンセル時の状態リセット。 */
   function resetDragState() {
-    draggedId = null;
-    isActive = false;
+    drag = { phase: "idle" };
     clearDropCandidates();
+  }
+
+  function dispose() {
+    cleanupPointerListeners();
+    resetDragState();
   }
 
   return {
@@ -394,5 +413,6 @@ export function createDragReorder<T extends Orderable>(
       return dropPosition;
     },
     handleDragStart,
+    dispose,
   };
 }

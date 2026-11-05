@@ -4,22 +4,26 @@ import type { TagInfo } from "#lib/types.ts";
 export function createMainDialogs() {
   // タスク編集ダイアログの状態
   type EditDialog = {
+    sessionId: number;
     open: boolean;
     listId: number;
     taskId: number;
     text: string;
     moveTo: string;
     completed: boolean;
+    savedCompleted: boolean;
     tags: TagInfo[];
     kind: TaskKind;
   };
   let editDialog = $state<EditDialog>({
+    sessionId: 0,
     open: false,
     listId: 0,
     taskId: 0,
     text: "",
     moveTo: "",
     completed: false,
+    savedCompleted: false,
     tags: [],
     kind: "normal",
   });
@@ -29,12 +33,14 @@ export function createMainDialogs() {
 
   // リスト統合ダイアログの状態
   type MergeDialog = {
+    pending: boolean;
     open: boolean;
     sourceListId: number;
     sourceTitle: string;
     taskCount: number;
   };
   let mergeDialog = $state<MergeDialog>({
+    pending: false,
     open: false,
     sourceListId: 0,
     sourceTitle: "",

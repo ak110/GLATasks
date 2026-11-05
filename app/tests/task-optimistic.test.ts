@@ -485,7 +485,7 @@ test.describe("task-optimistic", () => {
     }
   });
 
-  test("同一内容の後発保存が成功した後に先行保存が失敗しても編集結果を維持する", async ({
+  test("保存中の再送を抑止し、失敗後の再試行で編集結果を維持する", async ({
     page,
     browser,
   }) => {
@@ -553,6 +553,18 @@ test.describe("task-optimistic", () => {
       await dialog.getByTestId("task-edit-save-btn").click();
       await firstUpdateIntercepted;
 
+      await expect(dialog.getByTestId("task-edit-save-btn")).toBeDisabled();
+      await dialog.getByTestId("task-edit-save-btn").dispatchEvent("click");
+      expect(updateRequestCount).toBe(1);
+      const failedUpdateRefetch = page.waitForResponse((response) =>
+        isTrpcUrl(response.url(), "tasks.listActive"),
+      );
+      releaseFirstUpdate();
+      expect((await failedUpdateResponse).status()).toBe(500);
+      expect((await failedUpdateRefetch).ok()).toBe(true);
+      await expect(page.getByTestId("toast-error")).toBeVisible();
+      await expect(dialog.getByTestId("task-edit-save-btn")).toBeEnabled();
+
       const successfulUpdateResponse = page.waitForResponse(
         (response) =>
           isTrpcUrl(response.url(), "tasks.update") && response.ok(),
@@ -564,13 +576,6 @@ test.describe("task-optimistic", () => {
       expect((await successfulUpdateResponse).ok()).toBe(true);
       expect((await successfulUpdateRefetch).ok()).toBe(true);
 
-      const failedUpdateRefetch = page.waitForResponse((response) =>
-        isTrpcUrl(response.url(), "tasks.listActive"),
-      );
-      releaseFirstUpdate();
-      expect((await failedUpdateResponse).status()).toBe(500);
-      expect((await failedUpdateRefetch).ok()).toBe(true);
-      await expect(page.getByTestId("toast-error")).toBeVisible();
       await dialog.getByRole("button", { name: "閉じる", exact: true }).click();
 
       await page

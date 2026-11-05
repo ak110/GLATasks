@@ -60,35 +60,42 @@ export async function createFixtureTask(userId?: number) {
 
 export async function cleanupFixtures(userIds: number[]): Promise<void> {
   if (userIds.length === 0) return;
-  await getDb().transaction(async (tx) => {
-    const listRows = await tx
-      .select({ id: lists.id })
-      .from(lists)
-      .where(inArray(lists.user_id, userIds));
-    const listIds = listRows.map((row) => row.id);
-    if (listIds.length > 0) {
-      const taskRows = await tx
-        .select({ id: tasks.id })
-        .from(tasks)
-        .where(inArray(tasks.list_id, listIds));
-      const taskIds = taskRows.map((row) => row.id);
-      if (taskIds.length > 0) {
-        await tx
-          .delete(attachments)
-          .where(inArray(attachments.task_id, taskIds));
-        await tx.delete(tasks).where(inArray(tasks.id, taskIds));
+  // 回収対象のuserIdは固定されるため、子の最新状態を読んで削除する。
+  // 初回SELECTのスナップショットを後続DELETEへ持ち越す更新競合を避ける。
+  await getDb().transaction(
+    async (tx) => {
+      const listRows = await tx
+        .select({ id: lists.id })
+        .from(lists)
+        .where(inArray(lists.user_id, userIds));
+      const listIds = listRows.map((row) => row.id);
+      if (listIds.length > 0) {
+        const taskRows = await tx
+          .select({ id: tasks.id })
+          .from(tasks)
+          .where(inArray(tasks.list_id, listIds));
+        const taskIds = taskRows.map((row) => row.id);
+        if (taskIds.length > 0) {
+          await tx
+            .delete(attachments)
+            .where(inArray(attachments.task_id, taskIds));
+          await tx.delete(tasks).where(inArray(tasks.id, taskIds));
+        }
+        await tx.delete(schedules).where(inArray(schedules.list_id, listIds));
+        await tx.delete(lists).where(inArray(lists.id, listIds));
       }
-      await tx.delete(schedules).where(inArray(schedules.list_id, listIds));
-      await tx.delete(lists).where(inArray(lists.id, listIds));
-    }
-    await tx.delete(timers).where(inArray(timers.user_id, userIds));
-    await tx
-      .delete(calorieAutoRecords)
-      .where(inArray(calorieAutoRecords.user_id, userIds));
-    await tx
-      .delete(calorieRecords)
-      .where(inArray(calorieRecords.user_id, userIds));
-    await tx.delete(calorieItems).where(inArray(calorieItems.user_id, userIds));
-    await tx.delete(users).where(inArray(users.id, userIds));
-  });
+      await tx.delete(timers).where(inArray(timers.user_id, userIds));
+      await tx
+        .delete(calorieAutoRecords)
+        .where(inArray(calorieAutoRecords.user_id, userIds));
+      await tx
+        .delete(calorieRecords)
+        .where(inArray(calorieRecords.user_id, userIds));
+      await tx
+        .delete(calorieItems)
+        .where(inArray(calorieItems.user_id, userIds));
+      await tx.delete(users).where(inArray(users.id, userIds));
+    },
+    { isolationLevel: "read committed" },
+  );
 }

@@ -21,6 +21,7 @@
     } from "#lib/timer-utils.ts";
 
     interface Props {
+        session?: number;
         open: boolean;
         mode: "create" | "edit";
         ephemeral: boolean;
@@ -31,6 +32,8 @@
         adjustMinutes: number;
         ringSeconds: number;
         onSubmit: (data: TimerFormSubmission) => void;
+        submitting?: boolean;
+        onInputChange?: (data: TimerFormSubmission | undefined) => void;
         onClose: () => void;
         onSaveAsDefault?: (
             preferences: RouterInputs["users"]["updatePreferences"],
@@ -38,6 +41,7 @@
     }
 
     let {
+        session = 0,
         open,
         mode,
         ephemeral,
@@ -48,6 +52,8 @@
         adjustMinutes: initialAdjustMinutes,
         ringSeconds: initialRingSeconds,
         onSubmit,
+        submitting = false,
+        onInputChange,
         onClose,
         onSaveAsDefault,
     }: Props = $props();
@@ -72,6 +78,7 @@
 
     // ダイアログ開閉時にローカル状態をリセット
     $effect(() => {
+        void session;
         if (open) {
             localName = initialName;
             localTimerMode = initialTimerMode;
@@ -86,11 +93,11 @@
         }
     });
 
-    function handleSubmit() {
+    function getSubmission(): TimerFormSubmission | undefined {
         if (localTimerMode === "alarm") {
             const target = parseTargetTime(localTargetTime);
             if (target === null) return;
-            onSubmit({
+            return {
                 name: localName.trim(),
                 mode: "alarm",
                 baseSeconds: 0,
@@ -98,11 +105,11 @@
                 tzOffsetMinutes: getUtcOffsetMinutes(),
                 adjustMinutes: localAdjustMinutes,
                 ringSeconds: localRingSeconds,
-            });
+            };
         } else {
             const baseSeconds = parseTimeInput(localBaseTime);
             if (baseSeconds === null || baseSeconds <= 0) return;
-            onSubmit({
+            return {
                 name: localName.trim(),
                 mode: "countdown",
                 baseSeconds: baseSeconds,
@@ -110,8 +117,14 @@
                 tzOffsetMinutes: null,
                 adjustMinutes: localAdjustMinutes,
                 ringSeconds: localRingSeconds,
-            });
+            };
         }
+    }
+
+    function handleSubmit() {
+        if (submitting) return;
+        const data = getSubmission();
+        if (data) onSubmit(data);
     }
 
     /** 現在のフォーム値を利用者既定値として保存する */
@@ -142,6 +155,8 @@
 >
     <form
         bind:this={formEl}
+        oninput={() => onInputChange?.(getSubmission())}
+        onchange={() => onInputChange?.(getSubmission())}
         onsubmit={(e) => {
             e.preventDefault();
             handleSubmit();
@@ -170,7 +185,10 @@
         <div class="flex gap-0" data-testid="timer-mode-selector">
             <button
                 type="button"
-                onclick={() => (localTimerMode = "countdown")}
+                onclick={() => {
+                    localTimerMode = "countdown";
+                    onInputChange?.(getSubmission());
+                }}
                 class="cursor-pointer rounded-l px-4 py-1.5 text-sm {localTimerMode ===
                 'countdown'
                     ? 'bg-blue-600 text-white'
@@ -181,7 +199,10 @@
             </button>
             <button
                 type="button"
-                onclick={() => (localTimerMode = "alarm")}
+                onclick={() => {
+                    localTimerMode = "alarm";
+                    onInputChange?.(getSubmission());
+                }}
                 class="cursor-pointer rounded-r px-4 py-1.5 text-sm {localTimerMode ===
                 'alarm'
                     ? 'bg-blue-600 text-white'
@@ -277,9 +298,14 @@
             {/if}
             <button
                 type="submit"
+                disabled={submitting}
                 class="cursor-pointer rounded bg-blue-600 px-6 py-2 text-white hover:bg-blue-700"
                 data-testid="timer-submit-btn"
-                >{mode === "create" ? "追加" : "保存"}</button
+                >{submitting
+                    ? "保存中…"
+                    : mode === "create"
+                      ? "追加"
+                      : "保存"}</button
             >
         </div>
     </form>
