@@ -38,7 +38,7 @@ jobs:
           output=$(pyfltr --version 2>&1)
           version=$(printf '%s\n' "$output" | sed -n 's/^pyfltr \([0-9][0-9A-Za-z.+-]*\)$/\1/p')
           if [ -z "$version" ]; then
-            echo "::error::pyfltrの版を取り出せない: ${output}"
+            echo "::error::pyfltrの版を取り出せない（pyfltr --versionの出力: ${output}）。出力の形式が変わった場合は、このステップの抽出処理を出力に合わせて直す"
             exit 1
           fi
           echo "version=${version}" >> "$GITHUB_OUTPUT"
