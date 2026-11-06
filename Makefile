@@ -200,9 +200,19 @@ test-e2e:  # E2Eテスト（E2E_GREP=... 指定で対象限定実行）
 # アプリと同じデータベースを使うと、稼働中のアプリの定期処理がテストのfixtureへ実時刻の分を書き込み、
 # テストもアプリの開発用データを処理するためである。
 # 本番イメージは`TZ=Asia/Tokyo`で動くため、プロセスの時刻帯に依存する計算を検出できるよう、UTCと本番の時刻帯の両方で実行する
+# 試験専用のデータベースは名前が固定のため、同時に2つの実行が使うと、後の実行の作り直しと
+# 定期処理の試験（全リストの有効な予定を走査して更新する`processSchedules`）が先の実行のfixtureへ交差する。
+# 回収中の行が別の実行に更新されると、MariaDBのsnapshot isolationで回収が失敗する（ER_CHECKREAD）。
+# このため手順全体をホスト上のファイルロックで直列化し、後から起動した実行は先の実行の終了を待つ。
 TEST_DB_NAME = glatasks_test
+TEST_DB_LOCK = .cache/test-db.lock
 
 test-db:  # DBへ実接続する統合テスト（Docker環境が起動していること）。試験専用DBで動き、開発用データと稼働中のアプリの定期処理に影響しない
+	mkdir -p $(dir $(TEST_DB_LOCK))
+	flock $(TEST_DB_LOCK) $(MAKE) --no-print-directory test-db-locked
+
+# test-dbがロックを取得した後に実行する本体。直接呼ぶと同時実行の直列化を経ない
+test-db-locked:
 	docker compose exec -T db mariadb --user=root --password="$(DB_CREDENTIAL)" \
 		--execute="DROP DATABASE IF EXISTS $(TEST_DB_NAME); CREATE DATABASE $(TEST_DB_NAME); GRANT ALL PRIVILEGES ON $(TEST_DB_NAME).* TO '$(DB_CREDENTIAL)'@'%';"
 	docker compose run --rm \
@@ -218,4 +228,4 @@ test-db:  # DBへ実接続する統合テスト（Docker環境が起動してい
 			TZ=Asia/Tokyo pnpm run test:unit --project node\
 		'
 
-.PHONY: help setup sync backup deploy build start stop restart-app logs ps healthcheck shell node-shell update update-actions format test test-unit test-backup test-db test-e2e start-app logs-app migrate db-studio sql docs docs-dev
+.PHONY: help setup sync backup deploy build start stop restart-app logs ps healthcheck shell node-shell update update-actions format test test-unit test-backup test-db test-db-locked test-e2e start-app logs-app migrate db-studio sql docs docs-dev

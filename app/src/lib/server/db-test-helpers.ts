@@ -58,16 +58,35 @@ export async function createFixtureTask(userId?: number) {
   return { ...fixture, taskId };
 }
 
-export async function cleanupFixtures(userIds: number[]): Promise<void> {
+/** `cleanupFixtures`の試験用の差し込み口。回収の競合を決定的に再現する試験だけが使う。 */
+export type CleanupFixturesOptions = {
+  /** 回収transactionの分離レベル。既定はREAD COMMITTED。 */
+  isolationLevel?: "read committed" | "repeatable read";
+  /** 最初の読み取り（読み取りビューの作成）の直後に呼ぶ処理。 */
+  afterFirstRead?: () => Promise<void>;
+};
+
+/**
+ * 所有する利用者と、その子のfixtureを回収する。
+ *
+ * 回収transactionはREAD COMMITTEDで実行する。
+ * MariaDBの`innodb_snapshot_isolation=ON`とREPEATABLE READでは、最初の読み取りで作った読み取りビューの後に
+ * 別の接続が削除対象の行を更新すると、その行の削除が`ER_CHECKREAD`（1020）で失敗する。
+ * 定期処理（`processSchedules`）は全リストの有効な予定を走査して更新するため、別の試験の実行がfixtureの予定を更新しうる。
+ * 回収は固定のuserIdの行を消すだけで読み取りビューの一貫性を必要としないため、文ごとに最新の行を読む分離レベルを使う。
+ */
+export async function cleanupFixtures(
+  userIds: number[],
+  options: CleanupFixturesOptions = {},
+): Promise<void> {
   if (userIds.length === 0) return;
-  // 回収対象のuserIdは固定されるため、子の最新状態を読んで削除する。
-  // 初回SELECTのスナップショットを後続DELETEへ持ち越す更新競合を避ける。
   await getDb().transaction(
     async (tx) => {
       const listRows = await tx
         .select({ id: lists.id })
         .from(lists)
         .where(inArray(lists.user_id, userIds));
+      await options.afterFirstRead?.();
       const listIds = listRows.map((row) => row.id);
       if (listIds.length > 0) {
         const taskRows = await tx
@@ -96,6 +115,6 @@ export async function cleanupFixtures(userIds: number[]): Promise<void> {
         .where(inArray(calorieItems.user_id, userIds));
       await tx.delete(users).where(inArray(users.id, userIds));
     },
-    { isolationLevel: "read committed" },
+    { isolationLevel: options.isolationLevel ?? "read committed" },
   );
 }

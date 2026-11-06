@@ -280,6 +280,12 @@ const withApiErrors = t.middleware(async ({ next }) => {
 
 テーブル定義は `app/src/lib/server/schema.ts` を参照。以下はコードから読み取りにくい設計判断:
 
+- MariaDB（12.3系）は`innodb_snapshot_isolation=ON`で、既定の分離レベルはREPEATABLE READである。
+  transactionの最初の読み取りで作られた読み取りビューの後に、別の接続が同じ行を更新してcommitすると、
+  その行の削除・更新は`ER_CHECKREAD`（1020）で失敗する。別の値の行の更新では発生しない。
+  試験のfixture回収（`cleanupFixtures`）のように、読み取りビューの一貫性を要しない読み取り後の削除はREAD COMMITTEDにする。
+  定期処理（`processSchedules`）は全リストの有効な予定を走査して更新するため、試験用DBは`make test-db`のファイルロックで同時に1つの実行だけが使う
+
 - `task.status`は`active`・`running`・`completed`・`archived`の4値を取り得る。
   `running`は未完了としてTODOバッジへ計上し、`lists.clear`（完了済みタスクの非表示）の対象外とする
 
