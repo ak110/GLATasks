@@ -56,6 +56,7 @@ it("ESLint selects nested and dot files while preserving global ignores", async 
   expect(results.every((result) => result.errorCount === 0)).toBe(true);
 });
 
+// 実際の.textlintrc.yamlから全ルールを読み込むため、並行実行の負荷下では既定の5秒の上限を超える。
 it("textlint finds Markdown files and respects explicit and default ignores", async () => {
   for (const path of [
     "docs/main.md",
@@ -83,7 +84,7 @@ it("textlint finds Markdown files and respects explicit and default ignores", as
     results.map((result) => relative(cwd, result.filePath)).sort(),
   ).toEqual(["docs/.hidden.md", "docs/main.md", "docs/nested/page.md"]);
   await expect(linter.lintFiles(["docs/generated/*.md"])).resolves.toEqual([]);
-});
+}, 60_000);
 
 it("bounds globstar-parent pattern expansion at optimization level two", () => {
   // GHSA-g3hv-75wg-m249: 小さな入力で上限を確かめ、時間閾値には依存しない。
