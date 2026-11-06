@@ -24,16 +24,18 @@
  *
  * ## 検出後の挙動
  *
- * 入力中ユーザーの操作妨害を避けるため、検知時の挙動を入力中の有無で分岐する。
+ * 判定結果（`classifyHealth`）の区分で挙動を分ける。
  *
- * - 非入力中: 即時に `location.reload()` を呼ぶ。再読み込み先が認証画面への導線を兼ねる。
- * - 入力中:   `connectivityState.pendingReload` を真にしてバナーで案内する。
- *             入力を保ったまま、接続回復を検知した時点でバナーを自動解除する。
+ * - 到達不能（通信エラー・タイムアウト・511以外の5xx）: 再読み込みせず、`connectivityState.pendingReload`を真にしてバナーで案内する。
+ *   通信断の間に再読み込みすると、画面の取得に失敗してService Workerのオフライン画面へ移り、表示中の画面を失うためである
+ *   （AndroidのPWAで復帰直後に通信が再開しきっていない場合など）。接続回復を検知した時点でバナーを自動解除する。
+ * - 応答の横取り（キャプティブポータルなど）: 非入力中は即時に`location.reload()`を呼び、再読み込み先で認証画面へ誘導する。
+ *   入力中は操作妨害を避けるためバナーで案内する。
  */
 
 import { debugLog } from "#lib/client/debug-log.ts";
 import {
-  isHealthy,
+  classifyHealth,
   startConnectivityTriggers,
 } from "#lib/client/sse/connectivity-check.js";
 
@@ -75,11 +77,14 @@ export async function checkConnectivity(
   if (checking) return;
   checking = true;
   try {
-    const healthy = await isHealthy(fetchFn);
-    debugLog("connectivity", "check", { healthy });
-    if (healthy) {
+    const health = await classifyHealth(fetchFn);
+    debugLog("connectivity", "check", { health });
+    if (health === "healthy") {
       // 回復検知: バナー待機中なら自動解除する
       connectivityState.pendingReload = false;
+    } else if (health === "unreachable") {
+      debugLog("connectivity", "recover", { mode: "banner" });
+      connectivityState.pendingReload = true;
     } else {
       triggerReload();
     }
@@ -88,13 +93,14 @@ export async function checkConnectivity(
   }
 }
 
-/** 接続不全検知時に呼び出され、入力中ならバナー表示、非入力中なら即リロードする */
+/** 応答の横取りを検知した時に呼び出され、入力中ならバナー表示、非入力中なら即リロードする */
 function triggerReload(): void {
   if (isUserBusy()) {
     debugLog("connectivity", "recover", { mode: "banner" });
     connectivityState.pendingReload = true;
   } else {
     debugLog("connectivity", "recover", { mode: "reload" });
+    // eslint-disable-next-line no-restricted-syntax -- 応答の横取りのときだけ再読み込みし、到達不能では呼ばない。再読み込み先でキャプティブポータルの認証画面へ誘導する
     location.reload();
   }
 }

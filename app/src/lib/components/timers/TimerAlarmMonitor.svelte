@@ -188,6 +188,7 @@
         });
         notification.onclick = () => {
             window.focus();
+            // eslint-disable-next-line no-restricted-syntax -- 利用者が通知を押して起こる遷移で、自動処理が表示中の画面を捨てるものではない
             window.location.href = resolve("/timers");
             notification.close();
         };

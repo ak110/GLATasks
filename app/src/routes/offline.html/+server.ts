@@ -47,9 +47,17 @@ const HTML = `<!doctype html>
     <script type="module">
       ${connectivityCheckSource}
 
-      startConnectivityTriggers(async () => {
-        if (await isHealthy()) globalThis.location.reload();
-      });
+      // 健全を確認してから再読み込みし、通信断のままオフライン画面へ戻らないようにする。
+      // Service Workerは元のURLの応答としてこの画面を返すため、通常は再読み込みで元の画面へ戻る。
+      // この画面のURLを直接開いた場合は、再読み込みしても表示直後の判定で再び再読み込みを繰り返すため、トップ画面へ移る。
+      startConnectivityTriggers(
+        async () => {
+          if ((await classifyHealth()) !== "healthy") return;
+          if (globalThis.location.pathname === "/offline.html") globalThis.location.replace("/");
+          else globalThis.location.reload();
+        },
+        { intervalMs: OFFLINE_POLL_INTERVAL_MS, immediate: true },
+      );
 
       document.querySelector("button").addEventListener("click", () => {
         globalThis.location.reload();

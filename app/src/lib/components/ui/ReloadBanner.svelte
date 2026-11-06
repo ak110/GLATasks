@@ -5,6 +5,11 @@
         children: Snippet;
     }
     let { testId, children }: Props = $props();
+
+    function reloadPage(): void {
+        // eslint-disable-next-line no-restricted-syntax -- 利用者の操作で起こる再読み込み。通信断ならオフライン画面になるが、利用者が求めた結果である
+        location.reload();
+    }
 </script>
 
 <div
@@ -16,6 +21,6 @@
     <button
         type="button"
         class="cursor-pointer rounded bg-white px-3 py-1 font-semibold text-blue-700 hover:bg-blue-50 dark:bg-blue-100 dark:hover:bg-white"
-        onclick={() => location.reload()}>再読み込み</button
+        onclick={reloadPage}>再読み込み</button
     >
 </div>

@@ -45,6 +45,7 @@
     beforeNavigate((nav) => {
         if (updated.current && nav.to?.url && !nav.willUnload) {
             nav.cancel();
+            // eslint-disable-next-line no-restricted-syntax -- 新版の検知後に利用者の操作で起こる遷移を完全な遷移へ切り替える。遷移しない場合も通信断なら画面を取得できない
             location.href = nav.to.url.href;
         }
     });

@@ -7,7 +7,7 @@
 
 const SW_SCRIPT = `\
 // offline.html/+server.ts または connectivity-check.js を変更したら更新する。
-const OFFLINE_VERSION = 3;
+const OFFLINE_VERSION = 4;
 const CACHE_NAME = "offline-v" + OFFLINE_VERSION;
 const OFFLINE_URL = "/offline.html";
 

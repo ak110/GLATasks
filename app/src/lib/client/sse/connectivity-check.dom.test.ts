@@ -7,7 +7,14 @@ function makeFetch(options: {
   contentType?: string;
   body?: string;
   reject?: boolean;
+  timeout?: boolean;
 }): typeof fetch {
+  if (options.timeout) {
+    // AbortSignal.timeoutの打ち切りと同じ種別の例外で失敗させる
+    return vi.fn(() =>
+      Promise.reject(new DOMException("timed out", "TimeoutError")),
+    ) as unknown as typeof fetch;
+  }
   if (options.reject) {
     return vi.fn(() =>
       Promise.reject(new TypeError("network error")),
@@ -42,40 +49,78 @@ describe("connectivity-check", () => {
     vi.useRealTimers();
   });
 
+  // 3区分の同値分割と境界: 到達不能（通信断・511以外の5xx）と応答の横取り（それ以外の不健全）を分ける
   it.each([
     {
       label: "健全（200・JSON・ok）",
       fetch: makeFetch({}),
-      expected: true,
-    },
-    { label: "非200", fetch: makeFetch({ status: 503 }), expected: false },
-    {
-      label: "非JSON",
-      fetch: makeFetch({
-        contentType: "text/html",
-        body: "<html>login</html>",
-      }),
-      expected: false,
-    },
-    {
-      label: "status 値が非ok",
-      fetch: makeFetch({ body: '{"status":"error"}' }),
-      expected: false,
+      expected: "healthy",
     },
     {
       label: "fetch 例外",
       fetch: makeFetch({ reject: true }),
-      expected: false,
+      expected: "unreachable",
+    },
+    {
+      label: "タイムアウト",
+      fetch: makeFetch({ timeout: true }),
+      expected: "unreachable",
+    },
+    {
+      label: "502",
+      fetch: makeFetch({ status: 502 }),
+      expected: "unreachable",
+    },
+    {
+      label: "503",
+      fetch: makeFetch({ status: 503 }),
+      expected: "unreachable",
+    },
+    {
+      label: "511（キャプティブポータル）",
+      fetch: makeFetch({ status: 511 }),
+      expected: "intercepted",
+    },
+    {
+      label: "407",
+      fetch: makeFetch({ status: 407 }),
+      expected: "intercepted",
+    },
+    {
+      label: "200・text/html",
+      fetch: makeFetch({
+        contentType: "text/html",
+        body: "<html>login</html>",
+      }),
+      expected: "intercepted",
+    },
+    {
+      label: "status 値が非ok",
+      fetch: makeFetch({ body: '{"status":"error"}' }),
+      expected: "intercepted",
     },
     {
       label: "JSON解析失敗",
       fetch: makeFetch({ body: "not-json" }),
-      expected: false,
+      expected: "intercepted",
     },
-  ])("isHealthy: $label", async ({ fetch, expected }) => {
+  ])("classifyHealth: $label → $expected", async ({ fetch, expected }) => {
     const connectivity: ConnectivityCheck =
       await import("#lib/client/sse/connectivity-check.js");
-    await expect(connectivity.isHealthy(fetch)).resolves.toBe(expected);
+    await expect(connectivity.classifyHealth(fetch)).resolves.toBe(expected);
+  });
+
+  it("オフライン画面向けの間隔と即時判定で契機を起動する", async () => {
+    const connectivity: ConnectivityCheck =
+      await import("#lib/client/sse/connectivity-check.js");
+    const onTrigger = vi.fn();
+    cleanup = connectivity.startConnectivityTriggers(onTrigger, {
+      intervalMs: connectivity.OFFLINE_POLL_INTERVAL_MS,
+      immediate: true,
+    });
+    expect(onTrigger).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(connectivity.OFFLINE_POLL_INTERVAL_MS);
+    expect(onTrigger).toHaveBeenCalledTimes(2);
   });
 
   it("可視状態では30秒ごとに呼び出す", async () => {
