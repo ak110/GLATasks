@@ -38,8 +38,15 @@
     }: Props = $props();
     let editingId = $state<number | undefined>();
     let openMenuId = $state<number | undefined>();
-    let session = Symbol();
-    let sending = $state<symbol | undefined>();
+    let session = $state(Symbol());
+    let sending = $state<
+        { id: symbol; session: symbol; name: string } | undefined
+    >();
+    const sendingMessage = $derived(
+        sending
+            ? `${sending.session === session ? "" : "別の編集・追加の応答待ちです。"}「${sending.name}」を保存中です。完了まで追加・変更できません。`
+            : "",
+    );
     let deleting = $state<symbol | undefined>();
 
     let deleteTarget = $state<Item | undefined>();
@@ -126,7 +133,7 @@
         const startedSession = session;
         const snapshot = JSON.stringify([editingId, name, kcal, note]);
         const itemId = editingId;
-        sending = request;
+        sending = { id: request, session: startedSession, name };
         try {
             if (itemId === undefined) await onCreate(input);
             else await onUpdate({ itemId, ...input });
@@ -136,7 +143,7 @@
             )
                 clearForm();
         } finally {
-            if (sending === request) sending = undefined;
+            if (sending?.id === request) sending = undefined;
         }
     }
 </script>
@@ -206,6 +213,12 @@
         </form>
     {:else}
         <Dialog contentClass="p-6 pt-0" title="品目の編集" onClose={clearForm}>
+            {#if sending}<p
+                    role="status"
+                    class="mb-3 text-sm text-gray-700 dark:text-gray-200"
+                >
+                    {sendingMessage}
+                </p>{/if}
             <!-- ダイアログの幅が足りればラベルを左・入力欄を右に並べ、狭ければラベルの下に入力欄を置く -->
             <form class="@container" onsubmit={submit}>
                 <div
@@ -240,15 +253,20 @@
                     <button
                         type="submit"
                         disabled={sending !== undefined}
-                        class="cursor-pointer rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700"
-                        >変更</button
+                        class="cursor-pointer rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                        >{sending ? "保存待ち…" : "変更"}</button
                     >
                 </div>
             </form>
         </Dialog>
     {/if}
 
-    {#if sending}<p role="status">保存中…</p>{/if}
+    {#if sending && editingId === undefined}<p
+            role="status"
+            class="text-sm text-gray-700 dark:text-gray-200"
+        >
+            {sendingMessage}
+        </p>{/if}
     <!-- 横スクロールの要素で囲むと、最後の行の「⋯」メニューが表の下端で切り取られるため囲まない -->
     <CalorieFilterStatus keywords={filterKeywords} onClear={onClearFilter} />
     <table class="w-full table-fixed text-left text-sm">

@@ -44,10 +44,12 @@ export const queryKeys = {
 };
 
 export const listsOptions = (showType: ShowType) => ({
+  meta: { errorPresentation: "inline" },
   queryKey: queryKeys.list(showType),
   queryFn: () => trpc.lists.list.query(showType),
 });
 export const activeTasksOptions = (client: QueryClient) => ({
+  meta: { errorPresentation: "inline" },
   queryKey: queryKeys.activeTasks,
   queryFn: async () => {
     const previous = client.getQueryData<ActiveTasksCache>(
@@ -63,6 +65,7 @@ export const activeTasksOptions = (client: QueryClient) => ({
 export const archivedTasksOptions = (
   listId: RouterInputs["tasks"]["list"]["listId"] | null,
 ) => ({
+  meta: { errorPresentation: "inline" },
   queryKey: queryKeys.archivedTasks(listId),
   queryFn: () =>
     trpc.tasks.list.query({ listId: listId!, showType: "archived" }),
@@ -71,12 +74,14 @@ export const searchOptions = (
   query: RouterInputs["tasks"]["search"]["query"],
   showType: ShowType,
 ) => ({
+  meta: { errorPresentation: "inline" },
   queryKey: queryKeys.searchResults(query, showType),
   queryFn: () => trpc.tasks.search.query({ query, showType }),
 });
 export const schedulesOptions = (
   listId: RouterInputs["schedules"]["list"]["listId"] | null,
 ) => ({
+  meta: { errorPresentation: "inline" },
   queryKey: queryKeys.listSchedules(listId),
   queryFn: () => trpc.schedules.list.query({ listId: listId! }),
   enabled: listId !== null,
@@ -85,7 +90,9 @@ export const preferencesOptions = () => ({
   queryKey: queryKeys.preferences,
   queryFn: () => trpc.users.getPreferences.query(),
 });
-export const timersOptions = () => ({
+export const timersOptions = (errorPresentationPath: string) => ({
+  // 常設監視と画面で同じmetaを共有し、画面外の失敗通知は維持する。
+  meta: { errorPresentation: "inline", errorPresentationPath },
   queryKey: queryKeys.timers,
   queryFn: async () => {
     const started = Date.now();
@@ -97,10 +104,12 @@ export const timersOptions = () => ({
   },
 });
 export const calorieItemsOptions = () => ({
+  meta: { errorPresentation: "inline" },
   queryKey: queryKeys.calorieItems,
   queryFn: () => trpc.calories.items.query(),
 });
 export const calorieAutoRecordsOptions = () => ({
+  meta: { errorPresentation: "inline" },
   queryKey: queryKeys.calorieAutoRecords,
   queryFn: () => trpc.calories.autoRecords.query(),
 });
@@ -110,6 +119,7 @@ export const calorieRecordsOptions = (
   >,
   tzOffset: NonNullable<RouterInputs["calories"]["summary"]["tzOffsetMinutes"]>,
 ) => ({
+  meta: { errorPresentation: "inline" },
   queryKey: queryKeys.calorieRecords(windowOffset, tzOffset),
   queryFn: () =>
     trpc.calories.records.query({
@@ -120,6 +130,7 @@ export const calorieRecordsOptions = (
 export const calorieSummaryOptions = (
   tzOffset: NonNullable<RouterInputs["calories"]["summary"]["tzOffsetMinutes"]>,
 ) => ({
+  meta: { errorPresentation: "inline" },
   queryKey: queryKeys.calorieSummaryAt(tzOffset),
   queryFn: () => trpc.calories.summary.query({ tzOffsetMinutes: tzOffset }),
 });

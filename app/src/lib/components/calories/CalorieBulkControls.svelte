@@ -91,10 +91,7 @@
         } catch (error) {
             createState = {
                 kind: "failure",
-                message:
-                    error instanceof Error
-                        ? error.message
-                        : "一括追加に失敗しました。再試行してください",
+                message: `${error instanceof Error ? error.message : typeof error === "string" ? error : "一括追加に失敗しました"}。反映されたか記録の一覧を確認してから、再操作してください`,
             };
         } finally {
             if (
@@ -136,10 +133,7 @@
         } catch (error) {
             deleteState = {
                 kind: "failure",
-                message:
-                    error instanceof Error
-                        ? error.message
-                        : "一括削除に失敗しました。再試行してください",
+                message: `${error instanceof Error ? error.message : typeof error === "string" ? error : "一括削除に失敗しました"}。反映されたか記録の一覧を確認してから、再操作してください`,
             };
         } finally {
             if (

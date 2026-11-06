@@ -89,8 +89,20 @@
         form.kind === "regular" ? form.conversion : undefined,
     );
     let sending = $state<
-        { id: symbol; session: symbol; snapshot: string } | undefined
+        | {
+              id: symbol;
+              session: symbol;
+              snapshot: string;
+              name: string;
+              operation: string;
+          }
+        | undefined
     >();
+    const sendingMessage = $derived(
+        sending
+            ? `${sending.session === form.session ? "" : "別の編集・追加の応答待ちです。"}「${sending.name}」を${sending.operation}中です。完了まで追加・変更できません。`
+            : "",
+    );
     let openMenuId = $state<number | undefined>();
     let consumedAt = $state(formatLocalMinute(new Date()));
     // 追加欄の日時は現在時刻へ追従させ、手で修正した後は追加か取消までその値を保つ
@@ -213,6 +225,11 @@
             id: Symbol(),
             session: form.session,
             snapshot: snapshot(),
+            name: `${itemName.trim()}（${consumedAt}）`,
+            operation:
+                form.kind === "temporary" || form.kind === "regular"
+                    ? "変換"
+                    : "保存",
         };
         const recordId = editingId;
         sending = request;
@@ -411,6 +428,12 @@
         </form>
     {:else}
         <Dialog contentClass="p-6 pt-0" title="記録の編集" onClose={resetForm}>
+            {#if sending}<p
+                    role="status"
+                    class="mb-3 text-sm text-gray-700 dark:text-gray-200"
+                >
+                    {sendingMessage}
+                </p>{/if}
             <!-- ダイアログの幅が足りればラベルを左・入力欄を右に並べ、狭ければラベルの下に入力欄を置く -->
             <form bind:this={editForm} class="@container" onsubmit={submit}>
                 <div
@@ -468,8 +491,8 @@
                     <button
                         type="submit"
                         disabled={sending !== undefined}
-                        class="ml-auto cursor-pointer rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700"
-                        >変更</button
+                        class="ml-auto cursor-pointer rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                        >{sending ? "保存待ち…" : "変更"}</button
                     >
                 </div>
             </form>
@@ -478,9 +501,9 @@
                 open={conversion !== undefined}
                 title="一時項目への変換"
                 message={conversion
-                    ? `「${itemName.trim()}」を${conversion.kcal} kcal（${conversion.itemKcal} kcal × ${conversion.quantity}）の一時項目として保存します。変換後は品目のkcalを変更しても、この記録には反映されません。`
+                    ? `「${itemName.trim()}」を${conversion.kcal} kcal（${conversion.itemKcal} kcal × ${conversion.quantity}）の一時項目として保存します。変換後は品目のkcalを変更しても、この記録には反映されません。${sendingMessage}`
                     : ""}
-                confirmLabel="変換"
+                confirmLabel={sending ? "変換待ち…" : "変換"}
                 variant="danger"
                 onConfirm={confirmConversion}
                 onCancel={cancelConversion}
@@ -489,6 +512,12 @@
             {#if regularConversion}
                 <Dialog title="通常項目への変換" onClose={cancelConversion}>
                     <form class="p-6" onsubmit={confirmRegularConversion}>
+                        {#if sending}<p
+                                role="status"
+                                class="mb-3 text-sm text-gray-700 dark:text-gray-200"
+                            >
+                                {sendingMessage}
+                            </p>{/if}
                         <p class="mb-4 text-gray-700 dark:text-gray-200">
                             「{regularConversion.item
                                 .name}」（1個当たり{regularConversion.item.kcal}
@@ -521,8 +550,8 @@
                             <button
                                 type="submit"
                                 disabled={sending !== undefined}
-                                class="cursor-pointer rounded bg-blue-600 px-6 py-2 text-white hover:bg-blue-700"
-                                >変換</button
+                                class="cursor-pointer rounded bg-blue-600 px-6 py-2 text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                                >{sending ? "変換待ち…" : "変換"}</button
                             >
                         </div>
                     </form>
@@ -531,7 +560,12 @@
         </Dialog>
     {/if}
 
-    {#if sending}<p role="status">保存中…</p>{/if}
+    {#if sending && editingId === undefined}<p
+            role="status"
+            class="text-sm text-gray-700 dark:text-gray-200"
+        >
+            {sendingMessage}
+        </p>{/if}
     <CalorieFilterStatus keywords={filterKeywords} onClear={onClearFilter} />
     <table class="w-full table-fixed text-left text-sm">
         <!-- 狭い画面でも品目の列幅を残すため、日時を2行にし、数値の列を詰める -->

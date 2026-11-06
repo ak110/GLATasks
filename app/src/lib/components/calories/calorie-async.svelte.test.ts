@@ -98,8 +98,21 @@ describe("カロリーの非同期フォーム", () => {
       await editRow(`${kind}の操作`, 0);
       await fireEvent.click(screen.getByRole("button", { name: "変更" }));
       expect(onUpdate).toHaveBeenCalledOnce();
+      const savingDialog = screen.getByRole("dialog");
+      expect(within(savingDialog).getByRole("status")).toHaveTextContent(
+        "食品",
+      );
+      expect(within(savingDialog).getByRole("status")).toHaveTextContent(
+        "完了まで追加・変更できません",
+      );
+      expect(
+        within(savingDialog).getByRole("button", { name: "保存待ち…" }),
+      ).toBeDisabled();
       await fireEvent.click(screen.getByRole("button", { name: "閉じる" }));
       await editRow(`${kind}の操作`, 1);
+      expect(
+        within(screen.getByRole("dialog")).getByRole("status"),
+      ).toHaveTextContent("別の編集・追加の応答待ち");
       save.resolve();
       await waitFor(() =>
         expect(
@@ -314,6 +327,13 @@ describe("保存対象と確認対象の寿命", () => {
       const confirm = within(dialog).getByRole("button", { name: "変換" });
       await fireEvent.click(confirm);
       await fireEvent.click(confirm);
+      expect(dialog).toHaveTextContent("食品");
+      expect(dialog).toHaveTextContent(
+        "変換中です。完了まで追加・変更できません",
+      );
+      expect(
+        within(dialog).getByRole("button", { name: "変換待ち…" }),
+      ).toBeDisabled();
       expect(onUpdate).toHaveBeenCalledExactlyOnceWith(
         expect.objectContaining(
           temporary

@@ -35,23 +35,28 @@
         | { kind: "sendingItems"; id: symbol }
         | { kind: "sendingRecords"; id: symbol; rows: Rows }
         | { kind: "success" | "failure"; message: string };
-    let state = $state<ImportState>({ kind: "idle" });
+    let importState = $state<ImportState>({ kind: "idle" });
+    let exportState = $state<
+        { kind: "idle" | "sending" } | { kind: "failure"; message: string }
+    >({ kind: "idle" });
     const busy = $derived(
-        state.kind === "sendingItems" || state.kind === "sendingRecords",
+        importState.kind === "sendingItems" ||
+            importState.kind === "sendingRecords",
     );
     const resultMessage = $derived(
-        state.kind === "success" || state.kind === "failure"
-            ? state.message
+        importState.kind === "success" || importState.kind === "failure"
+            ? importState.message
             : "",
     );
 
-    function showError(error: unknown) {
-        state = {
+    function showError(error: unknown, sent = false) {
+        importState = {
             kind: "failure",
-            message:
-                error instanceof Error
-                    ? error.message
-                    : "CSVを解析できません。CSVファイルを選び直して取り込み直してください",
+            message: `${error instanceof Error ? error.message : typeof error === "string" ? error : "CSVの処理に失敗しました"}。${
+                sent
+                    ? "反映されたか記録・品目の一覧を確認してから、再操作してください"
+                    : "CSVファイルを確認し、選び直してください"
+            }`,
         };
     }
 
@@ -71,19 +76,27 @@
         const file = input.files?.[0];
         if (!file || busy) return;
         const id = Symbol();
-        state = { kind: "sendingItems", id };
+        importState = { kind: "reading", id };
+        let rows: RouterInputs["calories"]["importItems"]["rows"];
         try {
-            const result = await onImportItems(
-                parseCalorieItemsCsv(await file.text()),
-            );
-            state = {
+            rows = parseCalorieItemsCsv(await file.text());
+        } catch (error) {
+            if (importState.kind === "reading" && importState.id === id)
+                showError(error);
+            return;
+        } finally {
+            input.value = "";
+        }
+        if (importState.kind !== "reading" || importState.id !== id) return;
+        importState = { kind: "sendingItems", id };
+        try {
+            const result = await onImportItems(rows);
+            importState = {
                 kind: "success",
                 message: `品目を${result.added}件追加し、${result.updated}件更新しました。`,
             };
         } catch (error) {
-            showError(error);
-        } finally {
-            input.value = "";
+            showError(error, true);
         }
     }
 
@@ -92,34 +105,36 @@
         const file = input.files?.[0];
         if (!file || busy) return;
         const id = Symbol();
-        state = { kind: "reading", id };
+        importState = { kind: "reading", id };
         try {
             const rows = parseCalorieRecordsCsv(await file.text());
-            if (state.kind === "reading" && state.id === id)
-                state = { kind: "confirm", id, rows };
+            if (importState.kind === "reading" && importState.id === id)
+                importState = { kind: "confirm", id, rows };
         } catch (error) {
-            if (state.kind === "reading" && state.id === id) showError(error);
+            if (importState.kind === "reading" && importState.id === id)
+                showError(error);
         } finally {
             input.value = "";
         }
     }
 
     async function confirmRecords() {
-        if (state.kind !== "confirm") return;
-        const request = { ...state, kind: "sendingRecords" as const };
-        state = request;
+        if (importState.kind !== "confirm") return;
+        const request = { ...importState, kind: "sendingRecords" as const };
+        importState = request;
         try {
             const result = await onImportRecords(request.rows);
-            state = {
+            importState = {
                 kind: "success",
                 message: `記録を${result.added}件追加しました。`,
             };
         } catch (error) {
-            showError(error);
+            showError(error, true);
         }
     }
     async function exportRecords() {
-        const startedState = state;
+        if (exportState.kind === "sending") return;
+        exportState = { kind: "sending" };
         try {
             const records = await onExportRecords();
             download(
@@ -133,15 +148,12 @@
                 ),
                 "カロリー記録.csv",
             );
+            exportState = { kind: "idle" };
         } catch (error) {
-            if (state === startedState)
-                state = {
-                    kind: "failure",
-                    message:
-                        error instanceof Error
-                            ? error.message
-                            : "CSVの取得に失敗しました。時間をおいてからエクスポートをやり直してください",
-                };
+            exportState = {
+                kind: "failure",
+                message: `${error instanceof Error ? error.message : typeof error === "string" ? error : "CSVの取得に失敗しました"}。時間をおいて再取得するには、記録をエクスポートしてください`,
+            };
         }
     }
 </script>
@@ -166,8 +178,14 @@
                 download(exportCalorieItemsCsv(items), "カロリー品目.csv")}
             class={grayButtonClass}>品目をエクスポート</button
         >
-        <button type="button" onclick={exportRecords} class={grayButtonClass}
-            >記録をエクスポート</button
+        <button
+            type="button"
+            onclick={exportRecords}
+            disabled={exportState.kind === "sending"}
+            class="{grayButtonClass} disabled:cursor-not-allowed disabled:opacity-50"
+            >{exportState.kind === "sending"
+                ? "記録を取得中…"
+                : "記録をエクスポート"}</button
         >
         <label class={grayButtonClass}>
             品目をインポート
@@ -193,6 +211,12 @@
         </label>
     </div>
     {#if busy}<p role="status">取り込み中…</p>{/if}
+    {#if exportState.kind === "failure"}<p
+            class="mt-3 text-sm text-gray-700 dark:text-gray-200"
+            role="status"
+        >
+            {exportState.message}
+        </p>{/if}
     {#if resultMessage}<p
             class="mt-3 text-sm text-gray-700 dark:text-gray-200"
             role="status"
@@ -202,13 +226,13 @@
 </section>
 
 <ConfirmDialog
-    open={state.kind === "confirm"}
+    open={importState.kind === "confirm"}
     confirmDisabled={busy}
     title="記録CSVのインポート"
     message="記録CSVは既存の記録へ追記されます。同じCSVを再度取り込むと記録が重複します。取り込みますか？"
     confirmLabel="取り込む"
     onConfirm={confirmRecords}
     onCancel={() => {
-        if (state.kind === "confirm") state = { kind: "idle" };
+        if (importState.kind === "confirm") importState = { kind: "idle" };
     }}
 />

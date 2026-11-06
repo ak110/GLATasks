@@ -34,8 +34,15 @@
     let editing = $state<AutoRecord | undefined>();
     let deleteTarget = $state<AutoRecord | undefined>();
     let openMenuId = $state<number | undefined>();
-    let session = Symbol();
-    let sending = $state<symbol | undefined>();
+    let session = $state(Symbol());
+    let sending = $state<
+        { id: symbol; session: symbol; name: string; time: string } | undefined
+    >();
+    const sendingMessage = $derived(
+        sending
+            ? `${sending.session === session ? "" : "別の編集・追加の応答待ちです。"}${sending.time}の「${sending.name}」を保存中です。完了まで追加・変更できません。`
+            : "",
+    );
     let deleting = $state<symbol | undefined>();
 
     let timeOfDay = $state("");
@@ -97,7 +104,12 @@
             quantity,
         ]);
         const autoRecordId = editing?.id;
-        sending = request;
+        sending = {
+            id: request,
+            session: startedSession,
+            name: itemName,
+            time: timeOfDay,
+        };
         try {
             if (autoRecordId === undefined) await onCreate(input);
             else await onUpdate({ autoRecordId, ...input });
@@ -108,7 +120,7 @@
             )
                 resetForm();
         } finally {
-            if (sending === request) sending = undefined;
+            if (sending?.id === request) sending = undefined;
         }
     }
 
@@ -183,8 +195,12 @@
             <button
                 type="submit"
                 disabled={sending !== undefined}
-                class="cursor-pointer rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700"
-                >{editing === undefined ? "追加" : "変更"}</button
+                class="cursor-pointer rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >{sending
+                    ? "保存待ち…"
+                    : editing === undefined
+                      ? "追加"
+                      : "変更"}</button
             >
         </form>
     {/snippet}
@@ -194,13 +210,24 @@
             title="自動記録の編集"
             onClose={resetForm}
         >
+            {#if sending}<p
+                    role="status"
+                    class="mb-3 text-sm text-gray-700 dark:text-gray-200"
+                >
+                    {sendingMessage}
+                </p>{/if}
             {@render autoRecordForm()}
         </Dialog>
     {:else}
         {@render autoRecordForm()}
     {/if}
 
-    {#if sending}<p role="status">保存中…</p>{/if}
+    {#if sending && editing === undefined}<p
+            role="status"
+            class="text-sm text-gray-700 dark:text-gray-200"
+        >
+            {sendingMessage}
+        </p>{/if}
     <!-- 狭い画面でも品目の列幅を残すため、行の操作は「⋯」メニューへまとめる -->
     <table class="w-full table-fixed text-left text-sm">
         <colgroup

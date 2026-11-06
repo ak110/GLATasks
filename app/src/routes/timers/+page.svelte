@@ -1,6 +1,7 @@
 <script lang="ts">
     import { subscribeQueryEvents } from "#lib/client/query-sync.ts";
     import { onMount } from "svelte";
+    import { resolve } from "$app/paths";
     import {
         timersOptions,
         preferencesOptions,
@@ -86,7 +87,9 @@
     }));
 
     // タイマー一覧取得（SSE でリアルタイム同期）
-    const timersQuery = createQuery(() => ({ ...timersOptions() }));
+    const timersQuery = createQuery(() => ({
+        ...timersOptions(resolve("/timers")),
+    }));
 
     subscribeQueryEvents(queryClient, [
         SSE_EVENTS.timersUpdated,

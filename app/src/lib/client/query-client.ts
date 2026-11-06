@@ -12,8 +12,17 @@ export const queryClient = new QueryClient({
   // 個別 onError は既定の onError を上書きするが、Cache のグローバル onError は
   // 個別処理の有無に左右されず全 query・mutation のエラーで必ず呼ばれる。
   // エラー通知と接続の能動チェックをここへ集約し、保存失敗時の通知欠落を解消する。
-  queryCache: new QueryCache({ onError: handleError }),
-  mutationCache: new MutationCache({ onError: handleError }),
+  queryCache: new QueryCache({
+    onError: (error, query) => {
+      const inline =
+        query.meta?.errorPresentation === "inline" &&
+        (query.meta.errorPresentationPath === undefined ||
+          (browser &&
+            window.location.pathname === query.meta.errorPresentationPath));
+      handleError(error, !inline);
+    },
+  }),
+  mutationCache: new MutationCache({ onError: (error) => handleError(error) }),
   defaultOptions: {
     queries: {
       // svelte-query 6.2.3以降はSSR中もqueryを購読して取得を始める。
@@ -29,9 +38,9 @@ export const queryClient = new QueryClient({
   },
 });
 
-/** query・mutation のエラー共通処理。トースト通知し、接続を能動チェックする */
-function handleError(error: unknown): void {
-  showErrorToast(extractErrorMessage(error));
+/** エラーの表示先にかかわらず接続を能動チェックする */
+function handleError(error: unknown, notify = true): void {
+  if (notify) showErrorToast(extractErrorMessage(error));
   // 操作失敗を起点に接続を能動チェックする。
   // 正当なアプリエラー時は判定基盤が ok を返すため検出は誤発火しない。
   void checkConnectivity();

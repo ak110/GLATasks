@@ -164,7 +164,7 @@
 
     // タイマー一覧取得（/timers ページとキャッシュ共有）
     const timersQuery = createQuery(() => ({
-        ...timersOptions(),
+        ...timersOptions(resolve("/timers")),
         refetchInterval: 60 * 1000,
     }));
 

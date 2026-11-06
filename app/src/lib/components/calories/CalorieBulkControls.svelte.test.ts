@@ -44,6 +44,26 @@ async function expectResult(message: string) {
 }
 
 describe("一括操作の最後に完了した結果", () => {
+  it.each([
+    ["create", new Error("通信失敗")],
+    ["delete", new Error("対象の業務エラー")],
+    ["create", "追加失敗"],
+    ["delete", "削除失敗"],
+  ] as const)(
+    "%sの失敗で原因と反映確認を案内する: %s",
+    async (kind, failure) => {
+      render(CalorieBulkControls, {
+        items: [{ id: 1, name: "食品" }],
+        onBulkCreate: vi.fn().mockRejectedValue(failure),
+        onBulkDelete: vi.fn().mockRejectedValue(failure),
+      });
+      await submit(kind);
+      if (kind === "delete") await confirmDelete();
+      await expectResult(
+        `${failure instanceof Error ? failure.message : failure}。反映されたか記録の一覧を確認してから、再操作してください`,
+      );
+    },
+  );
   it.each(["create", "delete"] as const)(
     "%sの後に反対の操作を完了すると結果を置換する",
     async (first) => {
@@ -106,7 +126,9 @@ describe("一括操作の最後に完了した結果", () => {
     await submit("create");
     await submit("delete");
     create.reject(new Error("追加失敗"));
-    await expectResult("追加失敗");
+    await expectResult(
+      "追加失敗。反映されたか記録の一覧を確認してから、再操作してください",
+    );
     expect(
       screen.getByRole("dialog", { name: "記録の一括削除" }),
     ).toBeVisible();
