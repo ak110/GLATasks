@@ -79,6 +79,7 @@ test.describe("非同期の画面状態", () => {
     browser,
   }) => {
     const listName = uniqueTestName("選択解除");
+    let needsCleanup = false;
     try {
       await Promise.all([
         page.goto("/"),
@@ -87,15 +88,17 @@ test.describe("非同期の画面状態", () => {
         ),
       ]);
       await createListFromPage(page, listName);
+      needsCleanup = true;
       await expect(page.getByTestId("task-add-form")).toBeVisible();
       await cleanupTestList(browser, listName);
+      needsCleanup = false;
       await expect(page.getByTestId("task-add-form")).toHaveCount(0);
       await expect(page).toHaveURL(/\/$/);
       expect(
         await page.evaluate(() => localStorage.getItem("selectedList")),
       ).toBeNull();
     } finally {
-      await cleanupTestList(browser, listName);
+      if (needsCleanup) await cleanupTestList(browser, listName);
     }
   });
 
