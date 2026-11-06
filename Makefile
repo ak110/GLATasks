@@ -27,9 +27,9 @@ RUN_NODE = docker run $(2) \
 	$(RUN_ARGS) \
 	node:lts \
 	bash -xc '\
-	    mkdir -p ${PWD}/.cache/bin &&\
-        corepack enable --install-directory=${PWD}/.cache/bin &&\
-        export PATH=${PWD}/.cache/bin:$$PATH &&\
+        npm install --global --prefix="${PWD}/.cache/corepack" --before="$$(date -u -d yesterday +%Y-%m-%dT%H:%M:%SZ)" corepack &&\
+        export PATH="${PWD}/.cache/corepack/bin:$$PATH" &&\
+        corepack enable pnpm &&\
 		pnpm install --frozen-lockfile &&\
 		$(1)\
 	'
@@ -169,9 +169,10 @@ docs:  # ドキュメントサイトをビルド
 	$(call RUN_NODE, pnpm --dir docs build, --rm)
 
 # playwrightサービスのコンテナー内で使うPATHと、pnpm・依存の導入手順（test-e2eとtest-dbで共有）
-PLAYWRIGHT_PATH = export PATH=${PWD}/.cache/playwright/bin:$$PATH
-PLAYWRIGHT_INSTALL = mkdir -p ${PWD}/.cache/playwright/bin &&\
-	corepack enable --install-directory=${PWD}/.cache/playwright/bin &&\
+# 配布イメージのCorepack同梱に依存せず、公開後1日を過ぎた版を非rootの専用prefixへ導入する。
+PLAYWRIGHT_PATH = export PATH="${PWD}/.cache/playwright/corepack/bin:$$PATH"
+PLAYWRIGHT_INSTALL = npm install --global --prefix="${PWD}/.cache/playwright/corepack" --before="$$(date -u -d yesterday +%Y-%m-%dT%H:%M:%SZ)" corepack &&\
+	corepack enable pnpm &&\
 	pnpm install --frozen-lockfile
 
 # E2E_GREPの値に`$`や`"`を含む場合は`sql`ターゲットと同じ制約が生じる

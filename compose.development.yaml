@@ -8,9 +8,9 @@ services:
     restart: always
     command: >
       bash -xc '
-        mkdir -p ${PWD}/.cache/bin &&
-        corepack enable --install-directory ${PWD}/.cache/bin &&
-        export PATH=${PWD}/.cache/bin:${PWD}/node_modules/.bin:$$PATH &&
+        npm install --global --prefix="${PWD}/.cache/corepack" --before="$$(date -u -d yesterday +%Y-%m-%dT%H:%M:%SZ)" corepack &&
+        export PATH="${PWD}/.cache/corepack/bin:${PWD}/node_modules/.bin:$$PATH" &&
+        corepack enable pnpm &&
         pnpm install --frozen-lockfile &&
         exec pnpm run dev
       '
