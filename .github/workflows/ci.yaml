@@ -32,7 +32,10 @@ jobs:
       # キャッシュのキーへ使うpyfltrの版。イメージが同梱するツール群はpyfltrの版で決まる。
       - name: Resolve pyfltr version
         id: pyfltr
-        run: echo "version=$(pyfltr --version | tr -c 'A-Za-z0-9.\n' '-')" >> "$GITHUB_OUTPUT"
+        # 代入へ分けて、pyfltrの起動失敗を空の版のキーにせずステップの失敗にする
+        run: |
+          version=$(pyfltr --version | tr -c 'A-Za-z0-9.\n' '-')
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
 
       # pyfltr推奨ガイドの構成（/cache全体をrun_id付きキーとrestore-keysで毎回保存）から意図して外れる。
       # 2026年11月の計測では、ジョブが/cacheへ加えるのはmiseの約86MBだけで、uvとpnpmはイメージ同梱の内容から変わらなかった。
