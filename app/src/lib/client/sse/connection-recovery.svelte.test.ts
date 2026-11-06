@@ -139,7 +139,8 @@ describe("connection-recovery", () => {
     expect(reloadMock).not.toHaveBeenCalled();
   });
 
-  // 同値分割: 入力中判定パターン。不健全検知でも reload せず pendingReload=true でバナー待機する。
+  // 同値分割: 入力中判定パターン。応答の横取りでも入力中は reload せず pendingReload=true でバナー待機する。
+  // 到達不能（503など）は入力中かどうかを判定せずにバナーへ進むため、入力中の判定を通る横取りの代表値（511）を使う。
   it.each([
     { label: "INPUT 要素にフォーカス", setup: () => focusElement("input") },
     {
@@ -173,23 +174,23 @@ describe("connection-recovery", () => {
         document.body.appendChild(el);
       },
     },
-  ])("入力中の不健全検知: $label → バナー表示", async ({ setup }) => {
+  ])("入力中の応答の横取り: $label → バナー表示", async ({ setup }) => {
     setup();
     const recovery: Recovery =
       await import("#lib/client/sse/connection-recovery.svelte.ts");
-    await recovery.checkConnectivity(makeFetch({ status: 503 }));
+    await recovery.checkConnectivity(makeFetch({ status: 511 }));
 
     expect(reloadMock).not.toHaveBeenCalled();
     expect(recovery.connectivityState.pendingReload).toBe(true);
   });
 
-  it("入力中の不健全検知後、回復検知でバナーが自動解除される", async () => {
+  it("入力中の応答の横取り後、回復検知でバナーが自動解除される", async () => {
     focusElement("textarea");
     const recovery: Recovery =
       await import("#lib/client/sse/connection-recovery.svelte.ts");
 
-    // 不健全検知でバナー待機へ
-    await recovery.checkConnectivity(makeFetch({ status: 503 }));
+    // 入力中の応答の横取りでバナー待機へ
+    await recovery.checkConnectivity(makeFetch({ status: 511 }));
     expect(recovery.connectivityState.pendingReload).toBe(true);
 
     // 回復検知でバナーを自動解除する（入力中のため reload はしない）
