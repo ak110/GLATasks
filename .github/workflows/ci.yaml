@@ -32,9 +32,15 @@ jobs:
       # キャッシュのキーへ使うpyfltrの版。イメージが同梱するツール群はpyfltrの版で決まる。
       - name: Resolve pyfltr version
         id: pyfltr
-        # 代入へ分けて、pyfltrの起動失敗を空の版のキーにせずステップの失敗にする
+        # pyfltrは版の表示を標準エラーへ書くため、両方を受け取って版の形だけを取り出す。
+        # 起動失敗や表示形式の変化で版を取り出せない場合は、空の版のキーにせずステップの失敗にする
         run: |
-          version=$(pyfltr --version | tr -c 'A-Za-z0-9.\n' '-')
+          output=$(pyfltr --version 2>&1)
+          version=$(printf '%s\n' "$output" | sed -n 's/^pyfltr \([0-9][0-9A-Za-z.+-]*\)$/\1/p')
+          if [ -z "$version" ]; then
+            echo "::error::pyfltrの版を取り出せない: ${output}"
+            exit 1
+          fi
           echo "version=${version}" >> "$GITHUB_OUTPUT"
 
       # pyfltr推奨ガイドの構成（/cache全体をrun_id付きキーとrestore-keysで毎回保存）から意図して外れる。
