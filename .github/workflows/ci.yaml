@@ -29,15 +29,22 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      # キャッシュのキーへ使うpyfltrの版。イメージが同梱するツール群はpyfltrの版で決まる。
+      - name: Resolve pyfltr version
+        id: pyfltr
+        run: echo "version=$(pyfltr --version | tr -c 'A-Za-z0-9.\n' '-')" >> "$GITHUB_OUTPUT"
+
+      # pyfltr推奨ガイドの構成（/cache全体をrun_id付きキーとrestore-keysで毎回保存）から意図して外れる。
+      # 2026年11月の計測では、ジョブが/cacheへ加えるのはmiseの約86MBだけで、uvとpnpmはイメージ同梱の内容から変わらなかった。
+      # 毎回の復元と再保存で古い内容とイメージ同梱分が累積し（約2.7GB）、保存に約5分かかっていた。
+      # そこでジョブが変更する/cache/miseだけを、内容を決める入力（pyfltrの版と設定ファイル）のハッシュで保存する。
+      # 入力が同じ実行は完全一致で復元して保存を省き、入力が変わった最初の成功した実行が新しい内容を保存して次回へ引き継ぐ。
+      # restore-keysを置かないのは、入力の変わったキャッシュへ古い版のツールを累積させないためである。
+      # 推奨ガイドへ同じ構成を反映するかはpyfltr側で検討する。
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: /cache
-          # run_idはワークフローの再実行でも変化せず、run_attemptは試行ごとに増加する。
-          # 試行ごとに異なる主キーを使い、完全一致による保存抑止を避ける。
-          # 前方一致で復元した/cacheへジョブ中の変更を加え、成功かつ書き込み可能な試行では、
-          # 別キーとして保存して次回へ引き継ぐ。
-          key: pyfltr-cache-${{ runner.os }}-${{ github.run_id }}-${{ github.run_attempt }}
-          restore-keys: pyfltr-cache-${{ runner.os }}-
+          path: /cache/mise
+          key: pyfltr-mise-${{ runner.os }}-${{ steps.pyfltr.outputs.version }}-${{ hashFiles('pyproject.toml', 'mise.toml', 'pnpm-lock.yaml') }}
 
       - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
 
