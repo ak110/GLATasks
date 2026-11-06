@@ -4,18 +4,9 @@
 
 import { fail, redirect } from "@sveltejs/kit";
 import * as api from "#lib/server/api.ts";
+import { safeReturnTo } from "#lib/server/auth-routes.ts";
 import { createSessionToken, setSessionCookie } from "#lib/server/session.ts";
 import type { Actions, PageServerLoad } from "./$types";
-
-/**
- * `returnTo` を相対パス（先頭が `/` で `//` で始まらないもの）に限定する。
- * 外部URLへリダイレクトする open redirect 脆弱性を防ぐ。
- */
-function safeReturnTo(value: string | null): string {
-  if (!value) return "/";
-  if (!value.startsWith("/") || value.startsWith("//")) return "/";
-  return value;
-}
 
 export const load: PageServerLoad = async ({ locals, url }) => {
   if (locals.user_id) {

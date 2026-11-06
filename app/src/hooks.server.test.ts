@@ -1,7 +1,6 @@
-import fs from "node:fs";
-import path from "node:path";
 import type { Handle } from "@sveltejs/kit/hooks";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { listRoutePaths } from "../tests/helpers/route-paths";
 vi.mock("$app/env", () => ({ building: false }));
 
 vi.mock("#lib/server/scheduler.ts", () => ({ startScheduler: vi.fn() }));
@@ -17,7 +16,7 @@ vi.mock("#lib/server/session.ts", async (importOriginal) => {
   };
 });
 const { handle } = await import("./hooks.server");
-const { COOKIELESS_MUTATION_PATHS, EXTENSION_EMBEDDABLE_PATHS } =
+const { COOKIELESS_MUTATION_PATHS, EXTENSION_EMBEDDABLE_PATHS, safeReturnTo } =
   await import("#lib/server/auth-routes.ts");
 
 type HandleEvent = Parameters<Handle>[0]["event"];
@@ -50,40 +49,6 @@ async function run(event: HandleEvent) {
   return { response, resolved: resolve.mock.calls.length > 0 };
 }
 
-/** `app/src/routes`の全ての`+server.ts`・`+page.server.ts`から、要求を送れる代表パスを導く。 */
-function listRoutePaths(): string[] {
-  const root = path.join(import.meta.dirname, "routes");
-  const result: string[] = [];
-  const walk = (dir: string) => {
-    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-      const full = path.join(dir, entry.name);
-      if (entry.isDirectory()) {
-        walk(full);
-      } else if (
-        entry.name === "+server.ts" ||
-        entry.name === "+page.server.ts"
-      ) {
-        const segments = path
-          .relative(root, dir)
-          .split(path.sep)
-          .filter((segment) => segment !== "")
-          // 16進エスケープ（[x+2e]）は文字へ、残余引数（[...trpc]）は代表値へ置き換える
-          .map((segment) =>
-            segment
-              .replace(/\[x\+([0-9a-f]{2})\]/g, (_, hex: string) =>
-                String.fromCharCode(parseInt(hex, 16)),
-              )
-              .replace(/^\[\.\.\.\w+\]$/, "sample")
-              .replace(/^\[\w+\]$/, "1"),
-          );
-        result.push(`/${segments.join("/")}`);
-      }
-    }
-  };
-  walk(root);
-  return [...new Set(result)].sort();
-}
-
 afterEach(() => {
   delete process.env.SESSION_COOKIE_NAME;
 });
@@ -97,6 +62,35 @@ describe("セッション認証の入口", () => {
       location: "/auth/login",
     });
     expect(resolve).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    // Chrome拡張のポップアップはタスク追加画面を埋め込み、ログイン後にこの画面へ戻る必要がある
+    [
+      "/share/ingest?title=t&in_popup=1",
+      "/auth/login?returnTo=%2Fshare%2Fingest%3Ftitle%3Dt%26in_popup%3D1",
+    ],
+    ["/timers", "/auth/login?returnTo=%2Ftimers"],
+    ["/", "/auth/login"],
+  ])(
+    "未ログインで画面%sを開くと、元の画面をreturnToに付けてログインへ転送する",
+    async (pathname, location) => {
+      const event = makeEvent(pathname, { method: "GET", cookieName: "other" });
+      await expect(
+        handle({ event, resolve: vi.fn(async () => new Response("page")) }),
+      ).rejects.toMatchObject({ status: 302, location });
+    },
+  );
+});
+
+describe("returnToの検証", () => {
+  it.each([
+    ["/share/ingest?in_popup=1", "/share/ingest?in_popup=1"],
+    [null, "/"],
+    ["https://evil.example/", "/"],
+    ["//evil.example/", "/"],
+  ])("returnTo=%sは%sへ戻す", (value, expected) => {
+    expect(safeReturnTo(value)).toBe(expected);
   });
 });
 

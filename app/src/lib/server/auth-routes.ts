@@ -34,4 +34,26 @@ export const EXTENSION_EMBEDDABLE_PATHS: ReadonlySet<string> = new Set([
   "/auth/login",
   "/auth/regist_user",
 ]);
+
+/**
+ * `returnTo` を相対パス（先頭が `/` で `//` で始まらないもの）に限定する。
+ * 外部URLへリダイレクトする open redirect 脆弱性を防ぐ。
+ */
+export function safeReturnTo(value: string | null): string {
+  if (!value) return "/";
+  if (!value.startsWith("/") || value.startsWith("//")) return "/";
+  return value;
+}
+
+/**
+ * 未ログインで画面を開いた要求の転送先。ログイン・利用者登録の後に元の画面へ戻れるよう`returnTo`を付ける。
+ *
+ * Chrome拡張のポップアップは`/share/ingest`を埋め込む。ログイン後にトップ画面へ移ると、
+ * 拡張からの埋め込みを許可しない画面になりブラウザーが表示を拒否するため、元の画面へ戻す。
+ */
+export function loginRedirectPath(url: URL): string {
+  const returnTo = `${url.pathname}${url.search}`;
+  if (returnTo === "/") return "/auth/login";
+  return `/auth/login?returnTo=${encodeURIComponent(returnTo)}`;
+}
 import { OAUTH_PATHS } from "./mcp/oauth-config";

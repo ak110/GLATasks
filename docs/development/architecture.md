@@ -240,14 +240,16 @@ Chrome拡張のポップアップ内iframeでログイン状態を使うため�
   `Sec-Fetch-Site`を送らない要求（ブラウザー以外のクライアント）は通す
 - 除外はセッションCookieを読まないルート（`/oauth/token`・`/oauth/register`・`/mcp`）だけとし、`auth-routes.ts`の`COOKIELESS_MUTATION_PATHS`に理由とともに置く。
   新しいルートは追加した時点で判定の対象になる
-- 画面は許可した埋め込み元以外から埋め込めない。全応答へ`Content-Security-Policy: frame-ancestors 'self'`と`X-Frame-Options: SAMEORIGIN`を付ける。
+- 画面は許可した埋め込み元以外から埋め込めない。ルートの処理を経た全応答へ`Content-Security-Policy: frame-ancestors 'self'`と`X-Frame-Options: SAMEORIGIN`を付ける。
+  `handle`がルートの処理より前に返す応答（他オリジンからの更新要求の403、未ログインのAPIの401、ログイン画面への転送）は画面を含まないため付けない。
   Chrome拡張が開く`/share/ingest`・`/auth/login`・`/auth/regist_user`だけは`frame-ancestors 'self' chrome-extension:`とし、`X-Frame-Options`を付けない
 - ログアウトをPOSTに限定する（GETリクエストによるCSRFを防止するため）
 
 SvelteKitが組み込みで行うOriginヘッダーの判定は、リバースプロキシ経由の利用でブラウザーのOriginとアプリの認識するオリジンが一致しないため無効にしている（`vite.config.ts`の`trustedOrigins: ["*"]`）。
 `Sec-Fetch-Site`はブラウザーが自分の見ているオリジン同士で判定するため、プロキシ経由でも同じ画面からの送信は`same-origin`になる。
-確認方法: `hooks.server.test.ts`が`app/src/routes`の全ルートを列挙し、除外以外の各ルートへの他オリジンからの更新要求が拒否されること、全応答が埋め込みを制限するヘッダーを持つことを確かめる。
-フレームワークの版更新や`handle`の構成変更で保護が外れた場合も、この試験が不変条件の違反として検出する。
+確認方法: E2Eの`app/tests/csrf-framing.test.ts`が、稼働中のアプリへHTTPで`app/src/routes`の全ルートを要求し、除外以外の各ルートへの他オリジンからの更新要求が拒否されること、ルートの処理を経た応答が埋め込みを制限するヘッダーを持つことを確かめる。
+SvelteKitのルーティングとhookを通った応答を判定するため、フレームワークの版更新や設定・`handle`の構成変更で保護が外れた場合も不変条件の違反として検出する。
+`hooks.server.test.ts`は同じルートの列挙で`handle`の判定を単体で確かめる。
 
 セッションCookie名は環境変数`SESSION_COOKIE_NAME`で指定し、未指定時は`__Host-gla-session`とする。
 `__Host-`接頭辞はSecure・`Path=/`・Domain指定なしのCookieだけに使え、同じ親ドメインの別サブドメインから上書きされない。

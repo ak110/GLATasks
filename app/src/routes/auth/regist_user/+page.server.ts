@@ -7,17 +7,18 @@ import * as api from "#lib/server/api.ts";
 import { createSessionToken, setSessionCookie } from "#lib/server/session.ts";
 import { RegisterUserSchema } from "#lib/schemas.ts";
 import { getErrorStatus, getPublicError } from "#lib/server/api-errors.ts";
+import { safeReturnTo } from "#lib/server/auth-routes.ts";
 import type { Actions, PageServerLoad } from "./$types";
 
-export const load: PageServerLoad = async ({ locals }) => {
+export const load: PageServerLoad = async ({ locals, url }) => {
   if (locals.user_id) {
-    redirect(302, "/");
+    redirect(302, safeReturnTo(url.searchParams.get("returnTo")));
   }
   return {};
 };
 
 export const actions: Actions = {
-  default: async ({ request, cookies }) => {
+  default: async ({ request, cookies, url }) => {
     const data = await request.formData();
     const parsed = RegisterUserSchema.safeParse({
       userId: data.get("user_id"),
@@ -47,6 +48,7 @@ export const actions: Actions = {
       return fail(getErrorStatus(e), { error: getPublicError(e).message });
     }
 
-    redirect(302, "/");
+    // ログイン画面と同じく元の画面へ戻す（Chrome拡張のポップアップ内で登録した場合など）
+    redirect(302, safeReturnTo(url.searchParams.get("returnTo")));
   },
 };

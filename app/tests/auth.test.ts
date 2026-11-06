@@ -27,6 +27,18 @@ test.describe("未ログイン状態", () => {
     ]);
   });
 
+  test("未ログインで開いた画面へ、ログイン後に戻る", async ({ page }) => {
+    // Chrome拡張のポップアップはタスク追加画面を埋め込み、ログイン後もこの画面を表示し続ける必要がある
+    await page.goto("/share/ingest?text=e2e&in_popup=1");
+    await expect(page).toHaveURL(/\/auth\/login\?returnTo=/);
+    await page.fill('[name="user"]', TEST_USER);
+    await page.fill('[name="password"]', TEST_PASSWORD);
+    await Promise.all([
+      page.waitForURL("/share/ingest?text=e2e&in_popup=1"),
+      page.click('button[type="submit"]'),
+    ]);
+  });
+
   test("誤った資格情報でログインするとエラーメッセージ表示", async ({
     page,
   }) => {

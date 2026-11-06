@@ -10,6 +10,7 @@ import {
   COOKIELESS_MUTATION_PATHS,
   EXTENSION_EMBEDDABLE_PATHS,
   isPublicPath,
+  loginRedirectPath,
 } from "#lib/server/auth-routes.ts";
 
 /** 更新要求を拒否する`Sec-Fetch-Site`の値。正規の送信元はGLATasks自身の画面（same-origin）とブラウザーの直接操作（none）だけである。 */
@@ -62,7 +63,13 @@ export const handle: Handle = async ({ event, resolve }) => {
         { status: 401 },
       );
     }
-    redirect(302, "/auth/login");
+    // 更新要求の転送先へ元のURLを付けると、ログイン後にその入口をGETで開き直すことになるため画面のGETに限る
+    redirect(
+      302,
+      event.request.method === "GET"
+        ? loginRedirectPath(event.url)
+        : "/auth/login",
+    );
   }
 
   const response = await resolve(event);
