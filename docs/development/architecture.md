@@ -221,15 +221,27 @@ CookieベースのJWT/HS256セッション。実装詳細は `hooks.server.ts` /
 
 ### CSRF 対策
 
-多層防御を採用している。
+Chrome拡張のポップアップ内iframeでログイン状態を使うため、セッションCookieは`SameSite=None`・`Secure`である。
+このCookieは他サイト経由の通信にも付くため、補償として次の不変条件をCookieが届く全ルートに対して持つ。
 
-- SvelteKit組み込み機能でform actionを保護
-- `hooks.server.ts`で`sec-fetch-site`が`cross-site`の`/api/*`への更新要求を拒否する（Fetch Metadataによる判定）
-- ログアウトをPOSTに限定（GETリクエストによるCSRFを防止するため）
+- Cookie認証の更新要求（POST・PUT・PATCH・DELETE）は同一オリジンからだけ受け付ける。
+  `hooks.server.ts`の`handle`が、パスを問わず`Sec-Fetch-Site`が`same-site`・`cross-site`の要求を403にする。
+  正規の送信元はGLATasks自身の画面（`same-origin`）とブラウザーの直接操作（`none`）だけである。
+  `Sec-Fetch-Site`を送らない要求（ブラウザー以外のクライアント）は通す
+- 除外はセッションCookieを読まないルート（`/oauth/token`・`/oauth/register`・`/mcp`）だけとし、`auth-routes.ts`の`COOKIELESS_MUTATION_PATHS`に理由とともに置く。
+  新しいルートは追加した時点で判定の対象になる
+- 画面は許可した埋め込み元以外から埋め込めない。全応答へ`Content-Security-Policy: frame-ancestors 'self'`と`X-Frame-Options: SAMEORIGIN`を付ける。
+  Chrome拡張が開く`/share/ingest`・`/auth/login`・`/auth/regist_user`だけは`frame-ancestors 'self' chrome-extension:`とし、`X-Frame-Options`を付けない
+- ログアウトをPOSTに限定する（GETリクエストによるCSRFを防止するため）
 
-Chrome拡張のポップアップ内iframeからのアクセスを許可する必要があるため、
-Cookieに `sameSite: "none"` + `secure: true` を設定している。
-この設定に伴うクロスサイト要求は、上記のFetch Metadata判定で制限する。
+SvelteKitが組み込みで行うOriginヘッダーの判定は、リバースプロキシ経由の利用でブラウザーのOriginとアプリの認識するオリジンが一致しないため無効にしている（`vite.config.ts`の`trustedOrigins: ["*"]`）。
+`Sec-Fetch-Site`はブラウザーが自分の見ているオリジン同士で判定するため、プロキシ経由でも同じ画面からの送信は`same-origin`になる。
+確認方法: `hooks.server.test.ts`が`app/src/routes`の全ルートを列挙し、除外以外の各ルートへの他オリジンからの更新要求が拒否されること、全応答が埋め込みを制限するヘッダーを持つことを確かめる。
+フレームワークの版更新や`handle`の構成変更で保護が外れた場合も、この試験が不変条件の違反として検出する。
+
+セッションCookie名は環境変数`SESSION_COOKIE_NAME`で指定し、未指定時は`__Host-gla-session`とする。
+`__Host-`接頭辞はSecure・`Path=/`・Domain指定なしのCookieだけに使え、同じ親ドメインの別サブドメインから上書きされない。
+本番（aws.tqzh.tk）はサーバー上の`.env`で従来の名前`gla-session`を指定して運用する（端末ごとの再ログインと移行処理を避けるため）。
 
 認証の必要な画面とAPIは`hooks.server.ts`で保護し、未認証の場合は画面のログイン誘導とAPIの認証エラーを使い分ける。
 認証画面、OAuthの公開エンドポイント、ヘルスチェックなどは公開ルートの定義に従う。

@@ -3,9 +3,10 @@
  */
 
 import { SignJWT } from "jose";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   createSessionToken,
+  getSessionCookieName,
   setSessionCookie,
   verifySessionToken,
 } from "./session";
@@ -68,12 +69,31 @@ describe("setSessionCookie", () => {
     setSessionCookie(cookies, "test-token-123");
 
     expect(set).toHaveBeenCalledOnce();
-    expect(set).toHaveBeenCalledWith("gla-session", "test-token-123", {
+    expect(set).toHaveBeenCalledWith("__Host-gla-session", "test-token-123", {
       path: "/",
       httpOnly: true,
       secure: true,
       sameSite: "none",
       maxAge: 365 * 24 * 60 * 60,
     });
+  });
+});
+
+describe("getSessionCookieName", () => {
+  afterEach(() => {
+    delete process.env.SESSION_COOKIE_NAME;
+  });
+
+  it("未指定・空文字列なら__Host-gla-sessionを返す", () => {
+    expect(getSessionCookieName()).toBe("__Host-gla-session");
+    process.env.SESSION_COOKIE_NAME = "";
+    expect(getSessionCookieName()).toBe("__Host-gla-session");
+  });
+
+  it("指定した名前で発行する", () => {
+    process.env.SESSION_COOKIE_NAME = "gla-session";
+    const set = vi.fn();
+    setSessionCookie({ set } as never, "token");
+    expect(set).toHaveBeenCalledWith("gla-session", "token", expect.anything());
   });
 });

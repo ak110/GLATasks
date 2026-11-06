@@ -20,23 +20,52 @@ export async function createSessionToken(userId: number): Promise<string> {
     .sign(getSecret());
 }
 
-/** セッション Cookie 名 */
-const SESSION_COOKIE = "gla-session";
+/**
+ * セッションCookie名の既定値。`__Host-`接頭辞は、Secure・Path=/・Domain指定なしを満たすCookieだけに使え、
+ * 同じ親ドメインの別サブドメインから上書きされない。
+ */
+export const DEFAULT_SESSION_COOKIE_NAME = "__Host-gla-session";
+
+/**
+ * セッションCookie名を返す。環境変数`SESSION_COOKIE_NAME`が空でなければその値を使う。
+ *
+ * 既存の名前で運用する環境（本番など）は設定で旧名を使い続け、端末ごとの再ログインを避ける。
+ */
+export function getSessionCookieName(): string {
+  return process.env.SESSION_COOKIE_NAME?.trim() || DEFAULT_SESSION_COOKIE_NAME;
+}
 
 /** セッション Cookie 有効期限（秒） */
 const SESSION_MAX_AGE = 365 * 24 * 60 * 60;
 
 /**
+ * セッションCookieの属性。発行と削除で同じ値を使う。
+ *
+ * アプリはリバースプロキシの内側でhttpとして要求を受けるため、`secure`を省くとSvelteKitは非Secureで書き出す。
+ * `__Host-`接頭辞のCookieは非Secureの書き込みをブラウザーが無視するため、削除でも`secure`を明示する。
+ */
+const SESSION_COOKIE_ATTRIBUTES = {
+  path: "/",
+  httpOnly: true,
+  secure: true,
+  sameSite: "none",
+} as const;
+
+/**
  * セッショントークンを Cookie にセットする。
  */
 export function setSessionCookie(cookies: Cookies, token: string): void {
-  cookies.set(SESSION_COOKIE, token, {
-    path: "/",
-    httpOnly: true,
-    secure: true,
-    sameSite: "none",
+  cookies.set(getSessionCookieName(), token, {
+    ...SESSION_COOKIE_ATTRIBUTES,
     maxAge: SESSION_MAX_AGE,
   });
+}
+
+/**
+ * セッションCookieを削除する。
+ */
+export function deleteSessionCookie(cookies: Cookies): void {
+  cookies.delete(getSessionCookieName(), SESSION_COOKIE_ATTRIBUTES);
 }
 
 /**

@@ -13,6 +13,8 @@ x-app-environment: &app-environment
   DATA_DIR: ${DATA_DIR}
   PROTOCOL_HEADER: X-Forwarded-Proto
   BODY_SIZE_LIMIT: 32M
+  # セッションCookie名。未設定時は`__Host-gla-session`を使う。既存の名前で運用する環境は.envで指定する
+  SESSION_COOKIE_NAME: ${SESSION_COOKIE_NAME:-}
 
 # extendsで参照する共通定義。サービスとしては起動しない。
 services:

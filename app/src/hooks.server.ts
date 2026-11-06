@@ -1,9 +1,20 @@
 import type { Handle, ServerInit } from "@sveltejs/kit/hooks";
 import { redirect } from "@sveltejs/kit";
 import { building } from "$app/env";
-import { verifySessionToken } from "#lib/server/session.ts";
+import {
+  getSessionCookieName,
+  verifySessionToken,
+} from "#lib/server/session.ts";
 import { startScheduler } from "#lib/server/scheduler.ts";
-import { isPublicPath } from "#lib/server/auth-routes.ts";
+import {
+  COOKIELESS_MUTATION_PATHS,
+  EXTENSION_EMBEDDABLE_PATHS,
+  isPublicPath,
+} from "#lib/server/auth-routes.ts";
+
+/** 更新要求を拒否する`Sec-Fetch-Site`の値。正規の送信元はGLATasks自身の画面（same-origin）とブラウザーの直接操作（none）だけである。 */
+const REJECTED_FETCH_SITES = new Set(["same-site", "cross-site"]);
+const MUTATING_METHODS = new Set(["POST", "PATCH", "PUT", "DELETE"]);
 
 /**
  * サーバー起動時に定期処理スケジューラー（定期TODOとカロリー自動記録）を起動する。
@@ -14,25 +25,32 @@ export const init: ServerInit = () => {
   startScheduler();
 };
 
+/**
+ * セッションCookieは`SameSite=None`（Chrome拡張のポップアップ内iframeでログイン状態を使うため）なので、
+ * 他サイトからの要求にも付く。その補償として、次の不変条件をこの関数で全経路へ既定で適用する。
+ *
+ * - Cookie認証の更新要求は同一オリジンからだけ受け付ける（`Sec-Fetch-Site`で判定し、Cookieを読まない入口だけを除く）
+ * - 画面は許可した埋め込み元（GLATasks自身と、拡張が開く画面に限りChrome拡張）以外から埋め込めない
+ *
+ * SvelteKit組み込みのOrigin検査はリバースプロキシ経由の利用でOriginが一致しないため無効のまま保つ。
+ * `Sec-Fetch-Site`はブラウザーが自分の見ているオリジン同士で判定するため、プロキシ経由でも同じ画面からの送信はsame-originになる。
+ */
 export const handle: Handle = async ({ event, resolve }) => {
-  // CSRF対策: cross-site リクエストを API ルートでブロック（Fetch Metadata）
   const secFetchSite = event.request.headers.get("sec-fetch-site");
-  const isMutating = ["POST", "PATCH", "PUT", "DELETE"].includes(
-    event.request.method,
-  );
   if (
-    secFetchSite === "cross-site" &&
-    isMutating &&
-    event.url.pathname.startsWith("/api/")
+    MUTATING_METHODS.has(event.request.method) &&
+    secFetchSite !== null &&
+    REJECTED_FETCH_SITES.has(secFetchSite) &&
+    !COOKIELESS_MUTATION_PATHS.has(event.url.pathname)
   ) {
     return new Response(
-      "Forbidden: cross-site requests cannot change data. Send the request from the GLATasks page on the same origin.",
+      "Forbidden: requests from other sites cannot change data. Send the request from the GLATasks page on the same origin.",
       { status: 403 },
     );
   }
 
   // セッション Cookie の検証（JWT/HS256）
-  const sessionCookie = event.cookies.get("gla-session");
+  const sessionCookie = event.cookies.get(getSessionCookieName());
   event.locals.user_id = sessionCookie
     ? await verifySessionToken(sessionCookie)
     : null;
@@ -47,5 +65,20 @@ export const handle: Handle = async ({ event, resolve }) => {
     redirect(302, "/auth/login");
   }
 
-  return resolve(event);
+  const response = await resolve(event);
+  setFrameAncestors(response, event.url.pathname);
+  return response;
 };
+
+/** 埋め込み元を制限する応答ヘッダーを付ける。旧ブラウザー向けの`X-Frame-Options`は拡張を表せないため拡張用の画面には付けない。 */
+function setFrameAncestors(response: Response, pathname: string): void {
+  if (EXTENSION_EMBEDDABLE_PATHS.has(pathname)) {
+    response.headers.set(
+      "Content-Security-Policy",
+      "frame-ancestors 'self' chrome-extension:",
+    );
+    return;
+  }
+  response.headers.set("Content-Security-Policy", "frame-ancestors 'self'");
+  response.headers.set("X-Frame-Options", "SAMEORIGIN");
+}
