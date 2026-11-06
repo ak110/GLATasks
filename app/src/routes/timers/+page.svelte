@@ -1,7 +1,6 @@
 <script lang="ts">
     import { subscribeQueryEvents } from "#lib/client/query-sync.ts";
     import { onMount } from "svelte";
-    import { resolve } from "$app/paths";
     import {
         timersOptions,
         preferencesOptions,
@@ -16,6 +15,7 @@
         createQuery,
         createMutation,
         useQueryClient,
+        hashKey,
     } from "@tanstack/svelte-query";
     import { trpc, type RouterInputs } from "#lib/client/trpc.ts";
     import { createDragReorder } from "#lib/actions/dnd-reorder.svelte.ts";
@@ -88,7 +88,7 @@
 
     // タイマー一覧取得（SSE でリアルタイム同期）
     const timersQuery = createQuery(() => ({
-        ...timersOptions(resolve("/timers")),
+        ...timersOptions(),
     }));
 
     subscribeQueryEvents(queryClient, [
@@ -332,7 +332,11 @@
         </div>
 
         {#if timersQuery.isError}
-            <div role="alert" class="py-8 text-center">
+            <div
+                role="alert"
+                data-query-error-key={hashKey(queryKeys.timers)}
+                class="py-8 text-center"
+            >
                 <p class="mb-4 text-red-600 dark:text-red-400">
                     タイマーを取得できませんでした
                 </p>

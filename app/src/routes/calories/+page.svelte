@@ -20,6 +20,8 @@
         createMutation,
         createQuery,
         useQueryClient,
+        hashKey,
+        type QueryKey,
     } from "@tanstack/svelte-query";
 
     import Header from "#lib/components/layout/Header.svelte";
@@ -204,10 +206,12 @@
         isFetching: boolean;
         refetch: () => Promise<unknown>;
     },
+    queryKey: QueryKey,
 )}
     {#if query.error}
         <div
             role="alert"
+            data-query-error-key={hashKey(queryKey)}
             class="mb-3 rounded border border-red-300 p-3 text-red-700 dark:border-red-700 dark:text-red-300"
         >
             <p>{label}の取得に失敗しました: {query.error.message}</p>
@@ -231,7 +235,11 @@
         <h1 class="mb-5 text-2xl font-bold text-gray-800 dark:text-gray-100">
             カロリー計算
         </h1>
-        {@render queryStatus("カロリー集計", summaryQuery)}
+        {@render queryStatus(
+            "カロリー集計",
+            summaryQuery,
+            queryKeys.calorieSummaryAt(tzOffsetMinutes),
+        )}
         {#if summaryQuery.data}
             <CalorieSummary
                 periods={summaryQuery.data.periods}
@@ -242,7 +250,11 @@
         {/if}
         <div class="mt-5 grid gap-5 lg:grid-cols-[1.4fr_1fr]">
             <div>
-                {@render queryStatus("記録", recordsQuery)}
+                {@render queryStatus(
+                    "記録",
+                    recordsQuery,
+                    queryKeys.calorieRecords(windowOffset, tzOffsetMinutes),
+                )}
                 {#if recordsQuery.data && itemsQuery.data}
                     <CalorieRecordTable
                         {items}
@@ -261,7 +273,11 @@
                 {/if}
             </div>
             <div>
-                {@render queryStatus("品目", itemsQuery)}
+                {@render queryStatus(
+                    "品目",
+                    itemsQuery,
+                    queryKeys.calorieItems,
+                )}
                 {#if itemsQuery.data}
                     <CalorieItemTable
                         {items}
@@ -280,7 +296,11 @@
         </div>
         <div class="mt-5 grid gap-5 lg:grid-cols-2">
             <div>
-                {@render queryStatus("自動記録", autoRecordsQuery)}
+                {@render queryStatus(
+                    "自動記録",
+                    autoRecordsQuery,
+                    queryKeys.calorieAutoRecords,
+                )}
                 {#if autoRecordsQuery.data && itemsQuery.data}
                     <CalorieAutoRecordPanel
                         {items}

@@ -25,6 +25,7 @@
         /** 検索クエリ実行中フラグ */
         isLoading: boolean;
         error?: string;
+        queryErrorKey?: string;
         onRetry?: () => void;
         /** 検索結果のタスクをクリックしたときのコールバック */
         onGoToResult: (listId: number) => void;
@@ -35,6 +36,7 @@
         searchResultsByList,
         isLoading,
         error,
+        queryErrorKey,
         onRetry,
         onGoToResult,
     }: Props = $props();
@@ -70,7 +72,11 @@
 {#if isLoading}
     <p class="p-4 text-gray-400 dark:text-gray-500">検索中...</p>
 {:else if error}
-    <div role="alert" class="p-4 text-red-600 dark:text-red-400">
+    <div
+        role="alert"
+        data-query-error-key={queryErrorKey}
+        class="p-4 text-red-600 dark:text-red-400"
+    >
         <p>{error}</p>
         <button type="button" onclick={onRetry} class={grayButtonClass}
             >再試行</button

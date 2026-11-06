@@ -61,7 +61,7 @@ describe("クエリーの取得と同期", () => {
     vi.spyOn(Date, "now").mockReturnValueOnce(1000).mockReturnValueOnce(1400);
     const result = { serverTime: new Date(2000).toISOString(), timers: [] };
     listTimers.mockResolvedValueOnce(result);
-    expect(await timersOptions("/timers").queryFn()).toBe(result);
+    expect(await timersOptions().queryFn()).toBe(result);
     expect(getServerOffset()).toBe(800);
   });
 

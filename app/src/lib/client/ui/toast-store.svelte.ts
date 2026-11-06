@@ -30,10 +30,11 @@ export function getToastDurationMs(message: string): number {
 }
 
 /** エラートーストを表示する（文面の長さに応じた時間の後に自動消去） */
-export function showErrorToast(message: string): void {
+export function showErrorToast(message: string): number {
   const id = nextId++;
   toasts = [...toasts, { id, message }];
   setTimeout(() => dismissToast(id), getToastDurationMs(message));
+  return id;
 }
 
 /** 指定トーストを消去する */

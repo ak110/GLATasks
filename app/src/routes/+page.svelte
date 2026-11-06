@@ -10,7 +10,8 @@
      * @fileoverview タスクメモ管理メインページ（リスト一覧 + タスク一覧）
      */
 
-    import { useQueryClient } from "@tanstack/svelte-query";
+    import { useQueryClient, hashKey } from "@tanstack/svelte-query";
+    import { reconcileVisibleQueryErrorToasts } from "#lib/client/query-client.ts";
     import { showErrorToast } from "#lib/client/ui/toast-store.svelte.ts";
     import { extractErrorMessage } from "#lib/client/ui/extract-error-message.ts";
     import { uploadAttachment } from "#lib/client/attachments/attachment-utils.ts";
@@ -48,6 +49,11 @@
     );
 
     const queryClient = useQueryClient();
+
+    $effect(() => {
+        void mobileView;
+        void reconcileVisibleQueryErrorToasts();
+    });
 
     // 検索クエリの debounce（300ms）
     // state.searchQuery の変更ごとにタイマーをリセットし、入力停止後に検索を実行する
@@ -450,7 +456,10 @@
     }
 </script>
 
-<svelte:window onkeydown={handleMainKeyboard} />
+<svelte:window
+    onkeydown={handleMainKeyboard}
+    onresize={() => void reconcileVisibleQueryErrorToasts()}
+/>
 
 <Header
     page="tasks"
@@ -462,7 +471,11 @@
 />
 
 {#if listsQuery.isError && listsQuery.data === undefined}
-    <div role="alert" class="p-4 text-red-600 dark:text-red-400">
+    <div
+        role="alert"
+        data-query-error-key={hashKey(queryKeys.list(state.showType))}
+        class="p-4 text-red-600 dark:text-red-400"
+    >
         <p>リストを取得できませんでした。</p>
         <button
             type="button"
@@ -513,6 +526,12 @@
             <SearchResults
                 query={state.debouncedQuery}
                 {searchResultsByList}
+                queryErrorKey={hashKey(
+                    queryKeys.searchResults(
+                        state.debouncedQuery,
+                        state.showType,
+                    ),
+                )}
                 isLoading={searchResultsQuery.isLoading}
                 error={searchResultsQuery.isError &&
                 searchResultsQuery.data === undefined
@@ -542,6 +561,11 @@
             <TaskList
                 bind:this={state.taskList}
                 {tasks}
+                queryErrorKey={hashKey(
+                    state.showType === "archived"
+                        ? queryKeys.archivedTasks(state.selectedListId)
+                        : queryKeys.activeTasks,
+                )}
                 isLoading={displayedTasksQuery.isLoading}
                 error={displayedTasksQuery.isError &&
                 displayedTasksQuery.data === undefined

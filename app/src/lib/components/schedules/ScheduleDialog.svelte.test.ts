@@ -9,7 +9,8 @@ const mocks = vi.hoisted(() => ({
   query: { data: undefined, isPending: false, isError: false },
 }));
 
-vi.mock("@tanstack/svelte-query", () => ({
+vi.mock("@tanstack/svelte-query", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@tanstack/svelte-query")>()),
   createQuery: () => ({ ...mocks.query, refetch: mocks.refetch }),
   createMutation: (
     options: () => { mutationFn: (input: unknown) => Promise<unknown> },
@@ -20,6 +21,9 @@ vi.mock("@tanstack/svelte-query", () => ({
 }));
 vi.mock("#lib/client/trpc.ts", () => ({
   trpc: { schedules: { create: { mutate: mocks.create } } },
+}));
+vi.mock("#lib/client/query-client.ts", () => ({
+  reconcileVisibleQueryErrorToasts: vi.fn(),
 }));
 
 describe("ScheduleDialogの非同期応答", () => {

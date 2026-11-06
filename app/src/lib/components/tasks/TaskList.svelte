@@ -15,6 +15,7 @@
         tasks: TaskListItem[];
         isLoading: boolean;
         error?: string;
+        queryErrorKey?: string;
         onRetry?: () => void;
         onToggle: (taskId: number, nextStatus: TaskStatus) => void;
         onEdit: (task: TaskListItem) => void;
@@ -28,6 +29,7 @@
         tasks,
         isLoading,
         error,
+        queryErrorKey,
         onRetry,
         onToggle,
         onEdit,
@@ -69,7 +71,11 @@
     {#if isLoading}
         <p class="p-4 text-gray-400 dark:text-gray-500">読み込み中...</p>
     {:else if error}
-        <div role="alert" class="p-4 text-red-600 dark:text-red-400">
+        <div
+            role="alert"
+            data-query-error-key={queryErrorKey}
+            class="p-4 text-red-600 dark:text-red-400"
+        >
             <p>{error}</p>
             <button type="button" onclick={onRetry} class={grayButtonClass}
                 >再試行</button

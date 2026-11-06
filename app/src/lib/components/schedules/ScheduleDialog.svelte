@@ -1,6 +1,7 @@
 <script lang="ts">
     import { queryKeys } from "#lib/client/query-options.ts";
     import { schedulesOptions } from "#lib/client/query-options.ts";
+    import { reconcileVisibleQueryErrorToasts } from "#lib/client/query-client.ts";
     import {
         dialogInputClass,
         grayButtonClass,
@@ -18,6 +19,7 @@
         createQuery,
         createMutation,
         useQueryClient,
+        hashKey,
     } from "@tanstack/svelte-query";
     import { trpc, type RouterInputs } from "#lib/client/trpc.ts";
     import type { TagInfo, ScheduleInfo } from "#lib/types.ts";
@@ -44,6 +46,11 @@
 
     // 編集フォームの状態。null は非表示、"new" は新規追加、ScheduleInfo は編集対象
     let formTarget = $state<ScheduleInfo | "new" | null>(null);
+    // 一覧とeditorの切替はQueryを変えないため、描画後に通知resourceだけを照合する。
+    $effect(() => {
+        void formTarget;
+        void reconcileVisibleQueryErrorToasts();
+    });
     let formTitle = $state("");
     let formTags = $state<TagInfo[]>([]);
     let formSession = 0;
@@ -223,7 +230,12 @@
             {#if schedulesQuery.isPending}
                 <p>読み込み中...</p>
             {:else if schedulesQuery.isError && schedulesQuery.data === undefined}
-                <div role="alert">
+                <div
+                    role="alert"
+                    data-query-error-key={hashKey(
+                        queryKeys.listSchedules(listId),
+                    )}
+                >
                     <p>定期TODOを取得できませんでした。</p>
                     <button
                         type="button"
