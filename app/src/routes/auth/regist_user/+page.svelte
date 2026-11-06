@@ -6,12 +6,19 @@
     import type { ActionData } from "./$types";
     import AuthCard from "#lib/components/layout/AuthCard.svelte";
     import { resolve } from "$app/paths";
+    import { page } from "$app/state";
 
     interface Props {
         form: ActionData;
     }
 
     let { form }: Props = $props();
+
+    // ログイン画面との往復でも転送元の画面へ戻れるよう、戻り先をログイン画面へ引き継ぐ
+    let loginQuery = $derived.by(() => {
+        const returnTo = page.url.searchParams.get("returnTo");
+        return returnTo ? `?${new URLSearchParams({ returnTo })}` : "";
+    });
 </script>
 
 <AuthCard title="GLATasks - ユーザー登録" error={form?.error}>
@@ -69,7 +76,7 @@
         <p class="mt-4 text-center text-gray-600 dark:text-gray-300">
             アカウントをお持ちの方は
             <a
-                href={resolve("/auth/login")}
+                href="{resolve('/auth/login')}{loginQuery}"
                 class="text-blue-600 hover:underline">ログイン</a
             >
         </p>

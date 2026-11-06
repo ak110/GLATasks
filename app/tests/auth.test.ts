@@ -39,6 +39,28 @@ test.describe("未ログイン状態", () => {
     ]);
   });
 
+  test("登録画面を経由してログインしても、未ログインで開いた画面へ戻る", async ({
+    page,
+  }) => {
+    // ポップアップ内でも登録画面を経由してからログインする利用があり、戻り先を失うと埋め込めない画面へ移る
+    await page.goto("/share/ingest?text=e2e&in_popup=1");
+    await expect(page).toHaveURL(/\/auth\/login\?returnTo=/);
+    await page.getByRole("link", { name: "登録" }).click();
+    await expect(page).toHaveURL(
+      (url) =>
+        url.pathname === "/auth/regist_user" &&
+        url.searchParams.has("returnTo"),
+    );
+    await page.getByRole("link", { name: "ログイン" }).click();
+    await expect(page).toHaveURL(/\/auth\/login\?returnTo=/);
+    await page.fill('[name="user"]', TEST_USER);
+    await page.fill('[name="password"]', TEST_PASSWORD);
+    await Promise.all([
+      page.waitForURL("/share/ingest?text=e2e&in_popup=1"),
+      page.click('button[type="submit"]'),
+    ]);
+  });
+
   test("誤った資格情報でログインするとエラーメッセージ表示", async ({
     page,
   }) => {
