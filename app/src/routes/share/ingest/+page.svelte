@@ -14,7 +14,6 @@
     const defaultText = $derived(
         [data.title, data.text, data.pageUrl].filter(Boolean).join("\n\n"),
     );
-    // ポップアップでの追加に成功した場合だけ、追加先のリスト名（見つからなければ空文字列）を持つ
     const addedListTitle = $derived.by(() => {
         const added = form && "added" in form ? form.added : undefined;
         if (!added) return undefined;
