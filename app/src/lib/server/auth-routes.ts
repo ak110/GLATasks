@@ -28,6 +28,8 @@ export const COOKIELESS_MUTATION_PATHS: ReadonlySet<string> = new Set([
 /**
  * Chrome拡張のポップアップ内iframeが開く画面。拡張ページからの埋め込みだけを追加で許可する。
  * 拡張は`/share/ingest`を開き、未ログイン時はログイン・利用者登録の画面へ遷移する。
+ * これらの画面からの転送先（追加後の表示、ログイン後の戻り先など）もこの集合の画面に限る。
+ * 集合外の画面へ移るとブラウザーが埋め込みを拒否し、ポップアップに「接続が拒否されました」と表示される。
  */
 export const EXTENSION_EMBEDDABLE_PATHS: ReadonlySet<string> = new Set([
   "/share/ingest",

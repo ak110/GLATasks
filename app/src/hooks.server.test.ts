@@ -64,6 +64,19 @@ describe("セッション認証の入口", () => {
     expect(resolve).not.toHaveBeenCalled();
   });
 
+  it("未ログインのポップアップからの共有POSTは、元の画面をreturnToに付けてログインへ転送する", async () => {
+    // ログイン後にトップ画面へ移ると拡張からの埋め込みが拒否されるため、タスク追加画面へ戻す
+    const event = makeEvent("/share/ingest?in_popup=1", {
+      cookieName: "other",
+    });
+    const resolve = vi.fn(async () => new Response("action"));
+    await expect(handle({ event, resolve })).rejects.toMatchObject({
+      status: 302,
+      location: "/auth/login?returnTo=%2Fshare%2Fingest%3Fin_popup%3D1",
+    });
+    expect(resolve).not.toHaveBeenCalled();
+  });
+
   it.each([
     // Chrome拡張のポップアップはタスク追加画面を埋め込み、ログイン後にこの画面へ戻る必要がある
     [

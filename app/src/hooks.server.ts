@@ -63,10 +63,12 @@ export const handle: Handle = async ({ event, resolve }) => {
         { status: 401 },
       );
     }
-    // 更新要求の転送先へ元のURLを付けると、ログイン後にその入口をGETで開き直すことになるため画面のGETに限る
+    // 更新要求の転送先へ元のURLを付けると、ログイン後にその入口をGETで開き直すことになるため画面のGETに限る。
+    // 例外としてChrome拡張のポップアップからの送信は元の画面へ戻す。ログイン後にトップ画面へ移ると、
+    // 拡張からの埋め込みを許可しない画面になりブラウザーが表示を拒否するためである（元の画面はGETで入力欄を開き直すだけ）
     redirect(
       302,
-      event.request.method === "GET"
+      event.request.method === "GET" || isExtensionPopupRequest(event.url)
         ? loginRedirectPath(event.url)
         : "/auth/login",
     );
@@ -76,6 +78,14 @@ export const handle: Handle = async ({ event, resolve }) => {
   setFrameAncestors(response, event.url.pathname);
   return response;
 };
+
+/** Chrome拡張のポップアップが埋め込んだ画面からの要求かを返す。拡張は`in_popup=1`を付けて画面を開く。 */
+function isExtensionPopupRequest(url: URL): boolean {
+  return (
+    EXTENSION_EMBEDDABLE_PATHS.has(url.pathname) &&
+    url.searchParams.get("in_popup") === "1"
+  );
+}
 
 /** 埋め込み元を制限する応答ヘッダーを付ける。旧ブラウザー向けの`X-Frame-Options`は拡張を表せないため拡張用の画面には付けない。 */
 function setFrameAncestors(response: Response, pathname: string): void {

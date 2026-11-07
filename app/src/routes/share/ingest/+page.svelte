@@ -14,6 +14,12 @@
     const defaultText = $derived(
         [data.title, data.text, data.pageUrl].filter(Boolean).join("\n\n"),
     );
+    // ポップアップでの追加に成功した場合だけ、追加先のリスト名（見つからなければ空文字列）を持つ
+    const addedListTitle = $derived.by(() => {
+        const added = form && "added" in form ? form.added : undefined;
+        if (!added) return undefined;
+        return data.lists.find((list) => list.id === added.listId)?.title ?? "";
+    });
 </script>
 
 <div class="flex min-h-screen items-center justify-center bg-gray-100 p-4">
@@ -24,45 +30,57 @@
                 {form.error}
             </p>
         {/if}
-        <form method="POST">
-            <div class="mb-4">
-                <label
-                    class="mb-1 block cursor-pointer font-medium text-gray-700"
-                    for="text">内容</label
-                >
-                <textarea
-                    id="text"
-                    name="text"
-                    rows={5}
-                    required
-                    value={defaultText}
-                    class="w-full rounded border border-gray-200 px-3 py-2 focus:border-blue-500 focus:outline-none"
-                ></textarea>
-            </div>
-            <div class="mb-4">
-                <label
-                    class="mb-1 block cursor-pointer font-medium text-gray-700"
-                    for="list_id">リスト</label
-                >
-                <select
-                    id="list_id"
-                    name="list_id"
-                    required
-                    class="w-full rounded border border-gray-200 px-3 py-2 focus:border-blue-500 focus:outline-none"
-                >
-                    {#each data.lists as list (list.id)}
-                        <option value={list.id}>{list.title}</option>
-                    {/each}
-                </select>
-            </div>
-            <div class="flex justify-end">
-                <button
-                    type="submit"
-                    class="cursor-pointer rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
-                >
-                    追加
-                </button>
-            </div>
-        </form>
+        {#if addedListTitle !== undefined}
+            <p
+                class="mb-4 rounded bg-green-100 p-3 text-green-800"
+                role="status"
+                data-testid="ingest-added"
+            >
+                {addedListTitle
+                    ? `「${addedListTitle}」にタスクを追加しました。`
+                    : "タスクを追加しました。"}
+            </p>
+        {:else}
+            <form method="POST">
+                <div class="mb-4">
+                    <label
+                        class="mb-1 block cursor-pointer font-medium text-gray-700"
+                        for="text">内容</label
+                    >
+                    <textarea
+                        id="text"
+                        name="text"
+                        rows={5}
+                        required
+                        value={defaultText}
+                        class="w-full rounded border border-gray-200 px-3 py-2 focus:border-blue-500 focus:outline-none"
+                    ></textarea>
+                </div>
+                <div class="mb-4">
+                    <label
+                        class="mb-1 block cursor-pointer font-medium text-gray-700"
+                        for="list_id">リスト</label
+                    >
+                    <select
+                        id="list_id"
+                        name="list_id"
+                        required
+                        class="w-full rounded border border-gray-200 px-3 py-2 focus:border-blue-500 focus:outline-none"
+                    >
+                        {#each data.lists as list (list.id)}
+                            <option value={list.id}>{list.title}</option>
+                        {/each}
+                    </select>
+                </div>
+                <div class="flex justify-end">
+                    <button
+                        type="submit"
+                        class="cursor-pointer rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+                    >
+                        追加
+                    </button>
+                </div>
+            </form>
+        {/if}
     </div>
 </div>

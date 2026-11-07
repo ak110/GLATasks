@@ -56,6 +56,34 @@ test.describe("share/ingest", () => {
     await expect(page.locator("main")).toBeVisible({ timeout: 10000 });
   });
 
+  test("拡張のポップアップから追加すると同じ画面で結果を表示し、拡張からの埋め込みを保つ", async ({
+    page,
+  }) => {
+    // ポップアップはiframeで本画面を開く。メイン画面へ転送すると拡張からの埋め込みが拒否され、
+    // 「接続が拒否されました」と表示されるため、追加後も埋め込みを許可する画面に留まることを確かめる
+    await page.goto("/share/ingest?title=popupテスト&in_popup=1");
+    await expect(page.locator("#list_id option")).not.toHaveCount(0, {
+      timeout: 10000,
+    });
+    await page.locator("#list_id").selectOption({ label: LIST_NAME });
+    const [response] = await Promise.all([
+      page.waitForResponse(
+        (res) =>
+          new URL(res.url()).pathname === "/share/ingest" &&
+          res.request().method() === "POST",
+      ),
+      page.click('button[type="submit"]'),
+    ]);
+    expect(response.status()).toBe(200);
+    expect(response.headers()["content-security-policy"]).toBe(
+      "frame-ancestors 'self' chrome-extension:",
+    );
+    await expect(page.getByTestId("ingest-added")).toHaveText(
+      `「${LIST_NAME}」にタスクを追加しました。`,
+    );
+    expect(new URL(page.url()).pathname).toBe("/share/ingest");
+  });
+
   test("text パラメータがフォームに反映される", async ({ page }) => {
     const title = "テストページ";
     const text = "共有テキスト";

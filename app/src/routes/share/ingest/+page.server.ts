@@ -21,7 +21,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 };
 
 export const actions: Actions = {
-  default: async ({ request, locals }) => {
+  default: async ({ request, locals, url }) => {
     const data = await request.formData();
     if (!locals.user_id) redirect(302, "/auth/login");
     const listId = Number(data.get("list_id"));
@@ -44,6 +44,11 @@ export const actions: Actions = {
       return fail(getErrorStatus(e), { error: getPublicError(e).message });
     }
 
+    // Chrome拡張のポップアップは本画面をiframeへ埋め込む。メイン画面は拡張からの埋め込みを許可しないため、
+    // 転送するとブラウザーが表示を拒否する。ポップアップでは同じ画面で追加結果を表示する。
+    if (url.searchParams.get("in_popup") === "1") {
+      return { added: { listId } };
+    }
     redirect(303, "/#" + listId);
   },
 };
