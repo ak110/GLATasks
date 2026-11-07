@@ -222,6 +222,9 @@ test.describe("task-scroll", () => {
   test("アーカイブ表示でタスク追加した場合は一覧位置を維持する", async ({
     page,
   }) => {
+    // 18件の作成と各2回の完了操作など約55回の往復を直列に行う。開発用サーバーでは1往復が約0.4秒かかり、
+    // 既定の上限（30秒）に近づくか超えるため、上限を3倍にする（CIの本番構成では数秒で終わる）
+    test.slow();
     await prepareScrollableTaskList(page);
     const taskItems = page.getByTestId("task-item");
     const taskCount = await taskItems.count();
