@@ -29,7 +29,9 @@ const TEXT_INPUT_TYPES = new Set([
 
 type EditableField = HTMLInputElement | HTMLTextAreaElement;
 
-// 利用者が入力した欄。保存後に値を消す部品が多いため、値が残っている欄だけを作業中とみなす
+// 利用者が入力した欄。保存後に値を消す部品が多いため、値が残っている欄だけを作業中とみなす。
+// フォームの送信では追跡を外さない。保存に失敗して入力が残った場合も保護するためで、
+// 保存後も値を残す欄では、その画面にいる間は自動の再読み込みを見送る（更新案内の手動ボタンは使える）
 const editedFields = new Set<EditableField>();
 
 // フォーカスが外れた後も画面に残る、DOMの欄に値を持たない未保存の入力。申告した部品ごとの識別子を保持する
@@ -46,24 +48,12 @@ function handleInput(event: Event): void {
   if (isEditableField(event.target)) editedFields.add(event.target);
 }
 
-// 送信したフォームの欄は保存へ渡した入力とみなし、追跡を外す。
-// 送信後も値を残す部品（目標値の欄など）が、保存後もずっと作業中と判定され続けないようにするため。
-function handleSubmit(event: Event): void {
-  const form = event.target;
-  if (!(form instanceof HTMLFormElement)) return;
-  for (const field of editedFields) {
-    if (field.form === form) editedFields.delete(field);
-  }
-}
-
 /** 利用者が入力した欄の追跡を開始する。戻り値は追跡を止める関数 */
 export function startEditedFieldTracking(): () => void {
   // 部品の入力処理より先に記録するため、捕捉段階で受け取る
   document.addEventListener("input", handleInput, true);
-  document.addEventListener("submit", handleSubmit, true);
   return () => {
     document.removeEventListener("input", handleInput, true);
-    document.removeEventListener("submit", handleSubmit, true);
     editedFields.clear();
   };
 }
