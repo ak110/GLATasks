@@ -137,19 +137,19 @@ describe("一括操作の最後に完了した結果", () => {
   });
 });
 
-describe("送信後も欄に残る条件の保存済みの値", () => {
-  // 自動の再読み込みの見送り判定（user-busy.ts）は、data-saved-valueと異なる欄だけを未保存の入力とみなす
-  function savedValues(kind: "create" | "delete") {
+describe("送信後も欄に残る条件の、未保存の入力が無いとみなす値", () => {
+  // 自動の再読み込みの見送り判定（user-busy.ts）は、data-clean-valueと異なる欄だけを未保存の入力とみなす
+  function cleanValues(kind: "create" | "delete") {
     const form = screen.getByTestId(`calorie-bulk-${kind}-form`);
     return ["開始日", "終了日", "品目"].map((label) => {
       const field = within(form).getByLabelText(label);
       if (!(field instanceof HTMLInputElement)) throw new Error(label);
-      return [field.value, field.dataset.savedValue];
+      return [field.value, field.dataset.cleanValue];
     });
   }
 
   it.each(["create", "delete"] as const)(
-    "%sに成功すると欄の値を保存済みの値にする",
+    "%sに成功すると欄の値を未保存の入力が無いとみなす値にする",
     async (kind) => {
       render(CalorieBulkControls, {
         items: [{ id: 1, name: "食品" }],
@@ -159,7 +159,7 @@ describe("送信後も欄に残る条件の保存済みの値", () => {
       await submit(kind);
       if (kind === "delete") await confirmDelete();
       await waitFor(() =>
-        expect(savedValues(kind)).toEqual([
+        expect(cleanValues(kind)).toEqual([
           ["2026-08-01", "2026-08-01"],
           ["2026-08-01", "2026-08-01"],
           ["食品", "食品"],
@@ -181,7 +181,7 @@ describe("送信後も欄に残る条件の保存済みの値", () => {
       await expectResult(
         "通信失敗。反映されたか記録の一覧を確認してから、再操作してください",
       );
-      expect(savedValues(kind)).toEqual([
+      expect(cleanValues(kind)).toEqual([
         ["2026-08-01", ""],
         ["2026-08-01", ""],
         ["食品", ""],

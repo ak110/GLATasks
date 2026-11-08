@@ -34,7 +34,7 @@
     let deleteStart = $state("");
     let deleteEnd = $state("");
     let deleteItemName = $state("");
-    // 送信後も条件を欄に残すため、最後に処理した条件を欄の保存済みの値として示す。
+    // 送信後も条件を欄に残すため、最後に処理した条件を、未保存の入力が無いとみなす値として欄に示す。
     // 処理に成功した条件が残るだけでは未保存の入力とみなさず、自動の再読み込みを妨げない（user-busy.ts）
     let savedCreate = $state({
         start: "",
@@ -201,7 +201,7 @@
             開始日
             <input
                 bind:value={createStart}
-                data-saved-value={savedCreate.start}
+                data-clean-value={savedCreate.start}
                 type="date"
                 required
                 class={inputClass}
@@ -211,7 +211,7 @@
             終了日
             <input
                 bind:value={createEnd}
-                data-saved-value={savedCreate.end}
+                data-clean-value={savedCreate.end}
                 type="date"
                 required
                 class={inputClass}
@@ -221,7 +221,7 @@
             時刻
             <input
                 bind:value={createTime}
-                data-saved-value={savedCreate.time}
+                data-clean-value={savedCreate.time}
                 type="time"
                 required
                 class={inputClass}
@@ -231,7 +231,7 @@
             品目
             <input
                 bind:value={createItemName}
-                data-saved-value={savedCreate.itemName}
+                data-clean-value={savedCreate.itemName}
                 list="calorie-bulk-item-options"
                 required
                 autocomplete="off"
@@ -242,7 +242,7 @@
             数量
             <input
                 bind:value={createQuantity}
-                data-saved-value={savedCreate.quantity}
+                data-clean-value={savedCreate.quantity}
                 type="number"
                 min="0"
                 step="1"
@@ -274,7 +274,7 @@
             開始日
             <input
                 bind:value={deleteStart}
-                data-saved-value={savedDelete.start}
+                data-clean-value={savedDelete.start}
                 type="date"
                 required
                 class={inputClass}
@@ -284,7 +284,7 @@
             終了日
             <input
                 bind:value={deleteEnd}
-                data-saved-value={savedDelete.end}
+                data-clean-value={savedDelete.end}
                 type="date"
                 required
                 class={inputClass}
@@ -294,7 +294,7 @@
             品目
             <input
                 bind:value={deleteItemName}
-                data-saved-value={savedDelete.itemName}
+                data-clean-value={savedDelete.itemName}
                 list="calorie-bulk-item-options"
                 required
                 autocomplete="off"

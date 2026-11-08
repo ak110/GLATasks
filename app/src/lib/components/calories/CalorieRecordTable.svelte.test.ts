@@ -5,6 +5,10 @@
 import { fireEvent, render, screen } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import {
+  isUserBusy,
+  startEditedFieldTracking,
+} from "#lib/client/ui/user-busy.ts";
 import CalorieRecordTable from "./CalorieRecordTable.svelte";
 
 const record = {
@@ -133,6 +137,29 @@ describe("CalorieRecordTable", () => {
     expect(datetime.value).not.toBe("2026/08/01 01:00");
     expect(item.value).toBe("");
     expect(quantity.value).toBe("1");
+  });
+
+  it("入力した日時・数量は作業中とみなし、取消で初期値へ戻ると作業中でなくなる", async () => {
+    // 自動の再読み込みの見送り判定は、data-clean-valueと異なる欄だけを未保存の入力とみなす
+    const stopTracking = startEditedFieldTracking();
+    try {
+      renderTable();
+      const datetime = screen.getByLabelText("日時") as HTMLInputElement;
+      const quantity = screen.getByLabelText("数量") as HTMLInputElement;
+      await fireEvent.input(datetime, {
+        target: { value: "2026/08/01 01:00" },
+      });
+      await fireEvent.input(quantity, { target: { value: "3" } });
+      expect(isUserBusy()).toBe(true);
+
+      await fireEvent.click(screen.getByRole("button", { name: "取消" }));
+
+      expect(quantity.value).toBe("1");
+      expect(datetime.dataset.cleanValue).toBe(datetime.value);
+      expect(isUserBusy()).toBe(false);
+    } finally {
+      stopTracking();
+    }
   });
 
   it("一時項目のコピーは同名の品目があっても一時項目のまま扱い、品目欄が空の間は案内せず、取消で引き継ぎを解除する", async () => {

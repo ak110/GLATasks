@@ -47,7 +47,10 @@
 
     let timeOfDay = $state("");
     let itemName = $state("");
-    let quantity = $state("1");
+    // 保存・取消の後に戻す数量。未保存の入力が無いとみなす値として欄に示し、
+    // 保存後に初期値へ戻った欄が自動の再読み込みを止めないようにする（user-busy.ts）
+    const DEFAULT_QUANTITY = "1";
+    let quantity = $state(DEFAULT_QUANTITY);
 
     function tzOffsetMinutes(): number {
         return getUtcOffsetMinutes();
@@ -58,7 +61,7 @@
         editing = undefined;
         timeOfDay = "";
         itemName = "";
-        quantity = "1";
+        quantity = DEFAULT_QUANTITY;
     }
 
     function edit(autoRecord: AutoRecord) {
@@ -185,6 +188,7 @@
             <input
                 id="calorie-auto-quantity"
                 bind:value={quantity}
+                data-clean-value={DEFAULT_QUANTITY}
                 required
                 type="number"
                 min="0"

@@ -10,9 +10,10 @@
  * 値が残っている間は作業中とみなす。DOMの欄に値を持たない入力（選択済みのタグ・添付など）だけを、
  * 部品が`holdUnsavedDraft`で申告する。
  *
- * 保存に成功した後も値を欄に残す部品（目標値、一括操作の条件など）は、保存済みの値を欄の
- * `data-saved-value`属性で示す。その欄は値が保存済みの値と異なる間だけ作業中とみなすため、
- * 保存に成功すれば自動の再読み込みを妨げず、失敗して入力が残れば保護する。
+ * 保存に成功した後も値を欄に残す部品（目標値、一括操作の条件など）と、保存後に空でない初期値
+ * （数量の1、現在の日時など）へ戻す部品は、未保存の入力が無いとみなす値を欄の`data-clean-value`属性で示す。
+ * その欄は値がこの値と異なる間だけ作業中とみなすため、保存に成功すれば自動の再読み込みを妨げず、
+ * 失敗して入力が残れば保護する。
  */
 
 // 文字や数値を入力する種類のinput。チェックボックスや選択肢の操作は即時に反映する部品が多いため追跡しない
@@ -82,9 +83,9 @@ function hasEditedFieldWithValue(): boolean {
       editedFields.delete(field);
       continue;
     }
-    const savedValue = field.dataset.savedValue;
-    if (savedValue !== undefined) {
-      if (field.value !== savedValue) return true;
+    const cleanValue = field.dataset.cleanValue;
+    if (cleanValue !== undefined) {
+      if (field.value !== cleanValue) return true;
     } else if (field.value.trim() !== "") {
       return true;
     }
@@ -97,7 +98,7 @@ function hasEditedFieldWithValue(): boolean {
  *
  * - 入力欄・編集可能要素へのフォーカス
  * - 開いているモーダルダイアログ
- * - 利用者が入力して値が残っている欄（フォーカスが外れていても対象。`data-saved-value`を持つ欄は保存済みの値と異なる間）
+ * - 利用者が入力して値が残っている欄（フォーカスが外れていても対象。`data-clean-value`を持つ欄はその値と異なる間）
  * - `holdUnsavedDraft`で申告された未保存の入力
  */
 export function isUserBusy(): boolean {

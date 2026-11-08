@@ -174,8 +174,8 @@ test("1日目標は保存に失敗した入力を残す間は再読み込みせ�
     const saved = waitForMutationResponse(page, "users.updatePreferences");
     await saveButton.click();
     expect((await saved).ok()).toBe(true);
-    // 保存後の設定の再取得で、欄の保存済みの値が更新されるのを待つ
-    await expect(goal).toHaveAttribute("data-saved-value", "1234");
+    // 保存後の設定の再取得で、欄の未保存の入力が無いとみなす値が保存した値へ更新されるのを待つ
+    await expect(goal).toHaveAttribute("data-clean-value", "1234");
     version.reset();
     const reloaded = page.waitForEvent("load");
     await page.clock.runFor(RETRY_INTERVAL_MS);

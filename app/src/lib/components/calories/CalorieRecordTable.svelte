@@ -104,6 +104,9 @@
             : "",
     );
     let openMenuId = $state<number | undefined>();
+    // 追加・取消の後に戻す数量。日時を手で修正していない間の日時とともに、未保存の入力が無いとみなす値として
+    // 欄に示し、保存後に初期値へ戻った欄が自動の再読み込みを止めないようにする（user-busy.ts）
+    const DEFAULT_QUANTITY = "1";
     let consumedAt = $state(formatLocalMinute(new Date()));
     // 追加欄の日時は現在時刻へ追従させ、手で修正した後は追加か取消までその値を保つ
     let consumedAtEdited = $state(false);
@@ -112,7 +115,7 @@
     const itemName = $derived(
         editingId === undefined ? addItemName : editItemName,
     );
-    let quantity = $state("1");
+    let quantity = $state(DEFAULT_QUANTITY);
     let editForm = $state<HTMLFormElement | undefined>();
     const visibleRecords = $derived(
         records.filter((record) => {
@@ -153,7 +156,7 @@
         consumedAtEdited = false;
         addItemName = "";
         editItemName = "";
-        quantity = "1";
+        quantity = DEFAULT_QUANTITY;
     }
 
     function setItemName(value: string) {
@@ -348,6 +351,7 @@
             id="calorie-record-datetime"
             bind:value={consumedAt}
             oninput={() => (consumedAtEdited = true)}
+            data-clean-value={consumedAtEdited ? undefined : consumedAt}
             required
             pattern={"[0-9]{4}/[0-9]{2}/[0-9]{2} [0-9]{2}:[0-9]{2}"}
             placeholder="yyyy/MM/dd HH:mm"
@@ -374,6 +378,7 @@
         <input
             id="calorie-record-quantity"
             bind:value={quantity}
+            data-clean-value={DEFAULT_QUANTITY}
             required
             type="number"
             min="0"
