@@ -1,5 +1,7 @@
 import {
+  cleanupTestList,
   isTrpcUrl,
+  setupTestList,
   uniqueTestName,
   waitForMutationResponse,
 } from "./helpers/common";
@@ -16,6 +18,18 @@ import { test, expect, type Page } from "@playwright/test";
 
 // 自動再読み込みが見送った後に条件を確かめ直す間隔（`update-reload.ts`のUPDATE_RELOAD_RETRY_INTERVAL_MS）
 const RETRY_INTERVAL_MS = 3_000;
+
+// タスク追加フォームはリストを選ぶまで表示されない。
+// 試験用DBに既存のリストがあるとは限らないため、この試験だけが使うリストを用意する
+const LIST_NAME = `自動再読み込み_${uniqueTestName("e2e")}`;
+
+test.beforeAll(async ({ browser }) => {
+  await setupTestList(browser, LIST_NAME);
+});
+
+test.afterAll(async ({ browser }) => {
+  await cleanupTestList(browser, LIST_NAME);
+});
 
 /**
  * データ応答の版を差し替えて、新しい版を検知させる準備をする。
@@ -105,9 +119,14 @@ test("タスク追加フォームに未保存の入力が残る間は、フォ�
   await page.clock.install();
   const version = await routeNewVersion(page);
   await openTasks(page);
+  await page
+    .getByTestId("list-select-btn")
+    .filter({ hasText: LIST_NAME })
+    .click();
+  const textarea = page.getByTestId("task-add-form").locator("textarea");
+  await expect(textarea).toBeVisible();
   const marker = await placeReloadMarker(page);
 
-  const textarea = page.getByTestId("task-add-form").locator("textarea");
   const draft = `未保存の入力 ${uniqueTestName("e2e")}`;
   await textarea.fill(draft);
   // 入力欄からフォーカスを外し、フォーカスでは作業中と判定できない状態にする
