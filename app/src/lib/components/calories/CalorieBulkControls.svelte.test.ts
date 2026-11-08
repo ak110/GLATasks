@@ -136,3 +136,56 @@ describe("一括操作の最後に完了した結果", () => {
     await expectResult("2件の記録を削除しました");
   });
 });
+
+describe("送信後も欄に残る条件の保存済みの値", () => {
+  // 自動の再読み込みの見送り判定（user-busy.ts）は、data-saved-valueと異なる欄だけを未保存の入力とみなす
+  function savedValues(kind: "create" | "delete") {
+    const form = screen.getByTestId(`calorie-bulk-${kind}-form`);
+    return ["開始日", "終了日", "品目"].map((label) => {
+      const field = within(form).getByLabelText(label);
+      if (!(field instanceof HTMLInputElement)) throw new Error(label);
+      return [field.value, field.dataset.savedValue];
+    });
+  }
+
+  it.each(["create", "delete"] as const)(
+    "%sに成功すると欄の値を保存済みの値にする",
+    async (kind) => {
+      render(CalorieBulkControls, {
+        items: [{ id: 1, name: "食品" }],
+        onBulkCreate: vi.fn().mockResolvedValue({ added: 3 }),
+        onBulkDelete: vi.fn().mockResolvedValue({ deleted: 2 }),
+      });
+      await submit(kind);
+      if (kind === "delete") await confirmDelete();
+      await waitFor(() =>
+        expect(savedValues(kind)).toEqual([
+          ["2026-08-01", "2026-08-01"],
+          ["2026-08-01", "2026-08-01"],
+          ["食品", "食品"],
+        ]),
+      );
+    },
+  );
+
+  it.each(["create", "delete"] as const)(
+    "%sに失敗すると欄の値を未保存のまま残す",
+    async (kind) => {
+      render(CalorieBulkControls, {
+        items: [{ id: 1, name: "食品" }],
+        onBulkCreate: vi.fn().mockRejectedValue(new Error("通信失敗")),
+        onBulkDelete: vi.fn().mockRejectedValue(new Error("通信失敗")),
+      });
+      await submit(kind);
+      if (kind === "delete") await confirmDelete();
+      await expectResult(
+        "通信失敗。反映されたか記録の一覧を確認してから、再操作してください",
+      );
+      expect(savedValues(kind)).toEqual([
+        ["2026-08-01", ""],
+        ["2026-08-01", ""],
+        ["食品", ""],
+      ]);
+    },
+  );
+});

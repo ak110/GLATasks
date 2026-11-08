@@ -9,6 +9,10 @@
  * 部品ごとの申告に頼ると追加した部品で漏れるため、利用者が入力した欄を文書全体で追跡し、
  * 値が残っている間は作業中とみなす。DOMの欄に値を持たない入力（選択済みのタグ・添付など）だけを、
  * 部品が`holdUnsavedDraft`で申告する。
+ *
+ * 保存に成功した後も値を欄に残す部品（目標値、一括操作の条件など）は、保存済みの値を欄の
+ * `data-saved-value`属性で示す。その欄は値が保存済みの値と異なる間だけ作業中とみなすため、
+ * 保存に成功すれば自動の再読み込みを妨げず、失敗して入力が残れば保護する。
  */
 
 // 文字や数値を入力する種類のinput。チェックボックスや選択肢の操作は即時に反映する部品が多いため追跡しない
@@ -30,8 +34,7 @@ const TEXT_INPUT_TYPES = new Set([
 type EditableField = HTMLInputElement | HTMLTextAreaElement;
 
 // 利用者が入力した欄。保存後に値を消す部品が多いため、値が残っている欄だけを作業中とみなす。
-// フォームの送信では追跡を外さない。保存に失敗して入力が残った場合も保護するためで、
-// 保存後も値を残す欄では、その画面にいる間は自動の再読み込みを見送る（更新案内の手動ボタンは使える）
+// フォームの送信では追跡を外さない。保存の成否は送信の時点では分からず、失敗して入力が残った場合も保護するため
 const editedFields = new Set<EditableField>();
 
 // フォーカスが外れた後も画面に残る、DOMの欄に値を持たない未保存の入力。申告した部品ごとの識別子を保持する
@@ -79,7 +82,12 @@ function hasEditedFieldWithValue(): boolean {
       editedFields.delete(field);
       continue;
     }
-    if (field.value.trim() !== "") return true;
+    const savedValue = field.dataset.savedValue;
+    if (savedValue !== undefined) {
+      if (field.value !== savedValue) return true;
+    } else if (field.value.trim() !== "") {
+      return true;
+    }
   }
   return false;
 }
@@ -89,7 +97,7 @@ function hasEditedFieldWithValue(): boolean {
  *
  * - 入力欄・編集可能要素へのフォーカス
  * - 開いているモーダルダイアログ
- * - 利用者が入力して値が残っている欄（フォーカスが外れていても対象）
+ * - 利用者が入力して値が残っている欄（フォーカスが外れていても対象。`data-saved-value`を持つ欄は保存済みの値と異なる間）
  * - `holdUnsavedDraft`で申告された未保存の入力
  */
 export function isUserBusy(): boolean {

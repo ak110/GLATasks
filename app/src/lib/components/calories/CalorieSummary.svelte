@@ -85,6 +85,7 @@
         >
             カロリー
         </h2>
+        <!-- 保存後も保存値を欄に表示するため、保存値と異なる間だけを未保存の入力とする（user-busy.ts） -->
         <form class="flex items-center gap-2" onsubmit={handleGoalSubmit}>
             <label
                 for="calorie-goal"
@@ -99,6 +100,7 @@
                 min="1"
                 step="1"
                 value={goalKcal}
+                data-saved-value={goalKcal}
                 class="w-28 rounded border border-gray-300 bg-white px-2 py-1 text-right text-sm text-gray-800 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
             />
             <span class="text-sm text-gray-600 dark:text-gray-300">kcal</span>

@@ -34,9 +34,23 @@
     let deleteStart = $state("");
     let deleteEnd = $state("");
     let deleteItemName = $state("");
+    // 送信後も条件を欄に残すため、最後に処理した条件を欄の保存済みの値として示す。
+    // 処理に成功した条件が残るだけでは未保存の入力とみなさず、自動の再読み込みを妨げない（user-busy.ts）
+    let savedCreate = $state({
+        start: "",
+        end: "",
+        time: "",
+        itemName: "",
+        quantity: "1",
+    });
+    let savedDelete = $state({ start: "", end: "", itemName: "" });
     type ResultState =
         { kind: "idle" } | { kind: "success" | "failure"; message: string };
-    type DeleteRequest = { input: BulkDeleteInput; itemName: string };
+    type DeleteRequest = {
+        input: BulkDeleteInput;
+        itemName: string;
+        fields: { start: string; end: string; itemName: string };
+    };
     let createState = $state<
         ResultState | { kind: "sending"; id: symbol; input: BulkCreateInput }
     >({ kind: "idle" });
@@ -81,9 +95,17 @@
             quantity,
             tzOffsetMinutes: getUtcOffsetMinutes(),
         };
+        const fields = {
+            start: createStart,
+            end: createEnd,
+            time: createTime,
+            itemName: createItemName,
+            quantity: createQuantity,
+        };
         createState = { kind: "sending", id: Symbol(), input };
         try {
             const result = await onBulkCreate(input);
+            savedCreate = fields;
             createState = {
                 kind: "success",
                 message: `${result.added}件の記録を追加しました`,
@@ -111,6 +133,11 @@
         deleteState = {
             kind: "confirm",
             itemName: deleteItemName,
+            fields: {
+                start: deleteStart,
+                end: deleteEnd,
+                itemName: deleteItemName,
+            },
             input: {
                 startDate: toApiDate(deleteStart),
                 endDate: toApiDate(deleteEnd),
@@ -126,6 +153,7 @@
         deleteState = { ...request, kind: "sending" };
         try {
             const result = await onBulkDelete(request.input);
+            savedDelete = request.fields;
             deleteState = {
                 kind: "success",
                 message: `${result.deleted}件の記録を削除しました`,
@@ -173,6 +201,7 @@
             開始日
             <input
                 bind:value={createStart}
+                data-saved-value={savedCreate.start}
                 type="date"
                 required
                 class={inputClass}
@@ -182,6 +211,7 @@
             終了日
             <input
                 bind:value={createEnd}
+                data-saved-value={savedCreate.end}
                 type="date"
                 required
                 class={inputClass}
@@ -191,6 +221,7 @@
             時刻
             <input
                 bind:value={createTime}
+                data-saved-value={savedCreate.time}
                 type="time"
                 required
                 class={inputClass}
@@ -200,6 +231,7 @@
             品目
             <input
                 bind:value={createItemName}
+                data-saved-value={savedCreate.itemName}
                 list="calorie-bulk-item-options"
                 required
                 autocomplete="off"
@@ -210,6 +242,7 @@
             数量
             <input
                 bind:value={createQuantity}
+                data-saved-value={savedCreate.quantity}
                 type="number"
                 min="0"
                 step="1"
@@ -241,6 +274,7 @@
             開始日
             <input
                 bind:value={deleteStart}
+                data-saved-value={savedDelete.start}
                 type="date"
                 required
                 class={inputClass}
@@ -250,6 +284,7 @@
             終了日
             <input
                 bind:value={deleteEnd}
+                data-saved-value={savedDelete.end}
                 type="date"
                 required
                 class={inputClass}
@@ -259,6 +294,7 @@
             品目
             <input
                 bind:value={deleteItemName}
+                data-saved-value={savedDelete.itemName}
                 list="calorie-bulk-item-options"
                 required
                 autocomplete="off"

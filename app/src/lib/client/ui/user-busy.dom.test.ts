@@ -2,7 +2,7 @@
  * @fileoverview 作業中判定のうち、フォーカスが外れた後も残る未保存の入力の扱いのユニットテスト
  *
  * フォーカスとダイアログによる判定は`connection-recovery.svelte.test.ts`が検証する。
- * ここでは利用者が入力した欄の追跡（値の有無・送信後の扱い・画面からの除去・対象の種類）と、
+ * ここでは利用者が入力した欄の追跡（値の有無・送信後の扱い・保存済みの値との比較・画面からの除去・対象の種類）と、
  * `holdUnsavedDraft`による申告を検証する。
  */
 
@@ -71,6 +71,25 @@ describe("isUserBusy（未保存の入力）", () => {
     // 保存に成功して部品が入力を消すと作業中でなくなる
     textarea.value = "";
     expect(userBusy.isUserBusy()).toBe(false);
+  });
+
+  it("保存済みの値を示す欄は、値が保存済みの値と異なる間だけ作業中とみなす", () => {
+    const input = document.createElement("input");
+    input.type = "number";
+    input.value = "2000";
+    input.dataset.savedValue = "2000";
+    document.body.appendChild(input);
+
+    typeInto(input, "1800");
+    expect(userBusy.isUserBusy()).toBe(true);
+
+    // 保存に成功すると部品が保存済みの値を更新し、値が欄に残っていても作業中でなくなる
+    input.dataset.savedValue = "1800";
+    expect(userBusy.isUserBusy()).toBe(false);
+
+    // 保存済みの値を空にした変更も未保存の入力として扱う
+    typeInto(input, "");
+    expect(userBusy.isUserBusy()).toBe(true);
   });
 
   it("入力した欄が画面から除かれると作業中とみなさない", () => {

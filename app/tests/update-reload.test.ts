@@ -1,10 +1,16 @@
-import { uniqueTestName } from "./helpers/common";
+import {
+  isTrpcUrl,
+  uniqueTestName,
+  waitForMutationResponse,
+} from "./helpers/common";
+import { openCalories, openCaloriesAsNewUser } from "./helpers/calorie-page";
 import { test, expect, type Page } from "@playwright/test";
 /**
  * @fileoverview 新しい版の検知後の自動再読み込みのe2eテスト
  *
  * 作業中でない画面では、新しい版を検知すると更新案内の再読み込みボタンを押さずに再読み込みされることを確かめる。
  * タスク追加フォームに未保存の入力が残る間は、フォーカスが外れていても再読み込みしないことも確かめる。
+ * 保存後も値を欄に残すカロリーの1日目標では、保存に失敗した入力を守り、保存に成功すれば再読み込みすることを確かめる。
  * 入力欄へのフォーカス中とダイアログ表示中の見送りは`page-scroll.test.ts`の同時バナーの試験が確かめる。
  */
 
@@ -125,4 +131,58 @@ test("タスク追加フォームに未保存の入力が残る間は、フォ�
   await page.clock.runFor(RETRY_INTERVAL_MS);
   await reloaded;
   await expect.poll(() => readReloadMarker(page)).toBeUndefined();
+});
+
+test("1日目標は保存に失敗した入力を残す間は再読み込みせず、保存に成功すると値が欄に残っていても再読み込みする", async ({
+  browser,
+}) => {
+  // 目標値の変更が他の試験へ影響しないよう、新しく登録した利用者で開く
+  const { context, page } = await openCaloriesAsNewUser(browser);
+  try {
+    await page.clock.install();
+    const version = await routeNewVersion(page);
+    await openCalories(page);
+    const marker = await placeReloadMarker(page);
+
+    const goal = page.locator("#calorie-goal");
+    const saveButton = goal.locator("..").getByRole("button", { name: "保存" });
+    const failSave = (url: URL) =>
+      isTrpcUrl(url.toString(), "users.updatePreferences");
+    await page.route(failSave, (route) => route.fulfill({ status: 500 }));
+
+    await goal.fill("1234");
+    const failed = waitForMutationResponse(page, "users.updatePreferences");
+    await saveButton.click();
+    expect((await failed).ok()).toBe(false);
+    // フォーカスとダイアログでは作業中と判定できない状態にし、残る入力だけで見送ることを確かめる
+    await expect
+      .poll(() => page.evaluate(() => document.activeElement?.tagName))
+      .not.toMatch(/^(INPUT|TEXTAREA|SELECT)$/);
+    await expect(
+      page.locator('dialog[open], [role="dialog"][aria-modal="true"]'),
+    ).toHaveCount(0);
+
+    // 保存に失敗した入力が残る間は、試し直しを2回以上経ても再読み込みしない
+    await version.detect();
+    await expect(page.getByTestId("update-banner")).toBeVisible();
+    await page.clock.runFor(RETRY_INTERVAL_MS * 2 + 1_000);
+    expect(await readReloadMarker(page)).toBe(marker);
+    await expect(goal).toHaveValue("1234");
+
+    // 保存に成功すると、保存した値が欄に残っていても次の試し直しで再読み込みする
+    await page.unroute(failSave);
+    const saved = waitForMutationResponse(page, "users.updatePreferences");
+    await saveButton.click();
+    expect((await saved).ok()).toBe(true);
+    // 保存後の設定の再取得で、欄の保存済みの値が更新されるのを待つ
+    await expect(goal).toHaveAttribute("data-saved-value", "1234");
+    version.reset();
+    const reloaded = page.waitForEvent("load");
+    await page.clock.runFor(RETRY_INTERVAL_MS);
+    await reloaded;
+    await expect.poll(() => readReloadMarker(page)).toBeUndefined();
+    await expect(goal).toHaveValue("1234");
+  } finally {
+    await context.close();
+  }
 });
