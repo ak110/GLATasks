@@ -46,7 +46,11 @@ setup:  # 開発環境のセットアップ
 	git config --local commit.template .gitmessage
 
 sync:  # 最新化と各種更新
+# node:ltsは開発用ターゲット（RUN_NODE）とdevelopmentのmigrate-devだけが使う。
+# 本番・stagingのDeployでは使わず、取得が本番サーバーのディスク容量不足の発生箇所になったため、開発環境だけで取得する。
+ifeq ($(COMPOSE_PROFILE), development)
 	docker pull node:lts
+endif
 	git fetch --prune
 	git rebase
 	git show --oneline --no-patch

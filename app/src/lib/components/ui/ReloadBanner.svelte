@@ -3,8 +3,10 @@
     interface Props {
         testId: string;
         children: Snippet;
+        /** 再読み込みボタンを表示するか。再読み込みで解決しない案内では偽にする */
+        showReloadButton?: boolean;
     }
-    let { testId, children }: Props = $props();
+    let { testId, children, showReloadButton = true }: Props = $props();
 
     function reloadPage(): void {
         // eslint-disable-next-line no-restricted-syntax -- 利用者の操作で起こる再読み込み。通信断ならオフライン画面になるが、利用者が求めた結果である
@@ -18,9 +20,11 @@
     data-testid={testId}
 >
     <span>{@render children()}</span>
-    <button
-        type="button"
-        class="cursor-pointer rounded bg-white px-3 py-1 font-semibold text-blue-700 hover:bg-blue-50 dark:bg-blue-100 dark:hover:bg-white"
-        onclick={reloadPage}>再読み込み</button
-    >
+    {#if showReloadButton}
+        <button
+            type="button"
+            class="cursor-pointer rounded bg-white px-3 py-1 font-semibold text-blue-700 hover:bg-blue-50 dark:bg-blue-100 dark:hover:bg-white"
+            onclick={reloadPage}>再読み込み</button
+        >
+    {/if}
 </div>

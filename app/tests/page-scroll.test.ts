@@ -47,6 +47,8 @@ test.describe("page scroll", () => {
     test(`同時バナーがヘッダーとタイマー追加を覆わない（幅${viewport.width}）`, async ({
       page,
     }) => {
+      // 4画面それぞれで到達不能の案内の猶予（6秒）を待つため、既定の30秒では収まらない。
+      test.setTimeout(120_000);
       await page.setViewportSize(viewport);
       // 翻訳画面へ画面遷移で入るため、ブラウザー内蔵AIのスタブを最初の読み込みから注入しておく。
       await installAiStubs(page);
@@ -102,16 +104,6 @@ test.describe("page scroll", () => {
           .poll(() => new URL(page.url()).pathname)
           .toBe(name === "tasks" ? "/" : `/${name}`);
         if (name === "translate") await expectStubbedPageReady(page);
-        // 別の画面へのリンクのhoverによる先読みは遷移を伴わずにデータ応答を受け取るため、これで新しい版を検知させる。
-        reportNewVersion = true;
-        await Promise.all([
-          page.waitForResponse(
-            (response) =>
-              new URL(response.url()).pathname.endsWith("/__data.json") &&
-              response.headers()["x-sveltekit-version"] === newVersion,
-          ),
-          page.getByTestId(`header-nav-${otherName}`).hover(),
-        ]);
         const timerDialog = page.getByRole("dialog", {
           name: /^(?:一時)?タイマー追加$/,
         });
@@ -131,6 +123,20 @@ test.describe("page scroll", () => {
           await input.focus();
           await expect(input).toBeFocused();
         }
+        // 新しい版の検知は作業中にしてから行う。作業中でなければ検知と同時に自動で再読み込みし、更新案内が残らない。
+        // 別の画面へのリンク上のマウス移動による先読みは遷移を伴わずにデータ応答を受け取るため、これで新しい版を検知させる。
+        // タイマー追加のダイアログは背景のリンクを覆いhoverできないため、先読みが購読するmouseoverをリンクへ直接送る。
+        reportNewVersion = true;
+        await Promise.all([
+          page.waitForResponse(
+            (response) =>
+              new URL(response.url()).pathname.endsWith("/__data.json") &&
+              response.headers()["x-sveltekit-version"] === newVersion,
+          ),
+          page
+            .getByTestId(`header-nav-${otherName}`)
+            .dispatchEvent("mouseover"),
+        ]);
         unhealthy = true;
         await Promise.all([
           page.waitForResponse(
@@ -143,7 +149,8 @@ test.describe("page scroll", () => {
         const update = page.getByTestId("update-banner");
         const connectivity = page.getByTestId("connectivity-recovery-banner");
         await expect(update).toBeVisible();
-        await expect(connectivity).toBeVisible();
+        // 到達不能の案内は、到達不能が猶予（6秒）を超えて続いた時点で出る。
+        await expect(connectivity).toBeVisible({ timeout: 15_000 });
         if (name === "timers") {
           await page.keyboard.press("Escape");
           await expect(timerDialog).not.toBeVisible();

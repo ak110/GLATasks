@@ -51,8 +51,8 @@ function renderTable(overrides: Record<string, unknown> = {}) {
 describe("CalorieItemTable", () => {
   it("品目の編集ダイアログを開いている間は、入力欄にフォーカスがなくても再読込を保留する", async () => {
     const { unmount } = renderTable({ items: [items[0]] });
-    const previousPendingReload = connectivityState.pendingReload;
-    connectivityState.pendingReload = false;
+    const previousNotice = connectivityState.notice;
+    connectivityState.notice = "none";
     try {
       await fireEvent.click(screen.getByRole("button", { name: "品目の操作" }));
       await fireEvent.click(
@@ -72,16 +72,17 @@ describe("CalorieItemTable", () => {
       expect(submitButton).toHaveFocus();
       expect(document.activeElement?.tagName).toBe("BUTTON");
 
-      // 接続不健全時の公開処理で、ダイアログによるisUserBusyの真分岐を観測する。
-      const unhealthyFetch: typeof fetch = vi.fn(
-        async () => new Response(null, { status: 503 }),
+      // 応答の横取り（511）を検知する公開処理で、ダイアログによるisUserBusyの真分岐を観測する。
+      // 到達不能（503など）は作業中の判定を通らないため、横取りの代表値を使う。
+      const interceptedFetch: typeof fetch = vi.fn(
+        async () => new Response(null, { status: 511 }),
       );
-      await checkConnectivity(unhealthyFetch);
-      expect(unhealthyFetch).toHaveBeenCalledOnce();
-      expect(connectivityState.pendingReload).toBe(true);
+      await checkConnectivity(interceptedFetch);
+      expect(interceptedFetch).toHaveBeenCalledOnce();
+      expect(connectivityState.notice).toBe("reload-required");
       expect(dialog).toHaveAttribute("open");
     } finally {
-      connectivityState.pendingReload = previousPendingReload;
+      connectivityState.notice = previousNotice;
       unmount();
     }
   });

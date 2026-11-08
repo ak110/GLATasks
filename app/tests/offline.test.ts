@@ -122,3 +122,28 @@ test("通信断で可視復帰しても、オフライン画面へ移らず表�
     page.locator('[data-testid="connectivity-recovery-banner"]'),
   ).toHaveCount(0, { timeout: 15_000 });
 });
+
+test("到達不能の案内は再読み込みを促さず、回復すると可視復帰を待たずに数秒で消える", async ({
+  page,
+  context,
+}) => {
+  await Promise.all([
+    page.goto("/"),
+    page.waitForResponse((res) => res.url().includes("/api/trpc")),
+  ]);
+  const banner = page.getByTestId("connectivity-recovery-banner");
+
+  await context.setOffline(true);
+  await page.evaluate(() =>
+    document.dispatchEvent(new Event("visibilitychange")),
+  );
+  // 到達不能が猶予（6秒）を超えて続いた時点で案内が出る
+  await expect(banner).toBeVisible({ timeout: 15_000 });
+  await expect(banner.getByRole("button", { name: "再読み込み" })).toHaveCount(
+    0,
+  );
+
+  // 可視復帰やonlineイベントを起こさずに通信だけを戻し、到達不能の間の短い間隔の再判定で回復を捉えることを確かめる
+  await context.setOffline(false);
+  await expect(banner).toHaveCount(0, { timeout: 5_000 });
+});

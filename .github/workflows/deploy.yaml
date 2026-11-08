@@ -50,5 +50,7 @@ jobs:
           mkdir -p ~/.ssh
           ssh-keyscan -p 22 aws.tqzh.tk >> ~/.ssh/known_hosts
 
+      # 開始時の後片付けは、途中で失敗したDeployが残した取得途中のレイヤーや旧版のイメージを回収してから始めるため。
+      # 稼働中のコンテナーが使うイメージは削除されないため、失敗時に旧版のまま稼働を続けられる。
       - name: Deploy to aws.tqzh.tk
-        run: ssh ubuntu@aws.tqzh.tk "cd glatasks && make sync && make backup && make deploy && docker system prune --all --volumes --force"
+        run: ssh ubuntu@aws.tqzh.tk "cd glatasks && docker system prune --all --volumes --force && make sync && make backup && make deploy && docker system prune --all --volumes --force"
