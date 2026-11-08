@@ -194,6 +194,47 @@ describe("connection-recovery", () => {
     expect(fetch).toHaveBeenCalledTimes(2);
   });
 
+  it("案内の表示中に非表示へ移ると案内と再判定を打ち切り、可視復帰後は新しい猶予の後にだけ案内する", async () => {
+    const recovery: Recovery =
+      await import("#lib/client/sse/connection-recovery.svelte.ts");
+    const visibility = vi
+      .spyOn(document, "visibilityState", "get")
+      .mockReturnValue("visible");
+    // 監視のトリガー（可視復帰）は既定のfetchで判定するため、グローバルのfetchを到達不能へ差し替える
+    const fetch = sequenceFetch(makeFetch({ reject: true }));
+    vi.stubGlobal("fetch", fetch);
+    recovery.startConnectivityWatch();
+    try {
+      await recovery.checkConnectivity();
+      await vi.advanceTimersByTimeAsync(recovery.UNREACHABLE_NOTICE_DELAY_MS);
+      expect(recovery.connectivityState.notice).toBe("unreachable");
+
+      // 非表示へ移った時点で案内を消し、予約済みの再判定も通信しない
+      visibility.mockReturnValue("hidden");
+      document.dispatchEvent(new Event("visibilitychange"));
+      expect(recovery.connectivityState.notice).toBe("none");
+      const callsAtHidden = vi.mocked(fetch).mock.calls.length;
+      await vi.advanceTimersByTimeAsync(
+        recovery.UNREACHABLE_RECHECK_INTERVAL_MS * 3,
+      );
+      expect(fetch).toHaveBeenCalledTimes(callsAtHidden);
+
+      // 可視復帰の判定でもまだ到達不能だが、非表示前の継続時間を持ち越さないため案内しない
+      visibility.mockReturnValue("visible");
+      document.dispatchEvent(new Event("visibilitychange"));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(fetch).toHaveBeenCalledTimes(callsAtHidden + 1);
+      expect(recovery.connectivityState.notice).toBe("none");
+
+      // 新しい可視期間で猶予を超えて続いた場合だけ案内する
+      await vi.advanceTimersByTimeAsync(recovery.UNREACHABLE_NOTICE_DELAY_MS);
+      expect(recovery.connectivityState.notice).toBe("unreachable");
+    } finally {
+      recovery.stopConnectivityWatch();
+      vi.unstubAllGlobals();
+    }
+  });
+
   // 同値分割: 入力中判定パターン。応答の横取りでも入力中は reload せず、再読み込みを求める案内で待機する。
   // 到達不能（503など）は入力中かどうかを判定せずに案内の判断へ進むため、入力中の判定を通る横取りの代表値（511）を使う。
   it.each([

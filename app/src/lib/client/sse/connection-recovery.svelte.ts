@@ -77,6 +77,7 @@ export function startConnectivityWatch(): void {
   stopTriggers = startConnectivityTriggers(() => {
     void checkConnectivity();
   });
+  document.addEventListener("visibilitychange", handleVisibilityChange);
 }
 
 /** 能動検出監視を停止する（多重停止はno-op） */
@@ -85,7 +86,25 @@ export function stopConnectivityWatch(): void {
   watching = false;
   stopTriggers?.();
   stopTriggers = null;
+  document.removeEventListener("visibilitychange", handleVisibilityChange);
   clearRecheck();
+}
+
+/**
+ * 非表示へ移った時点で、到達不能の継続時間・再判定・到達不能の案内を打ち切る。
+ *
+ * 判定の完了を待たずに打ち切るのは、非表示の間に予約済みの再判定が通信したり、
+ * 非表示前の継続時間や案内が復帰後へ持ち越されたりしないようにするためである。
+ * 復帰後は可視復帰のトリガーが改めて判定し、到達不能が続けば新しい可視期間の猶予の後に案内する。
+ * 応答の横取りの案内は再読み込みが必要な状態を示すため、非表示の期間をまたいでも残す。
+ */
+function handleVisibilityChange(): void {
+  if (document.visibilityState !== "hidden") return;
+  unreachableSince = undefined;
+  clearRecheck();
+  if (connectivityState.notice === "unreachable") {
+    connectivityState.notice = "none";
+  }
 }
 
 /**

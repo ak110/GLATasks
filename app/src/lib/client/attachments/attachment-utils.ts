@@ -3,6 +3,7 @@
  */
 
 import { trpc, type RouterInputs } from "#lib/client/trpc.ts";
+import { trackPendingWrite } from "#lib/client/ui/pending-writes.ts";
 
 /** ファイルドロップ中のハイライト表示に使うTailwindクラス（タスク追加フォーム・編集ダイアログ共通） */
 export const FILE_DROP_HIGHLIGHT_CLASSES =
@@ -27,17 +28,23 @@ export function readFileAsBase64(file: File): Promise<string> {
   });
 }
 
-/** ファイルを読み込みタスクへ添付登録する。失敗時は例外をそのまま呼び出し元へ再送出する */
-export async function uploadAttachment(
+/**
+ * ファイルを読み込みタスクへ添付登録する。失敗時は例外をそのまま呼び出し元へ再送出する。
+ *
+ * 読み込みから送信の完了までを保存中として数え、新しい版の自動再読み込みが送信を中断しないようにする。
+ */
+export function uploadAttachment(
   taskId: RouterInputs["attachments"]["create"]["taskId"],
   file: File,
 ): Promise<void> {
-  const data = await readFileAsBase64(file);
-  await trpc.attachments.create.mutate({
-    taskId,
-    filename: file.name,
-    mimeType: file.type || "application/octet-stream",
-    data,
+  return trackPendingWrite(async () => {
+    const data = await readFileAsBase64(file);
+    await trpc.attachments.create.mutate({
+      taskId,
+      filename: file.name,
+      mimeType: file.type || "application/octet-stream",
+      data,
+    });
   });
 }
 

@@ -9,6 +9,7 @@
     import { FILE_DROP_HIGHLIGHT_CLASSES } from "#lib/client/attachments/attachment-utils.ts";
     import TagEditor from "./TagEditor.svelte";
     import AttachmentPicker from "./AttachmentPicker.svelte";
+    import { holdUnsavedDraft } from "#lib/client/ui/user-busy.ts";
 
     interface Props {
         value: string;
@@ -31,6 +32,13 @@
             tags.length > 0 ||
             selectedAttachments.length > 0,
     );
+
+    // 選択済みのタグ・添付は入力欄に値を持たないため、残っている間は自動の再読み込みで失わないよう作業中として申告する。
+    // 本文は入力欄の追跡（`user-busy.ts`）が扱う
+    $effect(() => {
+        if (tags.length > 0 || selectedAttachments.length > 0)
+            return holdUnsavedDraft();
+    });
 
     /** フォーム内のどこかにフォーカスがあるかを遅延チェック */
     function handleBlur(e: FocusEvent) {

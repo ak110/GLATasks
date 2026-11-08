@@ -16,6 +16,7 @@
     import { updated } from "$app/state";
     import { queryClient } from "#lib/client/query-client.ts";
     import { classifyHealth } from "#lib/client/sse/connectivity-check.js";
+    import { hasPendingDirectWrites } from "#lib/client/ui/pending-writes.ts";
     import { startUpdateAutoReload } from "#lib/client/ui/update-reload.ts";
     import { isUserBusy } from "#lib/client/ui/user-busy.ts";
     import ReloadBanner from "./ReloadBanner.svelte";
@@ -24,7 +25,8 @@
         if (!updated.current) return;
         return startUpdateAutoReload({
             isBusy: isUserBusy,
-            hasPendingWrites: () => queryClient.isMutating() > 0,
+            hasPendingWrites: () =>
+                queryClient.isMutating() > 0 || hasPendingDirectWrites(),
             isServerHealthy: async () => (await classifyHealth()) === "healthy",
             reload: () => {
                 // eslint-disable-next-line no-restricted-syntax -- 新しい版の検知後、接続が健全と判定できた場合だけ再読み込みする
@@ -35,7 +37,8 @@
 </script>
 
 {#if updated.current}
+    <!-- 作業中の利用者が再読み込みを押す必要があると受け取らないよう、作業後に自動で再読み込みすることを伝える -->
     <ReloadBanner testId="update-banner"
-        >新しいバージョンが利用可能です。</ReloadBanner
+        >新しいバージョンが利用可能です。入力や保存が終わると自動で再読み込みします。</ReloadBanner
     >
 {/if}

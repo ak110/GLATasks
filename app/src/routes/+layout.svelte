@@ -25,6 +25,7 @@
     import TimerAlarmMonitor from "#lib/components/timers/TimerAlarmMonitor.svelte";
     import Toast from "#lib/components/ui/Toast.svelte";
     import UpdateBanner from "#lib/components/ui/UpdateBanner.svelte";
+    import { startEditedFieldTracking } from "#lib/client/ui/user-busy.ts";
     import ConnectivityRecoveryBanner from "#lib/components/ui/ConnectivityRecoveryBanner.svelte";
     import { UI_LAYERS } from "#lib/components/ui/styles.ts";
     import { beforeNavigate } from "$app/navigation";
@@ -64,6 +65,8 @@
         // 能動検出監視（connection-recovery）はポーリングと可視・オンライン復帰の
         // 検出トリガを自前で持つため、ここでは起動・停止のみを担う。
         let visibilityHandler: (() => void) | null = null;
+        // 自動の再読み込みが未保存の入力を失わせないよう、利用者が入力した欄を追跡する
+        const stopEditedFieldTracking = startEditedFieldTracking();
         if (data.logged_in) {
             connect(queryClient);
             startConnectivityWatch();
@@ -114,6 +117,7 @@
             }
             stopConnectivityWatch();
             disconnect();
+            stopEditedFieldTracking();
         };
     });
 

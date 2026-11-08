@@ -14,6 +14,7 @@
     } from "#lib/client/trpc.ts";
     import { showErrorToast } from "#lib/client/ui/toast-store.svelte.ts";
     import { extractErrorMessage } from "#lib/client/ui/extract-error-message.ts";
+    import { trackPendingWrite } from "#lib/client/ui/pending-writes.ts";
     import {
         uploadAttachment,
         FILE_DROP_HIGHLIGHT_CLASSES,
@@ -248,7 +249,10 @@
         const attachmentChange = onAttachmentChange;
         attachmentOperations += 1;
         try {
-            await trpc.attachments.delete.mutate({ attachmentId });
+            // ダイアログを閉じた後も削除は続くため、自動再読み込みが中断しないよう保存中として数える
+            await trackPendingWrite(() =>
+                trpc.attachments.delete.mutate({ attachmentId }),
+            );
             if (
                 open &&
                 sessionId === targetSessionId &&
