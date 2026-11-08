@@ -70,6 +70,9 @@ flowchart LR
 
 設定上の制約:
 
+- 外部nginxの`client_max_body_size`を内部nginx・アプリの上限（32MiB）にそろえる。
+  添付ファイルはbase64へ変換して要求本文に含めるため、nginxの既定値（1MiB）のままでは
+  元のファイルで約750KiBを超える添付が外部nginxの413（Content Too Large）で失敗する
 - 内部nginxは自己署名HTTPSのため、`/api/events`と`/`の両方に
  `proxy_ssl_certificate` / `proxy_ssl_certificate_key`を指定する
 - SSE用の`/api/events`には`proxy_buffering off`に加え`proxy_read_timeout 86400`・
@@ -80,6 +83,8 @@ flowchart LR
 最小サンプル（要点のみ）:
 
 ```nginx
+client_max_body_size 32m;
+
 location /api/events {
     proxy_pass https://app_backend;
     proxy_http_version 1.1;
