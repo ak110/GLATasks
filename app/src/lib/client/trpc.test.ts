@@ -112,6 +112,26 @@ describe("tRPCクライアントの送信本文の暗号化", () => {
     expect(api.createCalorieItem).toHaveBeenCalledWith(42, calorieInput);
   });
 
+  // docs/guide/getting-started.mdの「外部nginxの既定値（1MiB）では元のファイルで約575KiBを超える添付が413で失敗する」と、
+  // 10MiBの添付上限が32MiBの本文上限に収まることを、実際の送信本文のUTF-8バイト数で裏付ける。
+  // 10MiBの添付の暗号化とbase64変換は既定の5秒を超えうるため、時間上限を延ばす。
+  it("添付の送信本文の大きさが、文書の目安と本文上限に一致する", async () => {
+    const KiB = 1024;
+    const MiB = 1024 * KiB;
+    const sentBytes = async (fileBytes: number) => {
+      sent.length = 0;
+      await trpc.attachments.create.mutate({
+        ...attachmentInput,
+        data: Buffer.alloc(fileBytes, 0x61).toString("base64"),
+      });
+      return Buffer.byteLength(sent[0].body!, "utf8");
+    };
+
+    expect(await sentBytes(575 * KiB)).toBeLessThanOrEqual(MiB);
+    expect(await sentBytes(576 * KiB)).toBeGreaterThan(MiB);
+    expect(await sentBytes(10 * MiB)).toBeLessThan(32 * MiB);
+  }, 60_000);
+
   it("GETのqueryは入力をURLで送り、応答を復号する", async () => {
     const result = await trpc.calories.summary.query({ tzOffsetMinutes: 540 });
 
