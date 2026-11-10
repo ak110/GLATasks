@@ -188,6 +188,8 @@ E2E_PROJECT = $(notdir $(CURDIR))-e2e
 E2E_DATA_DIR = $(CURDIR)/.cache/e2e-data
 E2E_COMPOSE = DATA_DIR=$(E2E_DATA_DIR) docker compose --project-name=$(E2E_PROJECT) --file=compose.yaml --file=compose.ci.yaml --file=compose.e2e.yaml
 E2E_LOCK = .cache/test-e2e.lock
+# 失敗時の診断用ログ。終了時に試験用の資源を回収するため、回収の前にここへ保存する
+E2E_FAILURE_LOG = $(CURDIR)/.cache/test-e2e-failure.log
 E2E_COMPOSE_RUN ?= docker compose
 
 # E2E_GREPの値に`$`や`"`を含む場合は`sql`ターゲットと同じ制約が生じる
@@ -202,12 +204,16 @@ endif
 # test-e2eがロックを取得した後に実行する本体。直接呼ぶと同時実行の直列化を経ない
 test-e2e-isolated:
 	$(E2E_COMPOSE) down --volumes --remove-orphans
-	rm -rf "$(E2E_DATA_DIR)"
+	rm -rf "$(E2E_DATA_DIR)" "$(E2E_FAILURE_LOG)"
 	mkdir -p "$(E2E_DATA_DIR)"
 	@status=0; \
 	{ $(E2E_COMPOSE) up --detach --wait web && \
 		$(MAKE) --no-print-directory healthcheck-e2e && \
 		$(MAKE) --no-print-directory test-e2e-run E2E_COMPOSE_RUN='$(E2E_COMPOSE)'; } || status=$$?; \
+	if [ "$$status" -ne 0 ]; then \
+		$(E2E_COMPOSE) logs --no-color --timestamps > "$(E2E_FAILURE_LOG)" 2>&1 || true; \
+		echo "test-e2e: 失敗時の試験用コンテナーのログを $(E2E_FAILURE_LOG) へ保存しました（試験用の資源は回収済み）" >&2; \
+	fi; \
 	$(E2E_COMPOSE) down --volumes --remove-orphans || true; \
 	rm -rf "$(E2E_DATA_DIR)"; \
 	exit $$status
@@ -222,7 +228,7 @@ healthcheck-e2e:
 		sleep 2; \
 		attempt=$$((attempt + 1)); \
 	done; \
-	echo "healthcheck-e2e: E2E用のアプリが180秒以内に応答しませんでした。$(E2E_COMPOSE) logs app で起動ログを確認してください" >&2; \
+	echo "healthcheck-e2e: E2E用のアプリが180秒以内に応答しませんでした。終了時に保存される $(E2E_FAILURE_LOG) の app の起動ログを確認してください" >&2; \
 	exit 1
 
 test-e2e-run:
