@@ -91,7 +91,24 @@ const encryptionLink: TRPCLink<AppRouter> = () => {
 };
 
 /**
+ * `httpBatchLink`のPOST本文（操作の添字を数値キーにした辞書）かを判定する。
+ */
+function isBatchInputBody(value: unknown): value is Record<string, unknown> {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value) &&
+    Object.keys(value).every((key) => /^\d+$/.test(key))
+  );
+}
+
+/**
  * リクエストを暗号化するfetch wrapper
+ *
+ * `httpBatchLink`はmutationの入力を`{"0": 入力, "1": 入力, ...}`の辞書としてPOST本文へ載せる
+ * （単一の呼び出しも同じ形）。各入力を`{ encrypted: 暗号文 }`へ置き換え、数値キーを保つ。
+ * サーバーの`withEncryption`は操作ごとの入力として受け取って復号する。
+ * GETのquery入力はURLで送られ本文を持たないため、ここでは扱わない。
  */
 async function encryptedFetch(
   url: RequestInfo | URL,
@@ -104,39 +121,18 @@ async function encryptedFetch(
 
   if (init.body && encryptKey) {
     try {
-      const bodyObj = JSON.parse(init.body as string);
-      // バッチリクエストの各アイテムを暗号化
-      if (Array.isArray(bodyObj)) {
-        const encryptedBatch = await Promise.all(
-          bodyObj.map(async (item) => {
-            if (item.input !== undefined) {
-              const encryptedInput = await encrypt(
-                JSON.stringify(item.input),
-                encryptKey!,
-              );
-              return {
-                ...item,
-                input: { encrypted: encryptedInput },
-              };
-            }
-            return item;
-          }),
+      const bodyObj: unknown = JSON.parse(init.body as string);
+      if (isBatchInputBody(bodyObj)) {
+        const key = encryptKey;
+        const encryptedEntries = await Promise.all(
+          Object.entries(bodyObj).map(async ([index, input]) => [
+            index,
+            { encrypted: await encrypt(JSON.stringify(input), key) },
+          ]),
         );
         init = {
           ...init,
-          body: JSON.stringify(encryptedBatch),
-        };
-      } else if (bodyObj.input !== undefined) {
-        const encryptedInput = await encrypt(
-          JSON.stringify(bodyObj.input),
-          encryptKey,
-        );
-        init = {
-          ...init,
-          body: JSON.stringify({
-            ...bodyObj,
-            input: { encrypted: encryptedInput },
-          }),
+          body: JSON.stringify(Object.fromEntries(encryptedEntries)),
         };
       }
     } catch (error) {
