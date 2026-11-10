@@ -179,9 +179,54 @@ PLAYWRIGHT_INSTALL = npm install --global --prefix="${PWD}/.cache/playwright/cor
 	corepack enable pnpm &&\
 	pnpm install --frozen-lockfile
 
+# ローカルのE2Eは、開発環境とは別のComposeプロジェクトを空のDB（tmpfs）と空のデータ置き場で起動して実行する。
+# 開発用DBに残ったデータが試験自身の準備不足を補い、CIで初めて失敗する手戻りを防ぐためである。
+# 開発用DB・添付ファイル・鍵と公開ポートは分離され（compose.e2e.yaml）、成功・失敗とも終了時に資源を回収する。
+# 前回の実行が途中で止まって資源が残っていても、開始時に回収してから空の状態で起動する。
+# CIは新しいDATA_DIRで起動したproduction構成が既に空のDBを持つため、起動・初期化を重ねずその構成へ接続する。
+E2E_PROJECT = $(notdir $(CURDIR))-e2e
+E2E_DATA_DIR = $(CURDIR)/.cache/e2e-data
+E2E_COMPOSE = DATA_DIR=$(E2E_DATA_DIR) docker compose --project-name=$(E2E_PROJECT) --file=compose.yaml --file=compose.ci.yaml --file=compose.e2e.yaml
+E2E_LOCK = .cache/test-e2e.lock
+E2E_COMPOSE_RUN ?= docker compose
+
 # E2E_GREPの値に`$`や`"`を含む場合は`sql`ターゲットと同じ制約が生じる
-test-e2e:  # E2Eテスト（E2E_GREP=... 指定で対象限定実行）
-	docker compose run --rm \
+test-e2e:  # E2Eテスト（E2E_GREP=... 指定で対象限定実行）。ローカルでは毎回空の試験用DBで実行する
+ifeq ($(CI),true)
+	$(MAKE) --no-print-directory test-e2e-run
+else
+	mkdir -p $(dir $(E2E_LOCK))
+	flock $(E2E_LOCK) $(MAKE) --no-print-directory test-e2e-isolated
+endif
+
+# test-e2eがロックを取得した後に実行する本体。直接呼ぶと同時実行の直列化を経ない
+test-e2e-isolated:
+	$(E2E_COMPOSE) down --volumes --remove-orphans
+	rm -rf "$(E2E_DATA_DIR)"
+	mkdir -p "$(E2E_DATA_DIR)"
+	@status=0; \
+	{ $(E2E_COMPOSE) up --detach --wait web && \
+		$(MAKE) --no-print-directory healthcheck-e2e && \
+		$(MAKE) --no-print-directory test-e2e-run E2E_COMPOSE_RUN='$(E2E_COMPOSE)'; } || status=$$?; \
+	$(E2E_COMPOSE) down --volumes --remove-orphans || true; \
+	rm -rf "$(E2E_DATA_DIR)"; \
+	exit $$status
+
+# E2E用のアプリが応答するまで待つ。開発サーバーの起動は依存の確認とビルドを含むため、通常のhealthcheckより長く待つ
+healthcheck-e2e:
+	@attempt=1; \
+	while [ "$$attempt" -le 90 ]; do \
+		if $(E2E_COMPOSE) exec -T app node --input-type=module --eval="const res = await fetch('http://localhost:3000/healthcheck', {signal: AbortSignal.timeout(2000)}); if (!res.ok) process.exit(1); console.log(await res.text());"; then \
+			exit 0; \
+		fi; \
+		sleep 2; \
+		attempt=$$((attempt + 1)); \
+	done; \
+	echo "healthcheck-e2e: E2E用のアプリが180秒以内に応答しませんでした。$(E2E_COMPOSE) logs app で起動ログを確認してください" >&2; \
+	exit 1
+
+test-e2e-run:
+	$(E2E_COMPOSE_RUN) run --rm \
 		--env=BASE_URL=https://web \
 		--env=DATABASE_URL=mysql://$(DB_CREDENTIAL):$(DB_CREDENTIAL)@db/glatasks \
 		--env=CI=$(CI) \
@@ -232,4 +277,4 @@ test-db-locked:
 			TZ=Asia/Tokyo pnpm run test:unit --project node\
 		'
 
-.PHONY: help setup sync backup deploy build start stop restart-app logs ps healthcheck shell node-shell update update-actions format test test-unit test-backup test-db test-db-locked test-e2e start-app logs-app migrate db-studio sql docs docs-dev
+.PHONY: help setup sync backup deploy build start stop restart-app logs ps healthcheck shell node-shell update update-actions format test test-unit test-backup test-db test-db-locked test-e2e test-e2e-isolated healthcheck-e2e test-e2e-run start-app logs-app migrate db-studio sql docs docs-dev

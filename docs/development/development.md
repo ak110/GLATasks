@@ -67,13 +67,17 @@ SvelteKitの設定は`app/vite.config.ts`に置く。
 | `make test-e2e` | e2eテスト（Playwright）単独実行 |
 | `make update` | 依存更新 |
 
-e2eテスト（`make test-e2e`）は開発環境（`make deploy`）が起動している必要がある。
+e2eテスト（`make test-e2e`）は、開発環境とは別のComposeプロジェクト（`glatasks-e2e`）を空の試験用DBと空のデータ置き場で起動して実行する。
+開発用DB・添付ファイル・鍵と公開ポートを使わないため、開発中のデータは残り、稼働中の開発環境も不要である。
+試験は毎回空のDBから始まるため、必要なリスト・設定などのデータは試験自身が用意する。
+成功・失敗とも終了時に試験用の資源を回収し、途中で止まった前回の資源も次回の開始時に回収する。
+CI（`CI=true`）では新しいデータ置き場で起動済みのproduction構成へそのまま接続する。
 
 ### 依存更新後の追随作業
 
 `make update`は`pnpm update --latest`により`package.json`の指定範囲を超えて更新する。
-稼働中の開発サーバーが更新前のモジュールを保持したままだとE2Eが失敗するため、`make update`は依存更新後に`app`を再起動し、疎通を確認してから検証する。
-`RUN_NODE`相当のコンテナーで`pnpm add`などを実行して手動で依存を入れ替えた場合も、E2Eの前に`make restart-app`、`make healthcheck`の順に実行する。
+稼働中の開発サーバーは更新前のモジュールを保持したまま動き続けるため、`make update`は依存更新後に`app`を再起動し、疎通を確認してから検証する。
+`RUN_NODE`相当のコンテナーで`pnpm add`などを実行して手動で依存を入れ替えた場合も、開発サーバーで確認する前に`make restart-app`、`make healthcheck`の順に実行する。
 実行後は次の3点を確認する。
 
 #### TypeScriptの版

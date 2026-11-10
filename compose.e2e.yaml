@@ -1,0 +1,12 @@
+---
+# ローカルのE2E専用の構成。`make test-e2e`が別のComposeプロジェクト名で
+# compose.yaml・compose.ci.yamlに重ねて起動し、実行のたびに空のDBから始める。
+# DBの保存先をtmpfsへ置き換えて開発用DBと分離する。公開ポートはcompose.ci.yamlが外す。
+# アプリのデータ置き場（添付ファイル・鍵）はincludeした構成が定義するため上書きできず、
+# Makefileが実行ごとに作り直す専用のDATA_DIRを渡して分離する。
+services:
+  db:
+    volumes: !override
+      - ${PWD}/db/my.cnf:/etc/mysql/conf.d/my.cnf:ro
+    tmpfs:
+      - /var/lib/mysql

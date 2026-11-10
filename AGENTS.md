@@ -21,7 +21,8 @@ SvelteKit、tRPC、Drizzleで構築し、Docker Composeで運用する。
 - test-dbは実行のたびに作成し直す試験専用のデータベース（`glatasks_test`）へ接続するため、開発用のデータと稼働中のアプリの定期処理に影響しない。node projectはUTCと本番と同じ`TZ=Asia/Tokyo`の両方で実行する
 - 画面と個別E2Eの変更は対応するテストを`make test-e2e E2E_GREP="パターン"`で実行する。全体E2EはCIのproduction環境で実行する
 - 対象を限定できない認証、SSE、共有fixture、全画面の初期化、Playwright設定を変更した場合は`make test-e2e`で全体E2Eを実行する
-- 開発環境が停止している場合は`make start`と`make healthcheck`で起動と疎通を確認してからテストを行う
+- ローカルの`make test-e2e`は開発環境と別のComposeプロジェクトを毎回空の試験用DBで起動するため、稼働中の開発環境を前提にしない。試験に必要なデータは試験自身が用意する
+- `make test-db`は稼働中の開発環境のDBを使う。開発環境が停止している場合は`make start`と`make healthcheck`で起動と疎通を確認してから実行する
 
 ## アーキテクチャの参照先
 
