@@ -88,12 +88,19 @@ it("textlint finds Markdown files and respects explicit and default ignores", as
 
 it("bounds globstar-parent pattern expansion at optimization level two", () => {
   // GHSA-g3hv-75wg-m249: 小さな入力で上限を確かめ、時間閾値には依存しない。
+  // minimatch 11.0.5以降は上限を超える展開を切り詰めずにRangeErrorで拒否する。どちらも展開量の上限を守る。
   const pattern = Array(8).fill("**/../a/b").join("/");
-  const matcher = new Minimatch(pattern, {
-    optimizationLevel: 2,
-    braceExpandMax: 64,
-  });
-  expect(matcher.set.length).toBeLessThanOrEqual(64);
+  let size: number;
+  try {
+    size = new Minimatch(pattern, {
+      optimizationLevel: 2,
+      braceExpandMax: 64,
+    }).set.length;
+  } catch (error) {
+    expect(error).toBeInstanceOf(RangeError);
+    return;
+  }
+  expect(size).toBeLessThanOrEqual(64);
 });
 
 it("stops directory traversal when the signal aborts during a read", async () => {
