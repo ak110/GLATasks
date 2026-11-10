@@ -212,7 +212,7 @@ test-e2e-isolated:
 		$(MAKE) --no-print-directory test-e2e-run E2E_COMPOSE_RUN='$(E2E_COMPOSE)'; } || status=$$?; \
 	if [ "$$status" -ne 0 ]; then \
 		$(E2E_COMPOSE) logs --no-color --timestamps > "$(E2E_FAILURE_LOG)" 2>&1 || true; \
-		echo "test-e2e: 失敗時の試験用コンテナーのログを $(E2E_FAILURE_LOG) へ保存しました（試験用の資源は回収済み）" >&2; \
+		echo "test-e2e: 失敗時の試験用コンテナーのログを $(E2E_FAILURE_LOG) へ保存しました。このファイルは、続けて行う試験用の資源の回収の後も残ります" >&2; \
 	fi; \
 	$(E2E_COMPOSE) down --volumes --remove-orphans || true; \
 	rm -rf "$(E2E_DATA_DIR)"; \
