@@ -85,9 +85,12 @@ CI（`CI=true`）では新しいデータ置き場で起動済みのproduction�
 TypeScriptの版を6系に留める。
 `typescript-eslint`がTypeScript 7を未サポートであり、
 `svelte-check`もTypeScript 7では6系との併存インストールと専用フラグを要求するためである。
-7系へ上がった場合は、rootを`pnpm add -D -w 'typescript@^6.0.3'`、appを`pnpm --dir app add -D 'typescript@^6.0.3'`で戻す。
+`pnpm-workspace.yaml`の`updateConfig.ignoreDependencies`に`typescript`を指定し、`make update`の一括更新の対象から外している。
+上流の対応待ちで版を据え置く依存は、手順書だけで管理せず、同じ設定で一括更新の対象から外す。
+
+この指定が適用されずに7系へ上がった場合は、rootを`pnpm add -D -w 'typescript@^6.0.3'`、appを`pnpm --dir app add -D 'typescript@^6.0.3'`で戻す。
 rootへの追加は`-w`を付けないとpnpmが`ERR_PNPM_ADDING_TO_ROOT`で拒否する。
-両ツールがTypeScript 7へ対応した時点で本運用を解除する。
+両ツールがTypeScript 7へ対応した時点で本運用を解除し、TypeScript 7へ移行するときに`updateConfig.ignoreDependencies`から`typescript`を取り除く。
 対応状況は次の2点で判定する。
 
 - `typescript-eslint`: 対応issue（<https://github.com/typescript-eslint/typescript-eslint/issues/10940>）がcloseされていること

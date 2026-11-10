@@ -3,6 +3,13 @@ packages:
   - docs
 storeDir: .cache/pnpm-store
 minimumReleaseAge: 1440
+# `make update`の`pnpm update --latest`は`package.json`の範囲を超えて最新版へ上げるため、
+# 上流の対応待ちで据え置く依存はここで一括更新の対象から外す。
+# typescript: typescript-eslintとsvelte-checkがTypeScript 7に未対応のため6系に据え置く。
+# TypeScript 7へ移行するときにこの指定を取り除く（docs/development/development.mdの「TypeScriptの版」）。
+updateConfig:
+  ignoreDependencies:
+    - typescript
 allowBuilds:
   esbuild: true
 ignoredBuiltDependencies:
