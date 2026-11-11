@@ -6,18 +6,27 @@ import { fail, redirect } from "@sveltejs/kit";
 import * as operations from "#lib/server/operations/index.ts";
 import { getErrorStatus, getPublicError } from "#lib/server/api-errors.ts";
 import { CreateTaskSchema } from "#lib/schemas.ts";
+import { buildShareInitialText } from "#lib/server/share-ingest.ts";
 import type { Actions, PageServerLoad } from "./$types";
 
-export const load: PageServerLoad = async ({ locals, url }) => {
-  const title = url.searchParams.get("title") ?? "";
-  const text = url.searchParams.get("text") ?? "";
-  const pageUrl = url.searchParams.get("url") ?? "";
+export const load: PageServerLoad = async ({ locals, url, fetch }) => {
   if (!locals.user_id) redirect(302, "/auth/login");
-  const lists = await operations.lists.list(
-    { userId: locals.user_id },
-    "active",
-  );
-  return { title, text, pageUrl, lists };
+  const [initialText, lists] = await Promise.all([
+    // X投稿は投稿者名と本文（日本語訳）を外部サービスから補う。失敗しても共有元の内容で画面を開く。
+    buildShareInitialText(
+      {
+        title: url.searchParams.get("title") ?? "",
+        text: url.searchParams.get("text") ?? "",
+        url: url.searchParams.get("url") ?? "",
+      },
+      {
+        fetch,
+        log: (message) => console.warn(`[share/ingest] ${message}`),
+      },
+    ),
+    operations.lists.list({ userId: locals.user_id }, "active"),
+  ]);
+  return { initialText, lists };
 };
 
 export const actions: Actions = {

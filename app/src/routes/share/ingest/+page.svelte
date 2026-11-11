@@ -11,9 +11,7 @@
     }
 
     let { data, form }: Props = $props();
-    const defaultText = $derived(
-        [data.title, data.text, data.pageUrl].filter(Boolean).join("\n\n"),
-    );
+    const defaultText = $derived(data.initialText);
     const addedListTitle = $derived.by(() => {
         const added = form && "added" in form ? form.added : undefined;
         if (!added) return undefined;
