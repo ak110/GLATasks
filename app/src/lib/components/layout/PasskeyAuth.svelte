@@ -21,6 +21,9 @@
     let error = $state("");
     let busy = $state(false);
     let recovering = $state(false);
+    // この画面で復旧コードによる本人確認が成功したか。再開ボタンはサーバーへ照会しないため、
+    // 復旧状態の有効期限を過ぎていても recovering だけが真になる。
+    let verified = $state(false);
     let embedded = $state(false);
     let ready = $state(false);
     let codes = $state<string[]>([]);
@@ -50,6 +53,7 @@
                 await publicPasskeyRequest({ action: "recover", userId, code });
                 code = "";
                 recovering = true;
+                verified = true;
                 return;
             }
             if (mode === "login") {
@@ -135,14 +139,26 @@
             <button
                 type="button"
                 class={grayButtonClass}
+                disabled={!ready}
                 onclick={() => {
                     recovering = true;
                 }}>本人確認済みの登録を再開</button
             >
         {/if}
-        {#if recovering}<p>
+        {#if recovering && verified}<p>
                 本人確認が完了した。15分以内に新しいパスキーを登録する。中断しても、この画面で登録を再試行できる。
-            </p>{/if}
+            </p>{:else if recovering}<p>
+                復旧コードで本人確認してから15分以内であれば、新しいパスキーを登録できる。登録を開始できない場合は、復旧コードの入力に戻って本人確認からやり直す。
+            </p>
+            <button
+                type="button"
+                class={grayButtonClass}
+                onclick={() => {
+                    recovering = false;
+                    error = "";
+                }}
+                data-testid="recovery-back">復旧コードの入力に戻る</button
+            >{/if}
         <button
             type="button"
             class={grayButtonClass}

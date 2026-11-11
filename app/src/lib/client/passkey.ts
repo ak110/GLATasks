@@ -23,6 +23,17 @@ export function passkeyError(error: unknown) {
     (error.name === "NotAllowedError" || error.name === "AbortError")
   )
     return "パスキー操作が取り消されたか、時間切れになりました。開始ボタンからやり直してください。";
+  // 通信断（fetchのTypeError）と応答の解析失敗（SyntaxError）はブラウザー由来の英語の文面になり、
+  // 次の操作が分からないため置き換える。tRPC経由ではこれらをcauseに持つTRPCClientErrorになる。
+  // サーバーが返した案内付きのエラーはcauseを持たないため、そのまま表示する。
+  const cause =
+    error instanceof Error && error.cause instanceof Error
+      ? error.cause
+      : error;
+  if (cause instanceof TypeError)
+    return "サーバーへ接続できませんでした。通信状況を確かめてから、開始ボタンからやり直してください。";
+  if (cause instanceof SyntaxError)
+    return "サーバーの応答を読み取れませんでした。時間をおいてから、開始ボタンからやり直してください。";
   return error instanceof Error
     ? error.message
     : "パスキー操作に失敗しました。開始ボタンからやり直してください。";

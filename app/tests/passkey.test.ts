@@ -156,6 +156,12 @@ test("パスキー: 登録・ログイン・管理・パスワード無効化と
           await context.request.get("/account/security", { maxRedirects: 0 })
         ).status(),
       ).toBe(302);
+      // 中断後に開き直した画面から、有効な復旧状態で再登録へ進めることを確かめる。
+      await page.reload();
+      await page
+        .getByRole("button", { name: "本人確認済みの登録を再開" })
+        .click();
+      await expect(page.getByTestId("recovery-back")).toBeVisible();
       await page.getByTestId("passkey-submit").click();
       await expect(page.getByTestId("recovery-codes")).toBeVisible();
       await codes(page);
@@ -231,6 +237,31 @@ test("パスキー: 不正originの登録失敗はユーザーIDを占有しな�
     await page.unroute("**/auth/passkey");
     await page.getByTestId("passkey-submit").click();
     await expect(page.getByTestId("recovery-codes")).toBeVisible();
+  } finally {
+    await context.close();
+  }
+});
+
+test("パスキー: 本人確認前の再開は完了を断定せず、復旧コードの入力へ戻れる", async ({
+  browser,
+}) => {
+  const context = await browser.newContext(
+    makeContextOptions({ storageState: { cookies: [], origins: [] } }),
+  );
+  const page = await context.newPage();
+  try {
+    await virtualAuthenticator(page);
+    await page.goto("/auth/recover");
+    await page
+      .getByRole("button", { name: "本人確認済みの登録を再開" })
+      .click();
+    await expect(page.getByText("本人確認が完了した")).toHaveCount(0);
+    await expect(page.getByText("15分以内であれば")).toBeVisible();
+    await page.getByTestId("passkey-submit").click();
+    await expect(page.getByRole("alert")).toBeVisible();
+    await page.getByTestId("recovery-back").click();
+    await expect(page.getByTestId("recovery-code")).toBeVisible();
+    await expect(page.getByRole("alert")).toHaveCount(0);
   } finally {
     await context.close();
   }
