@@ -12,6 +12,7 @@ import {
   index,
   uniqueIndex,
   customType,
+  bigint,
 } from "drizzle-orm/mysql-core";
 import {
   TIMER_DEFAULT_ADJUST_MINUTES,
@@ -26,7 +27,11 @@ import {
 export const users = mysqlTable("user", {
   id: int("id").primaryKey().autoincrement(),
   user: varchar("user", { length: 80 }).notNull().unique(),
-  pass_hash: varchar("pass_hash", { length: 255 }).notNull(),
+  pass_hash: varchar("pass_hash", { length: 255 }),
+  session_generation: int("session_generation").notNull().default(0),
+  webauthn_handle: varchar("webauthn_handle", { length: 64 }),
+  recovery_failures: int("recovery_failures").notNull().default(0),
+  recovery_locked_until: timestamp("recovery_locked_until"),
   joined: timestamp("joined").notNull(),
   last_login: timestamp("last_login"),
   // 利用者ごとの設定値を JSON 文字列で集約する。
@@ -34,6 +39,51 @@ export const users = mysqlTable("user", {
   // 値の構造は zod の UserPreferencesSchema 側で保証する。
   preferences: mediumtext("preferences").notNull().default("{}"),
 });
+
+// credential IDは大文字小文字を区別するbase64url。ASCIIに限り索引のバイト上限にも収める。
+const credentialId = customType<{ data: string }>({
+  dataType: () => "varchar(1400) CHARACTER SET ascii COLLATE ascii_bin",
+});
+export const passkeys = mysqlTable("passkey", {
+  id: credentialId("id").primaryKey(),
+  user_id: int("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  public_key: mediumtext("public_key").notNull(),
+  counter: bigint("counter", { mode: "number", unsigned: true }).notNull(),
+  transports: varchar("transports", { length: 255 }).notNull(),
+  name: varchar("name", { length: 100 }).notNull(),
+  created: timestamp("created").notNull(),
+  last_used: timestamp("last_used"),
+});
+
+export const recoveryCodes = mysqlTable("recovery_code", {
+  id: int("id").primaryKey().autoincrement(),
+  user_id: int("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  digest: varchar("digest", { length: 64 }).notNull(),
+  used: timestamp("used"),
+  created: timestamp("created").notNull(),
+});
+
+// 登録開始時にはuser行を作らず、取消や失敗でユーザーIDを占有しない。
+export const authChallenges = mysqlTable(
+  "auth_challenge",
+  {
+    id: varchar("id", { length: 64 }).primaryKey(),
+    purpose: varchar("purpose", { length: 32 }).notNull(),
+    user_id: int("user_id"),
+    user_name: varchar("user_name", { length: 80 }),
+    handle: varchar("handle", { length: 64 }),
+    generation: int("generation").notNull().default(0),
+    challenge: varchar("challenge", { length: 128 }).notNull(),
+    data: mediumtext("data").notNull().default("{}"),
+    expires: timestamp("expires").notNull(),
+    consumed: timestamp("consumed"),
+  },
+  (t) => ({ expires_idx: index("auth_challenge_expires_idx").on(t.expires) }),
+);
 
 /** カロリー計算の品目テーブル */
 export const calorieItems = mysqlTable(

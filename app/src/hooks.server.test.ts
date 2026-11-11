@@ -102,6 +102,8 @@ describe("returnToの検証", () => {
     [null, "/"],
     ["https://evil.example/", "/"],
     ["//evil.example/", "/"],
+    ["/\\evil.example/", "/"],
+    ["/\nevil.example/", "/"],
   ])("returnTo=%sは%sへ戻す", (value, expected) => {
     expect(safeReturnTo(value)).toBe(expected);
   });

@@ -3,6 +3,9 @@
  */
 
 import { initTRPC, TRPCError } from "@trpc/server";
+import type { Cookies } from "@sveltejs/kit";
+import { ManageSecuritySchema } from "#lib/passkey-schemas.ts";
+import { security } from "./operations/security";
 import { ZodError } from "zod";
 import { ApiError, getPublicError } from "./api-errors";
 import {
@@ -57,6 +60,7 @@ import { decryptToString, encryptObject } from "./crypto";
 // ── Context 型定義 ──
 
 interface Context {
+  cookies?: Cookies;
   userId: number | null;
   tabId: string | null;
 }
@@ -193,6 +197,15 @@ const encryptedProcedure = protectedProcedure.use(withEncryption);
 // ── ルーター定義 ──
 
 export const appRouter = t.router({
+  security: t.router({
+    list: encryptedProcedure.query(({ ctx }) => security.list(ctx)),
+    beginVerification: encryptedProcedure.mutation(({ ctx }) =>
+      security.beginVerification(ctx),
+    ),
+    manage: encryptedProcedure
+      .input(ManageSecuritySchema)
+      .mutation(({ ctx, input }) => security.manage(ctx, input)),
+  }),
   // ── 利用者設定 ──
   users: t.router({
     getPreferences: encryptedProcedure.query(({ ctx }) =>

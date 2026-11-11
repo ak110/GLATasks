@@ -4,6 +4,7 @@
 
 import { fail, redirect } from "@sveltejs/kit";
 import * as api from "#lib/server/api.ts";
+import { getSessionGeneration } from "#lib/server/api/passkey-common.ts";
 import { safeReturnTo } from "#lib/server/auth-routes.ts";
 import { createSessionToken, setSessionCookie } from "#lib/server/session.ts";
 import type { Actions, PageServerLoad } from "./$types";
@@ -33,7 +34,10 @@ export const actions: Actions = {
       });
     }
 
-    const token = await createSessionToken(userInfo.id);
+    const token = await createSessionToken(
+      userInfo.id,
+      await getSessionGeneration(userInfo.id),
+    );
     setSessionCookie(cookies, token);
 
     redirect(302, safeReturnTo(url.searchParams.get("returnTo")));

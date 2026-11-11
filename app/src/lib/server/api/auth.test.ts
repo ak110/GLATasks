@@ -20,7 +20,7 @@ describeDb("利用者の登録と認証", () => {
       .from(users)
       .where(eq(users.id, registered.id));
     expect(saved.pass_hash).not.toBe(password);
-    expect(await bcrypt.compare(password, saved.pass_hash)).toBe(true);
+    expect(await bcrypt.compare(password, saved.pass_hash!)).toBe(true);
     await expect(registerUser(name, password)).rejects.toThrow();
     expect(await validateCredentials(name, "誤ったpassword")).toBeNull();
     expect(await validateCredentials(`${name}x`, password)).toBeNull();

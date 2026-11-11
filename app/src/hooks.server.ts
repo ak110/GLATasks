@@ -6,6 +6,7 @@ import {
   verifySessionToken,
 } from "#lib/server/session.ts";
 import { startScheduler } from "#lib/server/scheduler.ts";
+import { getSessionGeneration } from "#lib/server/api/passkey-common.ts";
 import {
   COOKIELESS_MUTATION_PATHS,
   EXTENSION_EMBEDDABLE_PATHS,
@@ -53,7 +54,7 @@ export const handle: Handle = async ({ event, resolve }) => {
   // セッション Cookie の検証（JWT/HS256）
   const sessionCookie = event.cookies.get(getSessionCookieName());
   event.locals.user_id = sessionCookie
-    ? await verifySessionToken(sessionCookie)
+    ? await verifySessionToken(sessionCookie, getSessionGeneration)
     : null;
 
   if (!event.locals.user_id && !isPublicPath(event.url.pathname)) {

@@ -185,7 +185,7 @@ PLAYWRIGHT_INSTALL = npm install --global --prefix="${PWD}/.cache/playwright/cor
 # CIは新しいDATA_DIRで起動したproduction構成が既に空のDBを持つため、起動・初期化を重ねずその構成へ接続する。
 E2E_PROJECT = $(notdir $(CURDIR))-e2e
 E2E_DATA_DIR = $(CURDIR)/.cache/e2e-data
-E2E_COMPOSE = DATA_DIR=$(E2E_DATA_DIR) docker compose --project-name=$(E2E_PROJECT) --file=compose.yaml --file=compose.ci.yaml --file=compose.e2e.yaml
+E2E_COMPOSE = WEBAUTHN_RP_ID=web WEBAUTHN_ORIGINS=https://web DATA_DIR=$(E2E_DATA_DIR) docker compose --project-name=$(E2E_PROJECT) --file=compose.yaml --file=compose.ci.yaml --file=compose.e2e.yaml
 E2E_LOCK = .cache/test-e2e.lock
 # 失敗時の診断用ログ。終了時に試験用の資源を回収するため、回収の前にここへ保存する
 E2E_FAILURE_LOG = $(CURDIR)/.cache/test-e2e-failure.log

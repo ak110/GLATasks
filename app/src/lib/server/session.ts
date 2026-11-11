@@ -11,8 +11,11 @@ const SESSION_AUDIENCE = "glatasks-session";
 /**
  * ユーザーIDを含む署名済みセッショントークンを生成する。
  */
-export async function createSessionToken(userId: number): Promise<string> {
-  return new SignJWT({ sub: String(userId) })
+export async function createSessionToken(
+  userId: number,
+  generation = 0,
+): Promise<string> {
+  return new SignJWT({ sub: String(userId), generation })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setAudience(SESSION_AUDIENCE)
@@ -74,6 +77,8 @@ export function deleteSessionCookie(cookies: Cookies): void {
  */
 export async function verifySessionToken(
   token: string,
+  getGeneration: (userId: number) => Promise<number | undefined> = async () =>
+    0,
 ): Promise<number | null> {
   try {
     const { payload } = await jwtVerify(token, getSecret(), {
@@ -84,7 +89,11 @@ export async function verifySessionToken(
       return null;
     }
     const userId = payload.sub ? parseInt(payload.sub, 10) : null;
-    return userId !== null && !isNaN(userId) ? userId : null;
+    if (userId === null || !Number.isSafeInteger(userId) || userId <= 0)
+      return null;
+    return (payload.generation ?? 0) === (await getGeneration(userId))
+      ? userId
+      : null;
   } catch {
     return null;
   }

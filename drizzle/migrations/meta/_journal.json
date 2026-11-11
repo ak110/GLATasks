@@ -134,6 +134,20 @@
       "when": 1791388724560,
       "tag": "0018_clever_moonstone",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "5",
+      "when": 1794424800063,
+      "tag": "0019_living_cassandra_nova",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "5",
+      "when": 1794425496381,
+      "tag": "0020_living_slayback",
+      "breakpoints": true
     }
   ]
 }

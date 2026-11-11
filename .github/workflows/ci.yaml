@@ -84,6 +84,8 @@ jobs:
           {
             echo "COMPOSE_PROFILE=production"
             echo "DATA_DIR=${DATA_DIR}"
+            echo "WEBAUTHN_RP_ID=web"
+            echo "WEBAUTHN_ORIGINS=https://web"
             echo "UID=$(id -u)"
             echo "GID=$(id -g)"
           } > .env

@@ -13,6 +13,8 @@ const envSchema = z.object({
     .enum(["development", "production", "test"])
     .default("development"),
   PROTOCOL_HEADER: z.string().optional(),
+  WEBAUTHN_RP_ID: z.string().optional(),
+  WEBAUTHN_ORIGINS: z.string().optional(),
 });
 
 /** ビルド時のpostbuild分析で実行されるため遅延評価する */

@@ -159,6 +159,24 @@ DBの接続資格情報はComposeとMakeの設定を使い、各テストとス�
 
 ## DBマイグレーション運用
 
+### パスキーの配備設定
+
+サーバーの`.env`へ`WEBAUTHN_RP_ID`と`WEBAUTHN_ORIGINS`を設定してアプリを作り直す。
+`WEBAUTHN_RP_ID`は利用者がアクセスするホスト名（ポート・スキームなし）、`WEBAUTHN_ORIGINS`は許可するHTTPS originのカンマ区切り（末尾のスラッシュなし）とする。
+例えば`https://tasks.example.com`で公開する場合は次の値を使う。
+
+```dotenv
+WEBAUTHN_RP_ID=tasks.example.com
+WEBAUTHN_ORIGINS=https://tasks.example.com
+```
+
+本番の実際のホスト名とoriginは配備する人が指定する。
+受信HostからRP IDや許可originを決定しない。
+未設定の場合はパスキーを開始せず、パスワード認証は使い続けられる。
+登録後にRP IDを変更すると旧パスキーで認証できなくなるため、変更前にパスワードか復旧コードを確保する。
+開発構成の既定値は`localhost`と`https://localhost:38180`、隔離E2EとCIは`web`と`https://web`である。
+設定変更後は`docker compose up -d --force-recreate app`で環境変数を反映する。
+
 ### 自動適用
 
 `make deploy`（`docker compose up`）の起動時にマイグレーションが自動適用される。

@@ -27,6 +27,7 @@ export async function validateCredentials(
     .limit(1);
   if (rows.length === 0) return null;
   const row = rows[0];
+  if (!row.pass_hash) return null;
   const ok = await bcrypt.compare(password, row.pass_hash);
   if (!ok) return null;
   await db

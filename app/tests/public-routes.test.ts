@@ -21,8 +21,10 @@ test.describe("未認証", () => {
     await expect(
       page.getByRole("heading", { name: "GLATasks - ユーザー登録" }),
     ).toBeVisible();
-    await expect(page.getByLabel("ユーザーID")).toBeVisible();
+    await expect(page.getByLabel("ユーザーID", { exact: true })).toBeVisible();
     await expect(page.getByLabel("パスワード", { exact: true })).toBeVisible();
-    await expect(page.getByRole("button", { name: "登録" })).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "登録", exact: true }),
+    ).toBeVisible();
   });
 });

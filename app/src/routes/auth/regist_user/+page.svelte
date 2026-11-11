@@ -5,6 +5,7 @@
 
     import type { ActionData } from "./$types";
     import AuthCard from "#lib/components/layout/AuthCard.svelte";
+    import PasskeyAuth from "#lib/components/layout/PasskeyAuth.svelte";
     import { resolve } from "$app/paths";
     import { page } from "$app/state";
 
@@ -22,6 +23,8 @@
 </script>
 
 <AuthCard title="GLATasks - ユーザー登録" error={form?.error}>
+    <PasskeyAuth mode="register" />
+    <h2 class="mb-3 font-semibold">パスワードで登録</h2>
     <form method="POST">
         <div class="mb-4">
             <label

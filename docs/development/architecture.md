@@ -239,6 +239,27 @@ CookieベースのJWT/HS256セッション。実装詳細は `hooks.server.ts` /
 セッションJWTは専用の`aud`で用途を限定する。署名・期限が有効な既存の`aud`無しセッションは受理し、
 同じ署名鍵を使うMCPのアクセストークン・リフレッシュトークンと未知の用途のJWTはブラウザ認証で拒否する。
 
+### パスキーと復旧
+
+WebAuthnの生成・署名検証はSimpleWebAuthnを使用する。
+discoverable credentialと必須のuser verificationを要求し、challenge・RP ID・許可origin・user handleと資格情報の所有者をサーバーで照合する。
+RP IDとoriginは配備設定から取得する。
+認証試行は用途別のhttpOnly・Secure Cookieでブラウザーへ結び付け、DBのchallengeを5分以内に条件付き更新で1回だけ消費する。
+登録の取消や失敗でユーザーIDを占有しないよう、利用者・資格情報・復旧コードは署名検証後の単一transactionで作る。
+既存の利用者とパスワードは保持し、`pass_hash`のNULLをパスワード未設定・無効として扱う。
+
+認証手段の変更は利用者行をロックし、本人確認と更新を同じtransactionへ置く。
+パスワードが無い利用者の最後のパスキーを削除しない。
+復旧コードは十分な乱数から10個生成し、サーバーのJWT秘密鍵によるHMACだけをDBへ保存する。
+コードの消費と試行制限も利用者行のロック下で行い、連続失敗10回で15分拒否する。
+復旧用Cookieは15分有効の別audのJWTであり、通常のセッションとして使えない。
+復旧完了時に旧パスキー・復旧コードを置き換え、セッション世代番号を上げる。
+hooksは要求ごとにJWTの世代番号とDBを照合し、世代番号の無い既存JWTは0として扱う。
+
+未認証のJSON通信は`/auth/passkey`、復旧画面は`/auth/recover`が担当する。
+管理操作は`security`の`encryptedProcedure`を使用し、画面は更新後に再取得する。
+セキュリティ設定は他画面の共有データを変更しないためSSE通知を発行しない。
+
 ### CSRF 対策
 
 Chrome拡張のポップアップ内iframeでログイン状態を使うため、セッションCookieは`SameSite=None`・`Secure`である。

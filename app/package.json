@@ -24,6 +24,8 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.2",
+    "@simplewebauthn/browser": "^14.0.0",
+    "@simplewebauthn/server": "^14.1.0",
     "@tanstack/svelte-query": "^6.4.1",
     "@trpc/client": "^11.28.0",
     "@trpc/server": "^11.28.0",

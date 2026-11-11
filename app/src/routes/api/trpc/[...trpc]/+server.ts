@@ -12,6 +12,7 @@ export const GET: RequestHandler = async (event) => {
     req: event.request,
     router: appRouter,
     createContext: () => ({
+      cookies: event.cookies,
       userId: event.locals.user_id ?? null,
       tabId: event.request.headers.get("x-tab-id"),
     }),

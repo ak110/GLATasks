@@ -25,6 +25,32 @@ function reselect(target: string): string {
 }
 
 export const API_ERRORS = {
+  auth_failed: {
+    code: "BAD_REQUEST",
+    reason: "本人確認に失敗しました。",
+    nextAction: "有効なパスキーかパスワードで操作をやり直してください。",
+  },
+  recovery_failed: {
+    code: "BAD_REQUEST",
+    reason: "復旧の本人確認に失敗しました。",
+    nextAction:
+      "ユーザーIDと未使用の復旧コードを確認してください。連続して失敗した場合は15分待って再試行してください。",
+  },
+  challenge_expired: {
+    code: "BAD_REQUEST",
+    reason: "認証の試行が期限切れか使用済みです。",
+    nextAction: "操作の開始ボタンからやり直してください。",
+  },
+  last_passkey: {
+    code: "BAD_REQUEST",
+    reason: "最後のパスキーは削除できません。",
+    nextAction: "別のパスキーを追加するか、パスワードを設定してください。",
+  },
+  passkey_unconfigured: {
+    code: "BAD_REQUEST",
+    reason: "パスキーはこの環境で設定されていません。",
+    nextAction: "パスワードでログインしてください。",
+  },
   not_found_or_forbidden: {
     code: "NOT_FOUND",
     reason: "対象が見つかりません。",

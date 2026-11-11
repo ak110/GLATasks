@@ -16,6 +16,8 @@ services:
       '
     user: ${UID}:${GID}
     environment:
+      - WEBAUTHN_RP_ID=${WEBAUTHN_RP_ID:-localhost}
+      - WEBAUTHN_ORIGINS=${WEBAUTHN_ORIGINS:-https://localhost:38180}
       - HOME=${PWD}/.cache
       - COREPACK_ENABLE_DOWNLOAD_PROMPT=0
     volumes:

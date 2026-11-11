@@ -5,6 +5,7 @@
 
     import type { ActionData } from "./$types";
     import AuthCard from "#lib/components/layout/AuthCard.svelte";
+    import PasskeyAuth from "#lib/components/layout/PasskeyAuth.svelte";
     import { resolve } from "$app/paths";
     import { page } from "$app/state";
 
@@ -22,6 +23,11 @@
 </script>
 
 <AuthCard title="GLATasks" error={form?.error}>
+    <PasskeyAuth mode="login" />
+    <a
+        href="{resolve('/auth/recover')}{registerQuery}"
+        class="text-blue-600 underline">パスキーを失った場合の復旧</a
+    >
     <form method="POST">
         <div class="mb-4">
             <label

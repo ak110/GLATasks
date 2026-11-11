@@ -1,6 +1,8 @@
 const PUBLIC_PATHS = new Set([
   "/auth/login",
   "/auth/regist_user",
+  "/auth/passkey",
+  "/auth/recover",
   ...Object.values(OAUTH_PATHS),
   "/healthcheck",
   "/healthcheck/ready",
@@ -35,6 +37,7 @@ export const EXTENSION_EMBEDDABLE_PATHS: ReadonlySet<string> = new Set([
   "/share/ingest",
   "/auth/login",
   "/auth/regist_user",
+  "/auth/recover",
 ]);
 
 /**
@@ -44,6 +47,14 @@ export const EXTENSION_EMBEDDABLE_PATHS: ReadonlySet<string> = new Set([
 export function safeReturnTo(value: string | null): string {
   if (!value) return "/";
   if (!value.startsWith("/") || value.startsWith("//")) return "/";
+  if (
+    value.includes("\\") ||
+    Array.from(value).some(
+      (character) =>
+        character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127,
+    )
+  )
+    return "/";
   return value;
 }
 

@@ -21,7 +21,7 @@
     );
 
     interface Props {
-        page: (typeof navigationItems)[number]["key"];
+        page: (typeof navigationItems)[number]["key"] | "security";
         isLoading: boolean;
         showType?: "active" | "archived" | "all";
         onChangeShowType?: (type: "active" | "archived" | "all") => void;
@@ -106,6 +106,14 @@
         <span class="text-sm text-gray-400">読み込み中...</span>
     {/if}
     <div class="ml-auto flex flex-wrap items-center justify-end gap-2">
+        <a
+            href={resolve("/account/security")}
+            class="cursor-pointer rounded px-2 py-1 text-sm text-gray-300 hover:bg-gray-700 hover:text-white"
+            data-testid="security-link"
+            aria-label="セキュリティ"
+            title="セキュリティ"
+            >🔑<span class="hidden sm:inline">セキュリティ</span></a
+        >
         {#if page === "tasks" && onSearchChange}
             <input
                 type="text"
