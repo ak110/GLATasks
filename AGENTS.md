@@ -14,13 +14,18 @@ SvelteKit、tRPC、Drizzleで構築し、Docker Composeで運用する。
 セットアップ、コマンド、依存更新とDB運用は[開発手順](docs/development/development.md)を参照。
 全ターゲットは`make help`で確認する。
 
-- コミット前は`uvx --exclude-newer-package pyfltr=false pyfltr run`で検証する
+- 手元の検証は、変更したファイルと参照をたどって特定した利用側のテスト・lintを対象に指定した
+  `uvx --exclude-newer-package pyfltr=false pyfltr run <path>`で行う。
+  対象を渡さない全体の実行（`make test`、対象なしの`pyfltr run`）は求めず、全体のlintとテストはpush後のCIの結果で判定する
+  - 共通設定・共有fixture・依存の版指定とlockファイルなど利用側を列挙しきれない変更でも、全体の実行へ広げない。
+    列挙できた範囲だけを実行し、残りはCIの結果で判定する
+  - commit時のフック（`pyfltr fast`）は従来どおり動く。手元で全体を確かめたい場合は`make test`を使ってよい
 - 単体実行も`pyfltr run <path>`を使い、修正後は失敗したコマンドへ限定して再実行する
 - バックアップを変更した場合は`make test-backup`を実行する
 - DBアクセスを変更した場合は`make test-db`を実行する。通常のpyfltrとCIのtest jobはDBテストをスキップし、test-dbはnode project全体をDBへ接続して実行する
 - test-dbは実行のたびに作成し直す試験専用のデータベース（`glatasks_test`）へ接続するため、開発用のデータと稼働中のアプリの定期処理に影響しない。node projectはUTCと本番と同じ`TZ=Asia/Tokyo`の両方で実行する
 - 画面と個別E2Eの変更は対応するテストを`make test-e2e E2E_GREP="パターン"`で実行する。全体E2EはCIのproduction環境で実行する
-- 対象を限定できない認証、SSE、共有fixture、全画面の初期化、Playwright設定を変更した場合は`make test-e2e`で全体E2Eを実行する
+- 認証、SSE、共有fixture、全画面の初期化、Playwright設定を変更した場合も、手元では関連を特定できた画面操作のテストを`make test-e2e E2E_GREP="パターン"`で実行し、全体はCIの`integration`ジョブの結果で判定する
 - ローカルの`make test-e2e`は開発環境と別のComposeプロジェクトを毎回空の試験用DBで起動するため、稼働中の開発環境を前提にしない。試験に必要なデータは試験自身が用意する
 - `make test-db`は稼働中の開発環境のDBを使う。開発環境が停止している場合は`make start`と`make healthcheck`で起動と疎通を確認してから実行する
 

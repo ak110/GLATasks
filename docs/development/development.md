@@ -63,7 +63,7 @@ SvelteKitの設定は`app/vite.config.ts`に置く。
 | コマンド | 内容 |
 | --- | --- |
 | `make format` | 整形 + 軽量lint + 自動修正 |
-| `make test` | 全チェック実行（コミット前の必須検証） |
+| `make test` | 全チェック実行（手元で全体を確かめる場合に使う。通常の検証は変更箇所を対象にした`pyfltr run <path>`と関連するテストで行い、全体はCIで判定する） |
 | `make test-e2e` | e2eテスト（Playwright）単独実行 |
 | `make update` | 依存更新 |
 
@@ -76,7 +76,7 @@ CI（`CI=true`）では新しいデータ置き場で起動済みのproduction�
 ### 依存更新後の追随作業
 
 `make update`は`pnpm update --latest`により`package.json`の指定範囲を超えて更新する。
-稼働中の開発サーバーは更新前のモジュールを保持したまま動き続けるため、`make update`は依存更新後に`app`を再起動し、疎通を確認してから検証する。
+稼働中の開発サーバーは更新前のモジュールを保持したまま動き続けるため、`make update`は依存更新後に`app`を再起動し、疎通を確認する。
 `RUN_NODE`相当のコンテナーで`pnpm add`などを実行して手動で依存を入れ替えた場合も、開発サーバーで確認する前に`make restart-app`、`make healthcheck`の順に実行する。
 実行後は次の3点を確認する。
 

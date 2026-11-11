@@ -135,7 +135,6 @@ update:
 	$(MAKE) update-actions
 	$(MAKE) restart-app
 	$(MAKE) healthcheck
-	$(MAKE) test
 
 # GitHub Actionsのアクションをハッシュピンで最新化（mise未導入時はスキップ）
 update-actions:
