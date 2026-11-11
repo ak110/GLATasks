@@ -13,10 +13,8 @@ export type FetchLike = (
   init?: { signal?: AbortSignal; headers?: Record<string, string> },
 ) => Promise<Response>;
 
-/** X投稿の識別子。 */
 export type XPostRef = { screenName: string; id: string };
 
-/** 取得したX投稿の内容。 */
 export type XPostContent = { name: string; screenName: string; text: string };
 
 /** 外部取得1回あたりの時間上限（ミリ秒）。FxTwitterとoEmbedの合計で画面の表示を長く止めないための値。 */
@@ -45,13 +43,12 @@ const TRACKING_PARAMS = new Set([
 
 const URL_PATTERN = /https?:\/\/[^\s<>"'`]+/g;
 
-/** 文字列中の最初のhttp(s) URLを返す。 */
 export function findFirstUrl(value: string): string | undefined {
   const match = value.match(URL_PATTERN);
   return match?.[0];
 }
 
-/** 共有元が渡した値からURLを得る。`url`が空なら`text`、`title`の順に最初のURLを探す。 */
+/** AndroidのXアプリは`url`を空にしてURLを`text`側へ入れて渡す場合があるため、`text`・`title`からも探す。 */
 export function extractUrl(params: {
   title: string;
   text: string;
@@ -62,7 +59,6 @@ export function extractUrl(params: {
   return findFirstUrl(params.text) ?? findFirstUrl(params.title);
 }
 
-/** X投稿のURLなら識別子を返す。 */
 export function parseXPostUrl(raw: string): XPostRef | undefined {
   let parsed: URL;
   try {
@@ -76,10 +72,7 @@ export function parseXPostUrl(raw: string): XPostRef | undefined {
   return { screenName: match[1], id: match[2] };
 }
 
-/**
- * URLを正規化する。X投稿は`https://x.com/<ユーザー名>/status/<投稿ID>`へ置き換え、
- * それ以外は追跡用パラメーターだけを除く。URLとして解釈できない値はそのまま返す。
- */
+/** X以外のURLは、ページの表示に要るクエリがありうるため、既知の追跡用パラメーターだけを除く。 */
 export function normalizeUrl(raw: string): string {
   const post = parseXPostUrl(raw);
   if (post) return `https://x.com/${post.screenName}/status/${post.id}`;
@@ -100,7 +93,6 @@ export function normalizeUrl(raw: string): string {
   return parsed.toString();
 }
 
-/** 文字列中のURLを正規化後のURLへ置き換える。 */
 export function normalizeUrlsInText(value: string): string {
   return value.replace(URL_PATTERN, (url) => normalizeUrl(url));
 }
@@ -128,7 +120,7 @@ function nonEmptyString(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() !== "" ? value : undefined;
 }
 
-/** FxTwitter APIの応答から投稿内容を取り出す。必要な値が欠ければ`undefined`を返す。 */
+/** FxTwitterの`/2/`を含むv2形式ではなく、v1形式（`tweet.author.screen_name`など）の属性名で読む。 */
 export function parseFxTwitter(body: unknown): XPostContent | undefined {
   const root = asRecord(body);
   if (!root || root.code !== 200) return undefined;
@@ -168,7 +160,7 @@ function decodeHtmlEntities(value: string): string {
   );
 }
 
-/** X公式oEmbedの応答から投稿内容を取り出す。本文は`html`の`<p>`要素内のテキストとする。 */
+/** oEmbedは本文を構造化した値で返さないため、`html`の`<p>`要素から取り出す。訳は無く、長文は末尾を「…」で省略して返す。 */
 export function parseOEmbed(
   body: unknown,
   screenName: string,
@@ -186,10 +178,7 @@ export function parseOEmbed(
   return { name, screenName, text };
 }
 
-/**
- * X投稿の内容を取得する。FxTwitter APIが失敗したらoEmbedを使い、どちらも失敗したら`undefined`を返す。
- * 失敗の理由は`log`へ渡し、例外は送出しない。
- */
+/** 取得の失敗で共有の画面をエラーにしないため、理由は`log`へ渡して例外を送出しない。 */
 export async function fetchXPost(
   post: XPostRef,
   options: {
@@ -231,10 +220,7 @@ export async function fetchXPost(
   return undefined;
 }
 
-/**
- * 入力欄の初期値を組み立てる。X投稿の内容を取得できた場合は`<投稿者名> (@<ユーザー名>): <本文>`と正規化後のURLを使う。
- * それ以外は`title`・`text`（中のURLは正規化）を空行区切りで並べ、正規化後のURLが含まれていない場合だけ末尾に加える。
- */
+/** X投稿を取得できた場合は、本文の途中までしか含まず`&amp;`が残るChrome拡張のタブのタイトルと`text`を使わない。 */
 export async function buildShareInitialText(
   params: { title: string; text: string; url: string },
   options: {

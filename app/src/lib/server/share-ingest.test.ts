@@ -1,4 +1,3 @@
-/** 共有の取り込み画面の初期値（URLの抽出・正規化、X投稿の取得と組み立て）を、外部通信を差し替えて検証する。 */
 import { describe, expect, it } from "vitest";
 
 import {
@@ -13,7 +12,6 @@ const FX_URL = "https://api.fxtwitter.com/kaelig/status/2120347307988381787/ja";
 
 type Route = { status: number; body: unknown } | "network-error";
 
-/** URLごとの応答を返す`fetch`。呼ばれたURLを記録する。 */
 function fakeFetch(
   routes: Record<string, Route>,
 ): FetchLike & { calls: string[] } {
