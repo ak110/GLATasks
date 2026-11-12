@@ -276,8 +276,10 @@ test("パスキー: 埋め込み画面は戻り先を保って新しいタブで
   const page = await context.newPage();
   try {
     await page.goto("/auth/login");
+    // Chrome拡張のポップアップ（chrome_extension/popup.html）と同じ500x500で埋め込む。
+    // 既定の300x150では、リンクをスクロールで表示してもiframeの外へはみ出し、外側の文書がクリックを受ける。
     await page.setContent(
-      '<iframe title="共有の認証" src="/auth/login?returnTo=%2Fshare%2Fingest%3Fin_popup%3D1"></iframe>',
+      '<iframe title="共有の認証" style="width: 500px; height: 500px; border: none" src="/auth/login?returnTo=%2Fshare%2Fingest%3Fin_popup%3D1"></iframe>',
     );
     const frame = page.frameLocator("iframe");
     await expect(frame.getByTestId("passkey-open-tab")).toBeVisible();
