@@ -86,9 +86,8 @@
 >
     {#each navigationItems as item (item.key)}
         {#if item.key !== "tasks"}
-            <span
-                class="hidden text-gray-400 sm:inline"
-                data-testid="header-nav-separator">|</span
+            <span class="text-gray-400" data-testid="header-nav-separator"
+                >|</span
             >
         {/if}
         {#if page === item.key}
@@ -117,7 +116,7 @@
     {#if isLoading}
         <span class="text-sm text-gray-400">読み込み中...</span>
     {/if}
-    <div class="ml-auto flex flex-wrap items-center justify-end gap-2">
+    <div class="ml-auto flex flex-wrap items-center justify-end gap-1 sm:gap-2">
         {#if page === "tasks" && onSearchChange}
             <input
                 type="text"
@@ -170,7 +169,9 @@
                 title="アカウント"
                 ><span aria-hidden="true">👤</span><span
                     class="hidden sm:inline">アカウント</span
-                > <span aria-hidden="true">▾</span></button
+                >
+                <span aria-hidden="true" class="hidden sm:inline">▾</span
+                ></button
             >
             {#if accountOpen}
                 <div
