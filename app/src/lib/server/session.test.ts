@@ -5,6 +5,7 @@
 import { SignJWT } from "jose";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  getRecentAuthenticationUntil,
   createSessionToken,
   getSessionCookieName,
   setSessionCookie,
@@ -95,5 +96,73 @@ describe("getSessionCookieName", () => {
     const set = vi.fn();
     setSessionCookie({ set } as never, "token");
     expect(set).toHaveBeenCalledWith("gla-session", "token", expect.anything());
+  });
+});
+
+describe("本人確認の期限", () => {
+  afterEach(() => vi.useRealTimers());
+  it("15分丁度を許可し、1ms超過を拒否する", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(2_000_000_000_000);
+    const token = await createSessionToken(123, 2);
+    const cookies = { get: () => token } as never;
+    vi.setSystemTime(2_000_000_900_000);
+    expect(await getRecentAuthenticationUntil(cookies, 123, 2)).toBe(
+      2_000_000_900_000,
+    );
+    vi.setSystemTime(2_000_000_900_001);
+    expect(await getRecentAuthenticationUntil(cookies, 123, 2)).toBe(0);
+  });
+  it("用途・所有者・世代・発行日時・署名・有効期限を検証する", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(2_000_000_000_000);
+    for (const payload of [
+      {
+        sub: "123",
+        generation: 2,
+        aud: "glatasks-session",
+        exp: 2_000_001_000,
+      },
+      ...[
+        { iat: 2_000_000_001 },
+        { iat: -1 },
+        { iat: 1.5 },
+        { aud: "other" },
+        { aud: ["glatasks-session"] },
+        { sub: "0123" },
+        { generation: 1 },
+        { exp: 1 },
+      ].map((change) => ({
+        sub: "123",
+        generation: 2,
+        aud: "glatasks-session",
+        iat: 2_000_000_000,
+        exp: 2_000_001_000,
+        ...change,
+      })),
+    ]) {
+      const token = await new SignJWT(payload)
+        .setProtectedHeader({ alg: "HS256" })
+        .sign(new Uint8Array(32).fill(1));
+      expect(
+        await getRecentAuthenticationUntil(
+          { get: () => token } as never,
+          123,
+          2,
+        ),
+      ).toBe(0);
+    }
+    const token = await new SignJWT({
+      sub: "123",
+      generation: 2,
+      aud: "glatasks-session",
+      iat: 2_000_000_000,
+      exp: 2_000_001_000,
+    })
+      .setProtectedHeader({ alg: "HS256" })
+      .sign(new Uint8Array(32).fill(2));
+    expect(
+      await getRecentAuthenticationUntil({ get: () => token } as never, 123, 2),
+    ).toBe(0);
   });
 });

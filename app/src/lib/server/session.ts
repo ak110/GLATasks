@@ -98,3 +98,36 @@ export async function verifySessionToken(
     return null;
   }
 }
+
+/** 旧セッションのログインは維持し、本人確認の省略は用途・世代・発行時刻が揃った署名済みセッションに限る。 */
+export async function getRecentAuthenticationUntil(
+  cookies: Cookies,
+  userId: number,
+  generation: number,
+): Promise<number> {
+  const token = cookies.get(getSessionCookieName());
+  if (!token) return 0;
+  try {
+    const { payload } = await jwtVerify(token, getSecret(), {
+      algorithms: ["HS256"],
+    });
+    const now = Date.now();
+    if (
+      payload.aud !== SESSION_AUDIENCE ||
+      payload.sub !== String(userId) ||
+      payload.generation !== generation ||
+      !Number.isSafeInteger(payload.iat) ||
+      payload.iat === undefined ||
+      payload.iat < 0 ||
+      payload.iat * 1000 > now ||
+      typeof payload.exp !== "number" ||
+      !Number.isFinite(payload.exp) ||
+      payload.exp * 1000 <= now
+    )
+      return 0;
+    const until = payload.iat * 1000 + 900_000;
+    return now <= until ? until : 0;
+  } catch {
+    return 0;
+  }
+}

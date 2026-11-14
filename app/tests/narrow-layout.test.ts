@@ -107,6 +107,31 @@ async function expectHeaderActionsReachable(
 }
 
 test.describe("狭い画面の共通ヘッダー", () => {
+  test("Android幅360・390・412pxでヘッダーの主要操作が1行に収まる", async ({
+    page,
+  }, testInfo) => {
+    for (const width of [360, 390, 412]) {
+      await page.setViewportSize({ width, height: 800 });
+      await openPage(page, "tasks");
+      const navigation = await requireBoundingBox(
+        page.getByTestId("header-nav-tasks"),
+      );
+      const account = await requireBoundingBox(
+        page.getByTestId("account-menu-toggle"),
+      );
+      const difference = Math.abs(
+        navigation.y + navigation.height / 2 - account.y - account.height / 2,
+      );
+      console.log("header-row", JSON.stringify({ width, difference }));
+      await page.screenshot({
+        path: testInfo.outputPath(`header-${width}.png`),
+      });
+      expect.soft(difference, `width=${width}`).toBeLessThan(2);
+      expect
+        .soft(await getRootOverflow(page), `width=${width}`)
+        .toBeLessThanOrEqual(0);
+    }
+  });
   test("全画面でナビゲーション・テーマ・ログアウトが画面内で操作でき、本文がヘッダーの下にある", async ({
     page,
   }) => {

@@ -1,3 +1,8 @@
+import {
+  createSessionToken,
+  setSessionCookie,
+  getRecentAuthenticationUntil,
+} from "../session";
 import bcrypt from "bcryptjs";
 import { and, eq } from "drizzle-orm";
 import type { Cookies } from "@sveltejs/kit";
@@ -27,7 +32,7 @@ import {
 } from "./passkey-webauthn";
 import { getAttempt, setAttempt } from "../passkey-cookies";
 
-export async function listSecurity(userId: number) {
+export async function listSecurity(userId: number, cookies?: Cookies) {
   const [user] = await getDb().select().from(users).where(eq(users.id, userId));
   if (!user) throw new ApiError("auth_failed");
   const keys = await getDb()
@@ -35,6 +40,13 @@ export async function listSecurity(userId: number) {
     .from(passkeys)
     .where(eq(passkeys.user_id, userId));
   return {
+    authenticatedUntil: cookies
+      ? await getRecentAuthenticationUntil(
+          cookies,
+          userId,
+          user.session_generation,
+        )
+      : 0,
     passwordEnabled: user.pass_hash !== null,
     passkeys: keys.map((key) => ({
       id: key.id,
@@ -49,19 +61,32 @@ async function reauthenticate(
   tx: AuthTransaction,
   user: AuthUser,
   cookies: Cookies,
-  proof: z.infer<typeof AuthProofSchema>,
-  passkeyOnly = false,
+  proof: z.infer<typeof AuthProofSchema> | undefined,
 ) {
+  if (proof === undefined) {
+    if (
+      await getRecentAuthenticationUntil(
+        cookies,
+        user.id,
+        user.session_generation,
+      )
+    )
+      return;
+    throw new ApiError("auth_failed");
+  }
   if ("password" in proof) {
     if (
-      passkeyOnly ||
       !user.pass_hash ||
       !(await bcrypt.compare(proof.password, user.pass_hash))
     )
       throw new ApiError("auth_failed");
-    return;
+  } else {
+    await authenticate(tx, getAttempt(cookies, "reauth"), proof.response, user);
   }
-  await authenticate(tx, getAttempt(cookies, "reauth"), proof.response, user);
+  setSessionCookie(
+    cookies,
+    await createSessionToken(user.id, user.session_generation),
+  );
 }
 
 export async function manageSecurity(
@@ -127,13 +152,7 @@ export async function manageSecurity(
           .where(eq(users.id, userId));
         return { success: true };
       }
-      await reauthenticate(
-        tx,
-        user,
-        cookies,
-        input.proof,
-        input.action === "prepareDisable",
-      );
+      await reauthenticate(tx, user, cookies, input.proof);
       if (input.action === "beginAdd") {
         const result = await beginRegistration("add", user.user, user, tx);
         setAttempt(cookies, "add", result.id);

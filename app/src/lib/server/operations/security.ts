@@ -15,7 +15,7 @@ function cookies(ctx: SecurityContext) {
   return ctx.cookies;
 }
 export const security = {
-  list: (ctx: SecurityContext) => api.listSecurity(ctx.userId),
+  list: (ctx: SecurityContext) => api.listSecurity(ctx.userId, ctx.cookies),
   async beginVerification(ctx: SecurityContext) {
     const result = await beginAuthentication(ctx.userId);
     setAttempt(cookies(ctx), "reauth", result.id);

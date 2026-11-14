@@ -100,16 +100,14 @@
 
 <section class="my-4 space-y-3" aria-label="パスキー認証">
     {#if embedded}
-        <p>
-            埋め込み画面ではパスキーを使えない。新しいタブで認証してから、この共有画面を開き直す。
-        </p>
+        <p>新しいタブで認証し、この共有画面を開き直してください。</p>
         <a
             href={resolve(
                 (page.url.pathname + page.url.search) as "/auth/login",
             )}
             target="_blank"
             rel="noopener"
-            class="text-blue-600 underline"
+            class="text-blue-600 underline dark:text-blue-400"
             data-testid="passkey-open-tab">新しいタブで認証する</a
         >
     {:else if codes.length}
@@ -124,12 +122,6 @@
                     ? "2. 新しいパスキーを登録"
                     : "1. 復旧コードで本人確認"}
         </h2>
-        {#if mode === "login"}<p class="text-sm">
-                登録したパスキーを選択するとログインできる。ユーザーIDの入力は不要だ。
-            </p>
-        {:else if mode === "register"}<p class="text-sm">
-                ユーザーIDを決め、ブラウザーの案内に従ってパスキーを作成する。続いて復旧コードを保存すると、アカウントを使い始められる。
-            </p>{/if}
         {#if mode !== "login" && !recovering}
             <label class="block" for="passkey-user">ユーザーID</label>
             <input
@@ -150,7 +142,7 @@
                 data-testid="recovery-code"
             />
             <p class="text-sm">
-                このブラウザーで本人確認を済ませて登録を中断した場合は、入力せずに再開できる。
+                このブラウザーで本人確認済みなら、15分以内は登録を再開できます。
             </p>
             <button
                 type="button"
@@ -162,9 +154,9 @@
             >
         {/if}
         {#if recovering && verified}<p>
-                本人確認が完了した。15分以内に新しいパスキーを登録する。中断しても、この画面で登録を再試行できる。
+                本人確認が完了しました。15分以内に登録してください。
             </p>{:else if recovering}<p>
-                復旧コードで本人確認してから15分以内であれば、新しいパスキーを登録できる。登録を開始できない場合は、復旧コードの入力に戻って本人確認からやり直す。
+                本人確認から15分以内は登録を再開できます。開始できない場合は、復旧コードの入力に戻ってください。
             </p>
             <button
                 type="button"

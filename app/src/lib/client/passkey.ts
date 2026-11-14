@@ -19,7 +19,7 @@ export function defaultPasskeyName(userAgent: string) {
           : /Safari\//.test(userAgent)
             ? "Safari"
             : "このブラウザー";
-  return `${browser}のパスキー`;
+  return browser;
 }
 
 export function requireWebAuthn() {

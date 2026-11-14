@@ -19,7 +19,7 @@ test.describe("未認証", () => {
   test("登録ページからユーザー情報を入力できる", async ({ page }) => {
     await page.goto("/auth/regist_user");
     await expect(
-      page.getByRole("heading", { name: "GLATasks - ユーザー登録" }),
+      page.getByRole("heading", { name: "GLATasksに登録" }),
     ).toBeVisible();
     await expect(
       page

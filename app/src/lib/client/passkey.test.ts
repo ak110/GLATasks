@@ -3,11 +3,11 @@ import { defaultPasskeyName, passkeyError } from "./passkey.ts";
 
 describe("追加するパスキーの表示名", () => {
   test.each([
-    ["Mozilla Chrome/150.0 Safari/537.36 Edg/150.0", "Edgeのパスキー"],
-    ["Mozilla Chrome/150.0 Safari/537.36", "Chromeのパスキー"],
-    ["Mozilla Version/26.0 Safari/605.1", "Safariのパスキー"],
-    ["Mozilla Firefox/150.0", "Firefoxのパスキー"],
-    ["", "このブラウザーのパスキー"],
+    ["Mozilla Chrome/150.0 Safari/537.36 Edg/150.0", "Edge"],
+    ["Mozilla Chrome/150.0 Safari/537.36", "Chrome"],
+    ["Mozilla Version/26.0 Safari/605.1", "Safari"],
+    ["Mozilla Firefox/150.0", "Firefox"],
+    ["", "このブラウザー"],
   ])("%s の表示名を生成する", (userAgent, expected) => {
     expect(defaultPasskeyName(userAgent)).toBe(expected);
   });

@@ -46,7 +46,10 @@ export const AuthProofSchema = z.union([
   z.object({ response: AuthenticationResponseSchema }),
 ]);
 export const ManageSecuritySchema = z.discriminatedUnion("action", [
-  z.object({ action: z.literal("beginAdd"), proof: AuthProofSchema }),
+  z.object({
+    action: z.literal("beginAdd"),
+    proof: AuthProofSchema.optional(),
+  }),
   z.object({
     action: z.literal("finishAdd"),
     response: RegistrationResponseSchema,
@@ -60,20 +63,23 @@ export const ManageSecuritySchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("delete"),
     id: encoded,
-    proof: AuthProofSchema,
+    proof: AuthProofSchema.optional(),
   }),
   z.object({
     action: z.literal("password"),
     password: z.string().min(1).max(1000),
-    proof: AuthProofSchema,
+    proof: AuthProofSchema.optional(),
   }),
-  z.object({ action: z.literal("prepareDisable"), proof: AuthProofSchema }),
+  z.object({
+    action: z.literal("prepareDisable"),
+    proof: AuthProofSchema.optional(),
+  }),
   z.object({
     action: z.literal("confirmDisable"),
     attemptId: z.string().min(1).max(64),
     saved: z.literal(true),
   }),
-  z.object({ action: z.literal("codes"), proof: AuthProofSchema }),
+  z.object({ action: z.literal("codes"), proof: AuthProofSchema.optional() }),
 ]);
 export const PublicPasskeySchema = z.discriminatedUnion("action", [
   z.object({

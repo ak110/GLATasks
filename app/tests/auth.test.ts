@@ -40,6 +40,32 @@ test.describe("未ログイン状態", () => {
         await expect(page.getByTestId("passkey-submit")).toBeInViewport();
       }
     }
+    for (const viewport of [
+      { width: 1280, height: 900 },
+      { width: 360, height: 800 },
+    ]) {
+      await page.setViewportSize(viewport);
+      for (const colorScheme of ["light", "dark"] as const) {
+        await page.emulateMedia({ colorScheme, reducedMotion: "reduce" });
+        for (const route of [
+          "/auth/login",
+          "/auth/regist_user",
+          "/auth/recover",
+        ]) {
+          await page.goto(route);
+          await expect(page.getByTestId("passkey-submit")).toBeEnabled();
+          if (colorScheme === "dark")
+            await expect(page.locator("html")).toHaveClass(/dark/);
+          else await expect(page.locator("html")).not.toHaveClass(/dark/);
+          await page.screenshot({
+            path: testInfo.outputPath(
+              `${route.split("/").at(-1)}-${viewport.width}-${colorScheme}.png`,
+            ),
+            fullPage: true,
+          });
+        }
+      }
+    }
   });
 
   test("/ にアクセスするとログインページへリダイレクト", async ({ page }) => {

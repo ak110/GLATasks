@@ -53,6 +53,103 @@ async function credentials(cdp: CDPSession, id: string) {
     .credentials;
 }
 
+test("パスキー: パスワードアカウントの初回追加は認証getなしで登録createを呼ぶ", async ({
+  browser,
+}, testInfo) => {
+  const context = await browser.newContext(
+    makeContextOptions({ storageState: { cookies: [], origins: [] } }),
+  );
+  try {
+    const page = await context.newPage();
+    const auth = await virtualAuthenticator(page);
+    await page.clock.install();
+    await page.addInitScript(() => {
+      const calls: string[] = [];
+      Object.defineProperty(window, "webauthnCalls", { value: calls });
+      const get = CredentialsContainer.prototype.get;
+      const create = CredentialsContainer.prototype.create;
+      CredentialsContainer.prototype.get = function (options) {
+        calls.push("get");
+        return get.call(this, options);
+      };
+      CredentialsContainer.prototype.create = function (options) {
+        calls.push("create");
+        return create.call(this, options);
+      };
+    });
+    const user = uniqueTestName("password")
+      .replace(/[^A-Za-z0-9]/g, "")
+      .slice(0, 32);
+    const password = "passkey-test-password-123";
+    await page.goto("/auth/regist_user");
+    await page.locator('[name="user_id"]').fill(user);
+    await page.locator('[name="password"]').fill(password);
+    await page.locator('[name="password_confirm"]').fill(password);
+    await page.locator('form button[type="submit"]').click();
+    await expect(page).toHaveURL((url) => url.pathname === "/");
+    await page.goto("/account/security");
+    await expect(page.getByTestId("account-menu-toggle")).toBeEnabled();
+    await page.screenshot({
+      path: testInfo.outputPath("security-desktop.png"),
+      fullPage: true,
+    });
+    await page.setViewportSize({ width: 360, height: 800 });
+    await page.screenshot({
+      path: testInfo.outputPath("security-360.png"),
+      fullPage: true,
+    });
+    await page.getByTestId("account-menu-toggle").click();
+    await page.screenshot({
+      path: testInfo.outputPath("account-menu-360.png"),
+    });
+    await page.keyboard.press("Escape");
+    const currentPassword = page.getByTestId("current-password");
+    if (await currentPassword.isVisible()) await currentPassword.fill(password);
+    await page.getByTestId("passkey-add").click();
+    const calls = () =>
+      page.evaluate(
+        () => (window as unknown as { webauthnCalls: string[] }).webauthnCalls,
+      );
+    await expect.poll(async () => (await calls()).length).toBeGreaterThan(0);
+    const observed = await calls();
+    console.log("webauthn-calls", JSON.stringify(observed));
+    await testInfo.attach("webauthn-calls", {
+      body: JSON.stringify(observed),
+      contentType: "application/json",
+    });
+    expect(observed).toEqual(["create"]);
+    await expect(page.getByTestId("passkey-row")).toHaveCount(1);
+    await page.clock.fastForward(900_001);
+    await expect(currentPassword).toBeVisible();
+    await expect(page.getByTestId("verification-method")).toHaveValue(
+      "password",
+    );
+    await page.screenshot({
+      path: testInfo.outputPath("security-expired-360.png"),
+      fullPage: true,
+    });
+    await currentPassword.fill("incorrect-password");
+    await page.getByTestId("passkey-add").click();
+    await expect(page.getByRole("alert")).toBeVisible();
+    expect(await calls()).toEqual(["create"]);
+    await page.screenshot({
+      path: testInfo.outputPath("security-error-360.png"),
+      fullPage: true,
+    });
+    await auth.cdp.send("WebAuthn.removeVirtualAuthenticator", {
+      authenticatorId: auth.id,
+    });
+    await virtualAuthenticator(page);
+    await currentPassword.fill(password);
+    await page.getByTestId("passkey-add").click();
+    await expect(page.getByTestId("passkey-row")).toHaveCount(2);
+    console.log("webauthn-calls-after-expiry", JSON.stringify(await calls()));
+    expect(await calls()).toEqual(["create", "create"]);
+  } finally {
+    await context.close();
+  }
+});
+
 test("パスキー: 登録・ログイン・管理・パスワード無効化と再有効化・紛失復旧・再ログイン", async ({
   browser,
 }, testInfo) => {
@@ -103,9 +200,7 @@ test("パスキー: 登録・ログイン・管理・パスワード無効化と
     await account.press("ArrowDown");
     await page.keyboard.press("Enter");
     await expect(page).toHaveURL(/\/account\/security/);
-    await expect(page.getByTestId("new-key-name")).toHaveValue(
-      "Chromeのパスキー",
-    );
+    await expect(page.getByTestId("new-key-name")).toHaveValue("Chrome");
     const rename = waitForSuccessfulMutationResponse(page, "security.manage");
     await page.getByTestId("passkey-name").fill("端末のパスキー");
     await page.getByTestId("passkey-name").press("Tab");
@@ -115,8 +210,6 @@ test("パスキー: 登録・ログイン・管理・パスワード無効化と
     );
     await page.getByTestId("new-password").fill("old-password-123");
     await securityOperation(page, "password-set");
-    await page.getByTestId("use-password").check();
-    await page.getByTestId("current-password").fill("old-password-123");
     const firstId = auth.id;
     await auth.cdp.send("WebAuthn.removeVirtualAuthenticator", {
       authenticatorId: firstId,
@@ -126,8 +219,6 @@ test("パスキー: 登録・ログイン・管理・パスワード無効化と
     await page.getByTestId("passkey-add").click();
     await expect(page.getByTestId("passkey-row")).toHaveCount(2);
     await expect(page.getByTestId("new-key-name")).toHaveValue("予備");
-    await page.getByTestId("use-password").check();
-    await page.getByTestId("current-password").fill("old-password-123");
     for (const row of await page.getByTestId("passkey-row").all()) {
       if (
         (await row.getByTestId("passkey-name").inputValue()) ===
@@ -138,17 +229,15 @@ test("パスキー: 登録・ログイン・管理・パスワード無効化と
     await expect(page.getByTestId("passkey-row")).toHaveCount(1);
     auth.cdp = second.cdp;
     auth.id = second.id;
-    await page.getByTestId("use-password").uncheck();
     await securityOperation(page, "codes-reissue");
     await page.getByTestId("codes-saved").check();
     await securityOperation(page, "codes-reissue");
     await expect(page.getByTestId("codes-saved")).not.toBeChecked();
     await expect(page.getByTestId("codes-continue")).toBeDisabled();
     await codes(page);
-    await page.getByTestId("use-password").check();
     await securityOperation(page, "password-disable");
     const recovery = await codes(page);
-    await expect(page.getByTestId("use-password")).toHaveCount(0);
+    await expect(page.getByTestId("current-password")).toHaveCount(0);
     const rejected = await context.request.post("/auth/login", {
       form: { user: name, password: "old-password-123" },
       maxRedirects: 0,
@@ -156,7 +245,7 @@ test("パスキー: 登録・ログイン・管理・パスワード無効化と
     expect(rejected.status()).toBe(401);
     await page.getByTestId("new-password").fill("new-password-123");
     await securityOperation(page, "password-set");
-    await expect(page.getByTestId("use-password")).toBeVisible();
+    await expect(page.getByTestId("password-set")).toBeVisible();
     const stale = await browser.newContext(
       makeContextOptions({ storageState: await context.storageState() }),
     );
@@ -277,8 +366,10 @@ test("パスキー: 本人確認前の再開は完了を断定せず、復旧コ
     await page
       .getByRole("button", { name: "本人確認済みの登録を再開" })
       .click();
-    await expect(page.getByText("本人確認が完了した")).toHaveCount(0);
-    await expect(page.getByText("15分以内であれば")).toBeVisible();
+    await expect(page.getByText("本人確認が完了しました。")).toHaveCount(0);
+    await expect(
+      page.getByText("本人確認から15分以内は登録を再開できます。"),
+    ).toBeVisible();
     await page.getByTestId("passkey-submit").click();
     await expect(page.getByRole("alert")).toBeVisible();
     await page.getByTestId("recovery-back").click();

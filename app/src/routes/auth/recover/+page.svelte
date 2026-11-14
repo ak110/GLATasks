@@ -6,12 +6,10 @@
 </script>
 
 <AuthCard title="アカウントの復旧">
-    <p>
-        保存した復旧コードで本人確認し、新しいパスキーを登録する。その後、新しい復旧コードを保存するとログインできる。パスワードを使える場合は、ログイン画面からログインできる。
-    </p>
+    <p>登録済みのパスキーと以前の復旧コードは使えなくなります。</p>
     <PasskeyAuth mode="recover" />
     {#snippet footer()}<a
             href="{resolve('/auth/login')}{page.url.search}"
-            class="text-blue-600 underline">ログインへ戻る</a
+            class="text-blue-600 underline dark:text-blue-400">ログインへ戻る</a
         >{/snippet}
 </AuthCard>

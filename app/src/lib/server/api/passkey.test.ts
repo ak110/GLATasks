@@ -9,7 +9,11 @@ import { publicPasskey, recover } from "./passkey-public";
 import { manageSecurity, listSecurity } from "./security";
 import { authenticator, cookieJar } from "./passkey-test-fixture";
 import { beginAuthentication } from "./passkey-webauthn";
-import { createSessionToken, verifySessionToken } from "../session";
+import {
+  createSessionToken,
+  getSessionCookieName,
+  verifySessionToken,
+} from "../session";
 import { getSessionGeneration } from "./passkey-common";
 import { readRecoveryCookie, setRecoveryCookie } from "../passkey-cookies";
 import { validateCredentials } from "./auth";
@@ -72,6 +76,86 @@ describeDb("パスキーの認証と復旧の不変条件", () => {
       ),
     };
   }
+  it("本人確認後15分の境界・再確認・全操作の省略条件をserverで強制する", async () => {
+    const f = await registered();
+    // DBの接続・タイムアウトは実時間のまま、JWTと期限判定の時計だけを固定する。
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const start = Math.floor(Date.now() / 1000) * 1000;
+    vi.setSystemTime(start);
+    try {
+      f.jar.values.set(
+        getSessionCookieName(),
+        await createSessionToken(f.user.id, f.user.session_generation),
+      );
+      const actions = [
+        { action: "beginAdd" },
+        { action: "delete", id: "missing-key" },
+        { action: "password", password: "recent-pass" },
+        { action: "codes" },
+        { action: "prepareDisable" },
+      ] as const;
+      expect(
+        (await listSecurity(f.user.id, f.jar.cookies)).authenticatedUntil,
+      ).toBe(start + 900_000);
+      expect((await listSecurity(f.user.id)).authenticatedUntil).toBe(0);
+      for (const action of actions)
+        await expect(
+          manageSecurity(f.user.id, f.jar.cookies, action),
+        ).resolves.toBeDefined();
+      await expect(
+        manageSecurity(f.user.id, f.jar.cookies, {
+          action: "codes",
+          proof: { password: "wrong" },
+        }),
+      ).rejects.toThrow("auth_failed");
+      vi.setSystemTime(start + 900_000);
+      for (const action of actions)
+        await expect(
+          manageSecurity(f.user.id, f.jar.cookies, action),
+        ).resolves.toBeDefined();
+      vi.setSystemTime(start + 900_001);
+      expect(
+        (await listSecurity(f.user.id, f.jar.cookies)).authenticatedUntil,
+      ).toBe(0);
+      for (const action of actions)
+        await expect(
+          manageSecurity(f.user.id, f.jar.cookies, action),
+        ).rejects.toThrow("auth_failed");
+      await manageSecurity(f.user.id, f.jar.cookies, {
+        action: "codes",
+        proof: { password: "recent-pass" },
+      });
+      const until = start + 1_800_000;
+      expect(
+        (await listSecurity(f.user.id, f.jar.cookies)).authenticatedUntil,
+      ).toBe(until);
+      await expect(
+        manageSecurity(f.user.id, f.jar.cookies, { action: "codes" }),
+      ).resolves.toBeDefined();
+      // 省略認可は最後の認証手段の削除を許可するものではない。
+      const disable = await manageSecurity(f.user.id, f.jar.cookies, {
+        action: "prepareDisable",
+      });
+      if (!disable.attemptId)
+        throw new Error(
+          "無効化challengeがない。manageSecurityのprepareDisableの戻り値を確認する。",
+        );
+      await manageSecurity(f.user.id, f.jar.cookies, {
+        action: "confirmDisable",
+        attemptId: disable.attemptId,
+        saved: true,
+      });
+      await expect(
+        manageSecurity(f.user.id, f.jar.cookies, {
+          action: "delete",
+          id: f.key.id,
+        }),
+      ).rejects.toThrow("last_passkey");
+      expect((await listSecurity(f.user.id)).passkeys).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
   it.each([true, false])(
     "PQC対応=%sでも新規・追加・復旧の登録方式と保護条件を維持する",
     async (pqc) => {
@@ -145,12 +229,10 @@ describeDb("パスキーの認証と復旧の不変条件", () => {
       proof: await proof(f),
     });
     expect(await validateCredentials(f.name, "old-pass")).not.toBeNull();
-    await expect(
-      manageSecurity(f.user.id, f.jar.cookies, {
-        action: "prepareDisable",
-        proof: { password: "old-pass" },
-      }),
-    ).rejects.toThrow("auth_failed");
+    await manageSecurity(f.user.id, f.jar.cookies, {
+      action: "prepareDisable",
+      proof: { password: "old-pass" },
+    });
     const disableA = await manageSecurity(f.user.id, f.jar.cookies, {
       action: "prepareDisable",
       proof: await proof(f),

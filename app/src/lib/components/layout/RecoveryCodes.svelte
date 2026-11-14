@@ -15,7 +15,7 @@
 >
     <h2 class="font-semibold">復旧コードを保存</h2>
     <p>
-        パスキーを使えなくなった場合の本人確認に使う。各コードは1回だけ使える。再表示できないため、パスワードマネージャーなど安全な場所にコピーして保存する。
+        再表示できません。安全な場所に保存してください。各コードは1回だけ使えます。
     </p>
     <pre
         class="overflow-x-auto rounded bg-gray-100 p-3 text-sm dark:bg-gray-700">{displayedCodes}</pre>
@@ -29,13 +29,13 @@
                     : undefined;
             }}
             data-testid="codes-saved"
-        />復旧コードを安全な場所に保存した</label
+        />安全な場所に保存済み</label
     >
     <button
         type="button"
         class={grayButtonClass}
         disabled={savedCodes !== displayedCodes}
         onclick={onSaved}
-        data-testid="codes-continue">保存を確認して続ける</button
+        data-testid="codes-continue">続ける</button
     >
 </section>

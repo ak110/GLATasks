@@ -86,8 +86,9 @@
 >
     {#each navigationItems as item (item.key)}
         {#if item.key !== "tasks"}
-            <span class="text-gray-400" data-testid="header-nav-separator"
-                >|</span
+            <span
+                class="hidden text-gray-400 sm:inline"
+                data-testid="header-nav-separator">|</span
             >
         {/if}
         {#if page === item.key}
@@ -123,7 +124,7 @@
                 value={searchQuery ?? ""}
                 oninput={(e) => onSearchChange(e.currentTarget.value)}
                 placeholder="検索..."
-                class="w-16 rounded bg-gray-700 px-2 py-0.5 text-xs text-white placeholder-gray-400 focus:w-24 focus:ring-1 focus:ring-blue-400 focus:outline-none sm:w-28 sm:focus:w-40"
+                class="w-16 rounded bg-gray-700 px-2 py-0.5 text-xs text-white placeholder-gray-400 focus:ring-1 focus:ring-blue-400 focus:outline-none sm:w-28 sm:focus:w-40"
                 data-testid="search-input"
             />
         {/if}
@@ -165,7 +166,11 @@
                 onclick={() => (accountOpen = !accountOpen)}
                 disabled={!menuReady}
                 data-testid="account-menu-toggle"
-                >アカウント <span aria-hidden="true">▾</span></button
+                aria-label="アカウント"
+                title="アカウント"
+                ><span aria-hidden="true">👤</span><span
+                    class="hidden sm:inline">アカウント</span
+                > <span aria-hidden="true">▾</span></button
             >
             {#if accountOpen}
                 <div

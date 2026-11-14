@@ -26,7 +26,8 @@
     <PasskeyAuth mode="login" />
     <a
         href="{resolve('/auth/recover')}{registerQuery}"
-        class="text-blue-600 underline">パスキーを失った場合の復旧</a
+        class="text-blue-600 underline dark:text-blue-400"
+        >パスキーを失った場合の復旧</a
     >
     <div class="my-5 border-t border-gray-200 dark:border-gray-700"></div>
     <h2 class="mb-3 font-semibold">パスワードでログイン</h2>
@@ -71,7 +72,7 @@
             アカウントをお持ちでない方は
             <a
                 href="{resolve('/auth/regist_user')}{registerQuery}"
-                class="text-blue-600 hover:underline">登録</a
+                class="text-blue-600 hover:underline dark:text-blue-400">登録</a
             >
         </p>
     {/snippet}
