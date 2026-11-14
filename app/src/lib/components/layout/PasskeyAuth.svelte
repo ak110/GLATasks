@@ -100,7 +100,9 @@
 
 <section class="my-4 space-y-3" aria-label="パスキー認証">
     {#if embedded}
-        <p>新しいタブで認証し、この共有画面を開き直してください。</p>
+        <p>
+            埋め込み画面ではパスキーを使えません。新しいタブで認証し、この共有画面を開き直してください。
+        </p>
         <a
             href={resolve(
                 (page.url.pathname + page.url.search) as "/auth/login",

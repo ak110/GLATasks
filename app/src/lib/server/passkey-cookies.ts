@@ -34,7 +34,7 @@ export async function setRecoveryCookie(
 export async function readRecoveryCookie(cookies: Cookies) {
   try {
     const token = cookies.get("__Host-gla-recovery");
-    if (!token) throw new ApiError("auth_failed");
+    if (!token) throw new ApiError("recovery_session_expired");
     const result = await jwtVerify(token, getSecret(), {
       algorithms: ["HS256"],
       audience: "glatasks-recovery",
@@ -42,10 +42,10 @@ export async function readRecoveryCookie(cookies: Cookies) {
     const id = Number(result.payload.sub);
     const generation = result.payload.generation;
     if (!Number.isSafeInteger(id) || id <= 0 || typeof generation !== "number")
-      throw new ApiError("auth_failed");
+      throw new ApiError("recovery_session_expired");
     return { id, generation };
   } catch {
-    throw new ApiError("auth_failed");
+    throw new ApiError("recovery_session_expired");
   }
 }
 export function clearRecoveryCookie(cookies: Cookies) {

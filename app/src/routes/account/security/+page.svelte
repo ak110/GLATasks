@@ -29,7 +29,9 @@
         data.authenticatedUntil < currentTime,
     );
     $effect(() => {
-        const remaining = data.authenticatedUntil - Date.now();
+        const now = Date.now();
+        currentTime = now;
+        const remaining = data.authenticatedUntil - now;
         if (remaining < 0) return;
         const timer = setTimeout(() => {
             currentTime = Date.now();
@@ -100,7 +102,7 @@
                 attemptId: disableAttempt,
                 saved: true,
             });
-            verificationMethod = "passkey";
+            verificationMethod = "password";
         }
         disabling = false;
         codes = [];

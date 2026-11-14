@@ -399,7 +399,7 @@ describeDb("パスキーの認証と復旧の不変条件", () => {
       ),
     ).toBeNull();
     await expect(readRecoveryCookie(cookieJar().cookies)).rejects.toThrow(
-      "auth_failed",
+      "recovery_session_expired",
     );
     const start = await publicPasskey(
       { action: "beginRecovery" },

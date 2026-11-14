@@ -36,6 +36,11 @@ export const API_ERRORS = {
     nextAction:
       "ユーザーIDと未使用の復旧コードを確認してください。連続して失敗した場合は15分待って再試行してください。",
   },
+  recovery_session_expired: {
+    code: "BAD_REQUEST",
+    reason: "復旧の本人確認が未完了か、期限切れです。",
+    nextAction: "復旧コードの入力に戻り、本人確認をやり直してください。",
+  },
   challenge_expired: {
     code: "BAD_REQUEST",
     reason: "認証の試行が期限切れか使用済みです。",

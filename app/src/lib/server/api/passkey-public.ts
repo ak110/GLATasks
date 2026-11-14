@@ -58,7 +58,7 @@ export async function publicPasskey(
       .from(users)
       .where(eq(users.id, recovery.id));
     if (!user || user.session_generation !== recovery.generation)
-      throw new ApiError("auth_failed");
+      throw new ApiError("recovery_session_expired");
     const result = await beginRegistration("recover-register", user.user, user);
     setAttempt(cookies, "recover-register", result.id);
     return { options: result.options };
@@ -102,7 +102,7 @@ export async function publicPasskey(
       const recovery = await readRecoveryCookie(cookies);
       const user = await lockUser(tx, recovery.id);
       if (user.session_generation !== recovery.generation)
-        throw new ApiError("auth_failed");
+        throw new ApiError("recovery_session_expired");
       const challenge = await consumeChallenge(
         tx,
         getAttempt(cookies, "recover-register"),
