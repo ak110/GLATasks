@@ -3,9 +3,20 @@
      * @fileoverview 共通ヘッダーコンポーネント
      */
 
-    import { getContext } from "svelte";
+    import { getContext, onMount } from "svelte";
     import { resolve } from "$app/paths";
     import type { Theme } from "#lib/client/ui/theme.ts";
+    import { menuBehavior } from "#lib/actions/menu.ts";
+    import {
+        menuFrameClass,
+        menuItemClass,
+    } from "#lib/components/ui/styles.ts";
+
+    let accountOpen = $state(false);
+    let menuReady = $state(false);
+    onMount(() => {
+        menuReady = true;
+    });
 
     const themeCtx = getContext<{
         readonly theme: Theme;
@@ -106,14 +117,6 @@
         <span class="text-sm text-gray-400">読み込み中...</span>
     {/if}
     <div class="ml-auto flex flex-wrap items-center justify-end gap-2">
-        <a
-            href={resolve("/account/security")}
-            class="cursor-pointer rounded px-2 py-1 text-sm text-gray-300 hover:bg-gray-700 hover:text-white"
-            data-testid="security-link"
-            aria-label="セキュリティ"
-            title="セキュリティ"
-            >🔑<span class="hidden sm:inline">セキュリティ</span></a
-        >
         {#if page === "tasks" && onSearchChange}
             <input
                 type="text"
@@ -149,16 +152,46 @@
                 {themeIcon}
             </button>
         {/if}
-        <form method="post" action="/auth/logout">
+        <div
+            class="relative"
+            use:menuBehavior={{
+                open: accountOpen,
+                onClose: () => (accountOpen = false),
+            }}
+        >
             <button
-                type="submit"
+                type="button"
                 class="cursor-pointer rounded px-2 py-1 text-sm text-gray-300 hover:bg-gray-700 hover:text-white"
-                aria-label="ログアウト"
-                title="ログアウト"
-                ><span class="hidden sm:inline">ログアウト</span><span
-                    class="sm:hidden">↩</span
-                ></button
+                onclick={() => (accountOpen = !accountOpen)}
+                disabled={!menuReady}
+                data-testid="account-menu-toggle"
+                >アカウント <span aria-hidden="true">▾</span></button
             >
-        </form>
+            {#if accountOpen}
+                <div
+                    class="{menuFrameClass} text-sm text-gray-800"
+                    data-menu-frame
+                    role="menu"
+                    data-testid="account-menu"
+                    aria-label="アカウント"
+                >
+                    <a
+                        href={resolve("/account/security")}
+                        role="menuitem"
+                        class={menuItemClass}
+                        data-testid="security-link"
+                        onclick={() => (accountOpen = false)}>アカウント設定</a
+                    >
+                    <form method="post" action="/auth/logout">
+                        <button
+                            type="submit"
+                            role="menuitem"
+                            class={menuItemClass}
+                            data-testid="account-logout">ログアウト</button
+                        >
+                    </form>
+                </div>
+            {/if}
+        </div>
     </div>
 </header>

@@ -76,6 +76,7 @@ test.describe("未ログイン状態", () => {
 test.describe("ログイン済み状態", () => {
   test("ログアウトするとログインページへリダイレクト", async ({ page }) => {
     await page.goto("/");
+    await page.getByTestId("account-menu-toggle").click();
     await page.click('button[type="submit"]:has-text("ログアウト")');
     await expect(page).toHaveURL(/\/auth\/login/);
   });

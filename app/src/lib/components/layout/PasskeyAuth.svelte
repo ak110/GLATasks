@@ -115,10 +115,23 @@
     {:else if codes.length}
         <RecoveryCodes {codes} onSaved={finish} />
     {:else}
+        <h2 class="font-semibold">
+            {mode === "login"
+                ? "パスキーでログイン"
+                : mode === "register"
+                  ? "パスキーで登録"
+                  : recovering
+                    ? "2. 新しいパスキーを登録"
+                    : "1. 復旧コードで本人確認"}
+        </h2>
+        {#if mode === "login"}<p class="text-sm">
+                登録したパスキーを選択するとログインできる。ユーザーIDの入力は不要だ。
+            </p>
+        {:else if mode === "register"}<p class="text-sm">
+                ユーザーIDを決め、ブラウザーの案内に従ってパスキーを作成する。続いて復旧コードを保存すると、アカウントを使い始められる。
+            </p>{/if}
         {#if mode !== "login" && !recovering}
-            <label class="block" for="passkey-user"
-                >パスキー用のユーザーID</label
-            >
+            <label class="block" for="passkey-user">ユーザーID</label>
             <input
                 id="passkey-user"
                 class={inputClass}
@@ -136,6 +149,9 @@
                 autocomplete="off"
                 data-testid="recovery-code"
             />
+            <p class="text-sm">
+                このブラウザーで本人確認を済ませて登録を中断した場合は、入力せずに再開できる。
+            </p>
             <button
                 type="button"
                 class={grayButtonClass}
@@ -170,7 +186,7 @@
                 : mode === "login"
                   ? "パスキーでログイン"
                   : mode === "register"
-                    ? "パスキーだけで登録"
+                    ? "パスキーを作成して登録"
                     : recovering
                       ? "新しいパスキーを登録"
                       : "復旧コードで本人確認"}</button

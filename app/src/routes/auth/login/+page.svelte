@@ -22,12 +22,14 @@
     });
 </script>
 
-<AuthCard title="GLATasks" error={form?.error}>
+<AuthCard title="GLATasksにログイン" error={form?.error}>
     <PasskeyAuth mode="login" />
     <a
         href="{resolve('/auth/recover')}{registerQuery}"
         class="text-blue-600 underline">パスキーを失った場合の復旧</a
     >
+    <div class="my-5 border-t border-gray-200 dark:border-gray-700"></div>
+    <h2 class="mb-3 font-semibold">パスワードでログイン</h2>
     <form method="POST">
         <div class="mb-4">
             <label

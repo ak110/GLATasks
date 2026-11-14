@@ -38,7 +38,8 @@ async function securityOperation(page: Page, testId: string) {
   await expect(page.getByTestId(testId)).toBeEnabled();
 }
 async function logout(page: Page) {
-  await page.getByRole("button", { name: "ログアウト", exact: true }).click();
+  await page.getByTestId("account-menu-toggle").click();
+  await page.getByTestId("account-logout").click();
   await expect(page).toHaveURL(/\/auth\/login/);
 }
 async function credentials(cdp: CDPSession, id: string) {
@@ -84,7 +85,21 @@ test("パスキー: 登録・ログイン・管理・パスワード無効化と
     await logout(page);
     await page.getByTestId("passkey-submit").click();
     await expect(page).toHaveURL((url) => url.pathname === "/");
-    await page.getByTestId("security-link").click();
+    const account = page.getByTestId("account-menu-toggle");
+    await account.focus();
+    await account.press("Enter");
+    await account.press("ArrowDown");
+    await expect(page.getByTestId("security-link")).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(account).toBeFocused();
+    await expect(page.getByTestId("account-menu")).toHaveCount(0);
+    await account.press("Enter");
+    await account.press("ArrowDown");
+    await page.keyboard.press("Enter");
+    await expect(page).toHaveURL(/\/account\/security/);
+    await expect(page.getByTestId("new-key-name")).toHaveValue(
+      "Chromeのパスキー",
+    );
     const rename = waitForSuccessfulMutationResponse(page, "security.manage");
     await page.getByTestId("passkey-name").fill("端末のパスキー");
     await page.getByTestId("passkey-name").press("Tab");
@@ -104,6 +119,7 @@ test("パスキー: 登録・ログイン・管理・パスワード無効化と
     await page.getByTestId("new-key-name").fill("予備");
     await page.getByTestId("passkey-add").click();
     await expect(page.getByTestId("passkey-row")).toHaveCount(2);
+    await expect(page.getByTestId("new-key-name")).toHaveValue("予備");
     await page.getByTestId("use-password").check();
     await page.getByTestId("current-password").fill("old-password-123");
     for (const row of await page.getByTestId("passkey-row").all()) {

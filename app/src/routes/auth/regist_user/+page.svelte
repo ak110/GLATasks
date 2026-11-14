@@ -23,7 +23,11 @@
 </script>
 
 <AuthCard title="GLATasks - ユーザー登録" error={form?.error}>
+    <p class="text-sm">
+        パスキーかパスワードを選んで登録する。登録後もアカウント設定からログイン方法を追加・変更できる。
+    </p>
     <PasskeyAuth mode="register" />
+    <div class="my-5 border-t border-gray-200 dark:border-gray-700"></div>
     <h2 class="mb-3 font-semibold">パスワードで登録</h2>
     <form method="POST">
         <div class="mb-4">

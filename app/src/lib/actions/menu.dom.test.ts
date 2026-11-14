@@ -7,6 +7,32 @@ afterEach(() => {
 });
 
 describe("行メニュー", () => {
+  it("リンクとコマンドを矢印・Home・Endで移動できる", async () => {
+    const node = document.createElement("div");
+    node.innerHTML =
+      '<button>アカウント</button><div data-menu-frame><a href="/account/security">設定</a><form><button>ログアウト</button></form></div>';
+    document.body.appendChild(node);
+    const action = menuBehavior(node, { open: true, onClose: vi.fn() });
+    await tick();
+    const trigger = node.querySelector("button")!;
+    const link = node.querySelector("a")!;
+    const logout = node.querySelector("form button")!;
+    expect(link).toHaveAttribute("role", "menuitem");
+    trigger.focus();
+    trigger.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }),
+    );
+    expect(link).toHaveFocus();
+    link.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "End", bubbles: true }),
+    );
+    expect(logout).toHaveFocus();
+    logout.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Home", bubbles: true }),
+    );
+    expect(link).toHaveFocus();
+    action.destroy();
+  });
   it("ARIAを同期し、外側クリックとEscだけで閉じる", async () => {
     const node = document.createElement("div");
     node.innerHTML =

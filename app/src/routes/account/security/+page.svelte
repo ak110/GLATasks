@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { onMount } from "svelte";
     import {
         startAuthentication,
         startRegistration,
@@ -6,7 +7,11 @@
     import { invalidateAll } from "$app/navigation";
     import type { PageData } from "./$types";
     import { trpc, type RouterInputs } from "#lib/client/trpc.ts";
-    import { passkeyError, requireWebAuthn } from "#lib/client/passkey.ts";
+    import {
+        defaultPasskeyName,
+        passkeyError,
+        requireWebAuthn,
+    } from "#lib/client/passkey.ts";
     import Header from "#lib/components/layout/Header.svelte";
     import PageScrollArea from "#lib/components/layout/PageScrollArea.svelte";
     import RecoveryCodes from "#lib/components/layout/RecoveryCodes.svelte";
@@ -14,13 +19,17 @@
     let { data }: { data: PageData } = $props();
     let password = $state("");
     let newPassword = $state("");
-    let keyName = $state("追加のパスキー");
+    let keyName = $state("このブラウザーのパスキー");
+    onMount(() => {
+        keyName = defaultPasskeyName(navigator.userAgent);
+    });
     let usePassword = $state(false);
     let codes = $state<string[]>([]);
     let disabling = $state(false);
     let disableAttempt = $state("");
     let busy = $state(false);
     let error = $state("");
+    let message = $state("");
     async function proof(passkeyOnly = false) {
         if (usePassword && data.passwordEnabled && !passkeyOnly)
             return { password };
@@ -31,10 +40,14 @@
     async function run(operation: () => Promise<void>) {
         busy = true;
         error = "";
+        message = "";
         try {
             await operation();
             password = "";
             await invalidateAll();
+            message = codes.length
+                ? "復旧コードを保存して、操作を完了する。"
+                : "変更を保存した。";
         } catch (e) {
             error = passkeyError(e);
         } finally {
@@ -80,22 +93,29 @@
     <main
         class="mx-auto max-w-2xl space-y-5 p-4 text-gray-800 dark:text-gray-100"
     >
-        <h1 class="text-xl font-semibold">アカウントのセキュリティ</h1>
+        <h1 class="text-xl font-semibold">アカウント設定</h1>
         <p>
-            認証手段を変更するたびに、有効なパスキーか現在のパスワードで本人確認する。
+            ログインに使うパスキー・パスワードと、紛失時の復旧コードを管理する。
         </p>
         {#if error}<p role="alert" class="text-red-600 dark:text-red-400">
                 {error}
             </p>{/if}
-        <fieldset disabled={busy} class="space-y-3">
-            <legend class="font-semibold">本人確認の方法</legend>
+        {#if message}<p role="status">{message}</p>{/if}
+        <fieldset
+            disabled={busy}
+            class="space-y-3 rounded border border-gray-200 p-4 dark:border-gray-700"
+        >
+            <legend class="px-1 font-semibold">変更時の本人確認</legend>
+            <p class="text-sm">
+                追加・削除・パスワード設定・復旧コードの再発行時に、選んだ方法で本人確認する。
+            </p>
             {#if data.passwordEnabled}
                 <label class="flex cursor-pointer gap-2"
                     ><input
                         type="checkbox"
                         bind:checked={usePassword}
                         data-testid="use-password"
-                    />現在のパスワードを使う</label
+                    />パスキーの代わりに現在のパスワードを使う</label
                 >
                 {#if usePassword}<label class="block" for="current-password"
                         >現在のパスワード</label
@@ -108,7 +128,19 @@
                         data-testid="current-password"
                     />{/if}
             {/if}
-            <h2 class="font-semibold">パスキー</h2>
+            {#if !usePassword || !data.passwordEnabled}<p class="text-sm">
+                    変更ボタンを押した後、登録済みのパスキーを選択する。
+                </p>{/if}
+        </fieldset>
+        <fieldset
+            disabled={busy}
+            class="space-y-3 border-t border-gray-200 pt-4 dark:border-gray-700"
+        >
+            <legend class="font-semibold">パスキー</legend>
+            <p class="text-sm">
+                端末のロック解除やパスワードマネージャーなどを使ってログインできる。
+            </p>
+            {#if !data.passkeys.length}<p>登録済みのパスキーはない。</p>{/if}
             {#each data.passkeys as key (key.id)}
                 <div
                     class="space-y-2 rounded border border-gray-200 p-3 dark:border-gray-700"
@@ -150,8 +182,17 @@
                             })}
                         data-testid="passkey-delete">削除</button
                     >
+                    {#if !data.passwordEnabled && data.passkeys.length === 1}<p
+                            class="text-sm"
+                        >
+                            ログイン手段を残すため、最後のパスキーは削除できない。
+                        </p>{/if}
                 </div>
             {/each}
+            <h2 class="font-semibold">パスキーを追加</h2>
+            <p id="key-name-help" class="text-sm">
+                名前は見分けるための表示名だ。保存先は次のブラウザーの画面で選択する。
+            </p>
             <label class="block" for="new-key-name"
                 >追加するパスキーの名前</label
             >
@@ -159,6 +200,7 @@
                 id="new-key-name"
                 class={inputClass}
                 bind:value={keyName}
+                aria-describedby="key-name-help"
                 data-testid="new-key-name"
             />
             <button
@@ -167,9 +209,17 @@
                 onclick={() => run(add)}
                 data-testid="passkey-add">パスキーを追加</button
             >
-            <h2 class="font-semibold">
+            <p class="text-sm">
+                上の方法で本人確認した後、新しいパスキーの作成へ進む。
+            </p>
+        </fieldset>
+        <fieldset
+            disabled={busy}
+            class="space-y-3 border-t border-gray-200 pt-4 dark:border-gray-700"
+        >
+            <legend class="font-semibold">
                 パスワード（{data.passwordEnabled ? "有効" : "未設定・無効"}）
-            </h2>
+            </legend>
             <label class="block" for="new-password">新しいパスワード</label>
             <input
                 id="new-password"
@@ -195,7 +245,7 @@
             >
             {#if data.passwordEnabled}
                 <p>
-                    無効化には登録済みパスキーでの本人確認と、新しい復旧コードの保存が必要だ。
+                    パスワードを無効にすると、パスキーだけでログインする。無効化には登録済みパスキーでの本人確認と、新しい復旧コードの保存が必要だ。
                 </p>
                 <button
                     type="button"
@@ -211,9 +261,22 @@
                         })}
                     data-testid="password-disable">パスワードを無効化</button
                 >
+                {#if !data.passkeys.length}<p class="text-sm">
+                        先にパスキーを追加すると、パスワードを無効にできる。
+                    </p>{/if}
             {/if}
-            <h2 class="font-semibold">復旧コード</h2>
-            <p>再発行すると以前のコードは使えなくなる。</p>
+        </fieldset>
+        <fieldset
+            disabled={busy}
+            class="space-y-3 border-t border-gray-200 pt-4 dark:border-gray-700"
+        >
+            <legend class="font-semibold">復旧コード</legend>
+            <p>
+                パスキーを使えなくなったときに、アカウントを復旧するためのコードだ。再発行すると以前のコードは使えなくなる。
+            </p>
+            <p class="text-sm">
+                上の方法で本人確認した後、新しいコードを表示する。安全な場所へ保存して操作を完了する。
+            </p>
             <button
                 type="button"
                 class={grayButtonClass}

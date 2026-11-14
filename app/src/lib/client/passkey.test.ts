@@ -1,5 +1,17 @@
 import { describe, expect, test } from "vitest";
-import { passkeyError } from "./passkey.ts";
+import { defaultPasskeyName, passkeyError } from "./passkey.ts";
+
+describe("追加するパスキーの表示名", () => {
+  test.each([
+    ["Mozilla Chrome/150.0 Safari/537.36 Edg/150.0", "Edgeのパスキー"],
+    ["Mozilla Chrome/150.0 Safari/537.36", "Chromeのパスキー"],
+    ["Mozilla Version/26.0 Safari/605.1", "Safariのパスキー"],
+    ["Mozilla Firefox/150.0", "Firefoxのパスキー"],
+    ["", "このブラウザーのパスキー"],
+  ])("%s の表示名を生成する", (userAgent, expected) => {
+    expect(defaultPasskeyName(userAgent)).toBe(expected);
+  });
+});
 
 describe("passkeyError", () => {
   test("通信断はブラウザーの文面ではなく、通信の確認とやり直しを案内する", () => {

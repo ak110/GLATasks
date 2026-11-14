@@ -96,10 +96,14 @@ async function expectHeaderActionsReachable(
     });
   }
   await expectReachable(page, header.getByTestId("theme-toggle"));
+  await expectReachable(page, header.getByTestId("account-menu-toggle"));
+  await header.getByTestId("account-menu-toggle").click();
+  await expectReachable(page, header.getByTestId("security-link"));
   await expectReachable(
     page,
     header.locator('form[action="/auth/logout"] button'),
   );
+  await page.keyboard.press("Escape");
 }
 
 test.describe("狭い画面の共通ヘッダー", () => {
@@ -125,9 +129,7 @@ test.describe("狭い画面の共通ヘッダー", () => {
             ).toBeVisible();
           }
         }
-        await expect(
-          header.getByRole("button", { name: "ログアウト" }),
-        ).toBeVisible();
+        await expect(header.getByTestId("account-menu-toggle")).toBeVisible();
         await expect(
           header.getByRole("button", { name: "テーマ切替" }),
         ).toBeVisible();

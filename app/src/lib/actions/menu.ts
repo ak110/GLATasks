@@ -13,7 +13,7 @@ export function menuBehavior(node: HTMLElement, initial: MenuState) {
     void tick().then(() => {
       const menu = node.querySelector<HTMLElement>("[data-menu-frame]");
       menu?.setAttribute("role", "menu");
-      for (const button of menu?.querySelectorAll("button") ?? [])
+      for (const button of menu?.querySelectorAll("button, a[href]") ?? [])
         button.setAttribute("role", "menuitem");
     });
   }
@@ -32,14 +32,39 @@ export function menuBehavior(node: HTMLElement, initial: MenuState) {
     state.onClose();
     node.querySelector("button")?.focus();
   }
+  function keyboard(event: KeyboardEvent) {
+    if (
+      !state.open ||
+      !["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)
+    )
+      return;
+    const items = [
+      ...node.querySelectorAll<HTMLElement>(
+        "[data-menu-frame] button:not(:disabled), [data-menu-frame] a[href]",
+      ),
+    ];
+    if (!items.length) return;
+    const current = items.indexOf(document.activeElement as HTMLElement);
+    const next =
+      event.key === "Home"
+        ? 0
+        : event.key === "End"
+          ? items.length - 1
+          : (current + (event.key === "ArrowUp" ? -1 : 1) + items.length) %
+            items.length;
+    event.preventDefault();
+    items[next].focus();
+  }
   update(initial);
   document.addEventListener("mousedown", outside);
   document.addEventListener("keydown", escape);
+  node.addEventListener("keydown", keyboard);
   return {
     update,
     destroy() {
       document.removeEventListener("mousedown", outside);
       document.removeEventListener("keydown", escape);
+      node.removeEventListener("keydown", keyboard);
     },
   };
 }

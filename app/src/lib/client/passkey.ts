@@ -6,6 +6,22 @@ import type { z } from "zod";
 import type { PublicPasskeySchema } from "#lib/passkey-schemas.ts";
 import type { publicPasskey } from "#lib/server/api/passkey-public.ts";
 
+/** ブラウザーを識別する表示名。パスキーの実際の保存先はWebAuthnから取得できない。 */
+export function defaultPasskeyName(userAgent: string) {
+  const browser = /Edg(?:e|A|iOS)?\//.test(userAgent)
+    ? "Edge"
+    : /(?:OPR|Opera)\//.test(userAgent)
+      ? "Opera"
+      : /(?:Firefox|FxiOS)\//.test(userAgent)
+        ? "Firefox"
+        : /(?:Chrome|CriOS)\//.test(userAgent)
+          ? "Chrome"
+          : /Safari\//.test(userAgent)
+            ? "Safari"
+            : "このブラウザー";
+  return `${browser}のパスキー`;
+}
+
 export function requireWebAuthn() {
   if (!browserSupportsWebAuthn())
     throw new Error(
