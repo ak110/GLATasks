@@ -39,6 +39,8 @@ export async function beginRegistration(
     userName,
     userID: Buffer.from(handle, "base64url"),
     attestationType: "none",
+    // ランタイムのPQC対応で要求方式が変わらないよう、対応実績のある方式を明示する。
+    supportedAlgorithmIDs: [-8, -7, -257],
     authenticatorSelection: {
       residentKey: "required",
       userVerification: "required",

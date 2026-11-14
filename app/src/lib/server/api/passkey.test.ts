@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { SettingsService } from "@simplewebauthn/server";
 import { and, eq } from "drizzle-orm";
 import { afterAll, expect, it, vi } from "vitest";
 import { cleanupFixtures, describeDb } from "../db-test-helpers";
@@ -67,6 +68,59 @@ describeDb("パスキーの認証と復旧の不変条件", () => {
       ),
     };
   }
+  it.each([true, false])(
+    "PQC対応=%sでも新規・追加・復旧の登録方式と保護条件を維持する",
+    async (pqc) => {
+      const runtime = vi
+        .spyOn(SettingsService, "runtimeSupportsPQC")
+        .mockReturnValue(pqc);
+      try {
+        const f = await registered();
+        const added = await manageSecurity(f.user.id, f.jar.cookies, {
+          action: "beginAdd",
+          proof: await proof(f),
+        });
+        await publicPasskey(
+          { action: "recover", userId: f.name, code: f.codes[0] },
+          f.jar.cookies,
+        );
+        const recovery = await publicPasskey(
+          { action: "beginRecovery" },
+          f.jar.cookies,
+        );
+        if (!recovery.options || !("user" in recovery.options))
+          throw new Error("復旧の登録オプションがない");
+        for (const options of [f.options, added.options, recovery.options]) {
+          expect(options).toMatchObject({
+            pubKeyCredParams: [
+              { alg: -8, type: "public-key" },
+              { alg: -7, type: "public-key" },
+              { alg: -257, type: "public-key" },
+            ],
+            authenticatorSelection: {
+              residentKey: "required",
+              userVerification: "required",
+            },
+            attestation: "none",
+          });
+          expect(
+            options?.authenticatorSelection?.authenticatorAttachment,
+          ).toBeUndefined();
+          expect(options?.hints).toEqual([]);
+        }
+        expect(added.options?.excludeCredentials).toContainEqual({
+          id: f.key.id,
+          type: "public-key",
+        });
+        expect(recovery.options?.excludeCredentials).toContainEqual({
+          id: f.key.id,
+          type: "public-key",
+        });
+      } finally {
+        runtime.mockRestore();
+      }
+    },
+  );
   it("パスキーだけで登録し、本人確認・消費済みchallenge・旧パスワードを検証する", async () => {
     const f = await registered();
     expect(f.user.pass_hash).toBeNull();
