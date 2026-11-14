@@ -31,7 +31,7 @@
     let error = $state("");
     let message = $state("");
     let feedback: HTMLDivElement;
-    let codesPanel: HTMLDivElement;
+    let codesPanel = $state<HTMLDivElement>();
     async function proof(passkeyOnly = false) {
         if (usePassword && data.passwordEnabled && !passkeyOnly)
             return { password };
