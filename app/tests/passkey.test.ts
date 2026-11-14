@@ -300,6 +300,19 @@ test("パスキー: 登録・ログイン・管理・パスワード無効化と
           await context.request.get("/account/security", { maxRedirects: 0 })
         ).status(),
       ).toBe(302);
+      // 本人確認済みのまま復旧状態が失効しても、別の未使用コードでやり直せる。
+      await context.clearCookies({ name: "__Host-gla-recovery" });
+      await page.getByTestId("passkey-submit").click();
+      await expect(page.getByRole("alert")).toContainText(
+        "復旧コードの入力に戻り",
+      );
+      await page.getByTestId("recovery-back").click();
+      await page.getByTestId("recovery-code").fill(recovery[1]);
+      await page.getByTestId("passkey-submit").click();
+      await expect(
+        page.getByText("本人確認が完了しました。15分以内に登録してください。"),
+      ).toBeVisible();
+      await expect(page.getByTestId("recovery-back")).toBeVisible();
       // 中断後に開き直した画面から、有効な復旧状態で再登録へ進めることを確かめる。
       await page.reload();
       await page

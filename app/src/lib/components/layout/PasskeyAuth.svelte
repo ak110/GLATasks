@@ -160,15 +160,19 @@
             </p>{:else if recovering}<p>
                 本人確認から15分以内は登録を再開できます。開始できない場合は、復旧コードの入力に戻ってください。
             </p>
+        {/if}
+        {#if recovering}
             <button
                 type="button"
                 class={grayButtonClass}
                 onclick={() => {
                     recovering = false;
+                    verified = false;
                     error = "";
                 }}
                 data-testid="recovery-back">復旧コードの入力に戻る</button
-            >{/if}
+            >
+        {/if}
         <button
             type="button"
             class={grayButtonClass}
