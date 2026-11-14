@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { onMount } from "svelte";
+    import { onMount, tick } from "svelte";
     import {
         startAuthentication,
         startRegistration,
@@ -30,6 +30,8 @@
     let busy = $state(false);
     let error = $state("");
     let message = $state("");
+    let feedback: HTMLDivElement;
+    let codesPanel: HTMLDivElement;
     async function proof(passkeyOnly = false) {
         if (usePassword && data.passwordEnabled && !passkeyOnly)
             return { password };
@@ -52,6 +54,9 @@
             error = passkeyError(e);
         } finally {
             busy = false;
+            await tick();
+            // 発行後の保存欄や操作結果がスクロール外に追加されても、次の手順へ移れるようにする。
+            (error || !codes.length ? feedback : codesPanel)?.focus();
         }
     }
     async function manage(input: RouterInputs["security"]["manage"]) {
@@ -97,10 +102,12 @@
         <p>
             ログインに使うパスキー・パスワードと、紛失時の復旧コードを管理する。
         </p>
-        {#if error}<p role="alert" class="text-red-600 dark:text-red-400">
-                {error}
-            </p>{/if}
-        {#if message}<p role="status">{message}</p>{/if}
+        <div bind:this={feedback} tabindex="-1">
+            {#if error}<p role="alert" class="text-red-600 dark:text-red-400">
+                    {error}
+                </p>{/if}
+            {#if message}<p role="status">{message}</p>{/if}
+        </div>
         <fieldset
             disabled={busy}
             class="space-y-3 rounded border border-gray-200 p-4 dark:border-gray-700"
@@ -288,9 +295,8 @@
                 data-testid="codes-reissue">復旧コードを再発行</button
             >
         </fieldset>
-        {#if codes.length}<RecoveryCodes
-                {codes}
-                onSaved={() => run(saved)}
-            />{/if}
+        {#if codes.length}<div bind:this={codesPanel} tabindex="-1">
+                <RecoveryCodes {codes} onSaved={() => run(saved)} />
+            </div>{/if}
     </main>
 </PageScrollArea>

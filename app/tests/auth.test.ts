@@ -11,6 +11,37 @@ const TEST_PASSWORD = "e2etestpass123";
 test.describe("未ログイン状態", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
+  test("認証画面は各テーマの拡大相当の高さで先頭と操作へスクロールできる", async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width: 320, height: 225 });
+    for (const colorScheme of ["light", "dark"] as const) {
+      await page.emulateMedia({ colorScheme, reducedMotion: "reduce" });
+      for (const route of [
+        "/auth/login",
+        "/auth/regist_user",
+        "/auth/recover",
+      ]) {
+        await page.goto(route);
+        await expect(page.getByTestId("passkey-submit")).toBeEnabled();
+        if (colorScheme === "dark")
+          await expect(page.locator("html")).toHaveClass(/dark/);
+        const heading = page.getByRole("heading", { level: 1 });
+        await heading.scrollIntoViewIfNeeded();
+        await expect(heading).toBeInViewport();
+        const box = await heading.boundingBox();
+        expect(box?.y).toBeGreaterThanOrEqual(0);
+        await page.screenshot({
+          path: testInfo.outputPath(
+            `${route.split("/").at(-1)}-${colorScheme}-zoom.png`,
+          ),
+        });
+        await page.getByTestId("passkey-submit").scrollIntoViewIfNeeded();
+        await expect(page.getByTestId("passkey-submit")).toBeInViewport();
+      }
+    }
+  });
+
   test("/ にアクセスするとログインページへリダイレクト", async ({ page }) => {
     await page.goto("/");
     await expect(page).toHaveURL(/\/auth\/login/);

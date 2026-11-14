@@ -36,6 +36,12 @@ async function securityOperation(page: Page, testId: string) {
   await page.getByTestId(testId).click();
   await response;
   await expect(page.getByTestId(testId)).toBeEnabled();
+  if (testId === "codes-reissue" || testId === "password-disable") {
+    await expect(page.getByTestId("recovery-codes")).toBeInViewport();
+    await expect(
+      page.getByTestId("recovery-codes").locator(".."),
+    ).toBeFocused();
+  }
 }
 async function logout(page: Page) {
   await page.getByTestId("account-menu-toggle").click();
