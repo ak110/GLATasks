@@ -36,7 +36,9 @@ describeDb("パスキーの認証と復旧の不変条件", () => {
       jar.cookies,
     );
     if (!start.options || !("user" in start.options))
-      throw new Error("登録オプションがない");
+      throw new Error(
+        "登録オプションがない。publicPasskeyのbeginRegisterの戻り値を確認する。",
+      );
     return { jar, name, key, options: start.options };
   }
   async function registered() {
@@ -52,7 +54,9 @@ describeDb("パスキーの認証と復旧の不変条件", () => {
       .where(eq(users.user, fixture.name));
     ids.push(user.id);
     if (!("codes" in result) || !result.codes)
-      throw new Error("復旧コードがない");
+      throw new Error(
+        "復旧コードがない。publicPasskeyのfinishRegisterの戻り値を確認する。",
+      );
     return { ...fixture, user, codes: result.codes, response };
   }
   async function proof(
@@ -89,7 +93,9 @@ describeDb("パスキーの認証と復旧の不変条件", () => {
           f.jar.cookies,
         );
         if (!recovery.options || !("user" in recovery.options))
-          throw new Error("復旧の登録オプションがない");
+          throw new Error(
+            "復旧の登録オプションがない。publicPasskeyのbeginRecoveryの戻り値を確認する。",
+          );
         for (const options of [f.options, added.options, recovery.options]) {
           expect(options).toMatchObject({
             pubKeyCredParams: [
@@ -159,7 +165,9 @@ describeDb("パスキーの認証と復旧の不変条件", () => {
       !disableA.codes ||
       !disableB.codes
     )
-      throw new Error("無効化用コードがない");
+      throw new Error(
+        "無効化用コードがない。manageSecurityのprepareDisableの戻り値を確認する。",
+      );
     await expect(
       manageSecurity(f.user.id, f.jar.cookies, {
         action: "confirmDisable",
@@ -316,14 +324,18 @@ describeDb("パスキーの認証と復旧の不変条件", () => {
       f.jar.cookies,
     );
     if (!start.options || !("user" in start.options))
-      throw new Error("登録オプションがない");
+      throw new Error(
+        "登録オプションがない。publicPasskeyのbeginRecoveryの戻り値を確認する。",
+      );
     // 取消後も同じ短期状態で新しい試行を開始できる。
     const retry = await publicPasskey(
       { action: "beginRecovery" },
       f.jar.cookies,
     );
     if (!retry.options || !("user" in retry.options))
-      throw new Error("登録オプションがない");
+      throw new Error(
+        "登録オプションがない。publicPasskeyのbeginRecoveryの戻り値を確認する。",
+      );
     const next = authenticator();
     await publicPasskey(
       {
@@ -351,7 +363,10 @@ describeDb("パスキーの認証と復旧の不変条件", () => {
       ),
     ).toBe(f.user.id);
     const login = await publicPasskey({ action: "beginLogin" }, f.jar.cookies);
-    if (!login.options) throw new Error("認証オプションがない");
+    if (!login.options)
+      throw new Error(
+        "認証オプションがない。publicPasskeyのbeginLoginの戻り値を確認する。",
+      );
     await publicPasskey(
       {
         action: "finishLogin",
@@ -370,7 +385,10 @@ describeDb("パスキーの認証と復旧の不変条件", () => {
       action: "beginAdd",
       proof: await proof(f),
     });
-    if (!add.options) throw new Error("登録オプションがない");
+    if (!add.options)
+      throw new Error(
+        "登録オプションがない。manageSecurityのbeginAddの戻り値を確認する。",
+      );
     await expect(
       manageSecurity(f.user.id, cookieJar().cookies, {
         action: "finishAdd",
