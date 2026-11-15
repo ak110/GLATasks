@@ -51,7 +51,9 @@ fast = false
 [tool.pyfltr.custom-commands.app-unit]
 type = "tester"
 path = "pnpm"
-args = ["run", "test:unit"]
+# pnpm runがスクリプト末尾へ追加引数を渡すため、vitest runへ届く。
+# テスト名と個別の合否を保存出力だけで確認できるよう、verboseのreporterを使う。
+args = ["run", "test:unit", "--reporter=verbose"]
 targets = ["*.svelte", "*.ts", "*.tsx", "*.js", "*.mjs", "*.cjs"]
 pass-filenames = false
 fast = false
