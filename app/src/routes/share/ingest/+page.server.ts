@@ -21,7 +21,8 @@ export const load: PageServerLoad = async ({ locals, url, fetch }) => {
       },
       {
         fetch,
-        log: (message) => console.warn(`[share/ingest] ${message}`),
+        // 取得失敗はどれも共有元の内容や原文で続行し、運用者の対応を要さないため、診断用の情報として記録する。
+        log: (message) => console.info(`[share/ingest] ${message}`),
       },
     ),
     operations.lists.list({ userId: locals.user_id }, "active"),

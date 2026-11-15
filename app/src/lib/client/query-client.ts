@@ -14,7 +14,7 @@ import {
   showErrorToast,
   dismissToast,
 } from "#lib/client/ui/toast-store.svelte.ts";
-import { checkConnectivity } from "#lib/client/sse/connection-recovery.svelte.ts";
+import { shouldNotifyFailure } from "#lib/client/operation-error-notice.ts";
 import { extractErrorMessage } from "#lib/client/ui/extract-error-message.ts";
 
 type NotificationQuery = Query<unknown, unknown, unknown>;
@@ -22,7 +22,6 @@ const queryToasts = new WeakMap<object, number>();
 const queryCache = new QueryCache({
   onError: (error, query) => {
     if (!browser) return;
-    void checkConnectivity();
     void presentQueryError(error, query);
   },
 });
@@ -89,6 +88,7 @@ function hasVisibleInline(queryHash: string): boolean {
 }
 
 async function presentQueryError(error: unknown, query: NotificationQuery) {
+  if (!(await shouldNotifyFailure())) return;
   await tick();
   if (query.state.status !== "error" || query.state.error !== error) return;
   dismissQueryToast(query);
@@ -104,10 +104,9 @@ function dismissQueryToast(query: object) {
   queryToasts.delete(query);
 }
 
-/** mutation等の失敗通知と接続確認 */
+/** mutation等の失敗通知と接続確認（応答の横取りでは通知を省く。理由は`operation-error-notice.ts`） */
 function handleError(error: unknown): void {
-  showErrorToast(extractErrorMessage(error));
-  // 操作失敗を起点に接続を能動チェックする。
-  // 正当なアプリエラー時は判定基盤が ok を返すため検出は誤発火しない。
-  void checkConnectivity();
+  void (async () => {
+    if (await shouldNotifyFailure()) showErrorToast(extractErrorMessage(error));
+  })();
 }

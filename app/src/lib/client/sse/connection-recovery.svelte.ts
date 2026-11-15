@@ -47,6 +47,9 @@ import {
 } from "#lib/client/sse/connectivity-check.js";
 import { isUserBusy } from "#lib/client/ui/user-busy.ts";
 
+/** 接続の判定区分（健全・到達不能・応答の横取り） */
+export type Health = Awaited<ReturnType<typeof classifyHealth>>;
+
 // 別アプリからの復帰直後に通信が戻った時点を早く捉えるため、到達不能の間は定期ポーリングより短い間隔で再判定する。
 export const UNREACHABLE_RECHECK_INTERVAL_MS = 2_000;
 
@@ -68,13 +71,13 @@ export const connectivityState = $state<{ notice: ConnectivityNotice }>({
 
 let stopTriggers: (() => void) | null = null;
 let watching = false;
-// 複数トリガーがほぼ同時に発火しうるため、能動チェックの重複起動を防ぐ
-let checking = false;
+// 複数トリガーがほぼ同時に発火しうるため、能動チェックの重複起動を防ぎ、実行中の判定結果を共有する
+let inflight: Promise<Health> | undefined;
 // 到達不能が続いている開始時刻（到達不能でない間はundefined）
 let unreachableSince: number | undefined;
 let recheckTimer: ReturnType<typeof setTimeout> | undefined;
 // 「認証画面を開く」で開いた別ウィンドウと、その間の再判定。到達不能の再判定とは停止条件が異なるため分ける。
-let authWindow: Window | null = null;
+let authWindow: Window | undefined;
 let authRecheckTimer: ReturnType<typeof setTimeout> | undefined;
 
 /** 能動検出監視を開始する（多重起動はno-op） */
@@ -119,32 +122,36 @@ function handleVisibilityChange(): void {
  * 接続を能動チェックし、不健全なら回復誘導、健全ならバナーを解除する。
  *
  * ポーリング・可視復帰・オンライン復帰に加え、SSE不健全遷移・操作失敗からの
- * 前倒しトリガーとしても呼ばれる。`fetchFn` はテスト用の差し替え口で、本番では既定の `fetch` を使う。
+ * 前倒しトリガーとしても呼ばれる。判定区分を返し、判定の実行中に重ねて呼ばれた場合は同じ判定の結果を返す。
+ * 操作失敗の通知側は、この結果で応答の横取り（再読み込みか案内へ進む）を知り、個別のエラー通知を省く。
+ * `fetchFn` はテスト用の差し替え口で、本番では既定の `fetch` を使う。
  */
 export async function checkConnectivity(
   fetchFn: typeof fetch = fetch,
-): Promise<void> {
-  if (checking) return;
-  checking = true;
-  try {
-    const health = await classifyHealth(fetchFn);
-    debugLog("connectivity", "check", { health });
-    if (health === "healthy") {
-      // 回復検知: 案内を自動解除する
-      unreachableSince = undefined;
-      clearRecheck();
-      closeAuthWindow();
-      connectivityState.notice = "none";
-    } else if (health === "unreachable") {
-      handleUnreachable(fetchFn);
-    } else {
-      unreachableSince = undefined;
-      clearRecheck();
-      triggerReload();
-    }
-  } finally {
-    checking = false;
+): Promise<Health> {
+  inflight ??= runCheck(fetchFn).finally(() => {
+    inflight = undefined;
+  });
+  return inflight;
+}
+
+async function runCheck(fetchFn: typeof fetch): Promise<Health> {
+  const health = await classifyHealth(fetchFn);
+  debugLog("connectivity", "check", { health });
+  if (health === "healthy") {
+    // 回復検知: 案内を自動解除する
+    unreachableSince = undefined;
+    clearRecheck();
+    closeAuthWindow();
+    connectivityState.notice = "none";
+  } else if (health === "unreachable") {
+    handleUnreachable(fetchFn);
+  } else {
+    unreachableSince = undefined;
+    clearRecheck();
+    triggerReload();
   }
+  return health;
 }
 
 /** 到達不能の継続時間で案内を出すか決め、回復を早く捉えるための再判定を予約する */
@@ -187,8 +194,8 @@ export function openAuthWindow(fetchFn: typeof fetch = fetch): void {
     authWindow.focus();
     return;
   }
-  authWindow = window.open("/healthcheck", "glatasks-auth");
-  debugLog("connectivity", "auth-window", { opened: authWindow !== null });
+  authWindow = window.open("/healthcheck", "glatasks-auth") ?? undefined;
+  debugLog("connectivity", "auth-window", { opened: authWindow !== undefined });
   if (authWindow) scheduleAuthRecheck(fetchFn);
 }
 
@@ -198,7 +205,7 @@ function scheduleAuthRecheck(fetchFn: typeof fetch): void {
     authRecheckTimer = undefined;
     if (!authWindow || authWindow.closed) {
       // 利用者が別ウィンドウを閉じた。認証を続ける意思が無いため判定を止め、案内は残す
-      authWindow = null;
+      authWindow = undefined;
       return;
     }
     void checkConnectivity(fetchFn).then(() => {
@@ -217,7 +224,7 @@ function clearAuthRecheck(): void {
 function closeAuthWindow(): void {
   clearAuthRecheck();
   if (authWindow && !authWindow.closed) authWindow.close();
-  authWindow = null;
+  authWindow = undefined;
 }
 
 /** 応答の横取りを検知した時に呼び出され、入力中ならバナー表示、非入力中なら即リロードする */

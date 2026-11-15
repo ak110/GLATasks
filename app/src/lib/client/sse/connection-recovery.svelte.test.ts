@@ -297,6 +297,22 @@ describe("connection-recovery", () => {
     expect(reloadMock).not.toHaveBeenCalled();
   });
 
+  it("判定区分を返し、判定の実行中に重ねた呼出しは同じ判定を共有する", async () => {
+    const recovery: Recovery =
+      await import("#lib/client/sse/connection-recovery.svelte.ts");
+    const fetch = makeFetch({
+      contentType: "text/html",
+      body: "<html>login</html>",
+    });
+    const [first, second] = await Promise.all([
+      recovery.checkConnectivity(fetch),
+      recovery.checkConnectivity(fetch),
+    ]);
+    expect([first, second]).toEqual(["intercepted", "intercepted"]);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(await recovery.checkConnectivity(makeFetch({}))).toBe("healthy");
+  });
+
   describe("認証画面の別ウィンドウ", () => {
     /** `window.open`が返す別ウィンドウのスタブ */
     function stubAuthWindow(): {

@@ -142,7 +142,7 @@ export function parseFxTwitter(
   let translation = nonEmptyString(asRecord(tweet.translation)?.text);
   if (translation && !JAPANESE_CHAR_PATTERN.test(translation)) {
     log(
-      `FxTwitter APIの訳が日本語ではないため原文を使う: ${translation.slice(0, 100)}`,
+      `FxTwitter APIの訳が日本語ではないため原文で続行した（対応不要）: ${translation.slice(0, 100)}`,
     );
     translation = undefined;
   }
@@ -211,10 +211,12 @@ export async function fetchXPost(
     const content = status === 200 ? parseFxTwitter(body, log) : undefined;
     if (content) return content;
     log(
-      `FxTwitter APIから投稿内容を取得できなかった（HTTP ${status}）: ${fxUrl}`,
+      `FxTwitter APIから投稿内容を取得できず、X公式のoEmbedで続行する（対応不要、HTTP ${status}）: ${fxUrl}`,
     );
   } catch (error) {
-    log(`FxTwitter APIの取得に失敗した: ${fxUrl}: ${String(error)}`);
+    log(
+      `FxTwitter APIの取得に失敗し、X公式のoEmbedで続行する（対応不要）: ${fxUrl}: ${String(error)}`,
+    );
   }
   const canonical = `https://x.com/${post.screenName}/status/${post.id}`;
   const oembedUrl = `https://publish.twitter.com/oembed?url=${encodeURIComponent(canonical)}&omit_script=1`;
@@ -228,10 +230,12 @@ export async function fetchXPost(
       status === 200 ? parseOEmbed(body, post.screenName) : undefined;
     if (content) return content;
     log(
-      `X公式のoEmbedから投稿内容を取得できなかった（HTTP ${status}）: ${oembedUrl}`,
+      `X公式のoEmbedから投稿内容を取得できず、共有元の内容で続行する（対応不要、HTTP ${status}）: ${oembedUrl}`,
     );
   } catch (error) {
-    log(`X公式のoEmbedの取得に失敗した: ${oembedUrl}: ${String(error)}`);
+    log(
+      `X公式のoEmbedの取得に失敗し、共有元の内容で続行する（対応不要）: ${oembedUrl}: ${String(error)}`,
+    );
   }
   return undefined;
 }
