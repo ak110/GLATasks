@@ -10,6 +10,13 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 type Recovery = typeof import("#lib/client/sse/connection-recovery.svelte.ts");
 
+// 非表示iframeの読み込みはhappy-domで完了しないため、読み込みの完了だけを模す。
+// 通過したかは読み込み後の判定（注入したfetch）で決まる。
+const { loadHiddenFrame } = vi.hoisted(() => ({
+  loadHiddenFrame: vi.fn(async () => {}),
+}));
+vi.mock("#lib/client/sse/silent-pass.ts", () => ({ loadHiddenFrame }));
+
 /** 注入用の fetch スタブを生成する。`reject` 指定時はネットワークエラー相当で失敗させる */
 function makeFetch(opts: {
   status?: number;
@@ -309,8 +316,43 @@ describe("connection-recovery", () => {
       recovery.checkConnectivity(fetch),
     ]);
     expect([first, second]).toEqual(["intercepted", "intercepted"]);
-    expect(fetch).toHaveBeenCalledTimes(1);
+    // 判定1回と、横取りの自動通過を試した後の判定1回
+    expect(fetch).toHaveBeenCalledTimes(2);
     expect(await recovery.checkConnectivity(makeFetch({}))).toBe("healthy");
+  });
+
+  describe("横取りの自動通過", () => {
+    it("非表示の読み込みで通過して健全に戻れば、再読み込みせず案内を消して回復を通知する", async () => {
+      const recovery: Recovery =
+        await import("#lib/client/sse/connection-recovery.svelte.ts");
+      const recovered = vi.fn();
+      window.addEventListener(recovery.CONNECTIVITY_RECOVERED_EVENT, recovered);
+      const fetch = sequenceFetch(makeFetch({ status: 511 }), makeFetch({}));
+
+      expect(await recovery.checkConnectivity(fetch)).toBe("intercepted");
+
+      expect(loadHiddenFrame).toHaveBeenCalledTimes(1);
+      expect(reloadMock).not.toHaveBeenCalled();
+      expect(recovery.connectivityState.notice).toBe("none");
+      expect(recovered).toHaveBeenCalledTimes(1);
+      window.removeEventListener(
+        recovery.CONNECTIVITY_RECOVERED_EVENT,
+        recovered,
+      );
+    });
+
+    it("通過しなければ従来の回復誘導へ進み、直後の横取りでは通過を試し直さない", async () => {
+      const recovery: Recovery =
+        await import("#lib/client/sse/connection-recovery.svelte.ts");
+      const fetch = makeFetch({ status: 511 });
+
+      await recovery.checkConnectivity(fetch);
+      expect(reloadMock).toHaveBeenCalledTimes(1);
+      await recovery.checkConnectivity(fetch);
+
+      expect(loadHiddenFrame).toHaveBeenCalledTimes(1);
+      expect(reloadMock).toHaveBeenCalledTimes(2);
+    });
   });
 
   describe("認証画面の別ウィンドウ", () => {

@@ -196,18 +196,24 @@ test.describe("入力中の応答の横取り", () => {
     const typed = `入力中_${uniqueTestName("e2e")}`;
     await input.fill(typed);
 
-    await context.route("**/healthcheck", async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: "text/html",
-        body: "<html><body>login</body></html>",
+    // 認証画面が全ての通信を差し替え、取得中の操作も失敗する状態を作る
+    for (const pattern of ["**/healthcheck**", "**/api/trpc/**"]) {
+      await context.route(pattern, async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: "text/html",
+          body: "<html><body>login</body></html>",
+        });
       });
-    });
+    }
     await page.evaluate(() =>
       document.dispatchEvent(new Event("visibilitychange")),
     );
     const banner = page.getByTestId("connectivity-recovery-banner");
     await expect(banner).toBeVisible({ timeout: 15_000 });
+    // 横取りによる操作失敗のエラー通知は出さない
+    await expect(page.getByTestId("toast-error")).toHaveCount(0);
+    await context.unroute("**/api/trpc/**");
 
     const [popup] = await Promise.all([
       context.waitForEvent("page"),
@@ -216,9 +222,68 @@ test.describe("入力中の応答の横取り", () => {
     await expect(popup).toHaveURL(/\/healthcheck$/);
 
     // 認証が済んで通信が戻った状態にすると、別ウィンドウが閉じてバナーが消える
-    await context.unroute("**/healthcheck");
+    await context.unroute("**/healthcheck**");
     await expect(banner).toHaveCount(0, { timeout: 10_000 });
     await expect.poll(() => popup.isClosed(), { timeout: 10_000 }).toBe(true);
     await expect(input).toHaveValue(typed);
+  });
+
+  test("横取りでも認証画面が自動で通過すれば、画面を遷移せずエラー通知も出さずに回復する", async ({
+    page,
+    context,
+  }) => {
+    await Promise.all([
+      page.goto("/"),
+      page.waitForResponse((res) => res.url().includes("/api/trpc")),
+    ]);
+    const listButton = page.locator(
+      `[data-testid="list-select-btn"]:has-text("${listName}")`,
+    );
+    await expect(listButton).toBeVisible();
+    // 再読み込み・遷移で消える印を置き、画面を遷移しなかったことを確かめる
+    const marker = `silent-pass-${uniqueTestName("e2e")}`;
+    await page.evaluate((value) => {
+      (window as typeof window & { __screenMarker?: string }).__screenMarker =
+        value;
+    }, marker);
+
+    // 利用者の入力なしで通過する認証画面を模す。認証画面が読み込まれると通過し、以後の通信は差し替えない
+    let passed = false;
+    await context.route("**/__test-portal-pass", async (route) => {
+      passed = true;
+      await route.fulfill({ status: 204 });
+    });
+    for (const pattern of ["**/healthcheck**", "**/api/trpc/**"]) {
+      await context.route(pattern, async (route) => {
+        if (passed) {
+          await route.continue();
+          return;
+        }
+        await route.fulfill({
+          status: 200,
+          contentType: "text/html",
+          body: '<html><body>login<script>fetch("/__test-portal-pass")</script></body></html>',
+        });
+      });
+    }
+    // 可視復帰で取得し直した操作が失敗し、接続の判定が横取りを検知する
+    await page.evaluate(() =>
+      document.dispatchEvent(new Event("visibilitychange")),
+    );
+
+    await expect.poll(() => passed, { timeout: 15_000 }).toBe(true);
+    // 自動通過の後に取り直した一覧が表示され、画面は遷移していない
+    await expect(listButton).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId("connectivity-recovery-banner")).toHaveCount(
+      0,
+    );
+    await expect(page.getByTestId("toast-error")).toHaveCount(0);
+    expect(
+      await page.evaluate(
+        () =>
+          (window as typeof window & { __screenMarker?: string })
+            .__screenMarker,
+      ),
+    ).toBe(marker);
   });
 });

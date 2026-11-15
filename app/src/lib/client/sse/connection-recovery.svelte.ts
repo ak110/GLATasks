@@ -32,7 +32,10 @@
  *   AndroidのPWAで別アプリから戻った直後は通信が数秒で戻ることが多く、短い通信断ではバナーを出さずに済ませるためである。
  *   通信断の間に再読み込みすると、画面の取得に失敗してService Workerのオフライン画面へ移り、表示中の画面を失うため、
  *   このバナーは再読み込みを促さない。
- * - 応答の横取り（キャプティブポータルなど）: 非入力中は即時に`location.reload()`を呼び、再読み込み先で認証画面へ誘導する。
+ * - 応答の横取り（キャプティブポータルなど）: まず認証画面を非表示のiframeで読み込み、利用者の入力なしで通過するかを試す
+ *   （`silent-pass.ts`）。通過して健全に戻れば、画面を遷移せずに案内を消し、`CONNECTIVITY_RECOVERED_EVENT`で再取得を促す。
+ *   通過しない場合と、直近に通過を試して失敗した場合は次へ進む。
+ *   非入力中は即時に`location.reload()`を呼び、再読み込み先で認証画面へ誘導する。
  *   入力中は操作妨害を避けるため、`notice`を`"reload-required"`にして再読み込みボタンと「認証画面を開く」ボタン付きのバナーで案内する。
  *   「認証画面を開く」（`openAuthWindow`）は同一オリジンの`/healthcheck`を別ウィンドウで開く。横取りする側がこの通信も差し替えるため、
  *   別ウィンドウに認証画面が表示され、入力中の画面を残したまま認証できる。開いている間は2秒間隔で判定し直し、
@@ -46,6 +49,13 @@ import {
   startConnectivityTriggers,
 } from "#lib/client/sse/connectivity-check.js";
 import { isUserBusy } from "#lib/client/ui/user-busy.ts";
+import { loadHiddenFrame } from "#lib/client/sse/silent-pass.ts";
+
+/** 横取りの自動通過で画面を遷移せずに回復した時に`window`へ送るイベント名。再取得を担う側が購読する */
+export const CONNECTIVITY_RECOVERED_EVENT = "glatasks:connectivity-recovered";
+
+// 自動で通過しない認証画面へiframeの読み込みを繰り返さないよう、失敗後はこの間だけ通過を試さない
+export const SILENT_PASS_RETRY_INTERVAL_MS = 60_000;
 
 /** 接続の判定区分（健全・到達不能・応答の横取り） */
 export type Health = Awaited<ReturnType<typeof classifyHealth>>;
@@ -79,6 +89,8 @@ let recheckTimer: ReturnType<typeof setTimeout> | undefined;
 // 「認証画面を開く」で開いた別ウィンドウと、その間の再判定。到達不能の再判定とは停止条件が異なるため分ける。
 let authWindow: Window | undefined;
 let authRecheckTimer: ReturnType<typeof setTimeout> | undefined;
+// 直近に自動通過を試して失敗した時刻（成功または未試行ならundefined）
+let silentPassFailedAt: number | undefined;
 
 /** 能動検出監視を開始する（多重起動はno-op） */
 export function startConnectivityWatch(): void {
@@ -149,9 +161,31 @@ async function runCheck(fetchFn: typeof fetch): Promise<Health> {
   } else {
     unreachableSince = undefined;
     clearRecheck();
-    triggerReload();
+    if (await trySilentPass(fetchFn)) {
+      closeAuthWindow();
+      connectivityState.notice = "none";
+      window.dispatchEvent(new Event(CONNECTIVITY_RECOVERED_EVENT));
+    } else {
+      triggerReload();
+    }
   }
   return health;
+}
+
+/** 横取りした認証画面を非表示で読み込み、通過して健全に戻ったかを返す */
+async function trySilentPass(fetchFn: typeof fetch): Promise<boolean> {
+  if (
+    silentPassFailedAt !== undefined &&
+    Date.now() - silentPassFailedAt < SILENT_PASS_RETRY_INTERVAL_MS
+  ) {
+    return false;
+  }
+  // キャッシュを避けるため毎回異なるURLで読み込む
+  await loadHiddenFrame(`/healthcheck?silent-pass=${Date.now()}`);
+  const passed = (await classifyHealth(fetchFn)) === "healthy";
+  debugLog("connectivity", "silent-pass", { passed });
+  silentPassFailedAt = passed ? undefined : Date.now();
+  return passed;
 }
 
 /** 到達不能の継続時間で案内を出すか決め、回復を早く捉えるための再判定を予約する */

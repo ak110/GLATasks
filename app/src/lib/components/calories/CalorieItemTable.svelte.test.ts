@@ -78,7 +78,8 @@ describe("CalorieItemTable", () => {
         async () => new Response(null, { status: 511 }),
       );
       await checkConnectivity(interceptedFetch);
-      expect(interceptedFetch).toHaveBeenCalledOnce();
+      // 判定1回と、横取りの自動通過を試した後の判定1回
+      expect(interceptedFetch).toHaveBeenCalledTimes(2);
       expect(connectivityState.notice).toBe("reload-required");
       expect(dialog).toHaveAttribute("open");
     } finally {

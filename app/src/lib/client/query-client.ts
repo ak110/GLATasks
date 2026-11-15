@@ -15,6 +15,7 @@ import {
   dismissToast,
 } from "#lib/client/ui/toast-store.svelte.ts";
 import { shouldNotifyFailure } from "#lib/client/operation-error-notice.ts";
+import { CONNECTIVITY_RECOVERED_EVENT } from "#lib/client/sse/connection-recovery.svelte.ts";
 import { extractErrorMessage } from "#lib/client/ui/extract-error-message.ts";
 
 type NotificationQuery = Query<unknown, unknown, unknown>;
@@ -46,6 +47,13 @@ export const queryClient = new QueryClient({
     },
   },
 });
+
+// 認証画面を画面遷移なしで自動通過して回復した場合は、横取り中に失敗したqueryを取り直す。
+if (browser) {
+  window.addEventListener(CONNECTIVITY_RECOVERED_EVENT, () => {
+    void queryClient.invalidateQueries();
+  });
+}
 
 // 画面到達で別Queryのobserverだけが変わる場合も、可視DOMのhashに対応する通知を回収する。
 queryCache.subscribe((event) => {
