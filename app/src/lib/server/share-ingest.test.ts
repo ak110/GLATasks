@@ -87,12 +87,53 @@ describe("buildShareInitialText", () => {
       fetch,
     });
     expect(text).toBe(
-      `Kaelig (@kaelig): quality & ambitions\nline2 i…\n\n${POST_URL}`,
+      `Kaelig (@kaelig): quality & ambitions line2 i…\n\n${POST_URL}`,
     );
     expect(fetch.calls[1]).toBe(
       `https://publish.twitter.com/oembed?url=${encodeURIComponent(POST_URL)}&omit_script=1`,
     );
   });
+
+  it("本文の改行と連続した空白を1つの空白へまとめ、200文字を超える分を省く", async () => {
+    const longTranslation = `先週は\n\n決断疲れが\u3000ひどかった。  ${"あ".repeat(300)}`;
+    const fetch = fakeFetch({
+      [FX_URL]: { status: 200, body: fxBody(longTranslation) },
+    });
+    const text = await buildShareInitialText(shared({ text: SHARED_URL }), {
+      fetch,
+    });
+    const [body, blank, url, ...rest] = text.split("\n");
+    expect([blank, url, rest]).toEqual(["", POST_URL, []]);
+    const postText = body.slice("Kaelig (@kaelig): ".length);
+    expect(Array.from(postText)).toHaveLength(200);
+    expect(postText.startsWith("先週は 決断疲れが ひどかった。 あ")).toBe(true);
+    expect(postText.endsWith("あ…")).toBe(true);
+  });
+
+  it.each([
+    [
+      "DeepLの旧版警告文",
+      "You're using an older version of DeepL. To continue using the app, please update to the latest version.",
+    ],
+    ["英語の失敗文", "Rate limit exceeded. Please try again later."],
+  ])(
+    "日本語ではない訳（%s）は使わず原文を使う",
+    async (_label, translation) => {
+      const logs: string[] = [];
+      const fetch = fakeFetch({
+        [FX_URL]: { status: 200, body: fxBody(translation) },
+      });
+      const text = await buildShareInitialText(shared({ text: SHARED_URL }), {
+        fetch,
+        log: (message) => logs.push(message),
+      });
+      expect(text).toBe(
+        `Kaelig (@kaelig): decision fatigue hit me hard last week\n\n${POST_URL}`,
+      );
+      expect(fetch.calls).toEqual([FX_URL]);
+      expect(logs).toHaveLength(1);
+    },
+  );
 
   it("両方失敗したら共有元の内容を使い、URLを1回だけ正規化して入れる", async () => {
     const logs: string[] = [];

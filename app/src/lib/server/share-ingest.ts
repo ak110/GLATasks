@@ -20,6 +20,9 @@ export type XPostContent = { name: string; screenName: string; text: string };
 /** 外部取得1回あたりの時間上限（ミリ秒）。FxTwitterとoEmbedの合計で画面の表示を長く止めないための値。 */
 export const X_FETCH_TIMEOUT_MS = 3000;
 
+/** 入力欄へ入れる本文の最大文字数（コードポイント）。Chrome拡張が渡すタブ名と同じく、1行で途中までを示す長さにする。 */
+export const X_POST_TEXT_MAX_CHARS = 200;
+
 const X_HOSTS = new Set([
   "x.com",
   "twitter.com",
@@ -120,8 +123,15 @@ function nonEmptyString(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() !== "" ? value : undefined;
 }
 
+// 日本語訳なら仮名か漢字を含む。翻訳サービスが訳の代わりに返す英語の警告文や、訳されずに返る原文を訳として使わないための判定。
+const JAPANESE_CHAR_PATTERN =
+  /[\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Han}]/u;
+
 /** FxTwitterの`/2/`を含むv2形式ではなく、v1形式（`tweet.author.screen_name`など）の属性名で読む。 */
-export function parseFxTwitter(body: unknown): XPostContent | undefined {
+export function parseFxTwitter(
+  body: unknown,
+  log: (message: string) => void = () => {},
+): XPostContent | undefined {
   const root = asRecord(body);
   if (!root || root.code !== 200) return undefined;
   const tweet = asRecord(root.tweet);
@@ -129,7 +139,13 @@ export function parseFxTwitter(body: unknown): XPostContent | undefined {
   const name = nonEmptyString(author?.name);
   const screenName = nonEmptyString(author?.screen_name);
   if (!tweet || !name || !screenName) return undefined;
-  const translation = nonEmptyString(asRecord(tweet.translation)?.text);
+  let translation = nonEmptyString(asRecord(tweet.translation)?.text);
+  if (translation && !JAPANESE_CHAR_PATTERN.test(translation)) {
+    log(
+      `FxTwitter APIの訳が日本語ではないため原文を使う: ${translation.slice(0, 100)}`,
+    );
+    translation = undefined;
+  }
   const original = nonEmptyString(tweet.text);
   const articleTitle = nonEmptyString(asRecord(tweet.article)?.title);
   const text = translation ?? original ?? articleTitle;
@@ -192,7 +208,7 @@ export async function fetchXPost(
   const fxUrl = `https://api.fxtwitter.com/${post.screenName}/status/${post.id}/ja`;
   try {
     const { status, body } = await fetchJson(options.fetch, fxUrl, timeoutMs);
-    const content = status === 200 ? parseFxTwitter(body) : undefined;
+    const content = status === 200 ? parseFxTwitter(body, log) : undefined;
     if (content) return content;
     log(
       `FxTwitter APIから投稿内容を取得できなかった（HTTP ${status}）: ${fxUrl}`,
@@ -220,6 +236,17 @@ export async function fetchXPost(
   return undefined;
 }
 
+/** 改行と連続した空白を1つの空白へまとめ、上限を超える分を省いて末尾に「…」を付ける。 */
+export function toSingleLine(
+  value: string,
+  maxChars: number = X_POST_TEXT_MAX_CHARS,
+): string {
+  const line = value.replace(/\s+/gu, " ").trim();
+  const chars = Array.from(line);
+  if (chars.length <= maxChars) return line;
+  return `${chars.slice(0, maxChars - 1).join("")}…`;
+}
+
 /** X投稿を取得できた場合は、本文の途中までしか含まず`&amp;`が残るChrome拡張のタブのタイトルと`text`を使わない。 */
 export async function buildShareInitialText(
   params: { title: string; text: string; url: string },
@@ -235,7 +262,7 @@ export async function buildShareInitialText(
   if (post) {
     const content = await fetchXPost(post, options);
     if (content)
-      return `${content.name} (@${content.screenName}): ${content.text}\n\n${url}`;
+      return `${content.name} (@${content.screenName}): ${toSingleLine(content.text)}\n\n${url}`;
   }
   const title = normalizeUrlsInText(params.title);
   const text = normalizeUrlsInText(params.text);
