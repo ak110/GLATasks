@@ -129,6 +129,8 @@ test("パスキー: パスワードアカウントの初回追加は認証getな
     await page.getByTestId("new-password-confirm").fill("mismatch-password-2");
     await page.getByTestId("password-set").click();
     await expect(page.getByTestId("new-password-error")).toBeVisible();
+    // 送信を止めた後は、誤りのある確認欄からそのまま直せる。
+    await expect(page.getByTestId("new-password-confirm")).toBeFocused();
     await expect(page.getByTestId("password-set")).toHaveText(
       "パスワードを変更",
     );

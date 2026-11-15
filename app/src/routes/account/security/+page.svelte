@@ -27,6 +27,10 @@
     let newPassword = $state("");
     let newPasswordConfirm = $state("");
     let passwordError = $state("");
+    // 入力の誤りがある欄。送信を止めた後、利用者がその欄から直せるように操作位置を移す。
+    let passwordErrorField = $state<"new" | "confirm">();
+    let newPasswordEl = $state<HTMLInputElement>();
+    let newPasswordConfirmEl = $state<HTMLInputElement>();
     let editingId = $state<string>();
     let editingName = $state("");
     let deleteTarget = $state<{ id: string; name: string }>();
@@ -123,17 +127,28 @@
         if (result === CANCELLED) return;
         return "パスキーを削除しました。";
     }
-    async function setPassword() {
+    /** 送信前に入力を検証し、誤りがあれば理由を示してその欄へ操作位置を移す。 */
+    async function submitPassword() {
         if (!newPassword) {
             passwordError = "新しいパスワードを入力してください。";
-            return;
-        }
-        if (newPassword !== newPasswordConfirm) {
+            passwordErrorField = "new";
+        } else if (newPassword !== newPasswordConfirm) {
             passwordError =
                 "確認用のパスワードが一致しません。同じパスワードを入力してください。";
+            passwordErrorField = "confirm";
+        } else {
+            passwordError = "";
+            passwordErrorField = undefined;
+            await run(setPassword);
             return;
         }
-        passwordError = "";
+        await tick();
+        (passwordErrorField === "new"
+            ? newPasswordEl
+            : newPasswordConfirmEl
+        )?.focus();
+    }
+    async function setPassword() {
         const wasEnabled = data.passwordEnabled;
         const result = await withProof((proof) =>
             manage({ action: "password", password: newPassword, proof }),
@@ -316,7 +331,7 @@
                 class="space-y-3"
                 onsubmit={(e) => {
                     e.preventDefault();
-                    run(setPassword);
+                    void submitPassword();
                 }}
             >
                 <div class="space-y-1">
@@ -324,12 +339,19 @@
                         >新しいパスワード</label
                     >
                     <input
+                        bind:this={newPasswordEl}
                         id="new-password"
                         type="password"
                         class={inputClass}
                         bind:value={newPassword}
                         autocomplete="new-password"
                         disabled={busy}
+                        aria-invalid={passwordErrorField === "new"
+                            ? "true"
+                            : undefined}
+                        aria-describedby={passwordErrorField === "new"
+                            ? "new-password-error"
+                            : undefined}
                         data-testid="new-password"
                     />
                 </div>
@@ -338,14 +360,17 @@
                         >新しいパスワード（確認用）</label
                     >
                     <input
+                        bind:this={newPasswordConfirmEl}
                         id="new-password-confirm"
                         type="password"
                         class={inputClass}
                         bind:value={newPasswordConfirm}
                         autocomplete="new-password"
                         disabled={busy}
-                        aria-invalid={passwordError ? "true" : undefined}
-                        aria-describedby={passwordError
+                        aria-invalid={passwordErrorField === "confirm"
+                            ? "true"
+                            : undefined}
+                        aria-describedby={passwordErrorField === "confirm"
                             ? "new-password-error"
                             : undefined}
                         data-testid="new-password-confirm"
