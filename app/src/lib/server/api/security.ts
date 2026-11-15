@@ -30,6 +30,7 @@ import {
   insertPasskey,
   verifiedRegistration,
 } from "./passkey-webauthn";
+import { passkeyName } from "../passkey-providers";
 import { getAttempt, setAttempt } from "../passkey-cookies";
 
 export async function listSecurity(userId: number, cookies?: Cookies) {
@@ -114,7 +115,7 @@ export async function manageSecurity(
         );
         if (challenge.generation !== user.session_generation)
           throw new ApiError("auth_failed");
-        const credential = await verifiedRegistration(
+        const { credential, aaguid } = await verifiedRegistration(
           challenge,
           input.response,
         );
@@ -125,7 +126,12 @@ export async function manageSecurity(
           .update(users)
           .set({ webauthn_handle: challenge.handle })
           .where(eq(users.id, userId));
-        await insertPasskey(tx, userId, credential, input.name);
+        await insertPasskey(
+          tx,
+          userId,
+          credential,
+          passkeyName(aaguid, input.name),
+        );
         return { success: true };
       }
       if (input.action === "confirmDisable") {

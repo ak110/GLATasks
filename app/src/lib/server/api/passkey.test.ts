@@ -31,10 +31,9 @@ describeDb("パスキーの認証と復旧の不変条件", () => {
   afterAll(async () => {
     await cleanupFixtures(ids);
   });
-  async function begin() {
+  async function begin(key = authenticator()) {
     const jar = cookieJar();
     const name = `pk${randomUUID().replaceAll("-", "").slice(0, 24)}`;
-    const key = authenticator();
     const start = await publicPasskey(
       { action: "beginRegister", userId: name },
       jar.cookies,
@@ -548,5 +547,102 @@ describeDb("パスキーの認証と復旧の不変条件", () => {
     await expect(recover(f.name, f.codes[0])).resolves.toMatchObject({
       id: f.user.id,
     });
+  });
+
+  it("3つの登録経路で提供元の識別子から名前を付け、判別できなければブラウザー名にする", async () => {
+    async function names(userId: number) {
+      return (
+        await getDb()
+          .select()
+          .from(passkeys)
+          .where(eq(passkeys.user_id, userId))
+      ).map((key) => key.name);
+    }
+    async function register(
+      key: ReturnType<typeof authenticator>,
+      name?: string,
+    ) {
+      const fixture = await begin(key);
+      await publicPasskey(
+        {
+          action: "finishRegister",
+          response: key.register(fixture.options.challenge),
+          name,
+        },
+        fixture.jar.cookies,
+      );
+      const [user] = await getDb()
+        .select()
+        .from(users)
+        .where(eq(users.user, fixture.name));
+      ids.push(user.id);
+      return { ...fixture, user };
+    }
+    const google = await register(
+      authenticator("ea9b8d66-4d01-1d21-3ce4-b6b48cb575d4"),
+      "Chrome",
+    );
+    expect(await names(google.user.id)).toEqual([
+      "Googleパスワードマネージャー",
+    ]);
+    const unknown = await register(authenticator(), "Firefox");
+    expect(await names(unknown.user.id)).toEqual(["Firefox"]);
+    const legacy = await register(authenticator());
+    expect(await names(legacy.user.id)).toEqual(["このブラウザー"]);
+
+    // 復旧後の登録
+    // 登録直後のセッションは本人確認の期限内のため、証明なしで復旧コードを発行できる。
+    const reissued = await manageSecurity(google.user.id, google.jar.cookies, {
+      action: "codes",
+    });
+    if (!("codes" in reissued) || !reissued.codes)
+      throw new Error(
+        "復旧コードがない。manageSecurityのcodesの戻り値を確認する。",
+      );
+    const [code] = reissued.codes;
+    const recovered = await recover(google.name, code);
+    await setRecoveryCookie(
+      google.jar.cookies,
+      recovered.id,
+      recovered.session_generation,
+    );
+    const start = await publicPasskey(
+      { action: "beginRecovery" },
+      google.jar.cookies,
+    );
+    if (!start.options || !("user" in start.options))
+      throw new Error(
+        "登録オプションがない。publicPasskeyのbeginRecoveryの戻り値を確認する。",
+      );
+    const onePassword = authenticator("bada5566-a7aa-401f-bd96-45619a55120d");
+    await publicPasskey(
+      {
+        action: "finishRecovery",
+        response: onePassword.register(start.options.challenge),
+        name: "Edge",
+      },
+      google.jar.cookies,
+    );
+    expect(await names(google.user.id)).toEqual(["1Password"]);
+
+    // アカウント設定画面からの追加
+    const add = await manageSecurity(unknown.user.id, unknown.jar.cookies, {
+      action: "beginAdd",
+    });
+    if (!add.options)
+      throw new Error(
+        "登録オプションがない。manageSecurityのbeginAddの戻り値を確認する。",
+      );
+    await manageSecurity(unknown.user.id, unknown.jar.cookies, {
+      action: "finishAdd",
+      response: authenticator("08987058-cadc-4b81-b6e1-30de50dcbe96").register(
+        add.options.challenge,
+      ),
+      name: "Safari",
+    });
+    expect((await names(unknown.user.id)).sort()).toEqual([
+      "Firefox",
+      "Windows Hello",
+    ]);
   });
 });

@@ -53,6 +53,7 @@ export const ManageSecuritySchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("finishAdd"),
     response: RegistrationResponseSchema,
+    // 提供元を識別子から判別できない場合に使うブラウザー名
     name: PasskeyNameSchema,
   }),
   z.object({
@@ -89,6 +90,8 @@ export const PublicPasskeySchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("finishRegister"),
     response: RegistrationResponseSchema,
+    // 提供元を識別子から判別できない場合に使うブラウザー名。旧版のクライアントは送らない
+    name: PasskeyNameSchema.optional(),
   }),
   z.object({ action: z.literal("beginLogin") }),
   z.object({
@@ -104,5 +107,7 @@ export const PublicPasskeySchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("finishRecovery"),
     response: RegistrationResponseSchema,
+    // 提供元を識別子から判別できない場合に使うブラウザー名。旧版のクライアントは送らない
+    name: PasskeyNameSchema.optional(),
   }),
 ]);

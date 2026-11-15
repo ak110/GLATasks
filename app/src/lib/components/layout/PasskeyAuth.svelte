@@ -8,6 +8,7 @@
     import { resolve } from "$app/paths";
     import { page } from "$app/state";
     import {
+        defaultPasskeyName,
         passkeyError,
         publicPasskeyRequest,
         requireWebAuthn,
@@ -88,6 +89,7 @@
                 response: await startRegistration({
                     optionsJSON: begin.options,
                 }),
+                name: defaultPasskeyName(navigator.userAgent),
             });
             if ("codes" in result && result.codes) codes = result.codes;
         } catch (e) {

@@ -18,6 +18,7 @@ import {
   insertPasskey,
   verifiedRegistration,
 } from "./passkey-webauthn";
+import { passkeyName } from "../passkey-providers";
 import {
   clearRecoveryCookie,
   getAttempt,
@@ -26,6 +27,9 @@ import {
   setRecoveryCookie,
 } from "../passkey-cookies";
 import { createSessionToken, setSessionCookie } from "../session";
+
+// 名前を送らない旧版のクライアントには、ブラウザーを判別できない場合と同じ名前を付ける。
+const UNKNOWN_BROWSER_NAME = "このブラウザー";
 
 export async function publicPasskey(
   input: z.infer<typeof PublicPasskeySchema>,
@@ -83,7 +87,7 @@ export async function publicPasskey(
           getAttempt(cookies, "register"),
           "register",
         );
-        const credential = await verifiedRegistration(
+        const { credential, aaguid } = await verifiedRegistration(
           challenge,
           input.response,
         );
@@ -96,7 +100,12 @@ export async function publicPasskey(
             last_login: new Date(),
           })
           .$returningId();
-        await insertPasskey(tx, id, credential, "最初のパスキー");
+        await insertPasskey(
+          tx,
+          id,
+          credential,
+          passkeyName(aaguid, input.name ?? UNKNOWN_BROWSER_NAME),
+        );
         return { id, generation: 0, codes: await replaceRecoveryCodes(tx, id) };
       }
       const recovery = await readRecoveryCookie(cookies);
@@ -111,9 +120,17 @@ export async function publicPasskey(
       );
       if (challenge.generation !== user.session_generation)
         throw new ApiError("auth_failed");
-      const credential = await verifiedRegistration(challenge, input.response);
+      const { credential, aaguid } = await verifiedRegistration(
+        challenge,
+        input.response,
+      );
       await tx.delete(passkeys).where(eq(passkeys.user_id, user.id));
-      await insertPasskey(tx, user.id, credential, "復旧後のパスキー");
+      await insertPasskey(
+        tx,
+        user.id,
+        credential,
+        passkeyName(aaguid, input.name ?? UNKNOWN_BROWSER_NAME),
+      );
       await tx
         .update(users)
         .set({

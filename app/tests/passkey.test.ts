@@ -31,9 +31,28 @@ async function codes(page: Page) {
   await expect(page.getByTestId("recovery-codes")).toHaveCount(0);
   return text.split("\n");
 }
-async function securityOperation(page: Page, testId: string) {
+async function confirmDialog(page: Page, title: string, button: string) {
+  await page
+    .getByRole("dialog", { name: title })
+    .getByRole("button", { name: button })
+    .click();
+}
+/** 本人確認ダイアログで登録済みパスキーを選んで確認する。 */
+async function verifyWithPasskey(page: Page) {
+  await page.getByTestId("verification-method-passkey").check();
+  await page.getByTestId("verification-submit").click();
+}
+async function securityOperation(
+  page: Page,
+  testId: string,
+  verify?: () => Promise<void>,
+) {
   const response = waitForSuccessfulMutationResponse(page, "security.manage");
   await page.getByTestId(testId).click();
+  if (testId === "codes-reissue")
+    await confirmDialog(page, "復旧コードの再発行", "再発行");
+  if (verify) await verify();
+  else await expect(page.getByTestId("verification-dialog")).toHaveCount(0);
   await response;
   await expect(page.getByTestId(testId)).toBeEnabled();
   if (testId === "codes-reissue" || testId === "password-disable") {
@@ -104,8 +123,21 @@ test("パスキー: パスワードアカウントの初回追加は認証getな
     });
     await page.keyboard.press("Escape");
     const currentPassword = page.getByTestId("current-password");
-    await expect(currentPassword).toHaveCount(0);
+    const dialog = page.getByTestId("verification-dialog");
+    // 確認用の再入力が一致しない場合は理由を示し、送信しない。
+    await page.getByTestId("new-password").fill("mismatch-password-1");
+    await page.getByTestId("new-password-confirm").fill("mismatch-password-2");
+    await page.getByTestId("password-set").click();
+    await expect(page.getByTestId("new-password-error")).toBeVisible();
+    await expect(page.getByTestId("password-set")).toHaveText(
+      "パスワードを変更",
+    );
+    await page.getByTestId("new-password").fill("");
+    await page.getByTestId("new-password-confirm").fill("");
+    // 本人確認の期限内はダイアログを出さずに追加する。名前の入力欄は無い。
+    await expect(page.getByTestId("new-key-name")).toHaveCount(0);
     await page.getByTestId("passkey-add").click();
+    await expect(dialog).toHaveCount(0);
     const calls = () =>
       page.evaluate(
         () => (window as unknown as { webauthnCalls: string[] }).webauthnCalls,
@@ -119,19 +151,35 @@ test("パスキー: パスワードアカウントの初回追加は認証getな
     });
     expect(observed).toEqual(["create"]);
     await expect(page.getByTestId("passkey-row")).toHaveCount(1);
+    // 仮想認証器の提供元は対応表に無いため、ブラウザー名が付く。
+    await expect(page.getByTestId("passkey-name")).toHaveText("Chrome");
+    await expect(page.getByRole("status")).toHaveText(
+      "パスキーを追加しました。",
+    );
     await expect(page.getByTestId("passkey-add")).toBeEnabled();
     await page.clock.fastForward(900_001);
+    // 期限切れでは操作時にダイアログを出し、キャンセルすれば実行しない。
+    await expect(currentPassword).toHaveCount(0);
+    await page.getByTestId("passkey-add").click();
+    await expect(dialog).toBeVisible();
     await expect(currentPassword).toBeVisible();
-    await expect(page.getByTestId("verification-method")).toHaveValue(
-      "password",
-    );
+    await expect(
+      page.getByTestId("verification-method-password"),
+    ).toBeChecked();
     await page.screenshot({
       path: testInfo.outputPath("security-expired-360.png"),
       fullPage: true,
     });
-    await currentPassword.fill("incorrect-password");
+    await dialog.getByRole("button", { name: "キャンセル" }).click();
+    await expect(dialog).toHaveCount(0);
+    await expect(page.getByTestId("passkey-add")).toBeEnabled();
+    expect(await calls()).toEqual(["create"]);
+    await expect(page.getByTestId("passkey-row")).toHaveCount(1);
+    // 本人確認に失敗した場合はダイアログ内に理由を示し、再入力できる。
     await page.getByTestId("passkey-add").click();
-    await expect(page.getByRole("alert")).toBeVisible();
+    await currentPassword.fill("incorrect-password");
+    await page.getByTestId("verification-submit").click();
+    await expect(dialog.getByRole("alert")).toBeVisible();
     expect(await calls()).toEqual(["create"]);
     await page.screenshot({
       path: testInfo.outputPath("security-error-360.png"),
@@ -142,40 +190,58 @@ test("パスキー: パスワードアカウントの初回追加は認証getな
     });
     const second = await virtualAuthenticator(page);
     await currentPassword.fill(password);
-    await page.getByTestId("passkey-add").click();
+    await page.getByTestId("verification-submit").click();
+    await expect(dialog).toHaveCount(0);
     await expect(page.getByTestId("passkey-row")).toHaveCount(2);
     console.log("webauthn-calls-after-expiry", JSON.stringify(await calls()));
     expect(await calls()).toEqual(["create", "create"]);
     await expect(page.getByTestId("passkey-add")).toBeEnabled();
     // パスワードが有効な場合の代替と、無効な場合の既定経路を同じ実認証器で通す。
     await page.clock.fastForward(900_001);
-    await page.getByTestId("verification-method").selectOption("passkey");
-    await securityOperation(page, "codes-reissue");
+    await securityOperation(page, "codes-reissue", () =>
+      verifyWithPasskey(page),
+    );
     await codes(page);
     expect(await calls()).toEqual(["create", "create", "get"]);
-    await securityOperation(page, "password-disable");
+    // 試験の時計はサーバーより進めてあるため、画面は本人確認の期限切れとして再び確認を求める。
+    await securityOperation(page, "password-disable", () =>
+      verifyWithPasskey(page),
+    );
     await codes(page);
+    await expect(page.getByTestId("password-status")).toHaveText(
+      "パスワードは設定されていません。パスキーでログインします。",
+    );
     await expect(page.getByTestId("passkey-add")).toBeEnabled();
     await page.clock.fastForward(900_001);
-    await expect(currentPassword).toHaveCount(0);
-    await expect(page.getByTestId("verification-method")).toHaveCount(0);
     const beforePassword = await calls();
     await page.getByTestId("new-password").fill(password);
-    await securityOperation(page, "password-set");
+    await page.getByTestId("new-password-confirm").fill(password);
+    await securityOperation(page, "password-set", async () => {
+      // パスワードが無い間はパスキーだけで確認し、方法の選択とパスワード欄を出さない。
+      await expect(dialog).toBeVisible();
+      await expect(currentPassword).toHaveCount(0);
+      await expect(page.getByTestId("verification-method-passkey")).toHaveCount(
+        0,
+      );
+      await page.getByTestId("verification-submit").click();
+    });
     expect(await calls()).toEqual([...beforePassword, "get"]);
-    // 再有効化後はアプリが選んだパスキー確認を引き継がず、パスワードを既定に戻す。
-    await page.clock.fastForward(900_001);
-    await expect(currentPassword).toBeVisible();
-    await expect(page.getByTestId("verification-method")).toHaveValue(
-      "password",
+    await expect(page.getByRole("status")).toHaveText(
+      "パスワードを設定しました。",
     );
-    await currentPassword.fill(password);
+    // 再有効化後はパスキーの確認を引き継がず、パスワードを既定に戻す。
+    await page.clock.fastForward(900_001);
     await second.cdp.send("WebAuthn.removeVirtualAuthenticator", {
       authenticatorId: second.id,
     });
     await virtualAuthenticator(page);
     const beforeAdd = await calls();
     await page.getByTestId("passkey-add").click();
+    await expect(
+      page.getByTestId("verification-method-password"),
+    ).toBeChecked();
+    await currentPassword.fill(password);
+    await page.getByTestId("verification-submit").click();
     await expect(page.getByTestId("passkey-row")).toHaveCount(3);
     expect(await calls()).toEqual([...beforeAdd, "create"]);
   } finally {
@@ -233,35 +299,53 @@ test("パスキー: 登録・ログイン・管理・パスワード無効化と
     await account.press("ArrowDown");
     await page.keyboard.press("Enter");
     await expect(page).toHaveURL(/\/account\/security/);
-    await expect(page.getByTestId("new-key-name")).toHaveValue("Chrome");
+    // 登録画面からの登録にもブラウザー名が付く。
+    await expect(page.getByTestId("passkey-name")).toHaveText("Chrome");
+    // 名前の変更はキャンセルすれば元の名前に戻り、保存で確定する。
+    await page.getByTestId("passkey-rename").click();
+    await page.getByTestId("passkey-name-input").fill("破棄する名前");
+    await page.getByTestId("passkey-name-cancel").click();
+    await expect(page.getByTestId("passkey-name")).toHaveText("Chrome");
+    await page.getByTestId("passkey-rename").click();
+    await expect(page.getByTestId("passkey-name-input")).toHaveValue("Chrome");
     const rename = waitForSuccessfulMutationResponse(page, "security.manage");
-    await page.getByTestId("passkey-name").fill("端末のパスキー");
-    await page.getByTestId("passkey-name").press("Tab");
+    await page.getByTestId("passkey-name-input").fill("端末のパスキー");
+    await page.getByTestId("passkey-name-save").click();
     await rename;
-    await expect(page.getByTestId("passkey-name")).toHaveValue(
-      "端末のパスキー",
+    await expect(page.getByTestId("passkey-name")).toHaveText("端末のパスキー");
+    await expect(page.getByRole("status")).toHaveText(
+      "パスキーの名前を変更しました。",
     );
     await page.getByTestId("new-password").fill("old-password-123");
+    await page.getByTestId("new-password-confirm").fill("old-password-123");
     await securityOperation(page, "password-set");
     const firstId = auth.id;
     await auth.cdp.send("WebAuthn.removeVirtualAuthenticator", {
       authenticatorId: firstId,
     });
     const second = await virtualAuthenticator(page);
-    await page.getByTestId("new-key-name").fill("予備");
     await page.getByTestId("passkey-add").click();
     await expect(page.getByTestId("passkey-row")).toHaveCount(2);
-    await expect(page.getByTestId("new-key-name")).toHaveValue("予備");
-    for (const row of await page.getByTestId("passkey-row").all()) {
-      if (
-        (await row.getByTestId("passkey-name").inputValue()) ===
-        "端末のパスキー"
-      )
-        await row.getByTestId("passkey-delete").click();
-    }
+    const target = page
+      .getByTestId("passkey-row")
+      .filter({ hasText: "端末のパスキー" });
+    // 削除は確認ダイアログの同意後にだけ実行する。
+    await target.getByTestId("passkey-delete").click();
+    await confirmDialog(page, "パスキーの削除", "キャンセル");
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(page.getByTestId("passkey-row")).toHaveCount(2);
+    await target.getByTestId("passkey-delete").click();
+    await confirmDialog(page, "パスキーの削除", "削除");
     await expect(page.getByTestId("passkey-row")).toHaveCount(1);
+    await expect(page.getByRole("status")).toHaveText(
+      "パスキーを削除しました。",
+    );
     auth.cdp = second.cdp;
     auth.id = second.id;
+    // 再発行も確認ダイアログでキャンセルすれば実行しない。
+    await page.getByTestId("codes-reissue").click();
+    await confirmDialog(page, "復旧コードの再発行", "キャンセル");
+    await expect(page.getByTestId("recovery-codes")).toHaveCount(0);
     await securityOperation(page, "codes-reissue");
     await page.getByTestId("codes-saved").check();
     await securityOperation(page, "codes-reissue");
@@ -277,6 +361,7 @@ test("パスキー: 登録・ログイン・管理・パスワード無効化と
     });
     expect(rejected.status()).toBe(401);
     await page.getByTestId("new-password").fill("new-password-123");
+    await page.getByTestId("new-password-confirm").fill("new-password-123");
     await securityOperation(page, "password-set");
     await expect(page.getByTestId("password-set")).toBeVisible();
     const stale = await browser.newContext(

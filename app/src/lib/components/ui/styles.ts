@@ -22,6 +22,12 @@ export const actionAreaClass = "shrink-0";
 
 export const grayButtonClass =
   "cursor-pointer rounded bg-gray-100 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600";
+// 画面の主要な操作。他画面の青系の操作ボタンと同じ形にそろえる。
+export const primaryButtonClass =
+  "cursor-pointer rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50";
+// 削除・無効化など取り消しにくい操作。普段の操作と見た目で区別する。
+export const dangerButtonClass =
+  "cursor-pointer rounded bg-red-600 px-3 py-1.5 text-sm text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50";
 export const dialogInputClass =
   "rounded border border-gray-200 px-3 py-2 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100";
 export const closeButtonClass =

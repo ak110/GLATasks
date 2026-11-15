@@ -6,7 +6,10 @@ import type { z } from "zod";
 import type { PublicPasskeySchema } from "#lib/passkey-schemas.ts";
 import type { publicPasskey } from "#lib/server/api/passkey-public.ts";
 
-/** ブラウザーを識別する表示名。パスキーの実際の保存先はWebAuthnから取得できない。 */
+/**
+ * ブラウザーを識別する表示名。
+ * パスキーの名前はサーバーが登録時の提供元の識別子（AAGUID）から決め、識別子から判別できない場合にこの名前を使う。
+ */
 export function defaultPasskeyName(userAgent: string) {
   const browser = /Edg(?:e|A|iOS)?\//.test(userAgent)
     ? "Edge"

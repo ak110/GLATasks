@@ -80,7 +80,11 @@ export async function verifiedRegistration(
       response.clientExtensionResults.credProps?.rk === false
     )
       throw new ApiError("auth_failed");
-    return result.registrationInfo.credential;
+    // aaguidは提供元の識別子で、登録時のパスキー名を決めるために返す。
+    return {
+      credential: result.registrationInfo.credential,
+      aaguid: result.registrationInfo.aaguid,
+    };
   } catch {
     throw new ApiError("auth_failed");
   }
