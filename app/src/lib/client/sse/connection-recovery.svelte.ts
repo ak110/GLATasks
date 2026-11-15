@@ -161,10 +161,15 @@ async function runCheck(fetchFn: typeof fetch): Promise<Health> {
   } else {
     unreachableSince = undefined;
     clearRecheck();
-    if (await trySilentPass(fetchFn)) {
+    const afterPass = await trySilentPass(fetchFn);
+    if (afterPass === "healthy") {
       closeAuthWindow();
       connectivityState.notice = "none";
       window.dispatchEvent(new Event(CONNECTIVITY_RECOVERED_EVENT));
+    } else if (afterPass === "unreachable") {
+      // 通過を試す間に通信が切れた。到達不能では再読み込みせず表示中の画面を守る
+      handleUnreachable(fetchFn);
+      return afterPass;
     } else {
       triggerReload();
     }
@@ -172,20 +177,24 @@ async function runCheck(fetchFn: typeof fetch): Promise<Health> {
   return health;
 }
 
-/** 横取りした認証画面を非表示で読み込み、通過して健全に戻ったかを返す */
-async function trySilentPass(fetchFn: typeof fetch): Promise<boolean> {
+/**
+ * 横取りした認証画面を非表示で読み込み、読み込み後の判定区分を返す。
+ *
+ * 直近に通過を試して失敗した場合は読み込まずに`"intercepted"`を返す。
+ */
+async function trySilentPass(fetchFn: typeof fetch): Promise<Health> {
   if (
     silentPassFailedAt !== undefined &&
     Date.now() - silentPassFailedAt < SILENT_PASS_RETRY_INTERVAL_MS
   ) {
-    return false;
+    return "intercepted";
   }
   // キャッシュを避けるため毎回異なるURLで読み込む
   await loadHiddenFrame(`/healthcheck?silent-pass=${Date.now()}`);
-  const passed = (await classifyHealth(fetchFn)) === "healthy";
-  debugLog("connectivity", "silent-pass", { passed });
-  silentPassFailedAt = passed ? undefined : Date.now();
-  return passed;
+  const health = await classifyHealth(fetchFn);
+  debugLog("connectivity", "silent-pass", { health });
+  silentPassFailedAt = health === "intercepted" ? Date.now() : undefined;
+  return health;
 }
 
 /** 到達不能の継続時間で案内を出すか決め、回復を早く捉えるための再判定を予約する */

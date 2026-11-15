@@ -341,6 +341,20 @@ describe("connection-recovery", () => {
       );
     });
 
+    it("通過を試す間に到達不能へ変われば、再読み込みせず到達不能の扱いへ進む", async () => {
+      const recovery: Recovery =
+        await import("#lib/client/sse/connection-recovery.svelte.ts");
+      const fetch = sequenceFetch(
+        makeFetch({ status: 511 }),
+        makeFetch({ reject: true }),
+      );
+
+      expect(await recovery.checkConnectivity(fetch)).toBe("unreachable");
+
+      expect(reloadMock).not.toHaveBeenCalled();
+      expect(recovery.connectivityState.notice).toBe("none");
+    });
+
     it("通過しなければ従来の回復誘導へ進み、直後の横取りでは通過を試し直さない", async () => {
       const recovery: Recovery =
         await import("#lib/client/sse/connection-recovery.svelte.ts");

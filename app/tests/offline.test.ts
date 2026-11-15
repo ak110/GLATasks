@@ -206,9 +206,17 @@ test.describe("入力中の応答の横取り", () => {
         });
       });
     }
-    await page.evaluate(() =>
-      document.dispatchEvent(new Event("visibilitychange")),
+    // 可視復帰でQueryを取り直させ（TanStack Queryはwindowで購読する）、差し替えたHTML応答による失敗を観測する
+    const failedQuery = page.waitForResponse(
+      (res) =>
+        res.url().includes("/api/trpc") &&
+        (res.headers()["content-type"] ?? "").includes("text/html"),
     );
+    await page.evaluate(() => {
+      document.dispatchEvent(new Event("visibilitychange"));
+      window.dispatchEvent(new Event("visibilitychange"));
+    });
+    await failedQuery;
     const banner = page.getByTestId("connectivity-recovery-banner");
     await expect(banner).toBeVisible({ timeout: 15_000 });
     // 横取りによる操作失敗のエラー通知は出さない
@@ -266,14 +274,30 @@ test.describe("入力中の応答の横取り", () => {
         });
       });
     }
-    // 可視復帰で取得し直した操作が失敗し、接続の判定が横取りを検知する
-    await page.evaluate(() =>
-      document.dispatchEvent(new Event("visibilitychange")),
+    // 可視復帰で取得し直した操作が失敗し、接続の判定が横取りを検知する（TanStack Queryはwindowで購読する）
+    const failedQuery = page.waitForResponse(
+      (res) =>
+        res.url().includes("/api/trpc") &&
+        (res.headers()["content-type"] ?? "").includes("text/html"),
     );
+    await page.evaluate(() => {
+      document.dispatchEvent(new Event("visibilitychange"));
+      window.dispatchEvent(new Event("visibilitychange"));
+    });
+    await failedQuery;
 
+    // 自動通過の後、失敗していた取得を画面の遷移なしに取り直して成功する
+    const recoveredQuery = page.waitForResponse(
+      (res) =>
+        passed &&
+        res.url().includes("/api/trpc") &&
+        res.status() === 200 &&
+        (res.headers()["content-type"] ?? "").includes("application/json"),
+      { timeout: 20_000 },
+    );
     await expect.poll(() => passed, { timeout: 15_000 }).toBe(true);
-    // 自動通過の後に取り直した一覧が表示され、画面は遷移していない
-    await expect(listButton).toBeVisible({ timeout: 15_000 });
+    await recoveredQuery;
+    await expect(listButton).toBeVisible();
     await expect(page.getByTestId("connectivity-recovery-banner")).toHaveCount(
       0,
     );
