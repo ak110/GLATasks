@@ -207,7 +207,17 @@ test("パスキー: パスワードアカウントの初回追加は認証getな
     await securityOperation(page, "password-disable", () =>
       verifyWithPasskey(page),
     );
+    // 無効化の保存待ちの間に再発行の本人確認をキャンセルしても、保存待ちのコードで無効化を完了できる。
+    await page.clock.fastForward(900_001);
+    await page.getByTestId("codes-reissue").click();
+    await confirmDialog(page, "復旧コードの再発行", "再発行");
+    await dialog.getByRole("button", { name: "キャンセル" }).click();
+    await expect(dialog).toHaveCount(0);
+    await expect(page.getByTestId("codes-reissue")).toBeEnabled();
     await codes(page);
+    await expect(page.getByRole("status")).toHaveText(
+      "パスワードを無効化しました。パスキーでログインしてください。",
+    );
     await expect(page.getByTestId("password-status")).toHaveText(
       "パスワードは設定されていません。パスキーでログインします。",
     );

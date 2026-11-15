@@ -154,11 +154,13 @@
         return "復旧コードを保存すると、パスワードを無効化します。";
     }
     async function reissueCodes() {
-        disabling = false;
         const result = await withProof((proof) =>
             manage({ action: "codes", proof }),
         );
+        // キャンセル・失敗では、無効化の保存待ちなど既存の状態を変えない。
+        // 再発行が成功した時点で表示中のコードは再発行分に置き換わるため、無効化の保存待ちを解除する。
         if (result === CANCELLED) return;
+        disabling = false;
         return "新しい復旧コードを保存してください。";
     }
     async function saved() {
