@@ -30,6 +30,6 @@
         actions={connectivityState.notice === "reload-required"
             ? authAction
             : undefined}
-        >サーバーに接続できていません。接続が回復するまで保存できない場合があります。</ReloadBanner
+        >{#if connectivityState.notice === "reload-required"}通信が認証画面に差し替えられています。「認証画面を開く」は別ウィンドウで開くため、入力中の内容は残ります。再読み込みすると入力中の内容は消えます。{:else}サーバーに接続できていません。接続が回復するまで保存できない場合があります。{/if}</ReloadBanner
     >
 {/if}
