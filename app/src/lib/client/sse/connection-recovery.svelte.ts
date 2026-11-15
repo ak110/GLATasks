@@ -33,7 +33,11 @@
  *   通信断の間に再読み込みすると、画面の取得に失敗してService Workerのオフライン画面へ移り、表示中の画面を失うため、
  *   このバナーは再読み込みを促さない。
  * - 応答の横取り（キャプティブポータルなど）: 非入力中は即時に`location.reload()`を呼び、再読み込み先で認証画面へ誘導する。
- *   入力中は操作妨害を避けるため、`notice`を`"reload-required"`にして再読み込みボタン付きのバナーで案内する。
+ *   入力中は操作妨害を避けるため、`notice`を`"reload-required"`にして再読み込みボタンと「認証画面を開く」ボタン付きのバナーで案内する。
+ *   「認証画面を開く」（`openAuthWindow`）は同一オリジンの`/healthcheck`を別ウィンドウで開く。横取りする側がこの通信も差し替えるため、
+ *   別ウィンドウに認証画面が表示され、入力中の画面を残したまま認証できる。開いている間は2秒間隔で判定し直し、
+ *   健全で別ウィンドウを閉じて案内を消す。30秒間隔のポーリングを待つと、認証後もバナーが最大30秒残るためである。
+ *   利用者が別ウィンドウを閉じたら判定を止め、案内は残す。ポップアップの阻止を避けるため、別ウィンドウは利用者のクリックでだけ開く。
  */
 
 import { debugLog } from "#lib/client/debug-log.ts";
@@ -69,6 +73,9 @@ let checking = false;
 // 到達不能が続いている開始時刻（到達不能でない間はundefined）
 let unreachableSince: number | undefined;
 let recheckTimer: ReturnType<typeof setTimeout> | undefined;
+// 「認証画面を開く」で開いた別ウィンドウと、その間の再判定。到達不能の再判定とは停止条件が異なるため分ける。
+let authWindow: Window | null = null;
+let authRecheckTimer: ReturnType<typeof setTimeout> | undefined;
 
 /** 能動検出監視を開始する（多重起動はno-op） */
 export function startConnectivityWatch(): void {
@@ -88,6 +95,7 @@ export function stopConnectivityWatch(): void {
   stopTriggers = null;
   document.removeEventListener("visibilitychange", handleVisibilityChange);
   clearRecheck();
+  clearAuthRecheck();
 }
 
 /**
@@ -125,6 +133,7 @@ export async function checkConnectivity(
       // 回復検知: 案内を自動解除する
       unreachableSince = undefined;
       clearRecheck();
+      closeAuthWindow();
       connectivityState.notice = "none";
     } else if (health === "unreachable") {
       handleUnreachable(fetchFn);
@@ -165,6 +174,50 @@ function clearRecheck(): void {
     clearTimeout(recheckTimer);
     recheckTimer = undefined;
   }
+}
+
+/**
+ * 認証画面を別ウィンドウで開き、認証の完了（健全の判定）を短い間隔で待つ。
+ *
+ * ポップアップが阻止されて開けなかった場合は再判定を始めず、バナーの再読み込みボタンで回復できる状態を保つ。
+ * `fetchFn` はテスト用の差し替え口で、本番では既定の `fetch` を使う。
+ */
+export function openAuthWindow(fetchFn: typeof fetch = fetch): void {
+  if (authWindow && !authWindow.closed) {
+    authWindow.focus();
+    return;
+  }
+  authWindow = window.open("/healthcheck", "glatasks-auth");
+  debugLog("connectivity", "auth-window", { opened: authWindow !== null });
+  if (authWindow) scheduleAuthRecheck(fetchFn);
+}
+
+function scheduleAuthRecheck(fetchFn: typeof fetch): void {
+  clearAuthRecheck();
+  authRecheckTimer = setTimeout(() => {
+    authRecheckTimer = undefined;
+    if (!authWindow || authWindow.closed) {
+      // 利用者が別ウィンドウを閉じた。認証を続ける意思が無いため判定を止め、案内は残す
+      authWindow = null;
+      return;
+    }
+    void checkConnectivity(fetchFn).then(() => {
+      if (authWindow) scheduleAuthRecheck(fetchFn);
+    });
+  }, UNREACHABLE_RECHECK_INTERVAL_MS);
+}
+
+function clearAuthRecheck(): void {
+  if (authRecheckTimer !== undefined) {
+    clearTimeout(authRecheckTimer);
+    authRecheckTimer = undefined;
+  }
+}
+
+function closeAuthWindow(): void {
+  clearAuthRecheck();
+  if (authWindow && !authWindow.closed) authWindow.close();
+  authWindow = null;
 }
 
 /** 応答の横取りを検知した時に呼び出され、入力中ならバナー表示、非入力中なら即リロードする */

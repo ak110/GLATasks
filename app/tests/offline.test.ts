@@ -1,4 +1,8 @@
-import { uniqueTestName } from "./helpers/common";
+import {
+  cleanupTestList,
+  setupTestList,
+  uniqueTestName,
+} from "./helpers/common";
 import { test, expect } from "@playwright/test";
 /**
  * @fileoverview オフライン画面の接続回復による自動再読み込みのe2eテスト
@@ -146,4 +150,75 @@ test("到達不能の案内は再読み込みを促さず、回復すると可�
   // 可視復帰やonlineイベントを起こさずに通信だけを戻し、到達不能の間の短い間隔の再判定で回復を捉えることを確かめる
   await context.setOffline(false);
   await expect(banner).toHaveCount(0, { timeout: 5_000 });
+});
+
+test("オフライン画面は応答の横取りでもonlineイベントなしで再読み込みする", async ({
+  page,
+}) => {
+  // 認証画面がHTTP 200のHTMLで通信を差し替えている状態を再現する
+  await page.route("**/healthcheck", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "text/html",
+      body: "<html><body>login</body></html>",
+    });
+  });
+  await page.goto("/offline.html");
+  // 表示直後の判定で横取りを検知し、直接開いたオフライン画面からトップ画面へ移る
+  await expect(page).toHaveURL(/\/$/, { timeout: 10_000 });
+  await expect(page.getByText("You are offline")).toHaveCount(0);
+});
+
+test.describe("入力中の応答の横取り", () => {
+  const listName = `横取りテスト_${uniqueTestName("e2e")}`;
+
+  test.beforeAll(async ({ browser }) => {
+    await setupTestList(browser, listName);
+  });
+
+  test.afterAll(async ({ browser }) => {
+    await cleanupTestList(browser, listName);
+  });
+
+  test("入力中の横取りでは認証画面を別ウィンドウで開き、回復すると閉じて入力を保つ", async ({
+    page,
+    context,
+  }) => {
+    await Promise.all([
+      page.goto("/"),
+      page.waitForResponse((res) => res.url().includes("/api/trpc")),
+    ]);
+    await page.click(`[data-testid="list-select-btn"]:has-text("${listName}")`);
+    await page
+      .locator('[data-testid="task-add-form"]')
+      .waitFor({ timeout: 15_000 });
+    const input = page.locator('textarea[placeholder*="タスクを追加"]');
+    const typed = `入力中_${uniqueTestName("e2e")}`;
+    await input.fill(typed);
+
+    await context.route("**/healthcheck", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "text/html",
+        body: "<html><body>login</body></html>",
+      });
+    });
+    await page.evaluate(() =>
+      document.dispatchEvent(new Event("visibilitychange")),
+    );
+    const banner = page.getByTestId("connectivity-recovery-banner");
+    await expect(banner).toBeVisible({ timeout: 15_000 });
+
+    const [popup] = await Promise.all([
+      context.waitForEvent("page"),
+      banner.getByRole("button", { name: "認証画面を開く" }).click(),
+    ]);
+    await expect(popup).toHaveURL(/\/healthcheck$/);
+
+    // 認証が済んで通信が戻った状態にすると、別ウィンドウが閉じてバナーが消える
+    await context.unroute("**/healthcheck");
+    await expect(banner).toHaveCount(0, { timeout: 10_000 });
+    await expect.poll(() => popup.isClosed(), { timeout: 10_000 }).toBe(true);
+    await expect(input).toHaveValue(typed);
+  });
 });

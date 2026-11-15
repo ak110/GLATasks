@@ -6,17 +6,30 @@
      * 回復を検知して`notice`が`"none"`へ戻った時点で自動的に消える。
      * 到達不能の案内は再読み込みを促さない。通信断の間の再読み込みはオフライン画面へ移り、
      * 回復後はバナーが自動で消えて再読み込みが不要なためである。
-     * 応答の横取りを入力中に検知した場合だけ、認証画面へ進むための再読み込みボタンを表示する。
+     * 応答の横取りを入力中に検知した場合だけ、認証画面へ進むための再読み込みボタンと、
+     * 入力中の画面を残したまま認証画面を別ウィンドウで開くボタンを表示する。
      */
 
-    import { connectivityState } from "#lib/client/sse/connection-recovery.svelte.ts";
+    import {
+        connectivityState,
+        openAuthWindow,
+    } from "#lib/client/sse/connection-recovery.svelte.ts";
     import ReloadBanner from "./ReloadBanner.svelte";
 </script>
+
+{#snippet authAction(buttonClass: string)}
+    <button type="button" class={buttonClass} onclick={() => openAuthWindow()}
+        >認証画面を開く</button
+    >
+{/snippet}
 
 {#if connectivityState.notice !== "none"}
     <ReloadBanner
         testId="connectivity-recovery-banner"
         showReloadButton={connectivityState.notice === "reload-required"}
+        actions={connectivityState.notice === "reload-required"
+            ? authAction
+            : undefined}
         >サーバーに接続できていません。接続が回復するまで保存できない場合があります。</ReloadBanner
     >
 {/if}

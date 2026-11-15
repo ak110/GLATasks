@@ -47,12 +47,13 @@ const HTML = `<!doctype html>
     <script type="module">
       ${connectivityCheckSource}
 
-      // 健全を確認してから再読み込みし、通信断のままオフライン画面へ戻らないようにする。
-      // Service Workerは元のURLの応答としてこの画面を返すため、通常は再読み込みで元の画面へ戻る。
+      // 健全か応答の横取り（認証画面など）を確認してから再読み込みし、通信断のままオフライン画面へ戻らないようにする。
+      // 横取りの応答は通信エラーにならずService Workerがそのまま返すため、再読み込みで認証画面へ進み、この画面へは戻らない。
+      // Service Workerは元のURLの応答としてこの画面を返すため、健全なら再読み込みで元の画面へ戻る。
       // この画面のURLを直接開いた場合は、再読み込みしても表示直後の判定で再び再読み込みを繰り返すため、トップ画面へ移る。
       startConnectivityTriggers(
         async () => {
-          if ((await classifyHealth()) !== "healthy") return;
+          if ((await classifyHealth()) === "unreachable") return;
           if (globalThis.location.pathname === "/offline.html") globalThis.location.replace("/");
           else globalThis.location.reload();
         },

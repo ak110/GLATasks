@@ -296,4 +296,91 @@ describe("connection-recovery", () => {
     expect(recovery.connectivityState.notice).toBe("none");
     expect(reloadMock).not.toHaveBeenCalled();
   });
+
+  describe("認証画面の別ウィンドウ", () => {
+    /** `window.open`が返す別ウィンドウのスタブ */
+    function stubAuthWindow(): {
+      closed: boolean;
+      close: ReturnType<typeof vi.fn>;
+      focus: ReturnType<typeof vi.fn>;
+    } {
+      const authWindow = {
+        closed: false,
+        close: vi.fn(() => {
+          authWindow.closed = true;
+        }),
+        focus: vi.fn(),
+      };
+      return authWindow;
+    }
+
+    async function interceptWhileTyping(): Promise<Recovery> {
+      focusElement("textarea");
+      const recovery: Recovery =
+        await import("#lib/client/sse/connection-recovery.svelte.ts");
+      await recovery.checkConnectivity(makeFetch({ status: 511 }));
+      expect(recovery.connectivityState.notice).toBe("reload-required");
+      return recovery;
+    }
+
+    it("開いた後の再判定で健全になると、別ウィンドウを閉じて案内を消す", async () => {
+      const recovery = await interceptWhileTyping();
+      const authWindow = stubAuthWindow();
+      const openMock = vi
+        .spyOn(window, "open")
+        .mockReturnValue(authWindow as unknown as Window);
+      const fetch = sequenceFetch(
+        makeFetch({ contentType: "text/html", body: "<html>login</html>" }),
+        makeFetch({}),
+      );
+
+      recovery.openAuthWindow(fetch);
+      expect(openMock).toHaveBeenCalledWith("/healthcheck", "glatasks-auth");
+
+      // 1回目の再判定は横取りのまま（入力中なので再読み込みしない）
+      await vi.advanceTimersByTimeAsync(
+        recovery.UNREACHABLE_RECHECK_INTERVAL_MS,
+      );
+      expect(authWindow.close).not.toHaveBeenCalled();
+      expect(recovery.connectivityState.notice).toBe("reload-required");
+
+      // 2回目の再判定で健全になり、別ウィンドウを閉じて案内を消す
+      await vi.advanceTimersByTimeAsync(
+        recovery.UNREACHABLE_RECHECK_INTERVAL_MS,
+      );
+      expect(authWindow.close).toHaveBeenCalledTimes(1);
+      expect(recovery.connectivityState.notice).toBe("none");
+      expect(reloadMock).not.toHaveBeenCalled();
+    });
+
+    it("利用者が別ウィンドウを閉じた後は再判定を止め、案内を残す", async () => {
+      const recovery = await interceptWhileTyping();
+      const authWindow = stubAuthWindow();
+      vi.spyOn(window, "open").mockReturnValue(authWindow as unknown as Window);
+      const fetch = makeFetch({});
+
+      recovery.openAuthWindow(fetch);
+      authWindow.closed = true;
+      await vi.advanceTimersByTimeAsync(
+        recovery.UNREACHABLE_RECHECK_INTERVAL_MS * 3,
+      );
+
+      expect(fetch).not.toHaveBeenCalled();
+      expect(recovery.connectivityState.notice).toBe("reload-required");
+    });
+
+    it("ポップアップが阻止されて開けなかった場合は再判定を始めない", async () => {
+      const recovery = await interceptWhileTyping();
+      vi.spyOn(window, "open").mockReturnValue(null);
+      const fetch = makeFetch({});
+
+      recovery.openAuthWindow(fetch);
+      await vi.advanceTimersByTimeAsync(
+        recovery.UNREACHABLE_RECHECK_INTERVAL_MS * 3,
+      );
+
+      expect(fetch).not.toHaveBeenCalled();
+      expect(recovery.connectivityState.notice).toBe("reload-required");
+    });
+  });
 });
