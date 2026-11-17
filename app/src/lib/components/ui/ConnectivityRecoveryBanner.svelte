@@ -6,7 +6,9 @@
      * 回復を検知して`notice`が`"none"`へ戻った時点で自動的に消える。
      * 到達不能の案内は再読み込みを促さない。通信断の間の再読み込みはオフライン画面へ移り、
      * 回復後はバナーが自動で消えて再読み込みが不要なためである。
-     * 応答の横取りを入力中に検知した場合だけ、認証画面へ進むための再読み込みボタンと、
+     * 到達不能の案内にも、認証画面を別ウィンドウで開くボタンを表示する。HTTPSの通信自体を遮断する認証画面は
+     * 通信エラーとなり、到達不能と区別できないためである。
+     * 応答の横取りを入力中に検知した場合は、認証画面へ進むための再読み込みボタンと、
      * 入力中の画面を残したまま認証画面を別ウィンドウで開くボタンを表示する。
      */
 
@@ -27,9 +29,7 @@
     <ReloadBanner
         testId="connectivity-recovery-banner"
         showReloadButton={connectivityState.notice === "reload-required"}
-        actions={connectivityState.notice === "reload-required"
-            ? authAction
-            : undefined}
-        >{#if connectivityState.notice === "reload-required"}通信が認証画面に差し替えられています。「認証画面を開く」は別ウィンドウで開くため、入力中の内容は残ります。再読み込みすると入力中の内容は消えます。{:else}サーバーに接続できていません。接続が回復するまで保存できない場合があります。{/if}</ReloadBanner
+        actions={authAction}
+        >{#if connectivityState.notice === "reload-required"}通信が認証画面に差し替えられています。「認証画面を開く」は別ウィンドウで開くため、入力中の内容は残ります。再読み込みすると入力中の内容は消えます。{:else}サーバーに接続できていません。接続が回復するまで保存できない場合があります。Wi-Fiなどの認証が必要な場合は「認証画面を開く」から認証してください。接続が回復するとこの表示は自動で消えます。{/if}</ReloadBanner
     >
 {/if}

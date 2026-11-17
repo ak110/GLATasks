@@ -24,7 +24,16 @@ function makeFetch(opts: {
   body?: string;
   reject?: boolean;
   timeout?: boolean;
+  redirect?: boolean;
 }): typeof fetch {
+  if (opts.redirect) {
+    // redirect: "manual" の取得でリダイレクトを受けた時の応答（status 0）。Responseのコンストラクターでは作れないため形だけを模す
+    return vi.fn(async () => ({
+      type: "opaqueredirect",
+      status: 0,
+      headers: new Headers(),
+    })) as unknown as typeof fetch;
+  }
   if (opts.timeout) {
     // AbortSignal.timeoutの打ち切りと同じ種別の例外で失敗させる
     return vi.fn(() =>
@@ -125,6 +134,11 @@ describe("connection-recovery", () => {
         contentType: "text/html",
         body: "<html>login</html>",
       }),
+      expectReload: true,
+    },
+    {
+      label: "応答の横取り（認証画面へのリダイレクト）",
+      fetch: makeFetch({ redirect: true }),
       expectReload: true,
     },
   ])(
@@ -420,6 +434,27 @@ describe("connection-recovery", () => {
       await vi.advanceTimersByTimeAsync(
         recovery.UNREACHABLE_RECHECK_INTERVAL_MS,
       );
+      expect(authWindow.close).toHaveBeenCalledTimes(1);
+      expect(recovery.connectivityState.notice).toBe("none");
+      expect(reloadMock).not.toHaveBeenCalled();
+    });
+
+    it("到達不能の案内から開いた場合も、再判定で健全になると別ウィンドウを閉じて案内を消す", async () => {
+      const recovery: Recovery =
+        await import("#lib/client/sse/connection-recovery.svelte.ts");
+      await recovery.checkConnectivity(
+        sequenceFetch(makeFetch({ reject: true })),
+      );
+      await vi.advanceTimersByTimeAsync(recovery.UNREACHABLE_NOTICE_DELAY_MS);
+      expect(recovery.connectivityState.notice).toBe("unreachable");
+
+      const authWindow = stubAuthWindow();
+      vi.spyOn(window, "open").mockReturnValue(authWindow as unknown as Window);
+      recovery.openAuthWindow(makeFetch({}));
+      await vi.advanceTimersByTimeAsync(
+        recovery.UNREACHABLE_RECHECK_INTERVAL_MS,
+      );
+
       expect(authWindow.close).toHaveBeenCalledTimes(1);
       expect(recovery.connectivityState.notice).toBe("none");
       expect(reloadMock).not.toHaveBeenCalled();

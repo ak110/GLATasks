@@ -31,8 +31,9 @@
  *   到達不能が6秒以上続いた場合だけ`connectivityState.notice`を`"unreachable"`にしてバナーで案内し、健全の判定で自動解除する。
  *   AndroidのPWAで別アプリから戻った直後は通信が数秒で戻ることが多く、短い通信断ではバナーを出さずに済ませるためである。
  *   通信断の間に再読み込みすると、画面の取得に失敗してService Workerのオフライン画面へ移り、表示中の画面を失うため、
- *   このバナーは再読み込みを促さない。
- * - 応答の横取り（キャプティブポータルなど）: まず認証画面を非表示のiframeで読み込み、利用者の入力なしで通過するかを試す
+ *   このバナーは再読み込みを促さない。HTTPSの通信自体を遮断する認証画面は通信エラーとなり到達不能と区別できないため、
+ *   このバナーにも「認証画面を開く」（下記の`openAuthWindow`）を置く。
+ * - 応答の横取り（キャプティブポータルのリダイレクトなど）: まず認証画面を非表示のiframeで読み込み、利用者の入力なしで通過するかを試す
  *   （`silent-pass.ts`）。通過して健全に戻れば、画面を遷移せずに案内を消し、`CONNECTIVITY_RECOVERED_EVENT`で再取得を促す。
  *   通過しない場合と、直近に通過を試して失敗した場合は次へ進む。
  *   非入力中は即時に`location.reload()`を呼び、再読み込み先で認証画面へ誘導する。
@@ -167,7 +168,7 @@ async function runCheck(fetchFn: typeof fetch): Promise<Health> {
       connectivityState.notice = "none";
       window.dispatchEvent(new Event(CONNECTIVITY_RECOVERED_EVENT));
     } else if (afterPass === "unreachable") {
-      // 通過を試す間に通信が切れた。到達不能では再読み込みせず表示中の画面を守る
+      // 通過を試す間に通信が途絶した。到達不能では再読み込みせず表示中の画面を守る
       handleUnreachable(fetchFn);
       return afterPass;
     } else {

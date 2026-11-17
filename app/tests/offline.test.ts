@@ -146,6 +146,10 @@ test("到達不能の案内は再読み込みを促さず、回復すると可�
   await expect(banner.getByRole("button", { name: "再読み込み" })).toHaveCount(
     0,
   );
+  // HTTPSを遮断する認証画面は通信エラーと区別できないため、到達不能の案内からも認証画面を開ける
+  await expect(
+    banner.getByRole("button", { name: "認証画面を開く" }),
+  ).toBeVisible();
 
   // 可視復帰やonlineイベントを起こさずに通信だけを戻し、到達不能の間の短い間隔の再判定で回復を捉えることを確かめる
   await context.setOffline(false);

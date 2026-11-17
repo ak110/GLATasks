@@ -110,6 +110,25 @@ describe("connectivity-check", () => {
     await expect(connectivity.classifyHealth(fetch)).resolves.toBe(expected);
   });
 
+  it("リダイレクトに従わずに取得し、リダイレクト応答は応答の横取りと判定する", async () => {
+    const connectivity: ConnectivityCheck =
+      await import("#lib/client/sse/connectivity-check.js");
+    // redirect: "manual" の取得でリダイレクトを受けた時の応答（status 0）。Responseのコンストラクターでは作れないため形だけを模す
+    const fetch = vi.fn(async () => ({
+      type: "opaqueredirect",
+      status: 0,
+      headers: new Headers(),
+    })) as unknown as typeof globalThis.fetch;
+
+    await expect(connectivity.classifyHealth(fetch)).resolves.toBe(
+      "intercepted",
+    );
+    expect(fetch).toHaveBeenCalledWith(
+      "/healthcheck",
+      expect.objectContaining({ redirect: "manual" }),
+    );
+  });
+
   it("オフライン画面向けの間隔と即時判定で契機を起動する", async () => {
     const connectivity: ConnectivityCheck =
       await import("#lib/client/sse/connectivity-check.js");

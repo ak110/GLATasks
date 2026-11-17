@@ -7,7 +7,7 @@
 
 const SW_SCRIPT = `\
 // offline.html/+server.ts または connectivity-check.js を変更したら更新する。
-const OFFLINE_VERSION = 5;
+const OFFLINE_VERSION = 6;
 const CACHE_NAME = "offline-v" + OFFLINE_VERSION;
 const OFFLINE_URL = "/offline.html";
 
@@ -38,6 +38,9 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
+  // /healthcheck のナビゲーション（認証画面を開く別ウィンドウ、自動通過を試す非表示iframe）は横取りしない。
+  // 通信が遮断された状態でオフライン画面へ置き換えると、ブラウザーや認証画面の案内が表示されなくなるためである。
+  if (new URL(event.request.url).pathname === "/healthcheck") return;
   if (event.request.mode === "navigate") {
     event.respondWith(
       (async () => {

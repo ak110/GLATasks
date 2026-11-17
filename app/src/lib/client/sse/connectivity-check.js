@@ -21,7 +21,7 @@ export const HEALTHCHECK_TIMEOUT_MS = 5_000;
  * - `"healthy"`: HTTP 200・`application/json`・本文の`status`が`"ok"`
  * - `"unreachable"`: 通信エラー・タイムアウト（`fetch`の例外）、511を除く5xx。
  *   再読み込みしても画面を取得できず、Service Workerのオフライン画面かエラー画面へ移るため、再読み込みの理由にしない
- * - `"intercepted"`: 上記以外。511（キャプティブポータル用）、5xx・1xx以外の非200、200の非JSONや`status`不一致、本文の解析失敗。
+ * - `"intercepted"`: 上記以外。リダイレクト、511（キャプティブポータル用）、5xx・1xx以外の非200、200の非JSONや`status`不一致、本文の解析失敗。
  *   キャプティブポータルなどが応答を横取りした状態で、再読み込みすると認証画面へ届く
  *
  * @param {typeof fetch} fetchFn 判定に使うfetch関数
@@ -31,13 +31,17 @@ export async function classifyHealth(fetchFn = fetch) {
   /** @type {Response} */
   let response;
   try {
+    // リダイレクトには従わない。認証画面は別オリジンやhttpへリダイレクトすることが多く、従うとCORSや混在コンテンツの拒否で
+    // 例外になり、通信断と区別できなくなるためである。/healthcheck は正常時にリダイレクトしない
     response = await fetchFn("/healthcheck", {
       cache: "no-store",
+      redirect: "manual",
       signal: AbortSignal.timeout(HEALTHCHECK_TIMEOUT_MS),
     });
   } catch {
     return "unreachable";
   }
+  if (response.type === "opaqueredirect") return "intercepted";
   if (response.status >= 500 && response.status !== 511) return "unreachable";
   if (response.status !== 200) return "intercepted";
   const contentType = response.headers.get("Content-Type") ?? "";
