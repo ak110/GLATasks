@@ -114,7 +114,7 @@ flowchart LR
     SK["SvelteKit"]
 
     Browser -- "HTTPS" --> ExtNginx
-    ExtNginx -- "HTTPS（proxy_ssl_*）" --> IntNginx
+    ExtNginx -- "HTTPS" --> IntNginx
     IntNginx --> SK
 ```
 
@@ -123,8 +123,7 @@ flowchart LR
 - 外部nginxの`client_max_body_size`を内部nginx・アプリの上限（32MiB）にそろえる。
   添付ファイルはbase64へ変換したうえで、要求本文の入力全体をさらにbase64でエンコードして送るため、
   nginxの既定値（1MiB）のままでは元のファイルで約575KiBを超える添付が外部nginxの413（Content Too Large）で失敗する
-- 内部nginxは自己署名HTTPSのため、`/api/events`と`/`の両方に
- `proxy_ssl_certificate` / `proxy_ssl_certificate_key`を指定する
+- 内部nginxは自己署名証明書を使うため、外部nginxで`proxy_ssl_verify`を有効にしない（nginxの既定は無効）
 - SSE用の`/api/events`には`proxy_buffering off`に加え`proxy_read_timeout 86400`・
  `proxy_http_version 1.1`・`Connection ''`を指定する。
   さらに`X-Accel-Buffering: no`ヘッダーでレスポンスバッファも無効化する
@@ -139,8 +138,6 @@ location /api/events {
     proxy_pass https://app_backend;
     proxy_http_version 1.1;
     proxy_set_header Connection '';
-    proxy_ssl_certificate     /path/to/glatasks/web/ssl/server.crt;
-    proxy_ssl_certificate_key /path/to/glatasks/web/ssl/server.key;
     proxy_buffering off;
     proxy_read_timeout 86400;
     add_header X-Accel-Buffering no;
@@ -148,8 +145,6 @@ location /api/events {
 
 location / {
     proxy_pass https://app_backend;
-    proxy_ssl_certificate     /path/to/glatasks/web/ssl/server.crt;
-    proxy_ssl_certificate_key /path/to/glatasks/web/ssl/server.key;
 }
 ```
 
