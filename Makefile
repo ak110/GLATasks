@@ -80,6 +80,25 @@ start:
 stop:
 	docker compose down
 
+# アプリ本体のイメージはgit pullとmake deployによる更新と組で扱うため、対象を外部提供のイメージ（nginx・MariaDB）に限る。
+update-images:  # 依存イメージを取得し、イメージが変わったサービスだけを作り直す（自動更新タイマーが毎日実行する）
+	bash deploy/update-images.sh web db
+
+AUTO_UPDATE_UNIT := glatasks-update-images
+SYSTEMD_UNIT_DIR := /etc/systemd/system
+
+install-auto-update:  # 依存イメージの自動更新タイマーを登録する（sudoを使う）
+	sed -e 's|@DIR@|$(CURDIR)|g' -e 's|@USER@|$(shell id -un)|g' deploy/$(AUTO_UPDATE_UNIT).service \
+		| sudo tee $(SYSTEMD_UNIT_DIR)/$(AUTO_UPDATE_UNIT).service >/dev/null
+	sudo install -m 0644 deploy/$(AUTO_UPDATE_UNIT).timer $(SYSTEMD_UNIT_DIR)/$(AUTO_UPDATE_UNIT).timer
+	sudo systemctl daemon-reload
+	sudo systemctl enable --now $(AUTO_UPDATE_UNIT).timer
+
+uninstall-auto-update:  # 依存イメージの自動更新タイマーを削除する（sudoを使う）
+	sudo systemctl disable --now $(AUTO_UPDATE_UNIT).timer
+	sudo rm -f $(SYSTEMD_UNIT_DIR)/$(AUTO_UPDATE_UNIT).service $(SYSTEMD_UNIT_DIR)/$(AUTO_UPDATE_UNIT).timer
+	sudo systemctl daemon-reload
+
 restart-app:
 	docker compose restart app
 
@@ -282,4 +301,4 @@ test-db-locked:
 			TZ=Asia/Tokyo pnpm run test:unit --project node\
 		'
 
-.PHONY: help setup sync backup deploy build start stop restart-app logs ps healthcheck shell node-shell update update-actions format test test-unit test-backup test-db test-db-locked test-e2e test-e2e-isolated healthcheck-e2e test-e2e-run start-app logs-app migrate db-studio sql docs docs-dev
+.PHONY: help setup sync backup deploy build start stop update-images install-auto-update uninstall-auto-update restart-app logs ps healthcheck shell node-shell update update-actions format test test-unit test-backup test-db test-db-locked test-e2e test-e2e-isolated healthcheck-e2e test-e2e-run start-app logs-app migrate db-studio sql docs docs-dev

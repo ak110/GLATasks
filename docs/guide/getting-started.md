@@ -52,6 +52,21 @@ git pull
 make deploy
 ```
 
+### 自動更新
+
+nginxとMariaDBのイメージを毎日取得して更新するsystemdのタイマーを登録できる（systemdとsudoが必要）。
+アプリ本体のイメージは対象外のため、アプリは上記の手順で更新する。
+
+```bash
+make install-auto-update
+```
+
+タイマーは毎日4時（日本時間）に`make update-images`を実行する。
+`make update-images`は稼働中のコンテナと異なるイメージを取得したサービスだけを作り直す。
+MariaDBのイメージが変わる場合は、作り直す前に`make backup`でバックアップを取る。
+実行結果は`journalctl -u glatasks-update-images.service`で確認できる。
+タイマーを外す場合は`make uninstall-auto-update`を実行する。
+
 ## 登録・ログインとパスキー
 
 登録画面では、ユーザーID（4～32文字の英数字）とパスキーだけで登録できる。

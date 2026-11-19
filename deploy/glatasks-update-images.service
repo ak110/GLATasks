@@ -1,0 +1,13 @@
+# `make install-auto-update`が@DIR@と@USER@を置き換えて/etc/systemd/systemへ配置する
+[Unit]
+Description=GLATasksの依存イメージの更新
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=@USER@
+WorkingDirectory=@DIR@
+ExecStart=/usr/bin/make update-images
+TimeoutStartSec=1h

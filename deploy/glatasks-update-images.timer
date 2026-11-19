@@ -1,0 +1,10 @@
+[Unit]
+Description=GLATasksの依存イメージを毎日更新する
+
+[Timer]
+OnCalendar=*-*-* 04:00:00 Asia/Tokyo
+RandomizedDelaySec=15min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
