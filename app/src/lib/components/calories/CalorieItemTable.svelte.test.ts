@@ -17,6 +17,8 @@ import {
   connectivityState,
 } from "#lib/client/sse/connection-recovery.svelte.ts";
 
+import { startEditedFieldTracking } from "#lib/client/ui/user-busy.ts";
+
 const items = [
   {
     id: 1,
@@ -49,8 +51,9 @@ function renderTable(overrides: Record<string, unknown> = {}) {
 }
 
 describe("CalorieItemTable", () => {
-  it("品目の編集ダイアログを開いている間は、入力欄にフォーカスがなくても再読込を保留する", async () => {
+  it("品目の編集ダイアログを編集中は、入力欄にフォーカスがなくても再読込を保留する", async () => {
     const { unmount } = renderTable({ items: [items[0]] });
+    const stopTracking = startEditedFieldTracking();
     const previousNotice = connectivityState.notice;
     connectivityState.notice = "none";
     try {
@@ -65,6 +68,9 @@ describe("CalorieItemTable", () => {
       await waitFor(() =>
         expect(within(dialog).getByLabelText("品目名")).toHaveFocus(),
       );
+      await fireEvent.input(within(dialog).getByLabelText("品目名"), {
+        target: { value: "未保存" },
+      });
       const submitButton = within(dialog).getByRole("button", {
         name: "変更",
       });
@@ -72,7 +78,7 @@ describe("CalorieItemTable", () => {
       expect(submitButton).toHaveFocus();
       expect(document.activeElement?.tagName).toBe("BUTTON");
 
-      // 応答の横取り（511）を検知する公開処理で、ダイアログによるisUserBusyの真分岐を観測する。
+      // 応答の横取り（511）を検知する公開処理で、復元先がない入力による再読み込みの保留を観測する。
       // 到達不能（503など）は作業中の判定を通らないため、横取りの代表値を使う。
       const interceptedFetch: typeof fetch = vi.fn(
         async () => new Response(null, { status: 511 }),
@@ -84,6 +90,7 @@ describe("CalorieItemTable", () => {
       expect(dialog).toHaveAttribute("open");
     } finally {
       connectivityState.notice = previousNotice;
+      stopTracking();
       unmount();
     }
   });

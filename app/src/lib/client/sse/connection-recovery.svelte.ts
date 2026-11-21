@@ -36,8 +36,8 @@
  * - 応答の横取り（キャプティブポータルのリダイレクトなど）: まず認証画面を非表示のiframeで読み込み、利用者の入力なしで通過するかを試す
  *   （`silent-pass.ts`）。通過して健全に戻れば、画面を遷移せずに案内を消し、`CONNECTIVITY_RECOVERED_EVENT`で再取得を促す。
  *   通過しない場合と、直近に通過を試して失敗した場合は次へ進む。
- *   非入力中は即時に`location.reload()`を呼び、再読み込み先で認証画面へ誘導する。
- *   入力中は操作妨害を避けるため、`notice`を`"reload-required"`にして再読み込みボタンと「認証画面を開く」ボタン付きのバナーで案内する。
+ *   未保存の入力を退避できる場合は即時に`location.reload()`を呼び、再読み込み先で認証画面へ誘導する。
+ *   退避できない場合は入力を失わないよう、`notice`を`"reload-required"`にして再読み込みボタンと「認証画面を開く」ボタン付きのバナーで案内する。
  *   「認証画面を開く」（`openAuthWindow`）は同一オリジンの`/healthcheck`を別ウィンドウで開く。横取りする側がこの通信も差し替えるため、
  *   別ウィンドウに認証画面が表示され、入力中の画面を残したまま認証できる。開いている間は2秒間隔で判定し直し、
  *   健全で別ウィンドウを閉じて案内を消す。30秒間隔のポーリングを待つと、認証後もバナーが最大30秒残るためである。
@@ -49,7 +49,7 @@ import {
   classifyHealth,
   startConnectivityTriggers,
 } from "#lib/client/sse/connectivity-check.js";
-import { isUserBusy } from "#lib/client/ui/user-busy.ts";
+import { saveRecoveryDrafts } from "#lib/client/ui/user-busy.ts";
 import { loadHiddenFrame } from "#lib/client/sse/silent-pass.ts";
 
 /** 横取りの自動通過で画面を遷移せずに回復した時に`window`へ送るイベント名。再取得を担う側が購読する */
@@ -72,7 +72,7 @@ export const UNREACHABLE_NOTICE_DELAY_MS = 6_000;
  *
  * - `"none"`: 案内しない
  * - `"unreachable"`: サーバーへ到達できない。回復を検知すると自動で消え、再読み込みは不要
- * - `"reload-required"`: 応答が横取りされている（入力中のため自動再読み込みを見送った）。再読み込みで認証画面へ進む
+ * - `"reload-required"`: 応答が横取りされている（入力を退避できないため自動再読み込みを見送った）。再読み込みで認証画面へ進む
  */
 export type ConnectivityNotice = "none" | "unreachable" | "reload-required";
 
@@ -292,9 +292,9 @@ function stopAuthWatch(close: boolean): void {
   if (close && !session.window.closed) session.window.close();
 }
 
-/** 応答の横取りを検知した時に呼び出され、入力中ならバナー表示、非入力中なら即リロードする */
+/** 応答の横取りを検知した時に呼び出され、退避できない場合はバナー表示、それ以外は即リロードする */
 function triggerReload(): void {
-  if (isUserBusy()) {
+  if (!saveRecoveryDrafts()) {
     debugLog("connectivity", "recover", { mode: "banner" });
     connectivityState.notice = "reload-required";
   } else {

@@ -9,15 +9,25 @@
     import { FILE_DROP_HIGHLIGHT_CLASSES } from "#lib/client/attachments/attachment-utils.ts";
     import TagEditor from "./TagEditor.svelte";
     import AttachmentPicker from "./AttachmentPicker.svelte";
-    import { holdUnsavedDraft } from "#lib/client/ui/user-busy.ts";
+    import { TagsSchema } from "#lib/schemas.ts";
+    import {
+        holdUnsavedDraft,
+        restoreRecoveryDraft,
+    } from "#lib/client/ui/user-busy.ts";
 
     interface Props {
         value: string;
+        listId: number;
         listTagCandidates: TagInfo[];
         onSubmit: (data: TaskAddSubmission) => Promise<boolean>;
     }
 
-    let { value = $bindable(), listTagCandidates, onSubmit }: Props = $props();
+    let {
+        value = $bindable(),
+        listId,
+        listTagCandidates,
+        onSubmit,
+    }: Props = $props();
     let formFocused = $state(false);
     let tags = $state<TagInfo[]>([]);
     let selectedAttachments = $state<File[]>([]);
@@ -33,11 +43,30 @@
             selectedAttachments.length > 0,
     );
 
+    $effect(() => {
+        restoreRecoveryDraft(`task-add-options:${listId}`, (raw) => {
+            const data = JSON.parse(raw) as { tags: unknown; isTodo: unknown };
+            const result = TagsSchema.safeParse(data.tags);
+            if (!result.success || typeof data.isTodo !== "boolean")
+                return false;
+            tags = result.data;
+            isTodo = data.isTodo;
+            return true;
+        });
+    });
+
     // 選択済みのタグ・添付は入力欄に値を持たないため、残っている間は自動の再読み込みで失わないよう作業中として申告する。
     // 本文は入力欄の追跡（`user-busy.ts`）が扱う
     $effect(() => {
-        if (tags.length > 0 || selectedAttachments.length > 0)
-            return holdUnsavedDraft();
+        if (tags.length > 0 || selectedAttachments.length > 0 || isTodo)
+            return holdUnsavedDraft({
+                key: `task-add-options:${listId}`,
+                // 添付のバイナリーは同期的にsessionStorageへ退避できない。
+                serialize: () =>
+                    selectedAttachments.length > 0
+                        ? undefined
+                        : JSON.stringify({ tags, isTodo }),
+            });
     });
 
     /** フォーム内のどこかにフォーカスがあるかを遅延チェック */
@@ -105,6 +134,7 @@
         <div class="flex items-start gap-2">
             <textarea
                 bind:value
+                data-recovery-key={`task-add:${listId}`}
                 placeholder="タスクを追加... (Ctrl+Enter で送信)"
                 rows={expanded ? 5 : 1}
                 onfocus={() => (formFocused = true)}

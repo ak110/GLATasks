@@ -184,7 +184,7 @@ test.describe("入力中の応答の横取り", () => {
     await cleanupTestList(browser, listName);
   });
 
-  test("入力中の横取りでは認証画面を別ウィンドウで開き、回復すると閉じて入力を保つ", async ({
+  test("退避できない入力の横取りでは認証画面を別ウィンドウで開き、回復すると閉じて入力を保つ", async ({
     page,
     context,
   }) => {
@@ -199,6 +199,11 @@ test.describe("入力中の応答の横取り", () => {
     const input = page.locator('textarea[placeholder*="タスクを追加"]');
     const typed = `入力中_${uniqueTestName("e2e")}`;
     await input.fill(typed);
+    await page.evaluate(() => {
+      Storage.prototype.setItem = () => {
+        throw new DOMException("Storage full", "QuotaExceededError");
+      };
+    });
 
     // 認証画面が全ての通信を差し替え、取得中の操作も失敗する状態を作る
     for (const pattern of ["**/healthcheck**", "**/api/trpc/**"]) {
@@ -222,7 +227,10 @@ test.describe("入力中の応答の横取り", () => {
     });
     await failedQuery;
     const banner = page.getByTestId("connectivity-recovery-banner");
-    await expect(banner).toBeVisible({ timeout: 15_000 });
+    await expect(banner).toContainText(
+      "再読み込みすると認証画面が開きますが、入力中の内容が消える場合があります。",
+      { timeout: 15_000 },
+    );
     // 横取りによる操作失敗のエラー通知は出さない
     await expect(page.getByTestId("toast-error")).toHaveCount(0);
     await context.unroute("**/api/trpc/**");
@@ -239,6 +247,51 @@ test.describe("入力中の応答の横取り", () => {
     await expect.poll(() => popup.isClosed(), { timeout: 10_000 }).toBe(true);
     await expect(input).toHaveValue(typed);
   });
+
+  for (const dirty of [false, true]) {
+    test(`認証画面への自動再読み込みと復元（入力${dirty ? "あり" : "なし"}）`, async ({
+      page,
+    }) => {
+      await page.goto("/");
+      await page.click(
+        `[data-testid="list-select-btn"]:has-text("${listName}")`,
+      );
+      const input = page.getByTestId("task-add-form").locator("textarea");
+      await input.focus();
+      const typed = dirty ? "認証前の下書き" : "";
+      if (dirty) await input.fill(typed);
+      const original = page.url();
+      await page.route("**/healthcheck**", (route) =>
+        route.fulfill({
+          contentType: "text/html",
+          body: "<html><body>login</body></html>",
+        }),
+      );
+      await page.route(
+        (url) => url.pathname === "/",
+        async (route) => {
+          if (!route.request().isNavigationRequest()) return route.fallback();
+          await route.fulfill({
+            contentType: "text/html",
+            body: "<p>認証画面</p>",
+          });
+        },
+      );
+      await page.evaluate(() => window.dispatchEvent(new Event("online")));
+      await expect(page.getByText("認証画面", { exact: true })).toBeVisible({
+        timeout: 15_000,
+      });
+      await page.unrouteAll();
+      await page.goto(original);
+      await expect(input).toHaveValue(typed);
+      await expect(
+        page.getByTestId("connectivity-recovery-banner"),
+      ).toHaveCount(0);
+      await expect(page.getByText("入力中の内容を復元しました。")).toHaveCount(
+        dirty ? 1 : 0,
+      );
+    });
+  }
 
   test("横取りでも認証画面が自動で通過すれば、画面を遷移せずエラー通知も出さずに回復する", async ({
     page,

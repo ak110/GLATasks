@@ -73,6 +73,11 @@ function sequenceFetch(...fetches: (typeof fetch)[]): typeof fetch {
   }) as unknown as typeof fetch;
 }
 
+async function holdUnrestorableDraft(): Promise<void> {
+  const { holdUnsavedDraft } = await import("#lib/client/ui/user-busy.ts");
+  holdUnsavedDraft();
+}
+
 describe("connection-recovery", () => {
   let reloadMock: ReturnType<typeof vi.fn>;
 
@@ -256,7 +261,7 @@ describe("connection-recovery", () => {
     }
   });
 
-  // 同値分割: 入力中判定パターン。応答の横取りでも入力中は reload せず、再読み込みを求める案内で待機する。
+  // フォーカスや未編集のダイアログだけでは再読み込みを妨げない。
   // 到達不能（503など）は入力中かどうかを判定せずに案内の判断へ進むため、入力中の判定を通る横取りの代表値（511）を使う。
   it.each([
     { label: "INPUT 要素にフォーカス", setup: () => focusElement("input") },
@@ -292,20 +297,59 @@ describe("connection-recovery", () => {
       },
     },
   ])(
-    "入力中の応答の横取り: $label → 再読み込みを求める案内",
+    "未保存の内容がない応答の横取り: $label → 案内なしで再読み込み",
     async ({ setup }) => {
       setup();
       const recovery: Recovery =
         await import("#lib/client/sse/connection-recovery.svelte.ts");
       await recovery.checkConnectivity(makeFetch({ status: 511 }));
 
-      expect(reloadMock).not.toHaveBeenCalled();
-      expect(recovery.connectivityState.notice).toBe("reload-required");
+      expect(reloadMock).toHaveBeenCalledOnce();
+      expect(recovery.connectivityState.notice).toBe("none");
     },
   );
 
+  it("退避できる入力では案内を出さず、再読み込み後に入力を一度だけ復元する", async () => {
+    sessionStorage.clear();
+    const drafts = await import("#lib/client/ui/user-busy.ts");
+    const stopTracking = drafts.startEditedFieldTracking();
+    const onRestored = vi.fn();
+    const stopRecovery = drafts.startDraftRecovery(() => 1, onRestored);
+    try {
+      const field = document.createElement("textarea");
+      field.id = "draft";
+      document.body.appendChild(field);
+      field.value = "下書き";
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+
+      const recovery =
+        await import("#lib/client/sse/connection-recovery.svelte.ts");
+      await recovery.checkConnectivity(makeFetch({ status: 511 }));
+      expect(reloadMock).toHaveBeenCalledOnce();
+      expect(recovery.connectivityState.notice).toBe("none");
+
+      stopRecovery();
+      field.remove();
+      const restoredField = document.createElement("textarea");
+      restoredField.id = "draft";
+      document.body.appendChild(restoredField);
+      const stopRestoration = drafts.startDraftRecovery(() => 1, onRestored);
+      try {
+        expect(restoredField.value).toBe("下書き");
+        expect(onRestored).toHaveBeenCalledOnce();
+        expect(sessionStorage.length).toBe(0);
+      } finally {
+        stopRestoration();
+      }
+    } finally {
+      stopRecovery();
+      stopTracking();
+      sessionStorage.clear();
+    }
+  });
+
   it("入力中の応答の横取り後、回復検知で案内が自動解除される", async () => {
-    focusElement("textarea");
+    await holdUnrestorableDraft();
     const recovery: Recovery =
       await import("#lib/client/sse/connection-recovery.svelte.ts");
 
@@ -401,7 +445,7 @@ describe("connection-recovery", () => {
     }
 
     async function interceptWhileTyping(): Promise<Recovery> {
-      focusElement("textarea");
+      await holdUnrestorableDraft();
       const recovery: Recovery =
         await import("#lib/client/sse/connection-recovery.svelte.ts");
       await recovery.checkConnectivity(makeFetch({ status: 511 }));

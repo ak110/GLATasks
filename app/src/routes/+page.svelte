@@ -546,6 +546,7 @@
             {/if}
 
             <TaskAddForm
+                listId={state.selectedListId}
                 bind:value={state.addTaskText}
                 {listTagCandidates}
                 onSubmit={addTask}

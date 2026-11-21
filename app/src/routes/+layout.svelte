@@ -25,7 +25,10 @@
     import TimerAlarmMonitor from "#lib/components/timers/TimerAlarmMonitor.svelte";
     import Toast from "#lib/components/ui/Toast.svelte";
     import UpdateBanner from "#lib/components/ui/UpdateBanner.svelte";
-    import { startEditedFieldTracking } from "#lib/client/ui/user-busy.ts";
+    import {
+        startDraftRecovery,
+        startEditedFieldTracking,
+    } from "#lib/client/ui/user-busy.ts";
     import ConnectivityRecoveryBanner from "#lib/components/ui/ConnectivityRecoveryBanner.svelte";
     import { UI_LAYERS } from "#lib/components/ui/styles.ts";
     import { beforeNavigate } from "$app/navigation";
@@ -39,6 +42,7 @@
 
     let { children, data }: Props = $props();
 
+    let draftRestored = $state(false);
     let theme = $state<Theme>("system");
 
     // 新バージョンを検知している状態で navigation が起きた場合、
@@ -67,6 +71,18 @@
         let visibilityHandler: (() => void) | null = null;
         // 自動の再読み込みが未保存の入力を失わせないよう、利用者が入力した欄を追跡する
         const stopEditedFieldTracking = startEditedFieldTracking();
+        let draftNoticeTimer: ReturnType<typeof setTimeout> | undefined;
+        const stopDraftRecovery = startDraftRecovery(
+            () => data.recovery_user_id,
+            () => {
+                draftRestored = true;
+                clearTimeout(draftNoticeTimer);
+                draftNoticeTimer = setTimeout(
+                    () => (draftRestored = false),
+                    5000,
+                );
+            },
+        );
         if (data.logged_in) {
             connect(queryClient);
             startConnectivityWatch();
@@ -118,6 +134,8 @@
             stopConnectivityWatch();
             disconnect();
             stopEditedFieldTracking();
+            stopDraftRecovery();
+            clearTimeout(draftNoticeTimer);
         };
     });
 
@@ -144,6 +162,9 @@
         <div class="relative shrink-0 {UI_LAYERS.banner}">
             <UpdateBanner />
             <ConnectivityRecoveryBanner />
+            {#if draftRestored}
+                <p role="status">入力中の内容を復元しました。</p>
+            {/if}
         </div>
         {@render children()}
     </div>
