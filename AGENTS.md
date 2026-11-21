@@ -54,6 +54,8 @@ SvelteのマークアップとTailwindのクラス順を同じ整形処理で保
 - Svelte、TypeScript、CSS、tRPC、画面状態、Vitestを編集する場合は`sveltekit`を起動し、作業に該当する資料を読む
 - 手続きの追加、スキーマの拡張、新しい場所からの呼び出し、表示種別の意味の変更は`add-trpc-procedure`を起動する
 - `app/tests/`の編集とE2Eの診断・再実行は`e2etest`を起動する
+- 主作業ツリーへ統合した変更の画面操作と証拠取得は[verify](.claude/skills/verify/SKILL.md)を使う
+- タイマーの保存状態・並行操作の変更は[timer-state-check](.claude/skills/timer-state-check/SKILL.md)で有界網羅検査を実行する
 - tRPC、入力スキーマ、DB、operations、SSE、再取得対象を変更した後は、変更ファイルと意図を渡して`trpc-zod-contract-reviewer`へレビューを依頼する
 
 ## 注意点

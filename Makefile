@@ -227,13 +227,16 @@ test-e2e-isolated:
 	@status=0; \
 	{ $(E2E_COMPOSE) up --detach --wait web && \
 		$(MAKE) --no-print-directory healthcheck-e2e && \
-		$(MAKE) --no-print-directory test-e2e-run E2E_COMPOSE_RUN='$(E2E_COMPOSE)'; } || status=$$?; \
+		$(if $(filter 1,$(E2E_VERIFY)),.claude/skills/verify/inspect.sh before env $(E2E_COMPOSE) &&) \
+		$(MAKE) --no-print-directory test-e2e-run E2E_COMPOSE_RUN='$(E2E_COMPOSE)' \
+		$(if $(filter 1,$(E2E_VERIFY)),&& .claude/skills/verify/inspect.sh after env $(E2E_COMPOSE)); } || status=$$?; \
 	if [ "$$status" -ne 0 ]; then \
 		$(E2E_COMPOSE) logs --no-color --timestamps > "$(E2E_FAILURE_LOG)" 2>&1 || true; \
 		echo "test-e2e: 失敗時の試験用コンテナーのログを $(E2E_FAILURE_LOG) へ保存しました。このファイルは、続けて行う試験用の資源の回収の後も残ります" >&2; \
 	fi; \
 	$(E2E_COMPOSE) down --volumes --remove-orphans || true; \
 	rm -rf "$(E2E_DATA_DIR)"; \
+	$(if $(filter 1,$(E2E_VERIFY)),.claude/skills/verify/inspect.sh cleanup env $(E2E_COMPOSE) || status=1;) \
 	exit $$status
 
 # E2E用のアプリが応答するまで待つ。開発サーバーの起動は依存の確認とビルドを含むため、通常のhealthcheckより長く待つ
@@ -264,7 +267,7 @@ test-e2e-run:
 			if [ "$$E2E_SKIP_INSTALL" != "1" ]; then\
 				$(PLAYWRIGHT_INSTALL);\
 			fi &&\
-			pnpm run test:e2e $(if $(E2E_GREP),-g "$(E2E_GREP)")\
+			pnpm run test:e2e $(if $(filter 1,$(E2E_VERIFY)),--trace on) $(if $(E2E_GREP),-g "$(E2E_GREP)")\
 		'
 
 # `describeDb`のテストは`DATABASE_URL`があるときだけ実行されるため、DBと同じネットワークのplaywrightサービスから
