@@ -111,6 +111,24 @@ describe("resolveLanguageTag", () => {
     expect(resolveLanguageTag(input)).toBe(expected);
   });
 
+  it.each([
+    ["IT", "it"],
+    ["ID", "id"],
+    ["italian", "it"],
+  ])("トルコ語の既定ロケールでも %s を %s へ解決する", (input, expected) => {
+    const original = String.prototype.toLocaleLowerCase;
+    const spy = vi
+      .spyOn(String.prototype, "toLocaleLowerCase")
+      .mockImplementation(function (this: string, locales) {
+        return original.call(this, locales ?? "tr");
+      });
+    try {
+      expect(resolveLanguageTag(input)).toBe(expected);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   it("Translator APIの候補タグを保持する", () => {
     expect(LANGUAGE_TAGS).toContain("zh-Hant");
   });

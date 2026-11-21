@@ -96,11 +96,11 @@ function isPromptLanguageTag(
  * タグの大小文字と前後の空白を正規化し、日本語・英語の表示名も受理する。
  */
 export function resolveLanguageTag(input: string): string | null {
-  const normalizedInput = input.trim().toLocaleLowerCase();
+  const normalizedInput = input.trim().toLowerCase();
   if (!normalizedInput) return null;
 
   const directMatch = LANGUAGE_TAGS.find(
-    (languageTag) => languageTag.toLocaleLowerCase() === normalizedInput,
+    (languageTag) => languageTag.toLowerCase() === normalizedInput,
   );
   if (directMatch) return directMatch;
 
@@ -111,8 +111,7 @@ export function resolveLanguageTag(input: string): string | null {
   for (const languageTag of LANGUAGE_TAGS) {
     for (const displayName of displayNames) {
       if (
-        displayName.of(languageTag)?.trim().toLocaleLowerCase() ===
-        normalizedInput
+        displayName.of(languageTag)?.trim().toLowerCase() === normalizedInput
       ) {
         return languageTag;
       }
