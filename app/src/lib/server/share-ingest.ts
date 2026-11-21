@@ -123,7 +123,11 @@ function nonEmptyString(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() !== "" ? value : undefined;
 }
 
-// 日本語訳なら仮名か漢字を含む。翻訳サービスが訳の代わりに返す英語の警告文や、訳されずに返る原文を訳として使わないための判定。
+// 多言語の警告文の後半に日本語があっても訳として採用しない。
+const TRANSLATION_PROBE_LENGTH = 120;
+const SENTENCE_END = /[。！？.!?\r\n]/u;
+const DEEPL_VERSION_WARNING =
+  /older version of DeepL|ältere Version von DeepL|古いバージョンのDeepLを使用/iu;
 const JAPANESE_CHAR_PATTERN =
   /[\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Han}]/u;
 
@@ -140,11 +144,22 @@ export function parseFxTwitter(
   const screenName = nonEmptyString(author?.screen_name);
   if (!tweet || !name || !screenName) return undefined;
   let translation = nonEmptyString(asRecord(tweet.translation)?.text);
-  if (translation && !JAPANESE_CHAR_PATTERN.test(translation)) {
-    log(
-      `FxTwitter APIの訳が日本語ではないため原文で続行した（対応不要）: ${translation.slice(0, 100)}`,
+  if (translation) {
+    const start = translation.trimStart();
+    const end = start.search(SENTENCE_END);
+    const firstSentence = start.slice(
+      0,
+      end < 0 ? TRANSLATION_PROBE_LENGTH : end,
     );
-    translation = undefined;
+    const reason = DEEPL_VERSION_WARNING.test(translation)
+      ? "DeepLの旧版警告文"
+      : !JAPANESE_CHAR_PATTERN.test(firstSentence)
+        ? "先頭の文に日本語がない"
+        : undefined;
+    if (reason) {
+      log(`FxTwitter APIの訳を使わず原文で続行した（対応不要）: ${reason}`);
+      translation = undefined;
+    }
   }
   const original = nonEmptyString(tweet.text);
   const articleTitle = nonEmptyString(asRecord(tweet.article)?.title);

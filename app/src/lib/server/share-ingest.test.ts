@@ -67,6 +67,17 @@ describe("buildShareInitialText", () => {
     );
   });
 
+  it("英語の固有名詞で始まる日本語訳を使う", async () => {
+    const translation = "DeepL の翻訳機能を使いました。";
+    const fetch = fakeFetch({
+      [FX_URL]: { status: 200, body: fxBody(translation) },
+    });
+    const text = await buildShareInitialText(shared({ text: SHARED_URL }), {
+      fetch,
+    });
+    expect(text).toBe(`Kaelig (@kaelig): ${translation}\n\n${POST_URL}`);
+  });
+
   it("訳が無ければ原文を使う", async () => {
     const fetch = fakeFetch({ [FX_URL]: { status: 200, body: fxBody(null) } });
     const text = await buildShareInitialText(
@@ -115,25 +126,35 @@ describe("buildShareInitialText", () => {
       "DeepLの旧版警告文",
       "You're using an older version of DeepL. To continue using the app, please update to the latest version.",
     ],
+    [
+      "英語・ドイツ語・日本語を含む旧版警告文",
+      // ドイツ語の代名詞は英語の誤字として判定されるため、引用を保ったままエスケープする。
+      "You're using an older version of DeepL. To continue using the app, please update to the latest version. \u0053ie verwenden eine ältere Version von DeepL. Bitte aktualisieren \u0053ie die App, um \u0073ie weiterhin nutzen zu können. 古いバージョンのDeepLを使用しています。",
+    ],
+    [
+      "日本語の文で始まる旧版警告文",
+      "古いバージョンの翻訳アプリを使用しています。You're using an older version of DeepL.",
+    ],
+    [
+      "最初の文に日本語を含まない警告文",
+      "Unable to translate! 翻訳できませんでした。",
+    ],
     ["英語の失敗文", "Rate limit exceeded. Please try again later."],
-  ])(
-    "日本語ではない訳（%s）は使わず原文を使う",
-    async (_label, translation) => {
-      const logs: string[] = [];
-      const fetch = fakeFetch({
-        [FX_URL]: { status: 200, body: fxBody(translation) },
-      });
-      const text = await buildShareInitialText(shared({ text: SHARED_URL }), {
-        fetch,
-        log: (message) => logs.push(message),
-      });
-      expect(text).toBe(
-        `Kaelig (@kaelig): decision fatigue hit me hard last week\n\n${POST_URL}`,
-      );
-      expect(fetch.calls).toEqual([FX_URL]);
-      expect(logs).toHaveLength(1);
-    },
-  );
+  ])("採用できない訳（%s）は使わず原文を使う", async (_label, translation) => {
+    const logs: string[] = [];
+    const fetch = fakeFetch({
+      [FX_URL]: { status: 200, body: fxBody(translation) },
+    });
+    const text = await buildShareInitialText(shared({ text: SHARED_URL }), {
+      fetch,
+      log: (message) => logs.push(message),
+    });
+    expect(text).toBe(
+      `Kaelig (@kaelig): decision fatigue hit me hard last week\n\n${POST_URL}`,
+    );
+    expect(fetch.calls).toEqual([FX_URL]);
+    expect(logs).toHaveLength(1);
+  });
 
   it("両方失敗したら共有元の内容を使い、URLを1回だけ正規化して入れる", async () => {
     const logs: string[] = [];
