@@ -31,21 +31,46 @@ export function createMainDialogs() {
   // 定期TODOスケジュール管理ダイアログの対象リストID（null は非表示）
   let schedulesDialogListId = $state<number | null>(null);
 
-  // リスト統合ダイアログの状態
-  type MergeDialog = {
-    pending: boolean;
-    open: boolean;
+  type MergeSource = {
     sourceListId: number;
     sourceTitle: string;
     taskCount: number;
   };
-  let mergeDialog = $state<MergeDialog>({
-    pending: false,
-    open: false,
-    sourceListId: 0,
-    sourceTitle: "",
-    taskCount: 0,
-  });
+  type MergeDialog =
+    | { phase: "closed" }
+    | { phase: "input" | "submitting"; session: MergeSource };
+  let mergeDialog = $state.raw<MergeDialog>({ phase: "closed" });
+
+  function openMergeDialog(session: MergeSource): void {
+    mergeDialog = { phase: "input", session: { ...session } };
+  }
+
+  function closeMergeDialog(): void {
+    mergeDialog = { phase: "closed" };
+  }
+
+  function beginMerge() {
+    if (mergeDialog.phase !== "input") return;
+    const submission = {
+      phase: "submitting",
+      session: mergeDialog.session,
+    } as const;
+    mergeDialog = submission;
+    return submission;
+  }
+
+  function finishMerge(
+    submission: ReturnType<typeof beginMerge>,
+    succeeded: boolean,
+  ): boolean {
+    if (!submission || mergeDialog !== submission) return false;
+    if (succeeded) {
+      closeMergeDialog();
+    } else {
+      mergeDialog = { phase: "input", session: submission.session };
+    }
+    return succeeded;
+  }
 
   // リスト削除確認ダイアログの状態
   type ConfirmDeleteListDialog = {
@@ -95,9 +120,10 @@ export function createMainDialogs() {
     get mergeDialog() {
       return mergeDialog;
     },
-    set mergeDialog(value: typeof mergeDialog) {
-      mergeDialog = value;
-    },
+    openMergeDialog,
+    closeMergeDialog,
+    beginMerge,
+    finishMerge,
     get confirmDeleteListDialog() {
       return confirmDeleteListDialog;
     },

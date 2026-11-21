@@ -476,6 +476,41 @@ describe("connection-recovery", () => {
       expect(recovery.connectivityState.notice).toBe("reload-required");
     });
 
+    it("到達不能追跡と認証監視が共存し、停止後の判定完了では両方とも再開しない", async () => {
+      const recovery = await interceptWhileTyping();
+      const authWindow = stubAuthWindow();
+      vi.spyOn(window, "open").mockReturnValue(authWindow as unknown as Window);
+      const late = Promise.withResolvers<Response>();
+      const fetch = vi
+        .fn<typeof globalThis.fetch>()
+        .mockRejectedValueOnce(new TypeError("network error"))
+        .mockReturnValue(late.promise);
+      vi.stubGlobal("fetch", fetch);
+      recovery.startConnectivityWatch();
+      try {
+        recovery.openAuthWindow(fetch);
+        await vi.advanceTimersByTimeAsync(
+          recovery.UNREACHABLE_RECHECK_INTERVAL_MS,
+        );
+        // 30秒ポーリングとは別に、両方の短周期の予約が残る。
+        expect(vi.getTimerCount()).toBe(3);
+        await vi.advanceTimersByTimeAsync(
+          recovery.UNREACHABLE_RECHECK_INTERVAL_MS,
+        );
+        expect(fetch).toHaveBeenCalledTimes(2);
+        recovery.stopConnectivityWatch();
+        late.reject(new TypeError("still offline"));
+        await vi.advanceTimersByTimeAsync(recovery.UNREACHABLE_NOTICE_DELAY_MS);
+        expect(fetch).toHaveBeenCalledTimes(2);
+        expect(vi.getTimerCount()).toBe(0);
+        expect(authWindow.close).toHaveBeenCalledOnce();
+        expect(recovery.connectivityState.notice).toBe("none");
+      } finally {
+        recovery.stopConnectivityWatch();
+        vi.unstubAllGlobals();
+      }
+    });
+
     it("ポップアップが阻止されて開けなかった場合は再判定を始めない", async () => {
       const recovery = await interceptWhileTyping();
       vi.spyOn(window, "open").mockReturnValue(null);

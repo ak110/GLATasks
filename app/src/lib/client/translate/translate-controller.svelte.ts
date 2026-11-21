@@ -2,6 +2,7 @@
  * @fileoverview 翻訳画面の要求、準備、実行と設定の状態管理
  */
 
+import { untrack } from "svelte";
 import { extractErrorMessage } from "#lib/client/ui/extract-error-message.ts";
 import {
   getStoredTranslateSettings,
@@ -54,13 +55,53 @@ export function createTranslationController() {
   let sourceText = $state("");
   let targetText = $state("");
   let availableEngines = $state<TranslateEngine[]>([]);
-  let availabilityReady = $state(false);
-  let initialized = $state(false);
+  let availability = $state<
+    "uninitialized" | "checking" | "ready" | "destroyed"
+  >("uninitialized");
+  const initialized = $derived(
+    availability === "checking" || availability === "ready",
+  );
+  const availabilityReady = $derived(availability === "ready");
   let statusMessage = $state("");
-  let isPreparing = $state(false);
-  let preparationProgress = $state<number | undefined>(undefined);
-  let pendingPreparation = $state<PendingPreparation | undefined>(undefined);
-  let pendingPreparationStale = $state(false);
+  type TranslationWork =
+    | { phase: "idle" }
+    | { phase: "scheduled"; timer: ReturnType<typeof setTimeout> }
+    | { phase: "translating"; controller: AbortController }
+    | { phase: "waiting"; pending: PendingPreparation; stale: boolean };
+  type PreparationWork = {
+    pending: PendingPreparation;
+    progress: number;
+    token: object;
+  };
+  type Work =
+    | TranslationWork
+    | ({ phase: "preparing" } & PreparationWork)
+    | ({ phase: "refreshing"; latest: TranslationWork } & PreparationWork);
+  let work = $state.raw<Work>({ phase: "idle" });
+  const isPreparing = $derived(
+    work.phase === "preparing" || work.phase === "refreshing",
+  );
+  const preparationProgress = $derived(
+    work.phase === "preparing" || work.phase === "refreshing"
+      ? work.progress
+      : undefined,
+  );
+  const pendingPreparation = $derived.by(() => {
+    if (work.phase === "refreshing") {
+      return work.latest.phase === "waiting"
+        ? work.latest.pending
+        : work.pending;
+    }
+    return work.phase === "waiting" || work.phase === "preparing"
+      ? work.pending
+      : undefined;
+  });
+  const pendingPreparationStale = $derived(
+    (work.phase === "waiting" && work.stale) ||
+      (work.phase === "refreshing" &&
+        (work.latest.phase !== "waiting" || work.latest.stale)),
+  );
+
   let directionPreparations = $state<readonly TranslatorPreparation[]>([]);
   let selectedDirection = $state<
     TranslatorPreparation["direction"] | undefined
@@ -85,8 +126,28 @@ export function createTranslationController() {
 
   let requestSequence = 0;
   let availabilitySequence = 0;
-  let activeController: AbortController | undefined;
-  let scheduledTranslationTimer: ReturnType<typeof setTimeout> | undefined;
+
+  function cancelTranslation(previous: Work): void {
+    if (previous.phase === "scheduled") clearTimeout(previous.timer);
+    if (previous.phase === "translating") previous.controller.abort();
+    if (previous.phase === "refreshing") cancelTranslation(previous.latest);
+  }
+
+  function transition(next: Work): void {
+    const previous = work;
+    work = next;
+    cancelTranslation(previous);
+  }
+
+  function transitionTranslation(next: TranslationWork): void {
+    if (work.phase === "refreshing") {
+      const previous = work.latest;
+      work = { ...work, latest: next };
+      cancelTranslation(previous);
+    } else {
+      transition(next);
+    }
+  }
 
   const nativeTag = $derived(resolveLanguageTag(nativeLanguage));
   const foreignTag = $derived(resolveLanguageTag(foreignLanguage));
@@ -122,14 +183,15 @@ export function createTranslationController() {
     initialized && availabilityReady && availableEngines.length === 0,
   );
 
-  function makeCurrentRequest(): TranslationRequest {
+  function makeCurrentRequest(
+    direction: TranslationDirectionChoice | undefined,
+  ): TranslationRequest {
     return {
       sourceText,
       nativeLanguage,
       foreignLanguage,
       engine: selectedEngine,
-      direction:
-        selectedEngine === "translator" ? selectedDirection : undefined,
+      direction: selectedEngine === "translator" ? direction : undefined,
     };
   }
 
@@ -154,7 +216,16 @@ export function createTranslationController() {
 
   /** 準備要求を陳腐化としてマークする */
   function markPendingPreparationStale(): void {
-    if (pendingPreparation) pendingPreparationStale = true;
+    if (work.phase === "preparing") {
+      // 原文が変わっても共有モデル作成は続ける。その間も新しい原文の準備要否は独立して判定する。
+      work = { ...work, phase: "refreshing", latest: { phase: "idle" } };
+    } else if (work.phase === "waiting") {
+      work = { ...work, stale: true };
+    } else if (work.phase === "refreshing" && work.latest.phase === "waiting") {
+      work = { ...work, latest: { ...work.latest, stale: true } };
+    } else {
+      transitionTranslation({ phase: "idle" });
+    }
   }
 
   /**
@@ -164,8 +235,7 @@ export function createTranslationController() {
    * 要求を先に中断することで、共有作成の放棄が状態表示へ到達しないようにする。
    */
   function invalidatePendingPreparation(): void {
-    markPendingPreparationStale();
-    activeController?.abort();
+    transition({ phase: "idle" });
     abandonEngineCreations();
   }
 
@@ -178,16 +248,19 @@ export function createTranslationController() {
   }
 
   function handleNativeLanguageInput(value: string): void {
+    if (nativeLanguage === value) return;
     nativeLanguage = value;
     resetSettings();
   }
 
   function handleForeignLanguageInput(value: string): void {
+    if (foreignLanguage === value) return;
     foreignLanguage = value;
     resetSettings();
   }
 
   function handleEngineChange(value: TranslateEngine): void {
+    if (selectedEngine === value) return;
     selectedEngine = value;
     resetSettings();
   }
@@ -199,6 +272,7 @@ export function createTranslationController() {
    * 中断せず、準備要求の陳腐化だけを記録する。
    */
   function handleSourceInput(value: string): void {
+    if (sourceText === value) return;
     sourceText = value;
     statusMessage = "";
     markPendingPreparationStale();
@@ -216,16 +290,17 @@ export function createTranslationController() {
     const selectedTarget = directionPreparations[selectedIndex];
     if (!selectedTarget) return;
 
-    if (pendingPreparation) {
-      const pendingIndex = pendingPreparation.preparation.findIndex(
+    if (isPreparing) return;
+    if (work.phase === "waiting") {
+      const pendingIndex = work.pending.preparation.findIndex(
         (target) =>
           target.kind === "translator" &&
           target.direction === selectedTarget.direction,
       );
       if (pendingIndex >= 0) {
-        pendingPreparation = {
-          ...pendingPreparation,
-          selectedIndex: pendingIndex,
+        work = {
+          ...work,
+          pending: { ...work.pending, selectedIndex: pendingIndex },
         };
         statusMessage = `準備対象: ${describePreparationDirection(selectedTarget)}`;
       }
@@ -233,6 +308,8 @@ export function createTranslationController() {
     }
 
     selectedDirection = selectedTarget.direction;
+    if (availabilityReady)
+      scheduleTranslation(makeCurrentRequest(selectedDirection));
     statusMessage = `翻訳方向を変更しました: ${describePreparationDirection(selectedTarget)}`;
   }
 
@@ -269,9 +346,7 @@ export function createTranslationController() {
     }
 
     const controller = new AbortController();
-    activeController = controller;
-    pendingPreparation = undefined;
-    pendingPreparationStale = false;
+    transitionTranslation({ phase: "translating", controller });
     const translationUnits =
       resume?.translationUnits ?? splitTranslationUnits(request.sourceText);
     const startIndex = resume?.translationIndex ?? 0;
@@ -331,7 +406,7 @@ export function createTranslationController() {
                   target.direction === request.direction,
               )
             : 0;
-          pendingPreparation = {
+          const pending: PendingPreparation = {
             request,
             translationUnits,
             preparation: result.preparation,
@@ -339,7 +414,7 @@ export function createTranslationController() {
             translationIndex: index,
             translatedText,
           };
-          pendingPreparationStale = false;
+          transitionTranslation({ phase: "waiting", pending, stale: false });
           statusMessage = `準備が必要です: ${result.preparation.map(describePreparationDirection).join("、")}。「モデルを準備する」ボタンを押してください`;
           return;
         }
@@ -354,36 +429,26 @@ export function createTranslationController() {
         statusMessage = extractErrorMessage(error);
       }
     } finally {
-      if (sequence === requestSequence) {
-        if (activeController === controller) activeController = undefined;
+      const current = work.phase === "refreshing" ? work.latest : work;
+      if (
+        current.phase === "translating" &&
+        current.controller === controller
+      ) {
+        transitionTranslation({ phase: "idle" });
       }
     }
   }
 
   async function handlePrepare(): Promise<void> {
     if (
-      isPreparing ||
-      pendingPreparationStale ||
-      !pendingPreparation ||
-      !isCurrentRequest(pendingPreparation.request)
-    ) {
+      work.phase !== "waiting" ||
+      work.stale ||
+      !isCurrentRequest(work.pending.request)
+    )
       return;
-    }
-
-    const selectedTarget =
-      pendingPreparation.preparation[pendingPreparation.selectedIndex];
+    const pending = work.pending;
+    const selectedTarget = pending.preparation[pending.selectedIndex];
     if (!selectedTarget) return;
-
-    if (
-      selectedTarget.kind === "translator" &&
-      selectedTarget.requiresDirectionChoice
-    ) {
-      selectedDirection = selectedTarget.direction;
-      updateDirectionPreparations(pendingPreparation.preparation);
-    } else {
-      selectedDirection = undefined;
-      directionPreparations = [];
-    }
 
     if (
       selectedTarget.requiresUserActivation &&
@@ -395,53 +460,58 @@ export function createTranslationController() {
       return;
     }
 
-    if (scheduledTranslationTimer) {
-      clearTimeout(scheduledTranslationTimer);
-      scheduledTranslationTimer = undefined;
-    }
-    activeController?.abort();
-    const preparationRequest = pendingPreparation;
-    const request = makeCurrentRequest();
-    const sequence = ++requestSequence;
-    isPreparing = true;
-    preparationProgress = 0;
+    const token = {};
+    transition({
+      phase: "preparing",
+      pending,
+      progress: 0,
+      token,
+    });
     statusMessage = "準備中...";
-
+    const currentPreparation = () =>
+      (work.phase === "preparing" || work.phase === "refreshing") &&
+      work.token === token
+        ? work
+        : undefined;
     try {
       await prepareEngine({
-        engine: request.engine,
+        engine: pending.request.engine,
         preparation: [selectedTarget],
         onProgress: (progress) => {
-          if (isCurrentRequest(request)) {
-            preparationProgress = Math.round(progress * 100);
+          const current = currentPreparation();
+          if (current?.phase === "preparing") {
+            work = { ...current, progress: Math.round(progress * 100) };
           }
         },
       });
 
-      if (!isCurrentRequest(request) || sequence !== requestSequence) {
-        if (pendingPreparation === preparationRequest) {
-          pendingPreparation = undefined;
-          pendingPreparationStale = false;
-        }
+      const current = currentPreparation();
+      if (current?.phase !== "preparing" || !isCurrentRequest(pending.request))
         return;
+      if (
+        selectedTarget.kind === "translator" &&
+        selectedTarget.requiresDirectionChoice
+      ) {
+        selectedDirection = selectedTarget.direction;
+        updateDirectionPreparations(pending.preparation);
+      } else {
+        selectedDirection = undefined;
+        directionPreparations = [];
       }
-
-      pendingPreparation = undefined;
-      pendingPreparationStale = false;
-      statusMessage = "";
-      const nextSequence = ++requestSequence;
-      void executeTranslation(request, nextSequence, {
-        translationUnits: preparationRequest.translationUnits,
-        translationIndex: preparationRequest.translationIndex,
-        translatedText: preparationRequest.translatedText,
-      });
+      const request = makeCurrentRequest(selectedDirection);
+      transition({ phase: "idle" });
+      void executeTranslation(request, ++requestSequence, pending);
     } catch (error) {
-      if (isCurrentRequest(request)) {
+      const current = currentPreparation();
+      if (current?.phase === "preparing" && isCurrentRequest(pending.request)) {
         statusMessage = extractErrorMessage(error);
+        transition({ phase: "waiting", pending, stale: false });
       }
     } finally {
-      isPreparing = false;
-      preparationProgress = undefined;
+      const current = currentPreparation();
+      // 準備されたモデルは共有資源に残るが、操作が古ければ画面には反映しない。
+      if (current?.phase === "refreshing") work = current.latest;
+      else if (current) transition({ phase: "idle" });
     }
   }
 
@@ -460,18 +530,18 @@ export function createTranslationController() {
     const foreign = foreignLanguage;
     if (!initialized) return;
 
-    availabilityReady = false;
+    availability = "checking";
     const sequence = ++availabilitySequence;
     void detectEngineAvailability(native, foreign)
       .then((engines) => {
         if (sequence !== availabilitySequence) return;
         availableEngines = [...engines];
-        availabilityReady = true;
+        availability = "ready";
       })
       .catch((error: unknown) => {
         if (sequence !== availabilitySequence) return;
         availableEngines = [];
-        availabilityReady = true;
+        availability = "ready";
         statusMessage = extractErrorMessage(error);
       });
   });
@@ -484,52 +554,45 @@ export function createTranslationController() {
     saveSettings();
   });
 
-  $effect(() => {
-    const request = makeCurrentRequest();
-    if (!initialized || !availabilityReady) return;
-
-    if (scheduledTranslationTimer) {
-      clearTimeout(scheduledTranslationTimer);
-      scheduledTranslationTimer = undefined;
-    }
+  function scheduleTranslation(request: TranslationRequest): void {
     const sequence = ++requestSequence;
-    activeController?.abort();
-    activeController = undefined;
     statusMessage = "";
-
-    if (!request.sourceText.trim()) {
-      targetText = "";
-      return;
-    }
     if (
-      availableEngines.length === 0 ||
+      !request.sourceText.trim() ||
       !availableEngines.includes(request.engine)
     ) {
+      transitionTranslation({ phase: "idle" });
       targetText = "";
       return;
     }
-
-    scheduledTranslationTimer = setTimeout(() => {
-      scheduledTranslationTimer = undefined;
+    const timer = setTimeout(() => {
       void executeTranslation(request, sequence);
     }, 600);
-    return () => {
-      clearTimeout(scheduledTranslationTimer);
-      scheduledTranslationTimer = undefined;
-    };
+    transitionTranslation({ phase: "scheduled", timer });
+  }
+
+  $effect(() => {
+    // 準備から再開する時にも方向を確定するため、その更新だけでは先頭から再実行しない。
+    const request = makeCurrentRequest(untrack(() => selectedDirection));
+    if (!availabilityReady) return;
+    void availableEngines;
+    untrack(() => scheduleTranslation(request));
   });
 
   function initialize(): void {
+    if (initialized) return;
     const settings = getStoredTranslateSettings();
     nativeLanguage = settings.nativeLanguage;
     foreignLanguage = settings.foreignLanguage;
     selectedEngine = settings.engine;
-    initialized = true;
+    availability = "checking";
   }
 
   function destroy(): void {
-    activeController?.abort();
-    if (scheduledTranslationTimer) clearTimeout(scheduledTranslationTimer);
+    availability = "destroyed";
+    availabilitySequence++;
+    requestSequence++;
+    transition({ phase: "idle" });
     destroyTranslationResources();
   }
 

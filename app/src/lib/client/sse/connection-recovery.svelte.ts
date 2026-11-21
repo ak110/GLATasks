@@ -80,38 +80,59 @@ export const connectivityState = $state<{ notice: ConnectivityNotice }>({
   notice: "none",
 });
 
-let stopTriggers: (() => void) | null = null;
-let watching = false;
-// 複数トリガーがほぼ同時に発火しうるため、能動チェックの重複起動を防ぎ、実行中の判定結果を共有する
+type RecheckTimer = ReturnType<typeof setTimeout>;
+type ConnectionPhase =
+  | { phase: "healthy" }
+  | { phase: "unreachable"; since: number; timer: RecheckTimer }
+  | { phase: "intercepted" };
+type AuthWatch = { phase: "monitoring"; window: Window; timer?: RecheckTimer };
+
+let connection: ConnectionPhase = { phase: "healthy" };
+let authWatch: { phase: "closed" } | AuthWatch = { phase: "closed" };
+let watch:
+  { phase: "manual" | "stopped" } | { phase: "watching"; stop: () => void } = {
+  phase: "manual",
+};
 let inflight: Promise<Health> | undefined;
-// 到達不能が続いている開始時刻（到達不能でない間はundefined）
-let unreachableSince: number | undefined;
-let recheckTimer: ReturnType<typeof setTimeout> | undefined;
-// 「認証画面を開く」で開いた別ウィンドウと、その間の再判定。到達不能の再判定とは停止条件が異なるため分ける。
-let authWindow: Window | undefined;
-let authRecheckTimer: ReturnType<typeof setTimeout> | undefined;
-// 直近に自動通過を試して失敗した時刻（成功または未試行ならundefined）
+let generation = 0;
 let silentPassFailedAt: number | undefined;
+
+function transitionConnection(
+  next: ConnectionPhase,
+  notice: ConnectivityNotice,
+): void {
+  if (connection.phase === "unreachable") clearTimeout(connection.timer);
+  connection = next;
+  connectivityState.notice = notice;
+}
 
 /** 能動検出監視を開始する（多重起動はno-op） */
 export function startConnectivityWatch(): void {
-  if (watching) return;
-  watching = true;
-  stopTriggers = startConnectivityTriggers(() => {
-    void checkConnectivity();
-  });
+  if (watch.phase === "watching") return;
+  watch = {
+    phase: "watching",
+    stop: startConnectivityTriggers(() => {
+      void checkConnectivity();
+    }),
+  };
   document.addEventListener("visibilitychange", handleVisibilityChange);
 }
 
 /** 能動検出監視を停止する（多重停止はno-op） */
 export function stopConnectivityWatch(): void {
-  if (!watching) return;
-  watching = false;
-  stopTriggers?.();
-  stopTriggers = null;
+  if (watch.phase === "stopped") return;
+  if (watch.phase === "watching") watch.stop();
+  watch = { phase: "stopped" };
+  generation++;
+  inflight = undefined;
+  silentPassFailedAt = undefined;
   document.removeEventListener("visibilitychange", handleVisibilityChange);
-  clearRecheck();
-  clearAuthRecheck();
+  recoverConnectivity();
+}
+
+function recoverConnectivity(): void {
+  transitionConnection({ phase: "healthy" }, "none");
+  stopAuthWatch(true);
 }
 
 /**
@@ -124,10 +145,12 @@ export function stopConnectivityWatch(): void {
  */
 function handleVisibilityChange(): void {
   if (document.visibilityState !== "hidden") return;
-  unreachableSince = undefined;
-  clearRecheck();
-  if (connectivityState.notice === "unreachable") {
-    connectivityState.notice = "none";
+  if (connection.phase === "unreachable") {
+    if (connectivityState.notice === "reload-required") {
+      transitionConnection({ phase: "intercepted" }, "reload-required");
+    } else {
+      transitionConnection({ phase: "healthy" }, "none");
+    }
   }
 }
 
@@ -142,33 +165,38 @@ function handleVisibilityChange(): void {
 export async function checkConnectivity(
   fetchFn: typeof fetch = fetch,
 ): Promise<Health> {
-  inflight ??= runCheck(fetchFn).finally(() => {
-    inflight = undefined;
+  if (watch.phase === "stopped") return classifyHealth(fetchFn);
+  const current = generation;
+  inflight ??= runCheck(fetchFn, current).finally(() => {
+    if (current === generation) inflight = undefined;
   });
   return inflight;
 }
 
-async function runCheck(fetchFn: typeof fetch): Promise<Health> {
+async function runCheck(
+  fetchFn: typeof fetch,
+  current: number,
+): Promise<Health> {
   const health = await classifyHealth(fetchFn);
+  if (current !== generation) return health;
   debugLog("connectivity", "check", { health });
   if (health === "healthy") {
-    // 回復検知: 案内を自動解除する
-    unreachableSince = undefined;
-    clearRecheck();
-    closeAuthWindow();
-    connectivityState.notice = "none";
+    recoverConnectivity();
   } else if (health === "unreachable") {
     handleUnreachable(fetchFn);
   } else {
-    unreachableSince = undefined;
-    clearRecheck();
-    const afterPass = await trySilentPass(fetchFn);
+    transitionConnection(
+      { phase: "intercepted" },
+      connectivityState.notice === "reload-required"
+        ? "reload-required"
+        : "none",
+    );
+    const afterPass = await trySilentPass(fetchFn, current);
+    if (current !== generation) return health;
     if (afterPass === "healthy") {
-      closeAuthWindow();
-      connectivityState.notice = "none";
+      recoverConnectivity();
       window.dispatchEvent(new Event(CONNECTIVITY_RECOVERED_EVENT));
     } else if (afterPass === "unreachable") {
-      // 通過を試す間に通信が途絶した。到達不能では再読み込みせず表示中の画面を守る
       handleUnreachable(fetchFn);
       return afterPass;
     } else {
@@ -183,7 +211,10 @@ async function runCheck(fetchFn: typeof fetch): Promise<Health> {
  *
  * 直近に通過を試して失敗した場合は読み込まずに`"intercepted"`を返す。
  */
-async function trySilentPass(fetchFn: typeof fetch): Promise<Health> {
+async function trySilentPass(
+  fetchFn: typeof fetch,
+  current: number,
+): Promise<Health> {
   if (
     silentPassFailedAt !== undefined &&
     Date.now() - silentPassFailedAt < SILENT_PASS_RETRY_INTERVAL_MS
@@ -192,7 +223,9 @@ async function trySilentPass(fetchFn: typeof fetch): Promise<Health> {
   }
   // キャッシュを避けるため毎回異なるURLで読み込む
   await loadHiddenFrame(`/healthcheck?silent-pass=${Date.now()}`);
+  if (current !== generation) return "intercepted";
   const health = await classifyHealth(fetchFn);
+  if (current !== generation) return health;
   debugLog("connectivity", "silent-pass", { health });
   silentPassFailedAt = health === "intercepted" ? Date.now() : undefined;
   return health;
@@ -200,31 +233,19 @@ async function trySilentPass(fetchFn: typeof fetch): Promise<Health> {
 
 /** 到達不能の継続時間で案内を出すか決め、回復を早く捉えるための再判定を予約する */
 function handleUnreachable(fetchFn: typeof fetch): void {
-  // 非表示の間は再判定を止め、継続時間も数え直す。可視復帰のトリガーが改めて判定し、
-  // 非表示の間の通信断を復帰直後の猶予に含めない（復帰した瞬間にバナーが出ないようにするため）。
-  if (document.visibilityState === "hidden") {
-    unreachableSince = undefined;
-    clearRecheck();
-    return;
-  }
+  if (document.visibilityState === "hidden") return;
   const now = Date.now();
-  unreachableSince ??= now;
-  if (now - unreachableSince >= UNREACHABLE_NOTICE_DELAY_MS) {
-    debugLog("connectivity", "recover", { mode: "banner" });
-    connectivityState.notice = "unreachable";
-  }
-  clearRecheck();
-  recheckTimer = setTimeout(() => {
-    recheckTimer = undefined;
+  const since = connection.phase === "unreachable" ? connection.since : now;
+  const notice =
+    now - since >= UNREACHABLE_NOTICE_DELAY_MS
+      ? "unreachable"
+      : connectivityState.notice === "reload-required"
+        ? "reload-required"
+        : "none";
+  const timer = setTimeout(() => {
     void checkConnectivity(fetchFn);
   }, UNREACHABLE_RECHECK_INTERVAL_MS);
-}
-
-function clearRecheck(): void {
-  if (recheckTimer !== undefined) {
-    clearTimeout(recheckTimer);
-    recheckTimer = undefined;
-  }
+  transitionConnection({ phase: "unreachable", since, timer }, notice);
 }
 
 /**
@@ -234,41 +255,41 @@ function clearRecheck(): void {
  * `fetchFn` はテスト用の差し替え口で、本番では既定の `fetch` を使う。
  */
 export function openAuthWindow(fetchFn: typeof fetch = fetch): void {
-  if (authWindow && !authWindow.closed) {
-    authWindow.focus();
+  if (watch.phase === "stopped") return;
+  if (authWatch.phase === "monitoring" && !authWatch.window.closed) {
+    authWatch.window.focus();
     return;
   }
-  authWindow = window.open("/healthcheck", "glatasks-auth") ?? undefined;
-  debugLog("connectivity", "auth-window", { opened: authWindow !== undefined });
-  if (authWindow) scheduleAuthRecheck(fetchFn);
+  stopAuthWatch(false);
+  const authWindow = window.open("/healthcheck", "glatasks-auth");
+  debugLog("connectivity", "auth-window", { opened: authWindow !== null });
+  if (!authWindow) return;
+  authWatch = { phase: "monitoring", window: authWindow };
+  scheduleAuthRecheck(authWatch, fetchFn);
 }
 
-function scheduleAuthRecheck(fetchFn: typeof fetch): void {
-  clearAuthRecheck();
-  authRecheckTimer = setTimeout(() => {
-    authRecheckTimer = undefined;
-    if (!authWindow || authWindow.closed) {
-      // 利用者が別ウィンドウを閉じた。認証を続ける意思が無いため判定を止め、案内は残す
-      authWindow = undefined;
+function scheduleAuthRecheck(session: AuthWatch, fetchFn: typeof fetch): void {
+  session.timer = setTimeout(() => {
+    session.timer = undefined;
+    if (session.window.closed) {
+      stopAuthWatch(false);
       return;
     }
     void checkConnectivity(fetchFn).then(() => {
-      if (authWindow) scheduleAuthRecheck(fetchFn);
+      if (authWatch === session) {
+        if (session.window.closed) stopAuthWatch(false);
+        else scheduleAuthRecheck(session, fetchFn);
+      }
     });
   }, UNREACHABLE_RECHECK_INTERVAL_MS);
 }
 
-function clearAuthRecheck(): void {
-  if (authRecheckTimer !== undefined) {
-    clearTimeout(authRecheckTimer);
-    authRecheckTimer = undefined;
-  }
-}
-
-function closeAuthWindow(): void {
-  clearAuthRecheck();
-  if (authWindow && !authWindow.closed) authWindow.close();
-  authWindow = undefined;
+function stopAuthWatch(close: boolean): void {
+  const session = authWatch;
+  authWatch = { phase: "closed" };
+  if (session.phase === "closed") return;
+  clearTimeout(session.timer);
+  if (close && !session.window.closed) session.window.close();
 }
 
 /** 応答の横取りを検知した時に呼び出され、入力中ならバナー表示、非入力中なら即リロードする */

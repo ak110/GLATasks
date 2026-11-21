@@ -367,36 +367,29 @@
         );
         const count =
             cache?.tasks.filter((t) => t.listId === listId).length ?? 0;
-        state.dialogs.mergeDialog = {
-            pending: false,
-            open: true,
+        state.dialogs.openMergeDialog({
             sourceListId: listId,
             sourceTitle: list.title,
             taskCount: count,
-        };
+        });
     }
 
     async function submitMerge(targetListId: number, isCurrent: () => boolean) {
-        const session = state.dialogs.mergeDialog;
-        if (session.pending) return;
-        session.pending = true;
+        const submission = state.dialogs.beginMerge();
+        if (!submission) return;
+        let succeeded = false;
         try {
             await mergeListMutation.mutateAsync({
-                sourceListId: session.sourceListId,
+                sourceListId: submission.session.sourceListId,
                 targetListId,
             });
-            if (
-                state.dialogs.mergeDialog === session &&
-                session.open &&
-                isCurrent()
-            ) {
-                session.open = false;
-                selectList(targetListId);
-            }
+            succeeded = isCurrent();
         } catch {
             // グローバルエラーハンドラがトースト表示を担当
         } finally {
-            session.pending = false;
+            if (state.dialogs.finishMerge(submission, succeeded)) {
+                selectList(targetListId);
+            }
         }
     }
 
@@ -612,19 +605,19 @@
     onClose={() => (state.dialogs.schedulesDialogListId = null)}
 />
 
-<MergeListDialog
-    session={state.dialogs.mergeDialog}
-    open={state.dialogs.mergeDialog.open}
-    sourceList={{
-        id: state.dialogs.mergeDialog.sourceListId,
-        title: state.dialogs.mergeDialog.sourceTitle,
-    }}
-    allLists={lists}
-    taskCount={state.dialogs.mergeDialog.taskCount}
-    submitting={state.dialogs.mergeDialog.pending}
-    onSubmit={submitMerge}
-    onClose={() => (state.dialogs.mergeDialog.open = false)}
-/>
+{#if state.dialogs.mergeDialog.phase !== "closed"}
+    {@const session = state.dialogs.mergeDialog.session}
+    <MergeListDialog
+        {session}
+        open={true}
+        sourceList={{ id: session.sourceListId, title: session.sourceTitle }}
+        allLists={lists}
+        taskCount={session.taskCount}
+        submitting={state.dialogs.mergeDialog.phase === "submitting"}
+        onSubmit={submitMerge}
+        onClose={state.dialogs.closeMergeDialog}
+    />
+{/if}
 
 <ConfirmDialog
     open={state.dialogs.confirmDeleteListDialog.open}
