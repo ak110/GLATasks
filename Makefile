@@ -260,6 +260,7 @@ test-e2e-run:
 		--env=COREPACK_ENABLE_DOWNLOAD_PROMPT=0 \
 		--env=E2E_STORAGE_STATE=$(E2E_STORAGE_STATE) \
 		--env=E2E_OUTPUT_DIR=$(E2E_OUTPUT_DIR) \
+		--env=E2E_SHARD \
 		--env=E2E_SKIP_INSTALL=$(E2E_SKIP_INSTALL) \
 		playwright \
 		bash -xc '\

@@ -67,6 +67,16 @@ jobs:
         run: pyfltr ci --output-format=github-annotations
 
   integration:
+    name: ${{ matrix.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: integration
+          - name: e2e-1
+            shard: 1/2
+          - name: e2e-2
+            shard: 2/2
     runs-on: ubuntu-latest
     env:
       COMPOSE_FILE: compose.yaml:compose.ci.yaml
@@ -109,22 +119,28 @@ jobs:
 
       # 公開している疎通確認コマンド自体がproductionイメージで成立することを確かめる
       - name: Run healthcheck
+        if: matrix.shard == null
         run: make healthcheck
 
       - name: Run backup test
+        if: matrix.shard == null
         run: make test-backup
 
       - name: Run DB integration test
+        if: matrix.shard == null
         run: make test-db COMPOSE_EXTRA_PROFILES=ci CI=true
 
       - name: Run e2e test
-        run: make test-e2e COMPOSE_EXTRA_PROFILES=ci CI=true E2E_SKIP_INSTALL=1
+        if: matrix.shard != null
+        env:
+          E2E_SHARD: ${{ matrix.shard }}
+        run: make test-e2e COMPOSE_EXTRA_PROFILES=ci CI=true
 
       - name: Upload Playwright artifacts
-        if: failure()
+        if: failure() && matrix.shard != null
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.name }}
           path: |
             test-results
             playwright-report

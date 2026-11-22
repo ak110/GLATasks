@@ -7,6 +7,20 @@ const storageState = path.resolve(
   process.env.E2E_STORAGE_STATE || "app/tests/.auth/user.json",
 );
 
+const shard = process.env.E2E_SHARD;
+if (shard !== undefined && shard !== "" && shard !== "1/2" && shard !== "2/2") {
+  throw new Error(`不明な E2E_SHARD: ${shard}`);
+}
+
+const longFiles =
+  /[/\\](?:offline|page-scroll|query-error-notifications|search|task-scroll|translate)\.test\.ts$/;
+const shardIgnore =
+  shard === "1/2"
+    ? [new RegExp(`^(?!.*${longFiles.source})`)]
+    : shard === "2/2"
+      ? [longFiles]
+      : [];
+
 export default defineConfig({
   testDir: "./tests",
   outputDir: path.resolve(
@@ -29,7 +43,7 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      testIgnore: /\.mobile\.test\.ts$/,
+      testIgnore: [/\.mobile\.test\.ts$/, ...shardIgnore],
       use: {
         ...devices["Desktop Chrome"],
         storageState,
@@ -45,6 +59,7 @@ export default defineConfig({
       // 実タッチ入力での動作確認は Chrome DevTools のデバイスエミュレーション
       // 等で手動検証する想定。
       testMatch: /\.mobile\.test\.ts$/,
+      testIgnore: shardIgnore,
       use: {
         ...devices["Desktop Chrome"],
         viewport: { width: 393, height: 851 },
