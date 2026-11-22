@@ -42,8 +42,8 @@ export function subscribeMainSync(
     }
   }
 
-  // タスク更新の再取得。自分のタブ発のSSEは差分同期のみ、それ以外（他タブ/他端末・
-  // フォールバック経路）はスナップショット比較で変更タスクIDを `state.updatedTaskIds` へ反映する。
+  // 差分同期とページの再取得は全タブで行う。他タブ/他端末・
+  // フォールバック経路では差分キャッシュを比較し、変更タスクIDも記録する。
   async function syncTasks(fromOwnTab: boolean): Promise<void> {
     debugLog("sync", "tasks", { fromOwnTab });
     const oldCache = queryClient.getQueryData<ActiveTasksCache>(

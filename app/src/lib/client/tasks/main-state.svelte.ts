@@ -11,6 +11,8 @@ export function createMainState() {
   let openMenuId = $state<number | null>(null);
   let dragOverListId = $state<number | null>(null);
   let hasHash = $state(false);
+  let archivePage = $state(0);
+  let searchPage = $state(0);
   let searchQuery = $state("");
   let debouncedQuery = $state("");
   let taskList = $state<{ scrollToTop: () => void }>();
@@ -23,12 +25,20 @@ export function createMainState() {
       return selectedListId;
     },
     set selectedListId(value: typeof selectedListId) {
+      if (selectedListId !== value) {
+        archivePage = 0;
+        searchPage = 0;
+      }
       selectedListId = value;
     },
     get showType() {
       return showType;
     },
     set showType(value: typeof showType) {
+      if (showType !== value) {
+        archivePage = 0;
+        searchPage = 0;
+      }
       showType = value;
     },
     get updatedTaskIds() {
@@ -71,7 +81,23 @@ export function createMainState() {
       return searchQuery;
     },
     set searchQuery(value: typeof searchQuery) {
+      if (searchQuery !== value) {
+        searchPage = 0;
+        archivePage = 0;
+      }
       searchQuery = value;
+    },
+    get archivePage() {
+      return archivePage;
+    },
+    set archivePage(value: number) {
+      archivePage = value;
+    },
+    get searchPage() {
+      return searchPage;
+    },
+    set searchPage(value: number) {
+      searchPage = value;
     },
     get debouncedQuery() {
       return debouncedQuery;

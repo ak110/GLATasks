@@ -187,6 +187,30 @@ export const GetListTasksSchema = z.object({
     ),
 });
 
+const TaskPageIndexSchema = z.number().int().min(0).max(100_000_000);
+
+export const ListTaskPageSchema = GetListTasksSchema.pick({
+  listId: true,
+}).extend({
+  page: TaskPageIndexSchema,
+});
+export const SearchTaskPageSchema = SearchTasksSchema.extend({
+  page: TaskPageIndexSchema,
+  selectedListId: GetListTasksSchema.shape.listId.nullable(),
+});
+export const ReorderArchivePageSchema = ListTaskPageSchema.extend({
+  change: z.discriminatedUnion("kind", [
+    z.object({
+      kind: z.literal("reorder"),
+      taskIds: z.array(z.number().int().positive()).min(1).max(50),
+    }),
+    z.object({
+      kind: z.enum(["previous", "next"]),
+      taskId: z.number().int().positive(),
+    }),
+  ]),
+});
+
 // ── タイマーデフォルト値 ──
 
 /** タイマー作成時のベース時間デフォルト（分） */

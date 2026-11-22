@@ -28,6 +28,9 @@ import {
   SetTimerTimeSchema,
   StartTimerSchema,
   ResetTimerSchema,
+  ListTaskPageSchema,
+  SearchTaskPageSchema,
+  ReorderArchivePageSchema,
   SearchTasksSchema,
   ReorderTasksSchema,
   ReorderTimersSchema,
@@ -354,6 +357,26 @@ export const appRouter = t.router({
     list: encryptedProcedure
       .input(GetListTasksSchema)
       .query(({ ctx, input }) => operations.tasks.list(ctx, input)),
+
+    archiveTagCandidates: encryptedProcedure
+      .input(GetListTasksSchema.pick({ listId: true }))
+      .query(({ ctx, input }) =>
+        operations.tasks.archiveTagCandidates(ctx, input),
+      ),
+
+    listPage: encryptedProcedure
+      .input(ListTaskPageSchema)
+      .query(({ ctx, input }) => operations.tasks.listPage(ctx, input)),
+
+    searchPage: encryptedProcedure
+      .input(SearchTaskPageSchema)
+      .query(({ ctx, input }) => operations.tasks.searchPage(ctx, input)),
+
+    reorderArchivePage: encryptedProcedure
+      .input(ReorderArchivePageSchema)
+      .mutation(({ ctx, input }) =>
+        operations.tasks.reorderArchivePage(ctx, input),
+      ),
 
     listActive: encryptedProcedure
       .input(GetActiveTasksSchema)

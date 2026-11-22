@@ -7,11 +7,49 @@ import type {
   GetActiveTasksSchema,
   CreateTaskSchema,
   UpdateTaskSchema,
+  ListTaskPageSchema,
+  SearchTaskPageSchema,
+  ReorderArchivePageSchema,
   SearchTasksSchema,
   ReorderTasksSchema,
 } from "#lib/schemas.ts";
 
 export const tasks = {
+  async archiveTagCandidates(
+    ctx: OperationContext,
+    input: Pick<z.infer<typeof GetListTasksSchema>, "listId">,
+  ) {
+    return api.archiveTagCandidates(ctx.userId, input.listId);
+  },
+
+  async listPage(
+    ctx: OperationContext,
+    input: z.infer<typeof ListTaskPageSchema>,
+  ) {
+    return api.listTaskPage(ctx.userId, input.listId, input.page);
+  },
+
+  async searchPage(
+    ctx: OperationContext,
+    input: z.infer<typeof SearchTaskPageSchema>,
+  ) {
+    return api.searchTaskPage(
+      ctx.userId,
+      input.query,
+      input.showType,
+      input.selectedListId,
+      input.page,
+    );
+  },
+
+  async reorderArchivePage(
+    ctx: OperationContext,
+    input: z.infer<typeof ReorderArchivePageSchema>,
+  ) {
+    await api.reorderArchivePage(ctx.userId, input);
+    notify(ctx, [SSE_EVENTS.tasksUpdated]);
+  },
+
   async list(ctx: OperationContext, input: z.infer<typeof GetListTasksSchema>) {
     return api.listTasks(
       ctx.userId,

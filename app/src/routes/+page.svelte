@@ -39,6 +39,7 @@
     import TaskEditDialog from "#lib/components/tasks/TaskEditDialog.svelte";
     import MergeListDialog from "#lib/components/lists/MergeListDialog.svelte";
     import ScheduleDialog from "#lib/components/schedules/ScheduleDialog.svelte";
+    import TaskPaging from "#lib/components/tasks/TaskPaging.svelte";
     import SearchResults from "#lib/components/search/SearchResults.svelte";
     import ConfirmDialog from "#lib/components/dialogs/ConfirmDialog.svelte";
     import PromptDialog from "#lib/components/dialogs/PromptDialog.svelte";
@@ -67,6 +68,7 @@
         listsQuery,
         tasksQuery,
         archivedTasksQuery,
+        archiveTagCandidatesQuery,
         searchResultsQuery,
         resetActiveTasks,
     } = createMainQueries(queryClient, state);
@@ -84,6 +86,7 @@
         clearListMutation,
         mergeListMutation,
         reorderTasksMutation,
+        reorderArchivePageMutation,
     } = createMainMutations(queryClient, state, resetActiveTasks);
 
     // 派生状態
@@ -91,8 +94,8 @@
     const tasks = $derived.by((): TaskListItem[] => {
         if (state.showType === "archived") {
             const data = archivedTasksQuery.data;
-            if (!data || !("data" in data)) return [];
-            return data.data.map((t) => ({
+            if (!data) return [];
+            return data.tasks.map((t) => ({
                 _key: t.id,
                 id: t.id,
                 listId: state.selectedListId!,
@@ -119,6 +122,11 @@
     );
     // 同一リスト内で既に使われているタグ候補（名前ユニーク、同名は最初の色を採用）
     const listTagCandidates = $derived.by(() => {
+        if (state.showType === "archived") {
+            return [...(archiveTagCandidatesQuery.data ?? [])].sort(
+                compareTagName,
+            );
+        }
         const seen = new SvelteMap<string, TagInfo>();
         for (const t of tasks) {
             for (const tag of t.tags) {
@@ -132,11 +140,39 @@
             tasksQuery.isLoading ||
             (state.showType === "archived" && archivedTasksQuery.isLoading),
     );
-    const isSearching = $derived(state.debouncedQuery.length > 0);
+    const isSearching = $derived(state.searchQuery.length > 0);
+    const waitingForSearch = $derived(
+        state.searchQuery !== state.debouncedQuery,
+    );
     const displayedTasksQuery = $derived(
         state.showType === "archived" ? archivedTasksQuery : tasksQuery,
     );
-    const searchResults = $derived(searchResultsQuery.data ?? []);
+    const archivePageActions = $derived.by(() => {
+        const data = archivedTasksQuery.data;
+        if (
+            state.showType !== "archived" ||
+            !data ||
+            state.selectedListId === null
+        )
+            return undefined;
+        const listId = state.selectedListId;
+        return {
+            previous: data.page > 0,
+            next: (data.page + 1) * data.pageSize < data.total,
+            disabled:
+                archivedTasksQuery.isFetching ||
+                reorderArchivePageMutation.isPending,
+            move: (taskId: number, kind: "previous" | "next") =>
+                reorderArchivePageMutation.mutate({
+                    listId,
+                    page: data.page,
+                    change: { kind, taskId },
+                }),
+        };
+    });
+    const searchResults = $derived(
+        waitingForSearch ? [] : (searchResultsQuery.data?.tasks ?? []),
+    );
     // 検索結果をリスト名でグループ化
     const searchResultsByList = $derived.by(() => {
         return groupSearchResultsByList(searchResults, state.selectedListId);
@@ -218,6 +254,7 @@
     // 添付ファイル追加・削除完了後の呼び出し。SSE経由の反映を待たず同一タブへ即時反映する
     function handleAttachmentChange() {
         queryClient.invalidateQueries({ queryKey: queryKeys.activeTasks });
+        queryClient.invalidateQueries({ queryKey: queryKeys.search });
         queryClient.invalidateQueries({
             queryKey: queryKeys.archivedTasks(state.selectedListId),
         });
@@ -408,6 +445,19 @@
         const persistedTaskIds = taskIds.filter(
             (taskId) => !isTempTaskId(taskId),
         );
+        if (state.showType === "archived") {
+            if (
+                archivedTasksQuery.isFetching ||
+                reorderArchivePageMutation.isPending
+            )
+                return;
+            reorderArchivePageMutation.mutate({
+                listId: state.selectedListId,
+                page: state.archivePage,
+                change: { kind: "reorder", taskIds: persistedTaskIds },
+            });
+            return;
+        }
         reorderTasksMutation.mutate({
             listId: state.selectedListId,
             taskIds: persistedTaskIds,
@@ -516,17 +566,29 @@
         class:overflow-y-auto={isSearching}
     >
         {#if isSearching}
+            {#if !waitingForSearch && searchResultsQuery.data}
+                <TaskPaging
+                    data={searchResultsQuery.data}
+                    onPage={(page) => {
+                        state.searchPage = page;
+                        document.querySelector("main")?.scrollTo({ top: 0 });
+                    }}
+                />
+            {/if}
             <SearchResults
-                query={state.debouncedQuery}
+                query={state.searchQuery}
                 {searchResultsByList}
-                queryErrorKey={hashKey(
-                    queryKeys.searchResults(
+                queryErrorKey={hashKey([
+                    ...queryKeys.searchResults(
                         state.debouncedQuery,
                         state.showType,
                     ),
-                )}
-                isLoading={searchResultsQuery.isLoading}
-                error={searchResultsQuery.isError &&
+                    state.selectedListId,
+                    state.searchPage,
+                ])}
+                isLoading={waitingForSearch || searchResultsQuery.isLoading}
+                error={!waitingForSearch &&
+                searchResultsQuery.isError &&
                 searchResultsQuery.data === undefined
                     ? "検索結果を取得できませんでした。"
                     : undefined}
@@ -557,7 +619,10 @@
                 {tasks}
                 queryErrorKey={hashKey(
                     state.showType === "archived"
-                        ? queryKeys.archivedTasks(state.selectedListId)
+                        ? [
+                              ...queryKeys.archivedTasks(state.selectedListId),
+                              state.archivePage,
+                          ]
                         : queryKeys.activeTasks,
                 )}
                 isLoading={displayedTasksQuery.isLoading}
@@ -569,10 +634,20 @@
                 onToggle={toggleTask}
                 onEdit={openEditDialog}
                 onReorder={handleReorderTasks}
+                {archivePageActions}
                 onTaskDragOver={(listId) => (state.dragOverListId = listId)}
                 onTaskDrop={handleTaskDropToList}
                 updatedTaskIds={state.updatedTaskIds}
             />
+            {#if state.showType === "archived" && archivedTasksQuery.data}
+                <TaskPaging
+                    data={archivedTasksQuery.data}
+                    onPage={(page) => {
+                        state.archivePage = page;
+                        state.taskList?.scrollToTop();
+                    }}
+                />
+            {/if}
         {:else}
             <div class="flex flex-1 items-center justify-center">
                 <p class="text-gray-400 dark:text-gray-500">

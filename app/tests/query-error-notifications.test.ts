@@ -35,7 +35,7 @@ async function routeFailures(page: Page, failures: Set<string>) {
                   ? "保存失敗"
                   : procedure === "timers.list"
                     ? timerFailure
-                    : procedure === "tasks.search"
+                    : procedure === "tasks.searchPage"
                       ? searchFailure
                       : procedure === "schedules.list"
                         ? scheduleFailure
@@ -99,7 +99,7 @@ test("Query通知: hashなし320px検索は他Queryの可視inlineで抑止し�
   page,
 }) => {
   await page.setViewportSize({ width: 320, height: 800 });
-  const failures = new Set(["lists.list", "tasks.search"]);
+  const failures = new Set(["lists.list", "tasks.searchPage"]);
   await routeFailures(page, failures);
   await page.goto("/");
   await expect(
@@ -125,7 +125,7 @@ test("Query通知: viewportだけの切替でも可視inlineへ通知を集約�
   page,
 }) => {
   await page.setViewportSize({ width: 320, height: 800 });
-  await routeFailures(page, new Set(["tasks.search"]));
+  await routeFailures(page, new Set(["tasks.searchPage"]));
   await page.goto("/");
   await expect(page.getByTestId("list-item")).toBeVisible();
   await page.getByTestId("search-input").fill("表示幅の切替");

@@ -3,7 +3,18 @@ import { ApiError } from "../api-errors";
  * @fileoverview タスク関連API（取得・追加・更新・検索・並び替え）
  */
 
-import { and, asc, eq, gte, inArray, like, min, ne } from "drizzle-orm";
+import {
+  and,
+  asc,
+  count,
+  sql,
+  eq,
+  gte,
+  inArray,
+  like,
+  min,
+  ne,
+} from "drizzle-orm";
 import type { z } from "zod";
 
 import type {
@@ -11,8 +22,8 @@ import type {
   TagInfo,
   TaskKind,
   UpdateTaskSchema,
+  ReorderArchivePageSchema,
 } from "#lib/schemas.ts";
-import { matchesShowType } from "#lib/show-type.ts";
 import { getHeadSortOrder } from "#lib/task-order.ts";
 import { getDb } from "../db";
 import { lists, tasks } from "../schema";
@@ -142,19 +153,12 @@ export async function listTasks(
   }
 
   const db = getDb();
-  const allTasks = await db
+  const rows = await db
     .select()
     .from(tasks)
-    .where(eq(tasks.list_id, listId))
-    .orderBy(asc(tasks.sort_order));
-
-  const filteredTasks = allTasks.filter((t) =>
-    matchesShowType(t.status, showType),
-  );
-  const attachmentsByTask = await listAttachmentsForTasks(
-    filteredTasks.map((t) => t.id),
-  );
-  const data = filteredTasks.map((t) => toTaskInfo(t, attachmentsByTask));
+    .where(and(eq(tasks.list_id, listId), taskStatusFilter(showType)))
+    .orderBy(asc(tasks.sort_order), asc(tasks.id));
+  const data = await convertTasks(rows);
 
   const lastModified = toUtcIso(list.last_updated);
   return { status: 200 as const, data, lastModified };
@@ -289,45 +293,255 @@ export async function updateTask(
   });
 }
 
+const TASK_PAGE_SIZE = 50;
+
+function taskStatusFilter(showType: ShowType) {
+  if (showType === "all") return undefined;
+  return showType === "archived"
+    ? eq(tasks.status, "archived")
+    : ne(tasks.status, "archived");
+}
+
+function searchFilter(userId: number, query: string, showType: ShowType) {
+  const pattern = `%${query.replace(/[%_]/g, "\\$&")}%`;
+  return and(
+    eq(lists.user_id, userId),
+    showType === "active" ? eq(lists.status, "active") : undefined,
+    taskStatusFilter(showType),
+    like(tasks.text, pattern),
+  );
+}
+
+async function convertTasks<T extends typeof tasks.$inferSelect>(
+  rows: T[],
+  db?: DbConnection,
+) {
+  const attachments = await listAttachmentsForTasks(
+    rows.map((row) => row.id),
+    db,
+  );
+  return rows.map((row) => toTaskInfo(row, attachments));
+}
+
+function pageResult<T>(rows: T[], page: number, total: number) {
+  return {
+    tasks: rows,
+    page,
+    pageSize: TASK_PAGE_SIZE,
+    total,
+    hasPrevious: page > 0,
+    hasNext: (page + 1) * TASK_PAGE_SIZE < total,
+  };
+}
+
+export async function listTaskPage(
+  userId: number,
+  listId: number,
+  page: number,
+) {
+  return getDb().transaction(async (db) => {
+    await getOwnedList(listId, userId, db);
+    const filter = and(eq(tasks.list_id, listId), taskStatusFilter("archived"));
+    const [{ total }] = await db
+      .select({ total: count() })
+      .from(tasks)
+      .where(filter);
+    const rows = await db
+      .select()
+      .from(tasks)
+      .where(filter)
+      .orderBy(asc(tasks.sort_order), asc(tasks.id))
+      .limit(TASK_PAGE_SIZE)
+      .offset(page * TASK_PAGE_SIZE);
+    return pageResult(await convertTasks(rows, db), page, total);
+  });
+}
+
+export async function archiveTagCandidates(userId: number, listId: number) {
+  const db = getDb();
+  await getOwnedList(listId, userId, db);
+  const rows = await db
+    .select({ tags: tasks.tags })
+    .from(tasks)
+    .where(
+      and(
+        eq(tasks.list_id, listId),
+        taskStatusFilter("archived"),
+        ne(tasks.tags, "[]"),
+      ),
+    )
+    .orderBy(asc(tasks.sort_order), asc(tasks.id));
+  const tags = new Map<string, TagInfo>();
+  for (const row of rows) {
+    for (const tag of parseTags(row.tags)) {
+      if (!tags.has(tag.name)) tags.set(tag.name, tag);
+    }
+  }
+  return [...tags.values()];
+}
+
+async function convertSearchRows(
+  rows: { task: typeof tasks.$inferSelect; listTitle: string }[],
+  db?: DbConnection,
+) {
+  const data = await convertTasks(
+    rows.map(({ task }) => task),
+    db,
+  );
+  return data.map((task, i) => ({
+    ...task,
+    listId: rows[i].task.list_id,
+    listTitle: rows[i].listTitle,
+  }));
+}
+
 /** 全リスト横断でタスクを LIKE 検索する */
 export async function searchTasks(
   userId: number,
   query: string,
   showType: ShowType,
 ) {
-  const db = getDb();
-  // active 表示では active リストだけ、それ以外ではユーザーの全リストを対象にする
-  const userLists = await db
-    .select()
-    .from(lists)
-    .where(eq(lists.user_id, userId));
-  const visibleLists = userLists.filter((list) =>
-    matchesShowType(list.status, showType, "list"),
-  );
-  if (visibleLists.length === 0) return [];
-
-  // LIKE 用にワイルドカードをエスケープ
-  const escaped = query.replace(/[%_]/g, "\\$&");
-  const pattern = `%${escaped}%`;
-
-  const listIds = visibleLists.map((l) => l.id);
-  const rows = await db
-    .select()
+  const rows = await getDb()
+    .select({ task: tasks, listTitle: lists.title })
     .from(tasks)
-    .where(and(inArray(tasks.list_id, listIds), like(tasks.text, pattern)))
-    .orderBy(asc(tasks.sort_order));
+    .innerJoin(lists, eq(tasks.list_id, lists.id))
+    .where(searchFilter(userId, query, showType))
+    .orderBy(asc(tasks.sort_order), asc(tasks.id));
+  return convertSearchRows(rows);
+}
 
-  // listId → title のマップ
-  const listMap = new Map(visibleLists.map((l) => [l.id, l.title]));
-  const matchedTasks = rows.filter((t) => matchesShowType(t.status, showType));
-  const attachmentsByTask = await listAttachmentsForTasks(
-    matchedTasks.map((t) => t.id),
-  );
-  return matchedTasks.map((t) => ({
-    ...toTaskInfo(t, attachmentsByTask),
-    listId: t.list_id,
-    listTitle: listMap.get(t.list_id) ?? "",
-  }));
+export async function searchTaskPage(
+  userId: number,
+  query: string,
+  showType: ShowType,
+  selectedListId: number | null,
+  page: number,
+) {
+  return getDb().transaction(async (db) => {
+    const filter = searchFilter(userId, query, showType);
+    const [{ total }] = await db
+      .select({ total: count() })
+      .from(tasks)
+      .innerJoin(lists, eq(tasks.list_id, lists.id))
+      .where(filter);
+    // 本文をウィンドウ関数の作業表へ入れず、ページのIDだけを先に選ぶ。
+    const matches = await db
+      .select({ id: tasks.id })
+      .from(tasks)
+      .innerJoin(lists, eq(tasks.list_id, lists.id))
+      .where(filter)
+      .orderBy(
+        sql`case when ${tasks.list_id} = ${selectedListId} then 0 else 1 end`,
+        sql`min(${tasks.sort_order}) over (partition by ${tasks.list_id})`,
+        asc(tasks.list_id),
+        asc(tasks.sort_order),
+        asc(tasks.id),
+      )
+      .limit(TASK_PAGE_SIZE)
+      .offset(page * TASK_PAGE_SIZE);
+    if (matches.length === 0) return pageResult([], page, total);
+
+    const rows = await db
+      .select({ task: tasks, listTitle: lists.title })
+      .from(tasks)
+      .innerJoin(lists, eq(tasks.list_id, lists.id))
+      .where(
+        inArray(
+          tasks.id,
+          matches.map(({ id }) => id),
+        ),
+      );
+    const byId = new Map(rows.map((row) => [row.task.id, row]));
+    return pageResult(
+      await convertSearchRows(
+        matches.map(({ id }) => byId.get(id)!),
+        db,
+      ),
+      page,
+      total,
+    );
+  });
+}
+
+export async function reorderArchivePage(
+  userId: number,
+  { listId, page, change }: z.infer<typeof ReorderArchivePageSchema>,
+) {
+  await getDb().transaction(async (db) => {
+    await getOwnedList(listId, userId, db);
+    const rows = await db
+      .select({ id: tasks.id, order: tasks.sort_order, status: tasks.status })
+      .from(tasks)
+      .where(eq(tasks.list_id, listId))
+      .orderBy(asc(tasks.sort_order), asc(tasks.id))
+      .for("update");
+    const archive = rows.filter((row) => row.status === "archived");
+    const offset = page * TASK_PAGE_SIZE;
+    const current = archive.slice(offset, offset + TASK_PAGE_SIZE);
+    const ordered = [...rows];
+    if (change.kind === "reorder") {
+      const byId = new Map(current.map((row) => [row.id, row]));
+      if (
+        byId.size !== change.taskIds.length ||
+        new Set(change.taskIds).size !== byId.size ||
+        change.taskIds.some((id) => !byId.has(id))
+      )
+        throw new ApiError("task_not_found");
+      const positions = current.map((row) => rows.indexOf(row));
+      positions.forEach((position, i) => {
+        ordered[position] = byId.get(change.taskIds[i])!;
+      });
+    } else {
+      const moved = current.find((row) => row.id === change.taskId);
+      const neighbor =
+        archive[
+          change.kind === "previous" ? offset - 1 : offset + TASK_PAGE_SIZE
+        ];
+      if (!moved || !neighbor) throw new ApiError("task_not_found");
+      ordered.splice(ordered.indexOf(moved), 1);
+      ordered.splice(
+        ordered.indexOf(neighbor) + (change.kind === "next" ? 1 : 0),
+        0,
+        moved,
+      );
+
+      const destination = ordered.indexOf(moved);
+      const lower = ordered[destination - 1]?.order ?? -2147483649;
+      const upper = ordered[destination + 1]?.order ?? 2147483648;
+      if (upper - lower > 1) {
+        await db
+          .update(tasks)
+          .set({
+            sort_order: Math.floor((lower + upper) / 2),
+            updated: new Date(),
+          })
+          .where(eq(tasks.id, moved.id));
+        await touchListUpdated(listId, db);
+        return;
+      }
+    }
+
+    // 同値の中でID順が逆転する場合だけ振り直し、ページ外の相対順も保つ。
+    const needsRenumber =
+      change.kind !== "reorder" ||
+      ordered.some(
+        (row, i) =>
+          i > 0 &&
+          rows[i - 1].order === rows[i].order &&
+          ordered[i - 1].id > row.id,
+      );
+    const now = new Date();
+    for (const [i, row] of ordered.entries()) {
+      const order = needsRenumber ? i : rows[i].order;
+      if (row.order !== order) {
+        await db
+          .update(tasks)
+          .set({ sort_order: order, updated: now })
+          .where(eq(tasks.id, row.id));
+      }
+    }
+    await touchListUpdated(listId, db);
+  });
 }
 
 /** タスクの並び順を更新する */

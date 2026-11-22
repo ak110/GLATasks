@@ -8,7 +8,16 @@ import {
 } from "../db-test-helpers";
 import { getDb } from "../db";
 import { lists, tasks } from "../schema";
-import { listActiveTasks, listTasks, updateTask, createTask } from "./tasks";
+import {
+  archiveTagCandidates,
+  listActiveTasks,
+  listTasks,
+  listTaskPage,
+  searchTaskPage,
+  reorderArchivePage,
+  updateTask,
+  createTask,
+} from "./tasks";
 
 describeDb("タスク更新と差分同期", () => {
   const userIds: number[] = [];
@@ -108,5 +117,108 @@ describeDb("タスク更新と差分同期", () => {
     });
     expect(Date.parse(delta.serverTime) % 1000).toBe(0);
     expect(Date.parse(delta.serverTime)).toBeLessThanOrEqual(Date.now() - 1000);
+  });
+});
+
+describeDb("アーカイブと検索のページ取得", () => {
+  const owners: number[] = [];
+  afterAll(async () => cleanupFixtures(owners));
+
+  it("同順位の境界を欠落なく巡回し、検索のグループ順と所有権を保つ", async () => {
+    const first = await createFixtureList();
+    owners.push(first.userId);
+    const selected = await createFixtureList(first.userId);
+    const other = await createFixtureList();
+    owners.push(other.userId);
+    const now = new Date();
+    const insert = (listId: number, length: number, order: number) =>
+      getDb()
+        .insert(tasks)
+        .values(
+          Array.from({ length }, (_, i) => ({
+            list_id: listId,
+            text: `ページ検索_% ${i}`,
+            status: "archived" as const,
+            tags: i === length - 1 ? '[{"name":"末尾","color":"red"}]' : "[]",
+            sort_order: order,
+            created: now,
+            updated: now,
+          })),
+        )
+        .$returningId();
+    const firstRows = await insert(first.listId, 53, 0);
+    const selectedRows = await insert(selected.listId, 52, 1);
+    await insert(other.listId, 2, -1);
+    await createTask(first.userId, first.listId, "ページ検索_% 非アーカイブ");
+    const ids = (result: { tasks: { id: number }[] }) =>
+      result.tasks.map(({ id }) => id);
+    const archive = (page: number) =>
+      listTaskPage(first.userId, first.listId, page);
+    const search = (page: number, listId: number | null = selected.listId) =>
+      searchTaskPage(first.userId, "ページ検索_%", "archived", listId, page);
+
+    const archivePages = await Promise.all([
+      archive(0),
+      archive(1),
+      archive(2),
+    ]);
+    expect(archivePages.map(({ total, hasNext }) => [total, hasNext])).toEqual([
+      [53, true],
+      [53, false],
+      [53, false],
+    ]);
+    expect(archivePages.flatMap(ids)).toEqual(firstRows.map(({ id }) => id));
+    await expect(listTaskPage(first.userId, other.listId, 0)).rejects.toThrow(
+      "not_found_or_forbidden",
+    );
+    await expect(
+      archiveTagCandidates(first.userId, first.listId),
+    ).resolves.toEqual([{ name: "末尾", color: "red" }]);
+
+    const searchPages = await Promise.all([search(0), search(1), search(2)]);
+    expect(searchPages.map(({ total }) => total)).toEqual([105, 105, 105]);
+    expect(searchPages.flatMap(ids)).toEqual(
+      [...selectedRows, ...firstRows].map(({ id }) => id),
+    );
+    expect(ids(await search(0, other.listId))).toEqual(
+      firstRows.slice(0, 50).map(({ id }) => id),
+    );
+    expect(
+      (await searchTaskPage(first.userId, "ページ検索_%", "active", null, 0))
+        .total,
+    ).toBe(1);
+
+    const original = firstRows.map(({ id }) => id);
+    const reorder = (
+      page: number,
+      change: Parameters<typeof reorderArchivePage>[1]["change"],
+    ) =>
+      reorderArchivePage(first.userId, { listId: first.listId, page, change });
+    const readAll = async () => [
+      ...ids(await archive(0)),
+      ...ids(await archive(1)),
+    ];
+    await reorder(1, {
+      kind: "reorder",
+      taskIds: original.slice(50).reverse(),
+    });
+    expect(await readAll()).toEqual([
+      ...original.slice(0, 50),
+      ...original.slice(50).reverse(),
+    ]);
+    const moved = original[52];
+    const expected = (await readAll()).filter((id) => id !== moved);
+    await reorder(1, { kind: "previous", taskId: moved });
+    expect(await readAll()).toEqual([
+      ...expected.slice(0, 49),
+      moved,
+      ...expected.slice(49),
+    ]);
+    await reorder(0, { kind: "next", taskId: moved });
+    expect(await readAll()).toEqual([
+      ...expected.slice(0, 50),
+      moved,
+      ...expected.slice(50),
+    ]);
   });
 });

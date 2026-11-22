@@ -60,19 +60,27 @@ export const activeTasksOptions = (client: QueryClient) => ({
   },
   staleTime: Infinity,
 });
-export const archivedTasksOptions = (
-  listId: RouterInputs["tasks"]["list"]["listId"] | null,
-) => ({
-  queryKey: queryKeys.archivedTasks(listId),
-  queryFn: () =>
-    trpc.tasks.list.query({ listId: listId!, showType: "archived" }),
+export const archiveTagCandidatesOptions = (listId: number | null) => ({
+  queryKey: [...queryKeys.archivedTasks(listId), "tag-candidates"] as const,
+  queryFn: () => trpc.tasks.archiveTagCandidates.query({ listId: listId! }),
+});
+export const archivedTasksOptions = (listId: number | null, page: number) => ({
+  queryKey: [...queryKeys.archivedTasks(listId), page] as const,
+  queryFn: () => trpc.tasks.listPage.query({ listId: listId!, page }),
 });
 export const searchOptions = (
-  query: RouterInputs["tasks"]["search"]["query"],
+  query: string,
   showType: ShowType,
+  selectedListId: number | null,
+  page: number,
 ) => ({
-  queryKey: queryKeys.searchResults(query, showType),
-  queryFn: () => trpc.tasks.search.query({ query, showType }),
+  queryKey: [
+    ...queryKeys.searchResults(query, showType),
+    selectedListId,
+    page,
+  ] as const,
+  queryFn: () =>
+    trpc.tasks.searchPage.query({ query, showType, selectedListId, page }),
 });
 export const schedulesOptions = (
   listId: RouterInputs["schedules"]["list"]["listId"] | null,

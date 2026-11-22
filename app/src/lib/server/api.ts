@@ -29,6 +29,10 @@ export type {
   GetActiveTasksResult,
 } from "./api/tasks";
 export {
+  listTaskPage,
+  archiveTagCandidates,
+  searchTaskPage,
+  reorderArchivePage,
   listTasks,
   listActiveTasks,
   createTask,

@@ -11,7 +11,7 @@ import {
 } from "#lib/schemas.ts";
 import { getDb } from "../db";
 import { attachments, lists, tasks } from "../schema";
-import { toUtcIso } from "./common";
+import { toUtcIso, type DbConnection } from "./common";
 
 function toAttachmentMeta(row: Omit<typeof attachments.$inferSelect, "data">) {
   return {
@@ -173,11 +173,11 @@ export async function downloadAttachment(params: {
  */
 export async function listAttachmentsForTasks(
   taskIds: number[],
+  db: DbConnection = getDb(),
 ): Promise<Map<number, AttachmentMeta[]>> {
   const result = new Map<number, AttachmentMeta[]>();
   if (taskIds.length === 0) return result;
 
-  const db = getDb();
   const rows = await db
     .select({
       id: attachments.id,

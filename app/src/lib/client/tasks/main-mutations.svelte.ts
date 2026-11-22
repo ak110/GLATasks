@@ -1,4 +1,6 @@
 import { SvelteMap, SvelteDate } from "svelte/reactivity";
+import { invalidateEventQueries } from "#lib/client/query-sync.ts";
+import { SSE_EVENTS } from "#lib/sse-events.ts";
 import { queryKeys } from "#lib/client/query-options.ts";
 import { createMutation, type QueryClient } from "@tanstack/svelte-query";
 import { trpc, type RouterInputs } from "#lib/client/trpc.ts";
@@ -16,6 +18,14 @@ export function createMainMutations(
   state: MainState,
   resetActiveTasks: () => Promise<void>,
 ) {
+  const refreshTasks = () =>
+    invalidateEventQueries(queryClient, SSE_EVENTS.tasksUpdated);
+  const reorderArchivePageMutation = createMutation(() => ({
+    mutationFn: (input: RouterInputs["tasks"]["reorderArchivePage"]) =>
+      trpc.tasks.reorderArchivePage.mutate(input),
+    onSettled: refreshTasks,
+  }));
+
   // リスト作成
   const createListMutation = createMutation(() => ({
     mutationFn: (title: RouterInputs["lists"]["create"]["title"]) =>
@@ -103,9 +113,7 @@ export function createMainMutations(
               : old,
         );
       }
-      queryClient.invalidateQueries({ queryKey: queryKeys.activeTasks });
-      // TODO区分で作成された場合の通知バッジ反映のため、リスト一覧も再取得する
-      queryClient.invalidateQueries({ queryKey: queryKeys.lists });
+      void refreshTasks();
       state.addTaskText = "";
     },
   }));
@@ -193,57 +201,37 @@ export function createMainMutations(
           (old) => (old ? { ...old, serverTime: previousUpdated } : old),
         );
       }
-      queryClient.invalidateQueries({ queryKey: queryKeys.activeTasks });
+      void refreshTasks();
     },
-    onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.activeTasks });
-      // タスクが別リストへ移動された場合、または TODO 件数バッジに影響する
-      // kind・status の変更を伴う場合はリスト一覧も更新する
-      if (
-        (variables.moveTo !== undefined &&
-          variables.moveTo !== variables.listId) ||
-        variables.kind !== undefined ||
-        variables.status !== undefined
-      ) {
-        queryClient.invalidateQueries({ queryKey: queryKeys.lists });
-      }
-    },
+    onSuccess: refreshTasks,
   }));
 
   // リスト削除
   const deleteListMutation = createMutation(() => ({
     mutationFn: (listId: RouterInputs["lists"]["delete"]["listId"]) =>
       trpc.lists.delete.mutate({ listId }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.lists });
-    },
+    onSuccess: refreshTasks,
   }));
 
   // リスト名変更
   const renameListMutation = createMutation(() => ({
     mutationFn: ({ listId, title }: RouterInputs["lists"]["rename"]) =>
       trpc.lists.rename.mutate({ listId, title }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.lists });
-    },
+    onSuccess: refreshTasks,
   }));
 
   // リストをアーカイブ
   const archiveListMutation = createMutation(() => ({
     mutationFn: (listId: RouterInputs["lists"]["archive"]["listId"]) =>
       trpc.lists.archive.mutate({ listId }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.lists });
-    },
+    onSuccess: refreshTasks,
   }));
 
   // リストをアーカイブ解除
   const unarchiveListMutation = createMutation(() => ({
     mutationFn: (listId: RouterInputs["lists"]["unarchive"]["listId"]) =>
       trpc.lists.unarchive.mutate({ listId }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.lists });
-    },
+    onSuccess: refreshTasks,
   }));
 
   // 完了済みタスククリア
@@ -251,7 +239,7 @@ export function createMainMutations(
     mutationFn: (listId: RouterInputs["lists"]["clear"]["listId"]) =>
       trpc.lists.clear.mutate({ listId }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.activeTasks });
+      void refreshTasks();
     },
   }));
 
@@ -263,6 +251,7 @@ export function createMainMutations(
       queryClient.invalidateQueries({ queryKey: queryKeys.lists });
       queryClient.invalidateQueries({ queryKey: queryKeys.schedules });
       await resetActiveTasks();
+      await refreshTasks();
     },
   }));
 
@@ -309,7 +298,7 @@ export function createMainMutations(
       );
     },
     onSettled: async () => {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.activeTasks });
+      await refreshTasks();
     },
   }));
 
@@ -324,5 +313,6 @@ export function createMainMutations(
     clearListMutation,
     mergeListMutation,
     reorderTasksMutation,
+    reorderArchivePageMutation,
   };
 }

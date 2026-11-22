@@ -1,4 +1,4 @@
-import { QueryClient } from "@tanstack/svelte-query";
+import { QueryClient, QueryObserver } from "@tanstack/svelte-query";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   activeTasksOptions,
@@ -53,10 +53,33 @@ describe("クエリーの取得と同期", () => {
       .mockResolvedValue();
     await invalidateEventQueries(client, "lists:updated");
     expect(invalidate.mock.calls.map(([options]) => options?.queryKey)).toEqual(
-      [["lists"], ["search"]],
+      [["lists"], ["tasks"], ["search"]],
     );
     client.clear();
   });
+  it("初回ページ取得中の更新で旧応答をキャッシュしない", async () => {
+    const client = new QueryClient();
+    const queryKey = [...queryKeys.archivedTasks(1), 1];
+    const old = Promise.withResolvers<string>();
+    const queryFn = vi
+      .fn<() => Promise<string>>()
+      .mockReturnValueOnce(old.promise)
+      .mockResolvedValueOnce("更新後");
+    const observer = new QueryObserver(client, { queryKey, queryFn });
+    const unsubscribe = observer.subscribe(() => undefined);
+    try {
+      expect(queryFn).toHaveBeenCalledTimes(1);
+      await invalidateEventQueries(client, "tasks:updated");
+      old.resolve("更新前");
+      expect(queryFn).toHaveBeenCalledTimes(2);
+      expect(client.getQueryData(queryKey)).toBe("更新後");
+    } finally {
+      old.resolve("更新前");
+      unsubscribe();
+      client.clear();
+    }
+  });
+
   it("タイマー取得の往復時間の中点でサーバー時刻を補正する", async () => {
     vi.spyOn(Date, "now").mockReturnValueOnce(1000).mockReturnValueOnce(1400);
     const result = { serverTime: new Date(2000).toISOString(), timers: [] };

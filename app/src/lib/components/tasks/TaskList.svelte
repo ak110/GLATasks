@@ -22,6 +22,12 @@
         onReorder?: (taskIds: number[]) => void;
         onTaskDragOver?: (listId: number | null) => void;
         onTaskDrop?: (taskId: number, targetListId: number) => void;
+        archivePageActions?: {
+            previous: boolean;
+            next: boolean;
+            disabled: boolean;
+            move: (taskId: number, direction: "previous" | "next") => void;
+        };
         updatedTaskIds?: Set<number>;
     }
 
@@ -36,6 +42,7 @@
         onReorder,
         onTaskDragOver,
         onTaskDrop,
+        archivePageActions,
         updatedTaskIds,
     }: Props = $props();
 
@@ -99,6 +106,34 @@
                     ? dnd.handleDragStart
                     : undefined}
             />
+            {#if archivePageActions}
+                <div class="flex flex-wrap gap-2 px-4">
+                    {#if archivePageActions.previous}
+                        <button
+                            type="button"
+                            class={grayButtonClass}
+                            aria-label={`前のページの末尾へ移す: ${task.title}`}
+                            disabled={archivePageActions.disabled}
+                            onclick={() =>
+                                archivePageActions?.move(task.id, "previous")}
+                        >
+                            前のページの末尾へ移す
+                        </button>
+                    {/if}
+                    {#if archivePageActions.next}
+                        <button
+                            type="button"
+                            class={grayButtonClass}
+                            aria-label={`次のページの先頭へ移す: ${task.title}`}
+                            disabled={archivePageActions.disabled}
+                            onclick={() =>
+                                archivePageActions?.move(task.id, "next")}
+                        >
+                            次のページの先頭へ移す
+                        </button>
+                    {/if}
+                </div>
+            {/if}
         {/each}
     {/if}
 </div>

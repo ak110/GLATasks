@@ -1,7 +1,9 @@
+import { createConnection } from "mysql2/promise";
 import {
   isTrpcUrl,
   uniqueTestName,
   addTask,
+  waitForSuccessfulMutationResponse,
   cleanupTestLists,
   setupTestLists,
 } from "./helpers/common";
@@ -225,5 +227,82 @@ test("検索結果に選択リストが無い場合は受信したグループ�
     expect(await groupTop(firstList)).toBeLessThan(await groupTop(secondList));
   } finally {
     await cleanupTestLists(browser, [firstList, secondList, emptyList]);
+  }
+});
+
+test("アーカイブと検索をページ巡回し、条件変更とページ境界の移動を反映する", async ({
+  page,
+  browser,
+}) => {
+  const title = uniqueTestName("ページ試験");
+  const keyword = uniqueTestName("巡回");
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl) throw new Error("DATABASE_URL が必要です");
+  const db = await createConnection(databaseUrl);
+  try {
+    await setupTestLists(browser, [title]);
+    const titleAt = (i: number) => `${keyword} ${i}`;
+    const data = Array.from({ length: 51 }, (_, i) => [titleAt(i), i]);
+    await db.query(
+      `INSERT INTO task (list_id, text, sort_order, status, created, updated)
+        SELECT l.id, f.text, f.sort_order, 'archived', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+        FROM list l JOIN (${data.map(() => "SELECT ? AS text, ? AS sort_order").join(" UNION ALL ")}) f
+        WHERE l.title = ?`,
+      [...data.flat(), title],
+    );
+    await Promise.all([
+      page.goto("/"),
+      page.waitForResponse((response) => response.url().includes("/api/trpc")),
+    ]);
+    await selectList(page, title);
+    const showType = page.locator("header select");
+    await showType.selectOption("archived");
+    const pager = page.getByRole("navigation", { name: "ページ切り替え" });
+    const next = pager.getByRole("button", { name: "次のページ" });
+    const prev = pager.getByRole("button", { name: "前のページ" });
+    const rows = page.getByTestId("task-item");
+    await expect(rows).toHaveCount(50);
+    await next.click();
+    await expect(rows).toHaveCount(1);
+    await expect(rows.first()).toContainText(titleAt(50));
+    const moved = page.getByRole("button", {
+      name: `前のページの末尾へ移す: ${titleAt(50)}`,
+    });
+    await moved.click();
+    await expect(rows.first()).toContainText(titleAt(49));
+    await prev.click();
+    await expect(rows.last()).toContainText(titleAt(50));
+    await page
+      .getByRole("button", { name: `次のページの先頭へ移す: ${titleAt(50)}` })
+      .click();
+    await expect(rows.last()).toContainText(titleAt(49));
+
+    const search = page.getByTestId("search-input");
+    const lastResult = page.getByRole("button", {
+      name: titleAt(50),
+      exact: true,
+    });
+    await search.fill(keyword);
+    await expect(pager).toContainText("1 / 2");
+    await next.click();
+    await expect(lastResult).toBeVisible();
+    await search.fill(`${keyword} 該当なし`);
+    await expect(page.getByText("該当するタスクがありません")).toBeVisible();
+    await search.fill(keyword);
+    await expect(pager).toContainText("1 / 2");
+    await expect(lastResult).toHaveCount(0);
+
+    await search.fill("");
+    await next.click();
+    await expect(rows.first()).toContainText(titleAt(50));
+    await Promise.all([
+      waitForSuccessfulMutationResponse(page, "tasks.update"),
+      rows.first().getByRole("checkbox").dispatchEvent("click"),
+    ]);
+    await expect(rows).toHaveCount(50);
+    await expect(pager).toHaveCount(0);
+  } finally {
+    await db.end();
+    await cleanupTestLists(browser, [title]);
   }
 });

@@ -8,7 +8,11 @@ export const eventQueryKeys: Record<
   SseEventName | "connected" | "heartbeat",
   readonly QueryKey[]
 > = {
-  [SSE_EVENTS.listsUpdated]: [queryKeys.lists, queryKeys.search],
+  [SSE_EVENTS.listsUpdated]: [
+    queryKeys.lists,
+    queryKeys.tasks,
+    queryKeys.search,
+  ],
   [SSE_EVENTS.tasksUpdated]: [
     queryKeys.activeTasks,
     queryKeys.tasks,
@@ -31,6 +35,17 @@ export async function invalidateEventQueries(
   client: QueryClient,
   event: SseEventName,
 ): Promise<void> {
+  if (event === SSE_EVENTS.tasksUpdated || event === SSE_EVENTS.listsUpdated) {
+    // TanStack Query はデータのない初回取得を invalidate 時に再利用する。
+    // 更新前のスナップショットが返るのを防ぐため、その取得だけを先に取り消す。
+    await client.cancelQueries({
+      predicate: ({ queryKey, state }) =>
+        state.data === undefined &&
+        state.fetchStatus === "fetching" &&
+        ((queryKey[0] === "tasks" && queryKey[2] === "archived") ||
+          (queryKey[0] === "search" && queryKey.length === 5)),
+    });
+  }
   await Promise.all(
     eventQueryKeys[event].map((queryKey) =>
       client.invalidateQueries({ queryKey }),
