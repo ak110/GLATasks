@@ -35,26 +35,11 @@ extend-exclude = [
     "chrome_extension/dist",
 ]
 
-# svelte-check を pyfltr の custom-commands として統合する。
-# アプリのcheckはsvelte-kit sync後に全体を型検査する。
-# --incrementalで変換済みファイルを次回の検査に再利用する。
-# 対象ファイルは実行可否の判定にだけ使う。
-# fast = false でコミット前の `pyfltr fast` からは除外し、`pyfltr run` /
-# `pyfltr ci` のみで実行する。
-[tool.pyfltr.custom-commands.svelte-check]
-type = "linter"
-path = "pnpm"
-args = ["--dir", "app", "run", "check", "--incremental"]
-targets = ["*.svelte", "*.ts", "*.tsx", "*.js", "*.mjs", "*.cjs"]
-pass-filenames = false
-fast = false
-
-[tool.pyfltr.custom-commands.app-unit]
+# 型生成を両方の検証の前に一度だけ実行する。対象ファイルは起動条件にだけ使う。
+[tool.pyfltr.custom-commands.app-verify]
 type = "tester"
 path = "pnpm"
-# pnpm runがスクリプト末尾へ追加引数を渡すため、vitest runへ届く。
-# テスト名と個別の合否を保存出力だけで確認できるよう、verboseのreporterを使う。
-args = ["--dir", "app", "run", "test:unit", "--reporter=verbose"]
+args = ["--dir", "app", "run", "verify"]
 targets = ["*.svelte", "*.ts", "*.tsx", "*.js", "*.mjs", "*.cjs"]
 pass-filenames = false
 fast = false

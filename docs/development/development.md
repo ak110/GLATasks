@@ -54,6 +54,9 @@ AGENTS.mdが指定する`writing-standards`・`review-standards`と該当するr
 
 新しいworktreeでは依存を導入し、`pnpm --dir app exec svelte-kit sync`で型を生成する。
 ルートの`pnpm run check`と`pnpm run test:unit`はアプリでsyncを実行してから検証する。
+`pyfltr run <path>`は`svelte-kit sync`を一度だけ呼び、`svelte-check`とVitestを並行して実行する。
+Vitestの起動時にはNode.jsのコンパイル結果を再利用する。
+V8でカバレッジを測るときは`NODE_DISABLE_COMPILE_CACHE=1`を指定する。
 静的import、動的import、mock指定は拡張子を含む`#lib`参照を使う。
 
 ## 開発コマンド
