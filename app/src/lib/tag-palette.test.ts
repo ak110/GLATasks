@@ -7,6 +7,7 @@ describe("pickTagColor", () => {
   it("未使用色がある場合はその中から選ぶ", () => {
     const used = TAG_COLOR_KEYS.slice(0, 4);
     const picked = pickTagColor("新タグ", used);
+    expect(TAG_COLOR_KEYS).toContain(picked);
     expect(used).not.toContain(picked);
   });
 
@@ -39,6 +40,7 @@ describe("resolveTagColor", () => {
       color,
     }));
     const resolved = resolveTagColor("newtag", existing);
+    expect(TAG_COLOR_KEYS).toContain(resolved);
     expect(existing.map((t) => t.color)).not.toContain(resolved);
   });
 });

@@ -14,7 +14,12 @@ describe("base64ToBytes", () => {
     expect(Array.from(bytes)).toEqual([1]);
   });
 
-  it("複数バイト（パディングなし）を正しく変換する", () => {
+  it("3バイト（パディングなし）を正しく変換する", () => {
+    const bytes = base64ToBytes("AQID");
+    expect(Array.from(bytes)).toEqual([1, 2, 3]);
+  });
+
+  it("10バイト（2文字パディング）を正しく変換する", () => {
     const bytes = base64ToBytes("AAECAwQFBgcICQ==");
     expect(Array.from(bytes)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
   });

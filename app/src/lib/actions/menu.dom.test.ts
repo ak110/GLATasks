@@ -53,6 +53,7 @@ describe("行メニュー", () => {
     node.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
     expect(onClose).not.toHaveBeenCalled();
     document.body.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    expect(onClose).toHaveBeenCalledTimes(1);
     document.dispatchEvent(
       new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
     );
@@ -60,6 +61,11 @@ describe("行メニュー", () => {
     action.update({ open: false, onClose });
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
     expect(onClose).toHaveBeenCalledTimes(2);
+
+    action.update({ open: true, onClose });
     action.destroy();
+    document.body.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    expect(onClose).toHaveBeenCalledTimes(2);
   });
 });
