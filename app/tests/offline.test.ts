@@ -282,7 +282,9 @@ test.describe("入力中の応答の横取り", () => {
         timeout: 15_000,
       });
       await page.unrouteAll();
-      await page.goto(original);
+      // 同じハッシュ付きURLへの遷移は文書を読み直さないため、認証後の復帰は再読み込みで模す。
+      await page.reload();
+      await expect(page).toHaveURL(original);
       await expect(input).toHaveValue(typed);
       await expect(
         page.getByTestId("connectivity-recovery-banner"),
