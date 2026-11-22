@@ -37,12 +37,12 @@ RUN_NODE = docker run $(2) \
 help:
 	@cat Makefile
 
-# prekはworkspace rootから再帰的に配下の`.pre-commit-config.yaml`を探索するため、
-# `--config`で対象を本リポジトリの設定ファイルへ限定する。
+# Gitフックがuvの取得キャッシュに依存しないよう、mise管理のprekで導入する。
+# prekは設定ファイルを再帰的に探索するため、`-c`で本リポジトリの設定へ限定する。
 # `--overwrite`は、pre-commit時代に導入済みのgitフックが残る環境で
 # レガシーフックとの二重実行状態（migration mode）へ陥るのを避けるため付与する
 setup:  # 開発環境のセットアップ
-	uvx prek --config=.pre-commit-config.yaml install --overwrite
+	mise exec -- prek install -c .pre-commit-config.yaml --overwrite
 	git config --local commit.template .gitmessage
 
 sync:  # 最新化と各種更新

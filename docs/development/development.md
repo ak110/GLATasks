@@ -20,6 +20,7 @@ AGENTS.mdが指定する`writing-standards`・`review-standards`と該当するr
 - LinuxまたはmacOS
 - Docker / Docker Compose
 - uv
+- mise
 - Node.js 22.17以上
 
 ### セットアップ手順
@@ -36,9 +37,10 @@ AGENTS.mdが指定する`writing-standards`・`review-standards`と該当するr
 
    `COMPOSE_PROFILE`・`DATA_DIR`・`UID`・`GID`を環境に合わせて編集する
 
-3. 開発環境のセットアップを実行
+3. 開発ツールを導入し、miseで管理するprekでGitフックを登録
 
    ```bash
+   mise install
    make setup
    ```
 
@@ -63,7 +65,7 @@ AGENTS.mdが指定する`writing-standards`・`review-standards`と該当するr
 | `make test-e2e` | e2eテスト（Playwright）単独実行 |
 | `make update` | 依存更新 |
 
-e2eテスト（`make test-e2e`）は、開発環境とは別のComposeプロジェクト（`glatasks-e2e`）を空の試験用DBと空のデータ置き場で起動して実行する。
+e2eテスト（`make test-e2e`）は開発環境とは別のComposeプロジェクト（`glatasks-e2e`）を空の試験用DBと空のデータ置き場で起動して実行する。
 開発用DB・添付ファイル・鍵と公開ポートを使わないため、開発中のデータは残り、稼働中の開発環境も不要である。
 試験は毎回空のDBから始まるため、必要なリスト・設定などのデータは試験自身が用意する。
 成功・失敗とも終了時に試験用の資源を回収し、途中で止まった前回の資源も次回の開始時に回収する。

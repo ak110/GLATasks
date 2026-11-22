@@ -1,5 +1,6 @@
 [tools]
 pinact = "latest"
+prek = "latest"
 # actionlintがワークフローのrunステップのシェルスクリプトを確かめるために子プロセスとして起動する
 shellcheck = "latest"
 typos = "latest"
