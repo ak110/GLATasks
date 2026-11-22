@@ -125,11 +125,23 @@ function nonEmptyString(value: unknown): string | undefined {
 
 // 多言語の警告文の後半に日本語があっても訳として採用しない。
 const TRANSLATION_PROBE_LENGTH = 120;
-const SENTENCE_END = /[。！？.!?\r\n]/u;
+// 英字の句読点は直後が空白か末尾の時だけ文末とみなし、「Node.js」「v1.2」のような語中の記号を文の区切りとしない。
+const SENTENCE_END = /[。！？\r\n]|[.!?](?=\s|$)/gu;
+// 「Mr. Smith」のような敬称や頭文字の略記のピリオドは文末としない。
+const ABBREVIATION_BEFORE_PERIOD = /(?:^|\s)(?:[A-Za-z]|[A-Z][a-z]{1,2})$/u;
 const DEEPL_VERSION_WARNING =
   /older version of DeepL|ältere Version von DeepL|古いバージョンのDeepLを使用/iu;
 const JAPANESE_CHAR_PATTERN =
   /[\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Han}]/u;
+
+function leadingSentence(text: string): string {
+  for (const match of text.matchAll(SENTENCE_END)) {
+    const before = text.slice(0, match.index);
+    if (match[0] === "." && ABBREVIATION_BEFORE_PERIOD.test(before)) continue;
+    return before;
+  }
+  return text.slice(0, TRANSLATION_PROBE_LENGTH);
+}
 
 /** FxTwitterの`/2/`を含むv2形式ではなく、v1形式（`tweet.author.screen_name`など）の属性名で読む。 */
 export function parseFxTwitter(
@@ -145,12 +157,7 @@ export function parseFxTwitter(
   if (!tweet || !name || !screenName) return undefined;
   let translation = nonEmptyString(asRecord(tweet.translation)?.text);
   if (translation) {
-    const start = translation.trimStart();
-    const end = start.search(SENTENCE_END);
-    const firstSentence = start.slice(
-      0,
-      end < 0 ? TRANSLATION_PROBE_LENGTH : end,
-    );
+    const firstSentence = leadingSentence(translation.trimStart());
     const reason = DEEPL_VERSION_WARNING.test(translation)
       ? "DeepLの旧版警告文"
       : !JAPANESE_CHAR_PATTERN.test(firstSentence)

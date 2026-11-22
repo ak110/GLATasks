@@ -67,8 +67,13 @@ describe("buildShareInitialText", () => {
     );
   });
 
-  it("英語の固有名詞で始まる日本語訳を使う", async () => {
-    const translation = "DeepL の翻訳機能を使いました。";
+  it.each([
+    ["英語の固有名詞で始まる訳", "DeepL の翻訳機能を使いました。"],
+    ["敬称の略記で始まる訳", "Mr. Smithは到着した。"],
+    ["複数の略記で始まる訳", "Mr. and Mrs. Smithは到着した。"],
+    ["語中にピリオドを含む製品名で始まる訳", "Node.jsの使い方を紹介します。"],
+    ["感嘆符を含む固有名詞で始まる訳", "Yahoo!ニュースで紹介された。"],
+  ])("日本語訳（%s）を使う", async (_label, translation) => {
     const fetch = fakeFetch({
       [FX_URL]: { status: 200, body: fxBody(translation) },
     });
