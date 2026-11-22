@@ -1,6 +1,8 @@
 <script lang="ts">
     import { handleMainKeyboard } from "#lib/client/tasks/main-keyboard.svelte.ts";
     import { queryKeys } from "#lib/client/query-options.ts";
+    import { invalidateEventQueries } from "#lib/client/query-sync.ts";
+    import { SSE_EVENTS } from "#lib/sse-events.ts";
     import { createMainNavigation } from "#lib/client/tasks/main-navigation.svelte.ts";
     import { subscribeMainSync } from "#lib/client/tasks/main-sync.svelte.ts";
     import { createMainMutations } from "#lib/client/tasks/main-mutations.svelte.ts";
@@ -251,13 +253,10 @@
         }
     }
 
-    // 添付ファイル追加・削除完了後の呼び出し。SSE経由の反映を待たず同一タブへ即時反映する
+    // 添付ファイル追加・削除完了後の呼び出し。SSE経由の反映を待たず同一タブへ即時反映する。
+    // タスク更新の通知と同じ処理を通し、実行中の初回取得が返す更新前の応答を採用しない。
     function handleAttachmentChange() {
-        queryClient.invalidateQueries({ queryKey: queryKeys.activeTasks });
-        queryClient.invalidateQueries({ queryKey: queryKeys.search });
-        queryClient.invalidateQueries({
-            queryKey: queryKeys.archivedTasks(state.selectedListId),
-        });
+        void invalidateEventQueries(queryClient, SSE_EVENTS.tasksUpdated);
     }
 
     function openEditDialog(task: TaskListItem) {
