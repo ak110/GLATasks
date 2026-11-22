@@ -272,7 +272,7 @@ test.describe("入力中の応答の横取り", () => {
         async (route) => {
           if (!route.request().isNavigationRequest()) return route.fallback();
           await route.fulfill({
-            contentType: "text/html",
+            contentType: "text/html; charset=utf-8",
             body: "<p>認証画面</p>",
           });
         },
