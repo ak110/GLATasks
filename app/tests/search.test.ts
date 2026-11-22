@@ -284,7 +284,9 @@ test("アーカイブと検索をページ巡回し、条件変更とページ�
     });
     await search.fill(keyword);
     await expect(pager).toContainText("1 / 2");
-    await next.click();
+    const destination = pager.getByRole("spinbutton", { name: "ページ番号" });
+    await destination.fill("2");
+    await destination.press("Enter");
     await expect(lastResult).toBeVisible();
     await search.fill(`${keyword} 該当なし`);
     await expect(page.getByText("該当するタスクがありません")).toBeVisible();

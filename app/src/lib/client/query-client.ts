@@ -63,6 +63,14 @@ queryCache.subscribe((event) => {
   }
   if (!browser) return;
   if (
+    (event.type === "observerRemoved" ||
+      event.type === "observerOptionsUpdated") &&
+    event.query.meta?.dismissToastOnDeactivate &&
+    !event.query.isActive()
+  ) {
+    dismissQueryToast(event.query);
+  }
+  if (
     event.type === "observerAdded" ||
     event.type === "observerOptionsUpdated" ||
     event.type === "observerResultsUpdated"
@@ -100,6 +108,7 @@ async function presentQueryError(error: unknown, query: NotificationQuery) {
   await tick();
   if (query.state.status !== "error" || query.state.error !== error) return;
   dismissQueryToast(query);
+  if (query.meta?.dismissToastOnDeactivate && !query.isActive()) return;
   if (!hasVisibleInline(query.queryHash)) {
     queryToasts.set(query, showErrorToast(extractErrorMessage(error)));
   }

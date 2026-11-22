@@ -302,13 +302,16 @@ function taskStatusFilter(showType: ShowType) {
     : ne(tasks.status, "archived");
 }
 
-function searchFilter(userId: number, query: string, showType: ShowType) {
+function matchingTaskFilter(query: string, showType: ShowType) {
   const pattern = `%${query.replace(/[%_]/g, "\\$&")}%`;
+  return and(taskStatusFilter(showType), like(tasks.text, pattern));
+}
+
+function searchFilter(userId: number, query: string, showType: ShowType) {
   return and(
     eq(lists.user_id, userId),
     showType === "active" ? eq(lists.status, "active") : undefined,
-    taskStatusFilter(showType),
-    like(tasks.text, pattern),
+    matchingTaskFilter(query, showType),
   );
 }
 
@@ -424,15 +427,25 @@ export async function searchTaskPage(
       .from(tasks)
       .innerJoin(lists, eq(tasks.list_id, lists.id))
       .where(filter);
-    // 本文をウィンドウ関数の作業表へ入れず、ページのIDだけを先に選ぶ。
-    const matches = await db
-      .select({ id: tasks.id })
+    // 一致タスクごとにウィンドウ関数を評価せず、リスト単位の最小順位を再利用する。
+    const groups = db
+      .select({
+        listId: tasks.list_id,
+        firstOrder: min(tasks.sort_order).as("first_order"),
+      })
       .from(tasks)
       .innerJoin(lists, eq(tasks.list_id, lists.id))
       .where(filter)
+      .groupBy(tasks.list_id)
+      .as("matched_lists");
+    const matches = await db
+      .select({ id: tasks.id })
+      .from(tasks)
+      .innerJoin(groups, eq(tasks.list_id, groups.listId))
+      .where(matchingTaskFilter(query, showType))
       .orderBy(
         sql`case when ${tasks.list_id} = ${selectedListId} then 0 else 1 end`,
-        sql`min(${tasks.sort_order}) over (partition by ${tasks.list_id})`,
+        asc(groups.firstOrder),
         asc(tasks.list_id),
         asc(tasks.sort_order),
         asc(tasks.id),
@@ -467,81 +480,85 @@ export async function reorderArchivePage(
   userId: number,
   { listId, page, change }: z.infer<typeof ReorderArchivePageSchema>,
 ) {
-  await getDb().transaction(async (db) => {
-    await getOwnedList(listId, userId, db);
-    const rows = await db
-      .select({ id: tasks.id, order: tasks.sort_order, status: tasks.status })
-      .from(tasks)
-      .where(eq(tasks.list_id, listId))
-      .orderBy(asc(tasks.sort_order), asc(tasks.id))
-      .for("update");
-    const archive = rows.filter((row) => row.status === "archived");
-    const offset = page * TASK_PAGE_SIZE;
-    const current = archive.slice(offset, offset + TASK_PAGE_SIZE);
-    const ordered = [...rows];
-    if (change.kind === "reorder") {
-      const byId = new Map(current.map((row) => [row.id, row]));
-      if (
-        byId.size !== change.taskIds.length ||
-        new Set(change.taskIds).size !== byId.size ||
-        change.taskIds.some((id) => !byId.has(id))
-      )
-        throw new ApiError("task_not_found");
-      const positions = current.map((row) => rows.indexOf(row));
-      positions.forEach((position, i) => {
-        ordered[position] = byId.get(change.taskIds[i])!;
-      });
-    } else {
-      const moved = current.find((row) => row.id === change.taskId);
-      const neighbor =
-        archive[
-          change.kind === "previous" ? offset - 1 : offset + TASK_PAGE_SIZE
-        ];
-      if (!moved || !neighbor) throw new ApiError("task_not_found");
-      ordered.splice(ordered.indexOf(moved), 1);
-      ordered.splice(
-        ordered.indexOf(neighbor) + (change.kind === "next" ? 1 : 0),
-        0,
-        moved,
-      );
+  // 所有権確認の読み取りビューを次のロック取得へ持ち越さない。
+  await getDb().transaction(
+    async (db) => {
+      await getOwnedList(listId, userId, db);
+      const rows = await db
+        .select({ id: tasks.id, order: tasks.sort_order, status: tasks.status })
+        .from(tasks)
+        .where(eq(tasks.list_id, listId))
+        .orderBy(asc(tasks.sort_order), asc(tasks.id))
+        .for("update");
+      const archive = rows.filter((row) => row.status === "archived");
+      const offset = page * TASK_PAGE_SIZE;
+      const current = archive.slice(offset, offset + TASK_PAGE_SIZE);
+      const ordered = [...rows];
+      if (change.kind === "reorder") {
+        const byId = new Map(current.map((row) => [row.id, row]));
+        if (
+          byId.size !== change.taskIds.length ||
+          new Set(change.taskIds).size !== byId.size ||
+          change.taskIds.some((id) => !byId.has(id))
+        )
+          throw new ApiError("task_not_found");
+        const positions = current.map((row) => rows.indexOf(row));
+        positions.forEach((position, i) => {
+          ordered[position] = byId.get(change.taskIds[i])!;
+        });
+      } else {
+        const moved = current.find((row) => row.id === change.taskId);
+        const neighbor =
+          archive[
+            change.kind === "previous" ? offset - 1 : offset + TASK_PAGE_SIZE
+          ];
+        if (!moved || !neighbor) throw new ApiError("task_not_found");
+        ordered.splice(ordered.indexOf(moved), 1);
+        ordered.splice(
+          ordered.indexOf(neighbor) + (change.kind === "next" ? 1 : 0),
+          0,
+          moved,
+        );
 
-      const destination = ordered.indexOf(moved);
-      const lower = ordered[destination - 1]?.order ?? -2147483649;
-      const upper = ordered[destination + 1]?.order ?? 2147483648;
-      if (upper - lower > 1) {
-        await db
-          .update(tasks)
-          .set({
-            sort_order: Math.floor((lower + upper) / 2),
-            updated: new Date(),
-          })
-          .where(eq(tasks.id, moved.id));
-        await touchListUpdated(listId, db);
-        return;
+        const destination = ordered.indexOf(moved);
+        const lower = ordered[destination - 1]?.order ?? -2147483649;
+        const upper = ordered[destination + 1]?.order ?? 2147483648;
+        if (upper - lower > 1) {
+          await db
+            .update(tasks)
+            .set({
+              sort_order: Math.floor((lower + upper) / 2),
+              updated: new Date(),
+            })
+            .where(eq(tasks.id, moved.id));
+          await touchListUpdated(listId, db);
+          return;
+        }
       }
-    }
 
-    // 同値の中でID順が逆転する場合だけ振り直し、ページ外の相対順も保つ。
-    const needsRenumber =
-      change.kind !== "reorder" ||
-      ordered.some(
-        (row, i) =>
-          i > 0 &&
-          rows[i - 1].order === rows[i].order &&
-          ordered[i - 1].id > row.id,
-      );
-    const now = new Date();
-    for (const [i, row] of ordered.entries()) {
-      const order = needsRenumber ? i : rows[i].order;
-      if (row.order !== order) {
-        await db
-          .update(tasks)
-          .set({ sort_order: order, updated: now })
-          .where(eq(tasks.id, row.id));
+      // 同値の中でID順が逆転する場合だけ振り直し、ページ外の相対順も保つ。
+      const needsRenumber =
+        change.kind !== "reorder" ||
+        ordered.some(
+          (row, i) =>
+            i > 0 &&
+            rows[i - 1].order === rows[i].order &&
+            ordered[i - 1].id > row.id,
+        );
+      const now = new Date();
+      for (const [i, row] of ordered.entries()) {
+        const order = needsRenumber ? i : rows[i].order;
+        if (row.order !== order) {
+          await db
+            .update(tasks)
+            .set({ sort_order: order, updated: now })
+            .where(eq(tasks.id, row.id));
+        }
       }
-    }
-    await touchListUpdated(listId, db);
-  });
+      await touchListUpdated(listId, db);
+    },
+    { isolationLevel: "read committed" },
+  );
 }
 
 /** タスクの並び順を更新する */

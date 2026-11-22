@@ -66,6 +66,7 @@ export const archiveTagCandidatesOptions = (listId: number | null) => ({
 });
 export const archivedTasksOptions = (listId: number | null, page: number) => ({
   queryKey: [...queryKeys.archivedTasks(listId), page] as const,
+  meta: { dismissToastOnDeactivate: true },
   queryFn: () => trpc.tasks.listPage.query({ listId: listId!, page }),
 });
 export const searchOptions = (
@@ -79,6 +80,7 @@ export const searchOptions = (
     selectedListId,
     page,
   ] as const,
+  meta: { dismissToastOnDeactivate: true },
   queryFn: () =>
     trpc.tasks.searchPage.query({ query, showType, selectedListId, page }),
 });
