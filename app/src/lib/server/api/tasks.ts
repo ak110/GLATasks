@@ -23,6 +23,7 @@ import type {
   ShowType,
   TagInfo,
   TaskKind,
+  TaskStatus,
   UpdateTaskSchema,
   ReorderArchivePageSchema,
 } from "#lib/schemas.ts";
@@ -508,6 +509,63 @@ export async function searchTaskPage(
   });
 }
 
+export function planArchivePageReorder(
+  rows: ReadonlyArray<{ id: number; order: number; status: TaskStatus }>,
+  page: number,
+  change: z.infer<typeof ReorderArchivePageSchema>["change"],
+  pageSize = TASK_PAGE_SIZE,
+): Array<{ id: number; order: number }> {
+  const archive = rows.filter((row) => row.status === "archived");
+  const offset = page * pageSize;
+  const current = archive.slice(offset, offset + pageSize);
+  const ordered = [...rows];
+  if (change.kind === "reorder") {
+    const byId = new Map(current.map((row) => [row.id, row]));
+    if (
+      byId.size !== change.taskIds.length ||
+      new Set(change.taskIds).size !== byId.size ||
+      change.taskIds.some((id) => !byId.has(id))
+    )
+      throw new ApiError("task_not_found");
+    const positions = current.map((row) => rows.indexOf(row));
+    positions.forEach((position, i) => {
+      ordered[position] = byId.get(change.taskIds[i])!;
+    });
+  } else {
+    const moved = current.find((row) => row.id === change.taskId);
+    const neighbor =
+      archive[change.kind === "previous" ? offset - 1 : offset + pageSize];
+    if (!moved || !neighbor) throw new ApiError("task_not_found");
+    ordered.splice(ordered.indexOf(moved), 1);
+    ordered.splice(
+      ordered.indexOf(neighbor) + (change.kind === "next" ? 1 : 0),
+      0,
+      moved,
+    );
+
+    const destination = ordered.indexOf(moved);
+    const lower = ordered[destination - 1]?.order ?? -2147483649;
+    const upper = ordered[destination + 1]?.order ?? 2147483648;
+    if (upper - lower > 1) {
+      return [{ id: moved.id, order: Math.floor((lower + upper) / 2) }];
+    }
+  }
+
+  // 同値の中でID順が逆転する場合だけ振り直し、ページ外の相対順も保つ。
+  const needsRenumber =
+    change.kind !== "reorder" ||
+    ordered.some(
+      (row, i) =>
+        i > 0 &&
+        rows[i - 1].order === rows[i].order &&
+        ordered[i - 1].id > row.id,
+    );
+  return ordered.flatMap((row, i) => {
+    const order = needsRenumber ? i : rows[i].order;
+    return row.order === order ? [] : [{ id: row.id, order }];
+  });
+}
+
 export async function reorderArchivePage(
   userId: number,
   { listId, page, change }: z.infer<typeof ReorderArchivePageSchema>,
@@ -522,70 +580,12 @@ export async function reorderArchivePage(
         .where(eq(tasks.list_id, listId))
         .orderBy(asc(tasks.sort_order), asc(tasks.id))
         .for("update");
-      const archive = rows.filter((row) => row.status === "archived");
-      const offset = page * TASK_PAGE_SIZE;
-      const current = archive.slice(offset, offset + TASK_PAGE_SIZE);
-      const ordered = [...rows];
-      if (change.kind === "reorder") {
-        const byId = new Map(current.map((row) => [row.id, row]));
-        if (
-          byId.size !== change.taskIds.length ||
-          new Set(change.taskIds).size !== byId.size ||
-          change.taskIds.some((id) => !byId.has(id))
-        )
-          throw new ApiError("task_not_found");
-        const positions = current.map((row) => rows.indexOf(row));
-        positions.forEach((position, i) => {
-          ordered[position] = byId.get(change.taskIds[i])!;
-        });
-      } else {
-        const moved = current.find((row) => row.id === change.taskId);
-        const neighbor =
-          archive[
-            change.kind === "previous" ? offset - 1 : offset + TASK_PAGE_SIZE
-          ];
-        if (!moved || !neighbor) throw new ApiError("task_not_found");
-        ordered.splice(ordered.indexOf(moved), 1);
-        ordered.splice(
-          ordered.indexOf(neighbor) + (change.kind === "next" ? 1 : 0),
-          0,
-          moved,
-        );
-
-        const destination = ordered.indexOf(moved);
-        const lower = ordered[destination - 1]?.order ?? -2147483649;
-        const upper = ordered[destination + 1]?.order ?? 2147483648;
-        if (upper - lower > 1) {
-          await db
-            .update(tasks)
-            .set({
-              sort_order: Math.floor((lower + upper) / 2),
-              updated: new Date(),
-            })
-            .where(eq(tasks.id, moved.id));
-          await touchListUpdated(listId, db);
-          return;
-        }
-      }
-
-      // 同値の中でID順が逆転する場合だけ振り直し、ページ外の相対順も保つ。
-      const needsRenumber =
-        change.kind !== "reorder" ||
-        ordered.some(
-          (row, i) =>
-            i > 0 &&
-            rows[i - 1].order === rows[i].order &&
-            ordered[i - 1].id > row.id,
-        );
       const now = new Date();
-      for (const [i, row] of ordered.entries()) {
-        const order = needsRenumber ? i : rows[i].order;
-        if (row.order !== order) {
-          await db
-            .update(tasks)
-            .set({ sort_order: order, updated: now })
-            .where(eq(tasks.id, row.id));
-        }
+      for (const { id, order } of planArchivePageReorder(rows, page, change)) {
+        await db
+          .update(tasks)
+          .set({ sort_order: order, updated: now })
+          .where(eq(tasks.id, id));
       }
       await touchListUpdated(listId, db);
     },

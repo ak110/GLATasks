@@ -112,8 +112,8 @@ function toTimerInfo(row: typeof timers.$inferSelect) {
 export function calcAlarmRemainingSeconds(
   targetMinutes: number,
   tzOffsetMinutes: number,
+  nowUtcMs: number,
 ): number {
-  const nowUtcMs = Date.now();
   const nowLocal = new Date(nowUtcMs + tzOffsetMinutes * 60 * 1000);
   const nowLocalMinutes =
     nowLocal.getUTCHours() * 60 + nowLocal.getUTCMinutes();
@@ -134,6 +134,7 @@ export function calcAlarmRemainingSeconds(
 export function calcAlarmSecondsOrThrow(
   targetMinutes: number | null | undefined,
   tzOffsetMinutes: number | null | undefined,
+  nowUtcMs: number,
 ): number {
   if (targetMinutes === null || targetMinutes === undefined) {
     throw new ApiError("alarm_missing_params");
@@ -141,7 +142,7 @@ export function calcAlarmSecondsOrThrow(
   if (tzOffsetMinutes === null || tzOffsetMinutes === undefined) {
     throw new ApiError("alarm_missing_params");
   }
-  return calcAlarmRemainingSeconds(targetMinutes, tzOffsetMinutes);
+  return calcAlarmRemainingSeconds(targetMinutes, tzOffsetMinutes, nowUtcMs);
 }
 
 // ── 公開API ──
@@ -183,11 +184,11 @@ export async function createTimer(params: CreateTimerParams): Promise<void> {
   } = params;
   const isAlarm = mode === "alarm";
   const startsImmediately = isAlarm || ephemeral;
+  const now = new Date();
   const remainingSeconds = isAlarm
-    ? calcAlarmRemainingSeconds(targetMinutes!, tzOffsetMinutes!)
+    ? calcAlarmRemainingSeconds(targetMinutes!, tzOffsetMinutes!, now.getTime())
     : baseSeconds;
   const db = getDb();
-  const now = new Date();
   // 現在の最大 sort_order を取得
   const [{ maxOrder }] = await db
     .select({ maxOrder: max(timers.sort_order) })
@@ -236,6 +237,7 @@ export async function updateTimer(
         updates.remaining_seconds = calcAlarmRemainingSeconds(
           data.targetMinutes!,
           data.tzOffsetMinutes!,
+          now.getTime(),
         );
       } else {
         // alarm → countdown
@@ -259,6 +261,7 @@ export async function updateTimer(
           updates.remaining_seconds = calcAlarmRemainingSeconds(
             data.targetMinutes,
             data.tzOffsetMinutes,
+            now.getTime(),
           );
         }
       }
@@ -297,7 +300,11 @@ export async function startTimer(
     const state = decodeTimerState(timer);
     const alarmSeconds =
       timer.mode === "alarm" && state.kind !== "running"
-        ? calcAlarmSecondsOrThrow(timer.target_minutes, tzOffsetMinutes)
+        ? calcAlarmSecondsOrThrow(
+            timer.target_minutes,
+            tzOffsetMinutes,
+            now.getTime(),
+          )
         : undefined;
     return timerStateColumns(
       transitionTimer(state, { kind: "start", alarmSeconds }, now),
@@ -335,6 +342,7 @@ export async function resetTimer(
       newRemaining = calcAlarmSecondsOrThrow(
         timer.target_minutes,
         tzOffsetMinutes,
+        now.getTime(),
       );
     } else {
       const currentRemaining = Math.max(0, timerRemainingSeconds(state, now));
@@ -419,6 +427,7 @@ export async function setTimerTime(
         updates.remaining_seconds = calcAlarmRemainingSeconds(
           targetMinutes,
           tzOffsetMinutes,
+          now.getTime(),
         );
       } else {
         updates.remaining_seconds = seconds;

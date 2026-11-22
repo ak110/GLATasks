@@ -5,6 +5,19 @@ import { DAY_MS } from "#lib/calorie-date.ts";
 import { getDb } from "./db";
 import { calorieAutoRecords, calorieRecords } from "./schema";
 
+export function collectDueCalorieAutoRecordRuns(
+  nextRunAt: Date,
+  now: Date,
+): { consumedAts: Date[]; nextRunAt: Date } {
+  const consumedAts: Date[] = [];
+  let next = nextRunAt.getTime();
+  while (next <= now.getTime()) {
+    consumedAts.push(new Date(next));
+    next += DAY_MS;
+  }
+  return { consumedAts, nextRunAt: new Date(next) };
+}
+
 /**
  * ONの自動記録設定のうち次回時刻が`now`以前のものについて、過ぎた時刻ごとに記録を追加し、
  * 記録を追加したユーザーのIDと、全設定を正常に処理できたかを返す。
@@ -30,12 +43,10 @@ export async function processCalorieAutoRecords(
   let succeeded = true;
   for (const rule of rules) {
     try {
-      const consumedAts: Date[] = [];
-      let next = rule.next_run_at.getTime();
-      while (next <= now.getTime()) {
-        consumedAts.push(new Date(next));
-        next += DAY_MS;
-      }
+      const { consumedAts, nextRunAt } = collectDueCalorieAutoRecordRuns(
+        rule.next_run_at,
+        now,
+      );
       await db.transaction(async (tx) => {
         await tx.insert(calorieRecords).values(
           consumedAts.map((consumedAt) => ({
@@ -49,7 +60,7 @@ export async function processCalorieAutoRecords(
         );
         await tx
           .update(calorieAutoRecords)
-          .set({ next_run_at: new Date(next) })
+          .set({ next_run_at: nextRunAt })
           .where(eq(calorieAutoRecords.id, rule.id));
       });
       notifiedUserIds.add(rule.user_id);

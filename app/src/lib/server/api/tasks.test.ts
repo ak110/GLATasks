@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { afterAll, expect, it } from "vitest";
+import { afterAll, describe, expect, it } from "vitest";
 
 import {
   cleanupFixtures,
@@ -16,9 +16,66 @@ import {
   findArchivePage,
   searchTaskPage,
   reorderArchivePage,
+  planArchivePageReorder,
   updateTask,
   createTask,
 } from "./tasks";
+
+describe("planArchivePageReorder", () => {
+  const archived = (id: number, order: number) => ({
+    id,
+    order,
+    status: "archived" as const,
+  });
+
+  it("ページ内の並び替えは順位の値を入れ替え、同順位でID順が逆転する場合は振り直す", () => {
+    const rows = [archived(1, 10), archived(2, 20), archived(3, 30)];
+    expect(
+      planArchivePageReorder(rows, 0, { kind: "reorder", taskIds: [3, 1, 2] }),
+    ).toEqual([
+      { id: 3, order: 10 },
+      { id: 1, order: 20 },
+      { id: 2, order: 30 },
+    ]);
+    const tied = [archived(1, 5), archived(2, 5)];
+    expect(
+      planArchivePageReorder(tied, 0, { kind: "reorder", taskIds: [2, 1] }),
+    ).toEqual([
+      { id: 2, order: 0 },
+      { id: 1, order: 1 },
+    ]);
+  });
+
+  it("前後のページへの移動は空きがあれば中点へ、無ければ全体を振り直す", () => {
+    const rows = [archived(1, 10), archived(2, 20), archived(3, 30)];
+    expect(
+      planArchivePageReorder(rows, 1, { kind: "previous", taskId: 3 }, 2),
+    ).toEqual([{ id: 3, order: 15 }]);
+    const packed = [archived(1, 0), archived(2, 1), archived(3, 1)];
+    expect(
+      planArchivePageReorder(packed, 0, { kind: "next", taskId: 1 }, 1),
+    ).toEqual([
+      { id: 2, order: 0 },
+      { id: 1, order: 1 },
+      { id: 3, order: 2 },
+    ]);
+  });
+
+  it("ページの全件と一致しない並び替えや範囲外への移動はtask_not_foundにする", () => {
+    const rows = [archived(1, 10), archived(2, 20), archived(3, 30)];
+    const changes: Array<Parameters<typeof planArchivePageReorder>[2]> = [
+      { kind: "reorder", taskIds: [1, 2] },
+      { kind: "reorder", taskIds: [1, 1, 2] },
+      { kind: "previous", taskId: 1 },
+      { kind: "next", taskId: 3 },
+    ];
+    for (const change of changes) {
+      expect(() => planArchivePageReorder(rows, 0, change, 3)).toThrow(
+        "task_not_found",
+      );
+    }
+  });
+});
 
 describeDb("タスク更新と差分同期", () => {
   const userIds: number[] = [];

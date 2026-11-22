@@ -2,41 +2,29 @@
  * @fileoverview タイマー純粋関数のユニットテスト
  *
  * DB 依存がない calcAlarmRemainingSeconds / calcAlarmSecondsOrThrow を対象にする。
- * 現在時刻に依存するため vi.useFakeTimers() で時刻を固定する。
+ * 基準時刻を引数で渡して計算する。
  */
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import {
   calcAlarmRemainingSeconds,
   calcAlarmSecondsOrThrow,
 } from "./timers.js";
 
-/**
- * 固定時刻でのアラーム残り秒数を計算する補助関数。
- *
- * @param nowIso - 現在時刻（ISO 8601 UTC 文字列）
- * @param targetMinutes - ターゲット時刻（現地時間の分数: 0〜1439）
- * @param tzOffsetMinutes - タイムゾーンオフセット（分）
- */
 function calcWithFixedTime(
   nowIso: string,
   targetMinutes: number,
   tzOffsetMinutes: number,
 ): number {
-  vi.setSystemTime(new Date(nowIso));
-  return calcAlarmRemainingSeconds(targetMinutes, tzOffsetMinutes);
+  return calcAlarmRemainingSeconds(
+    targetMinutes,
+    tzOffsetMinutes,
+    Date.parse(nowIso),
+  );
 }
 
 describe("calcAlarmRemainingSeconds", () => {
-  beforeEach(() => {
-    vi.useFakeTimers();
-  });
-
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
   it("ターゲット時刻が現在より未来の場合は正の秒数を返す", () => {
     // UTC 12:00:00、JST(+9h=+540min) では 21:00:00
     // ターゲット: JST 22:00 = 22*60=1320分
@@ -106,47 +94,40 @@ describe("calcAlarmRemainingSeconds", () => {
 });
 
 describe("calcAlarmSecondsOrThrow", () => {
-  beforeEach(() => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2025-01-01T12:00:00.000Z"));
-  });
-
-  afterEach(() => {
-    vi.useRealTimers();
-  });
+  const nowUtcMs = Date.parse("2025-01-01T12:00:00.000Z");
 
   it("target_minutes と tzOffsetMinutes が両方指定されているとき正常に計算する", () => {
     // JST(+540) 21:00:00 → ターゲット JST 22:00 = 3600秒後
-    const result = calcAlarmSecondsOrThrow(22 * 60, 540);
+    const result = calcAlarmSecondsOrThrow(22 * 60, 540, nowUtcMs);
     expect(result).toBe(3600);
   });
 
   it("target_minutes が null のとき alarm_missing_params をスローする", () => {
-    expect(() => calcAlarmSecondsOrThrow(null, 540)).toThrowError(
+    expect(() => calcAlarmSecondsOrThrow(null, 540, nowUtcMs)).toThrowError(
       "alarm_missing_params",
     );
   });
 
   it("target_minutes が undefined のとき alarm_missing_params をスローする", () => {
-    expect(() => calcAlarmSecondsOrThrow(undefined, 540)).toThrowError(
-      "alarm_missing_params",
-    );
+    expect(() =>
+      calcAlarmSecondsOrThrow(undefined, 540, nowUtcMs),
+    ).toThrowError("alarm_missing_params");
   });
 
   it("tzOffsetMinutes が null のとき alarm_missing_params をスローする", () => {
-    expect(() => calcAlarmSecondsOrThrow(22 * 60, null)).toThrowError(
+    expect(() => calcAlarmSecondsOrThrow(22 * 60, null, nowUtcMs)).toThrowError(
       "alarm_missing_params",
     );
   });
 
   it("tzOffsetMinutes が undefined のとき alarm_missing_params をスローする", () => {
-    expect(() => calcAlarmSecondsOrThrow(22 * 60, undefined)).toThrowError(
-      "alarm_missing_params",
-    );
+    expect(() =>
+      calcAlarmSecondsOrThrow(22 * 60, undefined, nowUtcMs),
+    ).toThrowError("alarm_missing_params");
   });
 
   it("両方 null のとき alarm_missing_params をスローする", () => {
-    expect(() => calcAlarmSecondsOrThrow(null, null)).toThrowError(
+    expect(() => calcAlarmSecondsOrThrow(null, null, nowUtcMs)).toThrowError(
       "alarm_missing_params",
     );
   });
