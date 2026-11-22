@@ -194,6 +194,11 @@ export const ListTaskPageSchema = GetListTasksSchema.pick({
 }).extend({
   page: TaskPageIndexSchema,
 });
+export const FindArchivePageSchema = GetListTasksSchema.pick({
+  listId: true,
+}).extend({
+  taskId: z.number().int().positive(),
+});
 export const SearchTaskPageSchema = SearchTasksSchema.extend({
   page: TaskPageIndexSchema,
   selectedListId: GetListTasksSchema.shape.listId.nullable(),

@@ -27,8 +27,8 @@
         error?: string;
         queryErrorKey?: string;
         onRetry?: () => void;
-        /** 検索結果のタスクをクリックしたときのコールバック */
-        onGoToResult: (listId: number) => void;
+        /** リスト見出しまたはタスクをクリックしたときのコールバック。タスクの時だけ taskId を渡す */
+        onGoToResult: (listId: number, taskId?: number) => void;
     }
 
     let {
@@ -112,7 +112,7 @@
                             )} hover:text-blue-600 dark:hover:text-blue-400"
                             class:line-through={task.status === "completed"}
                             class:line-clamp-5={!expandedNotes.has(task.id)}
-                            onclick={() => onGoToResult(listId)}
+                            onclick={() => onGoToResult(listId, task.id)}
                             use:clampDetector={makeClampCallback(task.id)}
                         >
                             <!-- eslint-disable-next-line svelte/no-at-html-tags -- linkify()が自前でHTMLエスケープ済み -->
@@ -124,7 +124,7 @@
                                 task.status,
                             )} hover:text-blue-600 dark:hover:text-blue-400"
                             class:line-through={task.status === "completed"}
-                            onclick={() => onGoToResult(listId)}
+                            onclick={() => onGoToResult(listId, task.id)}
                         >
                             <!-- eslint-disable-next-line svelte/no-at-html-tags -- linkify()が自前でHTMLエスケープ済み -->
                             {@html linkify(task.title || "（空のタスク）")}

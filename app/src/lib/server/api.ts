@@ -30,6 +30,7 @@ export type {
 } from "./api/tasks";
 export {
   listTaskPage,
+  findArchivePage,
   archiveTagCandidates,
   searchTaskPage,
   reorderArchivePage,

@@ -13,6 +13,7 @@ import {
   listActiveTasks,
   listTasks,
   listTaskPage,
+  findArchivePage,
   searchTaskPage,
   reorderArchivePage,
   updateTask,
@@ -149,7 +150,11 @@ describeDb("アーカイブと検索のページ取得", () => {
     const firstRows = await insert(first.listId, 53, 0);
     const selectedRows = await insert(selected.listId, 52, 1);
     await insert(other.listId, 2, -1);
-    await createTask(first.userId, first.listId, "ページ検索_% 非アーカイブ");
+    const activeTaskId = await createTask(
+      first.userId,
+      first.listId,
+      "ページ検索_% 非アーカイブ",
+    );
     const ids = (result: { tasks: { id: number }[] }) =>
       result.tasks.map(({ id }) => id);
     const archive = (page: number) =>
@@ -171,6 +176,17 @@ describeDb("アーカイブと検索のページ取得", () => {
     await expect(listTaskPage(first.userId, other.listId, 0)).rejects.toThrow(
       "not_found_or_forbidden",
     );
+    const pageOf = (taskId: number) =>
+      findArchivePage(first.userId, first.listId, taskId);
+    expect(
+      await Promise.all(
+        [0, 49, 50, 52].map(async (i) => (await pageOf(firstRows[i].id)).page),
+      ),
+    ).toEqual([0, 0, 1, 1]);
+    await expect(pageOf(activeTaskId)).resolves.toEqual({ page: 0 });
+    await expect(
+      findArchivePage(first.userId, other.listId, firstRows[52].id),
+    ).rejects.toThrow("not_found_or_forbidden");
     await expect(
       archiveTagCandidates(first.userId, first.listId),
     ).resolves.toEqual([{ name: "末尾", color: "red" }]);
@@ -220,5 +236,45 @@ describeDb("アーカイブと検索のページ取得", () => {
       moved,
       ...expected.slice(50),
     ]);
+  });
+
+  it("タスクを含むページを並び順の値とIDの順で求める", async () => {
+    const { userId, listId } = await createFixtureList();
+    owners.push(userId);
+    const now = new Date();
+    const insert = async (order: number, length = 1) =>
+      (
+        await getDb()
+          .insert(tasks)
+          .values(
+            Array.from({ length }, (_, i) => ({
+              list_id: listId,
+              text: `ページ位置 ${order} ${i}`,
+              status: "archived" as const,
+              tags: "[]",
+              sort_order: order,
+              created: now,
+              updated: now,
+            })),
+          )
+          .$returningId()
+      ).map(({ id }) => id);
+    // IDの大小と並び順の値の大小を逆にし、どちらか一方だけで数えると結果が変わる配置にする。
+    const middle = await insert(10, 50);
+    const [head] = await insert(5);
+    const [tail] = await insert(20);
+    const pageOf = async (taskId: number) =>
+      (await findArchivePage(userId, listId, taskId)).page;
+    const expectedOrder = [head, ...middle, tail];
+    const shown = [
+      ...(await listTaskPage(userId, listId, 0)).tasks,
+      ...(await listTaskPage(userId, listId, 1)).tasks,
+    ].map(({ id }) => id);
+    expect(shown).toEqual(expectedOrder);
+    expect(
+      await Promise.all(
+        [head, middle[0], middle[48], middle[49], tail].map(pageOf),
+      ),
+    ).toEqual([0, 0, 0, 1, 1]);
   });
 });

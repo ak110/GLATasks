@@ -1,6 +1,7 @@
 <script lang="ts">
     import { handleMainKeyboard } from "#lib/client/tasks/main-keyboard.svelte.ts";
     import { queryKeys } from "#lib/client/query-options.ts";
+    import { trpc } from "#lib/client/trpc.ts";
     import { invalidateEventQueries } from "#lib/client/query-sync.ts";
     import { SSE_EVENTS } from "#lib/sse-events.ts";
     import { createMainNavigation } from "#lib/client/tasks/main-navigation.svelte.ts";
@@ -482,11 +483,33 @@
         }
     }
 
-    /** 検索結果のタスクをクリックしてリストに遷移 */
-    function goToSearchResult(listId: number) {
+    let searchResultNavigation = 0;
+    /** 検索結果からリストへ遷移する。アーカイブのタスクを選んだ時は、そのタスクを含むページを開く。 */
+    async function goToSearchResult(listId: number, taskId?: number) {
+        const navigation = ++searchResultNavigation;
+        let page = 0;
+        if (taskId !== undefined && state.showType === "archived") {
+            const { searchQuery, showType } = state;
+            try {
+                ({ page } = await trpc.tasks.findArchivePage.query({
+                    listId,
+                    taskId,
+                }));
+            } catch (error) {
+                showErrorToast(extractErrorMessage(error));
+            }
+            // 応答を待つ間に別の結果の選択、検索や表示種別の変更があった場合は、利用者の新しい操作を優先する。
+            if (
+                navigation !== searchResultNavigation ||
+                state.searchQuery !== searchQuery ||
+                state.showType !== showType
+            )
+                return;
+        }
         state.searchQuery = "";
         state.debouncedQuery = "";
         selectList(listId);
+        if (state.selectedListId === listId) state.archivePage = page;
     }
 
     /** モバイルでリスト一覧に戻る（pushState でハッシュを除去） */
@@ -592,7 +615,8 @@
                     ? "検索結果を取得できませんでした。"
                     : undefined}
                 onRetry={() => void searchResultsQuery.refetch()}
-                onGoToResult={goToSearchResult}
+                onGoToResult={(listId, taskId) =>
+                    void goToSearchResult(listId, taskId)}
             />
         {:else if state.selectedListId !== null && lists.some((list) => list.id === state.selectedListId)}
             {@const selectedList = lists.find(

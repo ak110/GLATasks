@@ -294,8 +294,13 @@ test("アーカイブと検索をページ巡回し、条件変更とページ�
     await expect(pager).toContainText("1 / 2");
     await expect(lastResult).toHaveCount(0);
 
-    await search.fill("");
-    await next.click();
+    // 2ページ目の検索結果から選んだタスクを、アーカイブ一覧の同じページで操作する。
+    await destination.fill("2");
+    await destination.press("Enter");
+    await lastResult.click();
+    await expect(search).toHaveValue("");
+    await expect(pager).toContainText("2 / 2");
+    await expect(rows).toHaveCount(1);
     await expect(rows.first()).toContainText(titleAt(50));
     await Promise.all([
       waitForSuccessfulMutationResponse(page, "tasks.update"),

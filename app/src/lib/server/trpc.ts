@@ -29,6 +29,7 @@ import {
   StartTimerSchema,
   ResetTimerSchema,
   ListTaskPageSchema,
+  FindArchivePageSchema,
   SearchTaskPageSchema,
   ReorderArchivePageSchema,
   SearchTasksSchema,
@@ -367,6 +368,10 @@ export const appRouter = t.router({
     listPage: encryptedProcedure
       .input(ListTaskPageSchema)
       .query(({ ctx, input }) => operations.tasks.listPage(ctx, input)),
+
+    findArchivePage: encryptedProcedure
+      .input(FindArchivePageSchema)
+      .query(({ ctx, input }) => operations.tasks.findArchivePage(ctx, input)),
 
     searchPage: encryptedProcedure
       .input(SearchTaskPageSchema)

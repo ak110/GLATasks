@@ -12,8 +12,10 @@ import {
   gte,
   inArray,
   like,
+  lt,
   min,
   ne,
+  or,
 } from "drizzle-orm";
 import type { z } from "zod";
 
@@ -357,6 +359,36 @@ export async function listTaskPage(
       .limit(TASK_PAGE_SIZE)
       .offset(page * TASK_PAGE_SIZE);
     return pageResult(await convertTasks(rows, db), page, total);
+  });
+}
+
+/** 対象がアーカイブ済みでなくなっていれば、一覧の先頭として0ページ目を返す。 */
+export async function findArchivePage(
+  userId: number,
+  listId: number,
+  taskId: number,
+) {
+  return getDb().transaction(async (db) => {
+    await getOwnedList(listId, userId, db);
+    const filter = and(eq(tasks.list_id, listId), taskStatusFilter("archived"));
+    const [target] = await db
+      .select({ sortOrder: tasks.sort_order })
+      .from(tasks)
+      .where(and(filter, eq(tasks.id, taskId)));
+    if (!target) return { page: 0 };
+    const [{ before }] = await db
+      .select({ before: count() })
+      .from(tasks)
+      .where(
+        and(
+          filter,
+          or(
+            lt(tasks.sort_order, target.sortOrder),
+            and(eq(tasks.sort_order, target.sortOrder), lt(tasks.id, taskId)),
+          ),
+        ),
+      );
+    return { page: Math.floor(before / TASK_PAGE_SIZE) };
   });
 }
 

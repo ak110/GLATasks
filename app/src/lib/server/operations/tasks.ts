@@ -8,6 +8,7 @@ import type {
   CreateTaskSchema,
   UpdateTaskSchema,
   ListTaskPageSchema,
+  FindArchivePageSchema,
   SearchTaskPageSchema,
   ReorderArchivePageSchema,
   SearchTasksSchema,
@@ -27,6 +28,13 @@ export const tasks = {
     input: z.infer<typeof ListTaskPageSchema>,
   ) {
     return api.listTaskPage(ctx.userId, input.listId, input.page);
+  },
+
+  async findArchivePage(
+    ctx: OperationContext,
+    input: z.infer<typeof FindArchivePageSchema>,
+  ) {
+    return api.findArchivePage(ctx.userId, input.listId, input.taskId);
   },
 
   async searchPage(
