@@ -7,41 +7,46 @@ function makeTag(name: string): TagInfo {
 }
 
 describe("compareTagName", () => {
-  it("ASCII大文字は小文字より前に並ぶ（コード順）", () => {
-    const sorted = [
-      makeTag("banana"),
-      makeTag("Apple"),
-      makeTag("cherry"),
-    ].sort(compareTagName);
-    expect(sorted.map((t) => t.name)).toEqual(["Apple", "banana", "cherry"]);
-  });
-
-  it("数字・記号・英字・日本語がコード順に並ぶ", () => {
-    const sorted = [
-      makeTag("あ"),
-      makeTag("A"),
-      makeTag("1"),
-      makeTag("!"),
-      makeTag("_"),
-    ].sort(compareTagName);
-    expect(sorted.map((t) => t.name)).toEqual(["!", "1", "A", "_", "あ"]);
+  it("文字コード順に並べ、接頭辞が同じ場合は短い名前を先にする", () => {
+    const tags = [
+      "い",
+      "abc",
+      "あ",
+      "_",
+      "cherry",
+      "Apple",
+      "abcd",
+      "1",
+      "A",
+      "!",
+      "banana",
+      "う",
+      "ab",
+    ];
+    const sorted = tags.map(makeTag).sort(compareTagName);
+    expect(sorted.map((tag) => tag.name)).toEqual([
+      "!",
+      "1",
+      "A",
+      "Apple",
+      "_",
+      "ab",
+      "abc",
+      "abcd",
+      "banana",
+      "cherry",
+      "あ",
+      "い",
+      "う",
+    ]);
   });
 
   it("同名は0を返す", () => {
     expect(compareTagName(makeTag("x"), makeTag("x"))).toBe(0);
   });
 
-  it("日本語のひらがな同士はコード順になる", () => {
-    const sorted = [makeTag("い"), makeTag("あ"), makeTag("う")].sort(
-      compareTagName,
-    );
-    expect(sorted.map((t) => t.name)).toEqual(["あ", "い", "う"]);
-  });
-
-  it("先頭が同じで長さが異なる場合は短い方が前に並ぶ", () => {
-    const sorted = [makeTag("abc"), makeTag("ab"), makeTag("abcd")].sort(
-      compareTagName,
-    );
-    expect(sorted.map((t) => t.name)).toEqual(["ab", "abc", "abcd"]);
+  it("後の名前を左に渡すと正、引数を逆にすると負を返す", () => {
+    expect(compareTagName(makeTag("b"), makeTag("a"))).toBeGreaterThan(0);
+    expect(compareTagName(makeTag("a"), makeTag("b"))).toBeLessThan(0);
   });
 });

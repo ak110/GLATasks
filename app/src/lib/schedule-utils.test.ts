@@ -29,6 +29,11 @@ describe("describeSchedule", () => {
     expect(describeSchedule(rrule)).toBe("2週間ごと");
   });
 
+  it("曜日を指定しない週次ルールを毎週と表示する", () => {
+    const rrule = `${DTSTART}\nRRULE:FREQ=WEEKLY;INTERVAL=1`;
+    expect(describeSchedule(rrule)).toBe("毎週");
+  });
+
   it("2週間ごとの月曜の要約文を生成する", () => {
     const rrule = `${DTSTART}\nRRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=MO`;
     expect(describeSchedule(rrule)).toBe("2週間ごとの月曜日");
@@ -47,6 +52,11 @@ describe("describeSchedule", () => {
   it("毎月第N曜日目の要約文を生成する", () => {
     const rrule = `${DTSTART}\nRRULE:FREQ=MONTHLY;INTERVAL=1;BYDAY=+2MO`;
     expect(describeSchedule(rrule)).toBe("毎月第2月曜日");
+  });
+
+  it("2か月ごとの第2月曜日を月間隔も含めて表示する", () => {
+    const rrule = `${DTSTART}\nRRULE:FREQ=MONTHLY;INTERVAL=2;BYDAY=+2MO`;
+    expect(describeSchedule(rrule)).toBe("2か月ごとの第2月曜日");
   });
 
   it("毎年の要約文を生成する", () => {

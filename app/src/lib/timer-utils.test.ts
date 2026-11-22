@@ -131,6 +131,10 @@ describe("parseTimeInput", () => {
     expect(parseTimeInput("100:00:00")).toBeNull();
   });
 
+  it("上限ちょうどの99時間59分59秒は受け付ける", () => {
+    expect(parseTimeInput("99:59:59")).toBe(359999);
+  });
+
   it("4パート以上は null を返す", () => {
     expect(parseTimeInput("1:2:3:4")).toBeNull();
   });
@@ -167,6 +171,10 @@ describe("parseTargetTime", () => {
     expect(parseTargetTime("24:00")).toBeNull();
   });
 
+  it("14:60 は null を返す", () => {
+    expect(parseTargetTime("14:60")).toBeNull();
+  });
+
   it("abc は null を返す", () => {
     expect(parseTargetTime("abc")).toBeNull();
   });
@@ -191,6 +199,16 @@ describe("calcSecondsUntilTarget", () => {
   it("目標が過ぎた場合、翌日の目標までの秒数を返す", () => {
     vi.useFakeTimers({ now: new Date(2026, 2, 18, 15, 0, 0, 0).getTime() });
     expect(calcSecondsUntilTarget(14 * 60 + 30)).toBe(84600);
+  });
+
+  it("現在の分の途中でも未来の目標は当日とする", () => {
+    vi.useFakeTimers({ now: new Date(2026, 2, 18, 14, 0, 10, 0).getTime() });
+    expect(calcSecondsUntilTarget(15 * 60 + 30)).toBe(5390);
+  });
+
+  it("目標時刻ちょうどの残り秒数は0とする", () => {
+    vi.useFakeTimers({ now: new Date(2026, 2, 18, 14, 30, 0, 0).getTime() });
+    expect(calcSecondsUntilTarget(14 * 60 + 30)).toBe(0);
   });
 
   it("目標がちょうど現在時刻と同じ分だが秒が過ぎている場合、翌日になる", () => {

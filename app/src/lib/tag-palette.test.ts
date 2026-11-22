@@ -24,13 +24,9 @@ describe("pickTagColor", () => {
 });
 
 describe("resolveTagColor", () => {
-  it("既存同名タグの色を再利用する", () => {
+  it("前後の空白にかかわらず既存同名タグの色を再利用する", () => {
     const existing: TagInfo[] = [{ name: "重要", color: "red" }];
     expect(resolveTagColor("重要", existing)).toBe("red");
-  });
-
-  it("前後空白は無視して同名判定する", () => {
-    const existing: TagInfo[] = [{ name: "重要", color: "red" }];
     expect(resolveTagColor("  重要  ", existing)).toBe("red");
   });
 
@@ -46,8 +42,10 @@ describe("resolveTagColor", () => {
 });
 
 describe("getTagColorClass", () => {
-  it("既知の色キーに対してbgクラスを含む文字列を返す", () => {
-    expect(getTagColorClass("amber")).toMatch(/bg-amber-/);
+  it("パレットの各色を背景色へ反映する", () => {
+    for (const color of TAG_COLOR_KEYS) {
+      expect(getTagColorClass(color), color).toContain(`bg-${color}-`);
+    }
   });
 
   it("未知の色キーはslateフォールバックを返す", () => {
