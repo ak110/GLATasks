@@ -1,10 +1,3 @@
-/**
- * @fileoverview OAuth 2.1 トークンエンドポイント
- *
- * grant_type = authorization_code: PKCE 検証のうえアクセストークン・リフレッシュトークン発行
- * grant_type = refresh_token: 既存リフレッシュトークンを検証し新規アクセストークン発行
- */
-
 import { json } from "@sveltejs/kit";
 import {
   RESTART_AUTHORIZATION,
@@ -149,7 +142,6 @@ export const POST: RequestHandler = async ({ request }) => {
   if (grantType === OAUTH_GRANTS.refreshToken) {
     return handleRefreshToken(request, form);
   }
-  // 受け取った値はASCII以外を含み得るため、error_descriptionへ転記しない
   return errorResponse("unsupported_grant_type", {
     reason: "The grant_type is not supported.",
     nextAction: `Send grant_type=${OAUTH_GRANTS.authorizationCode} or grant_type=${OAUTH_GRANTS.refreshToken}.`,

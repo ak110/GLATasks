@@ -1,13 +1,3 @@
-/**
- * @fileoverview MCP Streamable HTTP エンドポイント
- *
- * POST: JSON-RPC リクエスト受信。SSE ストリームまたは JSON で応答する。
- * GET: ステートフルセッション向けの GET SSE ストリーム。
- * DELETE: セッション終了。
- *
- * Bearer 認証必須。失敗時は WWW-Authenticate ヘッダーで Protected Resource Metadata を案内する。
- */
-
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
 import crypto from "node:crypto";
@@ -17,12 +7,6 @@ import { ownMcpSessions } from "#lib/server/mcp/sessions.ts";
 import { OAUTH_PATHS } from "#lib/server/mcp/oauth-config.ts";
 import type { RequestHandler } from "./$types";
 
-/**
- * セッションごとの transport を保持する。
- * Streamable HTTP のステートフルモードでは初期化リクエストで session id を発行し、
- * 後続リクエストは同じ transport インスタンスへルーティングする。
- * 表と回収周期はモジュールの再評価をまたいで保持される（`ownMcpSessions`を参照）。
- */
 const { sessions } = ownMcpSessions<WebStandardStreamableHTTPServerTransport>();
 
 function unauthorized(originUrl: URL): Response {

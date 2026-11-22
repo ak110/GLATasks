@@ -12,7 +12,6 @@ vi.mock("#lib/server/mcp/oauth.ts", () => ({
 
 type Route = typeof import("../../../routes/mcp/+server");
 
-/** 開発サーバーのモジュール再評価と同じく、ルートを新しい世代として読み込み直す。 */
 async function loadRoute(): Promise<Route> {
   vi.resetModules();
   return import("../../../routes/mcp/+server");
@@ -69,7 +68,6 @@ async function initializeSession(route: Route): Promise<string> {
   return sessionId!;
 }
 
-// ルートの読み込み直しはMCPサーバーと業務操作の変換を伴い、初回は既定の5秒を超え得る。
 describe("MCP sessionのHTTP応答", { timeout: 30_000 }, () => {
   beforeEach(() => _resetProcessStateForTest());
   afterEach(() => {
@@ -100,7 +98,6 @@ describe("MCP sessionのHTTP応答", { timeout: 30_000 }, () => {
     const deleted = await after.DELETE(rpc("DELETE", sessionId));
     expect(deleted.status).toBe(200);
 
-    // DELETEが同じtransportを終了したため、旧世代の処理からも到達できない
     const afterDelete = await before.POST(rpc("POST", sessionId, ping(3)));
     expect(afterDelete.status).toBe(404);
   });

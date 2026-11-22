@@ -1,8 +1,4 @@
 <script lang="ts">
-    /**
-     * @fileoverview タスク一覧表示コンポーネント
-     */
-
     import type { TaskStatus } from "#lib/schemas.ts";
     import { onDestroy } from "svelte";
     import type { TaskListItem } from "#lib/types.ts";
@@ -52,10 +48,6 @@
         if (scrollElement) scrollElement.scrollTop = 0;
     }
 
-    // D&D 状態管理（並び替えまたは別リストへの移動が渡された場合のみ有効化）
-    // 別リストへの移動はサイドバーと並べて表示する2ペイン表示に限る。
-    // 1ペイン表示ではサイドバーが非表示のため外部ドロップ先へ到達せず、
-    // 意図しない別リストへの移動を防ぐためドラッグ中もサイドバーへ切り替えない。
     const dnd = createDragReorder(
         () => tasks,
         (ids) => onReorder?.(ids),

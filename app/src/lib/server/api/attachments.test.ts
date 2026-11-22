@@ -1,10 +1,3 @@
-/**
- * @fileoverview 添付ファイルAPI（createAttachment・deleteAttachment・downloadAttachment・
- * listAttachmentsForTasks）の境界値・同値分割テスト。
- *
- * 開発用MariaDBへ実接続して検証する（`DATABASE_URL`が到達可能な環境で実行する）。
- */
-
 import { eq } from "drizzle-orm";
 import { afterAll, expect, it } from "vitest";
 
@@ -26,7 +19,6 @@ import {
   listAttachmentsForTasks,
 } from "./attachments.js";
 
-/** 指定件数のダミー添付を直接INSERTする（`createAttachment`呼び出しコストを避ける）。 */
 async function seedAttachments(taskId: number, count: number): Promise<void> {
   if (count === 0) return;
   const now = new Date();

@@ -1,5 +1,3 @@
-/** カロリー記録の現地日時と日の区切りをUTCへ換算する純粋関数。 */
-
 import { pad2 } from "#lib/date-time.ts";
 
 export const DAY_MS = 24 * 60 * 60 * 1000;
@@ -18,10 +16,6 @@ export function parseLocalTime(value: string): LocalTime {
   return { hour, minute };
 }
 
-/**
- * 現地の年月日・時分をUTCの時刻へ変換する。
- * 日が月末を超える値（31日の翌日など）は`Date.UTC`が翌月へ繰り上げる。
- */
 export function localToUtc(
   date: LocalDate,
   time: LocalTime,
@@ -42,7 +36,6 @@ export function localMinuteToUtc(value: string, offsetMinutes: number): Date {
   );
 }
 
-/** 指定時刻のUTCから現地の年月日を返す */
 export function toLocalDate(value: Date, offsetMinutes: number): LocalDate {
   const local = new Date(value.getTime() + offsetMinutes * 60_000);
   return {
@@ -52,7 +45,6 @@ export function toLocalDate(value: Date, offsetMinutes: number): LocalDate {
   };
 }
 
-/** 開始日から終了日までの日数（両端を含む）を返す。終了日が開始日より前なら0以下になる */
 export function countDays(start: LocalDate, end: LocalDate): number {
   return (
     (Date.UTC(end.year, end.month - 1, end.day) -
@@ -62,7 +54,6 @@ export function countDays(start: LocalDate, end: LocalDate): number {
   );
 }
 
-/** 現地時刻`timeOfDay`のうち`now`より後で最初の時刻をUTCで返す */
 export function nextRunAt(
   timeOfDay: string,
   offsetMinutes: number,
@@ -98,7 +89,6 @@ export function calculateWindow(
   };
 }
 
-/** 指定時刻を含む確定日の開始時刻をUTCで返す */
 export function dayStartOf(value: Date, offsetMinutes: number): Date {
   const shifted = new Date(value.getTime() - DAY_BOUNDARY_HOUR * 60 * 60_000);
   return localToUtc(

@@ -1,7 +1,3 @@
-/**
- * @fileoverview Drizzle ORM スキーマ定義（既存 MariaDB テーブルに準拠）
- */
-
 import {
   mysqlTable,
   int,
@@ -23,7 +19,6 @@ import {
   TimerModeSchema,
 } from "#lib/schemas.ts";
 
-/** user テーブル */
 export const users = mysqlTable("user", {
   id: int("id").primaryKey().autoincrement(),
   user: varchar("user", { length: 80 }).notNull().unique(),
@@ -34,13 +29,9 @@ export const users = mysqlTable("user", {
   recovery_locked_until: timestamp("recovery_locked_until"),
   joined: timestamp("joined").notNull(),
   last_login: timestamp("last_login"),
-  // 利用者ごとの設定値を JSON 文字列で集約する。
-  // 将来項目追加時にスキーマ変更を不要にするため単一カラムでまとめ、
-  // 値の構造は zod の UserPreferencesSchema 側で保証する。
   preferences: mediumtext("preferences").notNull().default("{}"),
 });
 
-// credential IDは大文字小文字を区別するbase64url。ASCIIに限り索引のバイト上限にも収める。
 const credentialId = customType<{ data: string }>({
   dataType: () => "varchar(1400) CHARACTER SET ascii COLLATE ascii_bin",
 });
@@ -67,7 +58,6 @@ export const recoveryCodes = mysqlTable("recovery_code", {
   created: timestamp("created").notNull(),
 });
 
-// 登録開始時にはuser行を作らず、取消や失敗でユーザーIDを占有しない。
 export const authChallenges = mysqlTable(
   "auth_challenge",
   {
@@ -85,7 +75,6 @@ export const authChallenges = mysqlTable(
   (t) => ({ expires_idx: index("auth_challenge_expires_idx").on(t.expires) }),
 );
 
-/** カロリー計算の品目テーブル */
 export const calorieItems = mysqlTable(
   "calorie_item",
   {
@@ -137,7 +126,6 @@ export const calorieRecords = mysqlTable(
   }),
 );
 
-/** カロリー計算の自動記録設定テーブル（毎日指定時刻に記録を追加する） */
 export const calorieAutoRecords = mysqlTable(
   "calorie_auto_record",
   {
@@ -149,12 +137,10 @@ export const calorieAutoRecords = mysqlTable(
         onDelete: "restrict",
         onUpdate: "cascade",
       }),
-    // 現地の時刻（HH:mm）。登録時のtz_offset_minutesで解釈する
     time_of_day: varchar("time_of_day", { length: 5 }).notNull(),
     quantity: int("quantity").notNull(),
     enabled: tinyint("enabled").notNull().default(1),
     tz_offset_minutes: int("tz_offset_minutes").notNull(),
-    // 次に記録を追加する時刻（UTC）。スケジューラーはこの時刻を過ぎた分を追加して先へ進める
     next_run_at: timestamp("next_run_at").notNull(),
     created: timestamp("created").notNull(),
     updated: timestamp("updated").notNull(),
@@ -164,7 +150,6 @@ export const calorieAutoRecords = mysqlTable(
   }),
 );
 
-/** list テーブル */
 export const lists = mysqlTable(
   "list",
   {
@@ -188,7 +173,6 @@ export const lists = mysqlTable(
   (t) => ({ user_id_idx: index("user_id_idx").on(t.user_id) }),
 );
 
-/** task テーブル */
 export const tasks = mysqlTable(
   "task",
   {
@@ -210,7 +194,6 @@ export const tasks = mysqlTable(
     })
       .notNull()
       .default("active"),
-    // タスク区分（"normal" | "todo"）。既存タスクには "normal" が自動的に入る
     kind: varchar("kind", {
       length: 255,
       enum: [TaskKindSchema.enum.normal, TaskKindSchema.enum.todo],
@@ -218,7 +201,6 @@ export const tasks = mysqlTable(
       .notNull()
       .default("normal"),
     text: mediumtext("text").notNull(),
-    // タグ配列のJSON文字列（要素は { name, color }）
     tags: mediumtext("tags").notNull().default("[]"),
     sort_order: int("sort_order").notNull().default(0),
     created: timestamp("created").notNull(),
@@ -228,7 +210,6 @@ export const tasks = mysqlTable(
   (t) => ({ list_id_idx: index("list_id_idx").on(t.list_id) }),
 );
 
-/** timer テーブル */
 export const timers = mysqlTable(
   "timer",
   {
@@ -254,7 +235,6 @@ export const timers = mysqlTable(
     running: tinyint("running").notNull().default(0),
     expired: tinyint("expired").notNull().default(0),
     ephemeral: tinyint("ephemeral").notNull().default(0),
-    // 期限切れ後にビープを鳴らす秒数。タイマーごとに上書き可能。
     ring_seconds: int("ring_seconds")
       .notNull()
       .default(TIMER_DEFAULT_RING_SECONDS),
@@ -267,8 +247,6 @@ export const timers = mysqlTable(
   (t) => ({ user_id_idx: index("user_id_idx").on(t.user_id) }),
 );
 
-// drizzle-orm 0.45.2 の mysql-core に mediumblob ビルダーが存在しないため、
-// customType で MEDIUMBLOB 型を定義する。
 const mediumblob = customType<{ data: Uint8Array; driverData: Buffer }>({
   dataType() {
     return "mediumblob";
@@ -281,7 +259,6 @@ const mediumblob = customType<{ data: Uint8Array; driverData: Buffer }>({
   },
 });
 
-/** attachment テーブル */
 export const attachments = mysqlTable(
   "attachment",
   {
@@ -303,7 +280,6 @@ export const attachments = mysqlTable(
   }),
 );
 
-/** schedule テーブル（定期TODOの繰り返しルールを保持する） */
 export const schedules = mysqlTable(
   "schedule",
   {
@@ -315,9 +291,7 @@ export const schedules = mysqlTable(
         onUpdate: "restrict",
       }),
     title: varchar("title", { length: 255 }).notNull(),
-    // タグ配列のJSON文字列（tasks.tags と同形式）
     tags: mediumtext("tags").notNull().default("[]"),
-    // RFC5545形式のRRULE文字列（DTSTART;TZID=Asia/Tokyo:... と RRULE:FREQ=... を改行連結）
     rrule: mediumtext("rrule").notNull(),
     last_fired: timestamp("last_fired"),
     enabled: tinyint("enabled").notNull().default(1),

@@ -13,7 +13,6 @@ const MALFORMED_BASIC: OAuthErrorDescription = {
     "Send client_id:client_secret encoded in Base64, or send client_id in the form body.",
 };
 
-/** Basic認証の解析失敗も、トークン応答の形式で返す。 */
 export function authenticateClient(request: Request, form: FormData) {
   const authorization = request.headers.get("authorization");
   const basic = /^Basic(?:\s|$)/i.test(authorization ?? "");

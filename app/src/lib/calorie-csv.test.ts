@@ -1,7 +1,3 @@
-/**
- * @fileoverview カロリー計算CSVの契約テスト
- */
-
 import Papa from "papaparse";
 import { describe, expect, it } from "vitest";
 

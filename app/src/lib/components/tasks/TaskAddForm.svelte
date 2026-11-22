@@ -1,8 +1,5 @@
 <script lang="ts">
     import { createAttachmentInput } from "#lib/client/attachments/task-attachments.svelte.ts";
-    /**
-     * @fileoverview タスク追加フォーム（テキストエリア + タグ設定 + 追加ボタン）
-     */
 
     import type { TaskAddSubmission } from "#lib/client/tasks/task-form-types.ts";
     import type { TagInfo } from "#lib/types.ts";
@@ -32,10 +29,8 @@
     let tags = $state<TagInfo[]>([]);
     let selectedAttachments = $state<File[]>([]);
     let isTodo = $state(false);
-    // フォームルート要素へのファイルドラッグアンドドロップ中かどうか
     const attachmentInput = createAttachmentInput(addAttachments);
 
-    // タグ削除などでフォーカスを失っても、入力中のテキストやタグ・添付があれば展開を維持する
     const expanded = $derived(
         formFocused ||
             value.length > 0 ||
@@ -55,13 +50,10 @@
         });
     });
 
-    // 選択済みのタグ・添付は入力欄に値を持たないため、残っている間は自動の再読み込みで失わないよう作業中として申告する。
-    // 本文は入力欄の追跡（`user-busy.ts`）が扱う
     $effect(() => {
         if (tags.length > 0 || selectedAttachments.length > 0 || isTodo)
             return holdUnsavedDraft({
                 key: `task-add-options:${listId}`,
-                // 添付のバイナリーは同期的にsessionStorageへ退避できない。
                 serialize: () =>
                     selectedAttachments.length > 0
                         ? undefined
@@ -69,10 +61,8 @@
             });
     });
 
-    /** フォーム内のどこかにフォーカスがあるかを遅延チェック */
     function handleBlur(e: FocusEvent) {
         const form = (e.currentTarget as HTMLElement).closest("form");
-        // relatedTarget がフォーム内ならフォーカス維持
         if (
             form &&
             e.relatedTarget instanceof Node &&
@@ -93,8 +83,6 @@
             attachments: selectedAttachments,
             kind: isTodo ? "todo" : "normal",
         });
-        // 送信成功時のみタグ・添付・区分をリセットしフォームを折りたたむ。失敗時は
-        // テキスト・タグ・添付・フォーカス状態を残し、ユーザーが修正して再送信できるようにする
         if (ok) {
             tags = [];
             selectedAttachments = [];

@@ -1,13 +1,3 @@
-/**
- * @fileoverview Web Audio API ビープ音ユーティリティ（タイマー通知用）
- *
- * AudioContext が利用できない環境では警告ログを出力して何もしない。
- */
-
-/**
- * ビープ音を指定回数再生する。
- * AudioContext が利用できない環境では警告ログを出力する。
- */
 async function beep(
   count: number,
   freq: number,
@@ -39,17 +29,10 @@ async function beep(
   }
 }
 
-/** タイマー開始時の確認ビープ（高め・短い「ぴぴっ」） */
 export async function playStartBeep(): Promise<void> {
   await beep(2, 880, 80, 60);
 }
 
-// ── ループビープ（タイマー完了アラーム用） ──
-
-/**
- * タイマーIDごとのループビープハンドル。
- * stop が呼ばれるか ringSeconds 経過の自動停止タイマーが発火するまで鳴り続ける。
- */
 type LoopHandle = {
   ctx: AudioContext;
   stopped: boolean;
@@ -58,11 +41,6 @@ type LoopHandle = {
 
 const loopHandles = new Map<number, LoopHandle>();
 
-/**
- * 指定タイマーIDに対しビープを ringSeconds 秒間ループ再生する。
- * 既にループ中の場合は何もしない（多重起動防止）。
- * AudioContext が無い環境では警告を出力して終了する。
- */
 export function startLoopBeep(timerId: number, ringSeconds: number): void {
   if (loopHandles.has(timerId)) return;
   if (typeof AudioContext === "undefined") {
@@ -78,22 +56,18 @@ export function startLoopBeep(timerId: number, ringSeconds: number): void {
   );
   const handle: LoopHandle = { ctx, stopped: false, autoStopTimeoutId };
   loopHandles.set(timerId, handle);
-  // バックグラウンドで非同期にループ
   void runLoop(timerId, handle);
 }
 
-/** 指定タイマーIDのループビープを停止する */
 export function stopLoopBeep(timerId: number): void {
   const handle = loopHandles.get(timerId);
   if (!handle) return;
   handle.stopped = true;
   clearTimeout(handle.autoStopTimeoutId);
   loopHandles.delete(timerId);
-  // close は失敗しても無視（既に閉じている場合がある）
   handle.ctx.close().catch(() => {});
 }
 
-/** すべてのループビープを停止する（テスト/デバッグ用途） */
 export function stopAllLoopBeeps(): void {
   for (const id of loopHandles.keys()) {
     stopLoopBeep(id);
@@ -101,7 +75,6 @@ export function stopAllLoopBeeps(): void {
 }
 
 async function runLoop(timerId: number, handle: LoopHandle): Promise<void> {
-  // タイマー完了を強調する周期: ぽーっ x5 → 1.5秒 休止 → 繰り返し
   const count = 5;
   const freq = 440;
   const duration = 400;
@@ -124,7 +97,6 @@ async function runLoop(timerId: number, handle: LoopHandle): Promise<void> {
     if (handle.stopped) return;
     await sleep(cycleGap);
   }
-  // 念のため呼び出し（stopLoopBeep 経由でない終了パスを保護）
   if (loopHandles.get(timerId) === handle) {
     loopHandles.delete(timerId);
     handle.ctx.close().catch(() => {});

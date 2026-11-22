@@ -50,7 +50,6 @@ const READ_ONLY = { readOnlyHint: true } as const;
 const ADDITIVE = { readOnlyHint: false, destructiveHint: false } as const;
 const DESTRUCTIVE = { readOnlyHint: false, destructiveHint: true } as const;
 
-/** AuthInfo.extra からアプリ内ユーザーIDを取り出す */
 function getUserId(authInfo: AuthInfo | undefined): number {
   const userId = authInfo?.extra?.userId;
   if (typeof userId !== "number") {
@@ -59,12 +58,10 @@ function getUserId(authInfo: AuthInfo | undefined): number {
   return userId;
 }
 
-/** MCP経由の操作は画面のタブを持たないため、送出元タブを空にする。 */
 function operationContext(authInfo: AuthInfo | undefined): OperationContext {
   return { userId: getUserId(authInfo), tabId: null };
 }
 
-/** ツール戻り値（JSON 形式の単一 text コンテンツ） */
 function jsonResult(value: unknown) {
   return {
     content: [
@@ -76,7 +73,6 @@ function jsonResult(value: unknown) {
   };
 }
 
-/** すべてのツールで同じ公開エラーへ変換する。 */
 async function toolResult(operation: () => Promise<unknown>) {
   try {
     return jsonResult(await operation());
@@ -102,7 +98,6 @@ export function createMcpServer(): McpServer {
     },
   );
 
-  // ── リスト ──
   server.registerTool(
     "lists.list",
     {
@@ -249,7 +244,6 @@ export function createMcpServer(): McpServer {
     },
   );
 
-  // ── タスク ──
   server.registerTool(
     "tasks.list",
     {
@@ -364,7 +358,6 @@ export function createMcpServer(): McpServer {
     },
   );
 
-  // ── タイマー ──
   server.registerTool(
     "timers.list",
     {
@@ -567,7 +560,6 @@ export function createMcpServer(): McpServer {
     },
   );
 
-  // ── カロリー（参照のみ） ──
   server.registerTool(
     "calories.summary",
     {
@@ -624,7 +616,6 @@ export function createMcpServer(): McpServer {
     },
   );
 
-  // ── 利用者設定 ──
   server.registerTool(
     "users.getPreferences",
     {

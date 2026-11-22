@@ -3,7 +3,6 @@ import { SSE_EVENTS, type SseEventName } from "#lib/sse-events.ts";
 import { subscribeOnMount } from "#lib/client/sse/sse-subscribe.ts";
 import { queryKeys } from "./query-options.ts";
 
-/** 接続通知とheartbeatはデータ変更を表さない。resetの全再取得は接続管理が所有する。 */
 export const eventQueryKeys: Record<
   SseEventName | "connected" | "heartbeat",
   readonly QueryKey[]

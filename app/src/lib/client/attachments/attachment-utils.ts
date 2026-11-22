@@ -1,15 +1,9 @@
-/**
- * @fileoverview 添付ファイルのデータ変換・アップロード共通処理
- */
-
 import { trpc, type RouterInputs } from "#lib/client/trpc.ts";
 import { trackPendingWrite } from "#lib/client/ui/pending-writes.ts";
 
-/** ファイルドロップ中のハイライト表示に使うTailwindクラス（タスク追加フォーム・編集ダイアログ共通） */
 export const FILE_DROP_HIGHLIGHT_CLASSES =
   "bg-blue-50 ring-2 ring-blue-400 ring-inset dark:bg-blue-900/30 dark:ring-blue-500";
 
-/** ファイルをbase64（data URLのプレフィックスを除いた部分）として読み込む */
 export function readFileAsBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -28,11 +22,6 @@ export function readFileAsBase64(file: File): Promise<string> {
   });
 }
 
-/**
- * ファイルを読み込みタスクへ添付登録する。失敗時は例外をそのまま呼び出し元へ再送出する。
- *
- * 読み込みから送信の完了までを保存中として数え、新しい版の自動再読み込みが送信を中断しないようにする。
- */
 export function uploadAttachment(
   taskId: RouterInputs["attachments"]["create"]["taskId"],
   file: File,
@@ -48,7 +37,6 @@ export function uploadAttachment(
   });
 }
 
-/** 添付ファイルのMIMEタイプが画像かどうかを判定する */
 export function isImageAttachment(mimeType: string): boolean {
   return mimeType.startsWith("image/");
 }
@@ -56,12 +44,6 @@ export function isImageAttachment(mimeType: string): boolean {
 let clipboardSequence = 0;
 let clipboardSequenceKey = "";
 
-/**
- * ClipboardEventから画像ファイルを抽出する。
- * ペースト経由の画像は`File.name`が空になり得るため
- * `clipboard-<yyyymmdd-HHMMSS>-<seq>.<ext>`で自動命名する。
- * `seq`は同一秒内の連番でファイル名重複を防止する。
- */
 export function extractImageFilesFromClipboard(event: ClipboardEvent): File[] {
   const items = event.clipboardData?.files;
   if (!items || items.length === 0) return [];

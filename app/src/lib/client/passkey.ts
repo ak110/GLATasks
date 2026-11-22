@@ -6,10 +6,6 @@ import type { z } from "zod";
 import type { PublicPasskeySchema } from "#lib/passkey-schemas.ts";
 import type { publicPasskey } from "#lib/server/api/passkey-public.ts";
 
-/**
- * ブラウザーを識別する表示名。
- * パスキーの名前はサーバーが登録時の提供元の識別子（AAGUID）から決め、識別子から判別できない場合にこの名前を使う。
- */
 export function defaultPasskeyName(userAgent: string) {
   const browser = /Edg(?:e|A|iOS)?\//.test(userAgent)
     ? "Edge"
@@ -42,9 +38,6 @@ export function passkeyError(error: unknown) {
     (error.name === "NotAllowedError" || error.name === "AbortError")
   )
     return "パスキー操作が取り消されたか、時間切れになりました。開始ボタンからやり直してください。";
-  // 通信断（fetchのTypeError）と応答の解析失敗（SyntaxError）はブラウザー由来の英語の文面になり、
-  // 次の操作が分からないため置き換える。tRPC経由ではこれらをcauseに持つTRPCClientErrorになる。
-  // サーバーが返した案内付きのエラーはcauseを持たないため、そのまま表示する。
   const cause =
     error instanceof Error && error.cause instanceof Error
       ? error.cause

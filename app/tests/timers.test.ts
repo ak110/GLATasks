@@ -6,14 +6,7 @@ import {
   type Locator,
   type Request,
 } from "@playwright/test";
-/**
- * @fileoverview タイマー機能の e2e テスト
- */
 
-/**
- * タイマーカードを削除する。
- * 通常削除（ConfirmDialog 表示）と一時タイマー満了時の確認なし削除の双方を扱う。
- */
 async function deleteTimerCard(page: Page, card: Locator, skipConfirm = false) {
   await card.locator('[data-testid="timer-delete-btn"]').click();
   if (!skipConfirm) {
@@ -227,21 +220,17 @@ test.describe("timers", () => {
   test("タイマーを追加すると一覧に表示される", async ({ page }) => {
     const timerName = `テスト_${uniqueTestName("e2e")}`;
 
-    // 追加ボタンをクリック
     await page.click('[data-testid="timer-add-btn"]');
     await page.locator('[data-testid="timer-name-input"]').waitFor();
 
-    // フォームを入力
     await page.fill('[data-testid="timer-name-input"]', timerName);
     await page.fill('[data-testid="timer-base-time-input"]', "00:05:00");
 
-    // 送信
     await Promise.all([
       page.waitForResponse((res) => res.url().includes("/api/trpc")),
       page.click('[data-testid="timer-submit-btn"]'),
     ]);
 
-    // タイマーカードが表示される
     const card = page
       .locator('[data-testid="timer-card"]')
       .filter({ hasText: timerName });
@@ -251,14 +240,12 @@ test.describe("timers", () => {
     );
     await expect(card.locator('[data-testid="timer-start-btn"]')).toBeVisible();
 
-    // 後片付け
     await deleteTimerCard(page, card);
   });
 
   test("タイマーを開始・一時停止できる", async ({ page }) => {
     const timerName = `開始停止_${uniqueTestName("e2e")}`;
 
-    // タイマー作成
     await page.click('[data-testid="timer-add-btn"]');
     await page.locator('[data-testid="timer-name-input"]').waitFor();
     await page.fill('[data-testid="timer-name-input"]', timerName);
@@ -270,36 +257,30 @@ test.describe("timers", () => {
       .filter({ hasText: timerName });
     await expect(card).toBeVisible({ timeout: 10000 });
 
-    // 開始
     await card.locator('[data-testid="timer-start-btn"]').click();
     await expect(card.locator('[data-testid="timer-pause-btn"]')).toBeVisible({
       timeout: 5000,
     });
 
-    // 59秒表示は開始直後にも現れるため、サーバーの整数秒が減る58秒以下を待つ。
     await expect(card.getByTestId("timer-display")).toHaveText(
       /^00:00:(?:[0-4]\d|5[0-8])$/,
     );
 
-    // 一時停止
     await card.locator('[data-testid="timer-pause-btn"]').click();
     await expect(card.locator('[data-testid="timer-start-btn"]')).toBeVisible({
       timeout: 5000,
     });
 
-    // 時間が減少していることを確認する（1 分 = 00:01:00 からの経過分）
     await expect(card.getByTestId("timer-display")).toHaveText(
       /^00:00:[0-5]\d$/,
     );
 
-    // 後片付け
     await deleteTimerCard(page, card);
   });
 
   test("タイマーをリセットできる", async ({ page }) => {
     const timerName = `リセット_${uniqueTestName("e2e")}`;
 
-    // タイマー作成
     await page.click('[data-testid="timer-add-btn"]');
     await page.locator('[data-testid="timer-name-input"]').waitFor();
     await page.fill('[data-testid="timer-name-input"]', timerName);
@@ -311,25 +292,21 @@ test.describe("timers", () => {
       .filter({ hasText: timerName });
     await expect(card).toBeVisible({ timeout: 10000 });
 
-    // 開始 → 少し待って → リセット
     await card.locator('[data-testid="timer-start-btn"]').click();
     await expect(card.getByTestId("timer-display")).not.toHaveText("00:02:30");
     await card.locator('[data-testid="timer-reset-btn"]').click();
 
-    // リセット後は元の時間に戻る
     await expect(card.locator('[data-testid="timer-display"]')).toHaveText(
       "00:02:30",
       { timeout: 5000 },
     );
 
-    // 後片付け
     await deleteTimerCard(page, card);
   });
 
   test("タイマーの延長・削減ができる", async ({ page }) => {
     const timerName = `延長削減_${uniqueTestName("e2e")}`;
 
-    // タイマー作成（5分、延長/削減=5分）
     await page.click('[data-testid="timer-add-btn"]');
     await page.locator('[data-testid="timer-name-input"]').waitFor();
     await page.fill('[data-testid="timer-name-input"]', timerName);
@@ -342,71 +319,58 @@ test.describe("timers", () => {
       .filter({ hasText: timerName });
     await expect(card).toBeVisible({ timeout: 10000 });
 
-    // +5分
     await card.locator('[data-testid="timer-plus-btn"]').click();
     await expect(card.locator('[data-testid="timer-display"]')).toHaveText(
       "00:10:00",
       { timeout: 5000 },
     );
 
-    // -5分
     await card.locator('[data-testid="timer-minus-btn"]').click();
     await expect(card.locator('[data-testid="timer-display"]')).toHaveText(
       "00:05:00",
       { timeout: 5000 },
     );
 
-    // 後片付け
     await deleteTimerCard(page, card);
   });
 
   test("アラームモードでタイマーを追加できる", async ({ page }) => {
     const timerName = `アラーム_${uniqueTestName("e2e")}`;
 
-    // 追加ボタンをクリック
     await page.click('[data-testid="timer-add-btn"]');
     await page.locator('[data-testid="timer-name-input"]').waitFor();
 
-    // フォームを入力
     await page.fill('[data-testid="timer-name-input"]', timerName);
 
-    // アラームモードに切り替え
     await page.click('[data-testid="timer-mode-alarm"]');
 
-    // 目標時刻を入力
     await page.fill('[data-testid="timer-target-time-input"]', "23:59");
 
-    // 送信
     await Promise.all([
       page.waitForResponse((res) => res.url().includes("/api/trpc")),
       page.click('[data-testid="timer-submit-btn"]'),
     ]);
 
-    // タイマーカードが表示される
     const card = page
       .locator('[data-testid="timer-card"]')
       .filter({ hasText: timerName });
     await expect(card).toBeVisible({ timeout: 10000 });
 
-    // 目標時刻が表示される
     await expect(
       card.locator('[data-testid="timer-target-display"]'),
     ).toContainText("23:59");
 
-    // アラームは自動スタートするのでカウントダウンが表示される
     const display = await card
       .locator('[data-testid="timer-display"]')
       .textContent();
     expect(display).not.toBe("00:00:00");
 
-    // 後片付け
     await deleteTimerCard(page, card);
   });
 
   test("アラームモードの±ボタンで目標時刻がずれる", async ({ page }) => {
     const timerName = `アラーム±_${uniqueTestName("e2e")}`;
 
-    // アラームタイマー作成
     await page.click('[data-testid="timer-add-btn"]');
     await page.locator('[data-testid="timer-name-input"]').waitFor();
     await page.fill('[data-testid="timer-name-input"]', timerName);
@@ -423,26 +387,22 @@ test.describe("timers", () => {
       card.locator('[data-testid="timer-target-display"]'),
     ).toContainText("12:00");
 
-    // +10分
     await card.locator('[data-testid="timer-plus-btn"]').click();
     await expect(
       card.locator('[data-testid="timer-target-display"]'),
     ).toContainText("12:10", { timeout: 5000 });
 
-    // -10分で戻る
     await card.locator('[data-testid="timer-minus-btn"]').click();
     await expect(
       card.locator('[data-testid="timer-target-display"]'),
     ).toContainText("12:00", { timeout: 5000 });
 
-    // 後片付け
     await deleteTimerCard(page, card);
   });
 
   test("アラームモードのリセットで再計算される", async ({ page }) => {
     const timerName = `アラームReset_${uniqueTestName("e2e")}`;
 
-    // アラームタイマー作成
     await page.click('[data-testid="timer-add-btn"]');
     await page.locator('[data-testid="timer-name-input"]').waitFor();
     await page.fill('[data-testid="timer-name-input"]', timerName);
@@ -455,18 +415,15 @@ test.describe("timers", () => {
       .filter({ hasText: timerName });
     await expect(card).toBeVisible({ timeout: 10000 });
 
-    // リセットで停止＆再計算される
     await Promise.all([
       page.waitForResponse((res) => res.url().includes("/api/trpc")),
       card.locator('[data-testid="timer-reset-btn"]').click(),
     ]);
 
-    // 開始ボタンが表示される（停止状態）
     await expect(card.locator('[data-testid="timer-start-btn"]')).toBeVisible({
       timeout: 5000,
     });
 
-    // 停止中アラームではカウントダウン非表示、目標時刻のみ表示される
     await expect(
       card.locator('[data-testid="timer-display"]'),
     ).not.toBeVisible();
@@ -478,20 +435,15 @@ test.describe("timers", () => {
       .textContent();
     expect(targetText).toContain("23:59");
 
-    // 後片付け
     await deleteTimerCard(page, card);
   });
 
   test("SSE 取りこぼし状態のブラウザでも、既に他端末で削除済みのタイマーを削除しようとしてエラーにならない", async ({
     browser,
   }) => {
-    // ブラウザ A でタイマーを削除したあと、SSE イベントを受け取れていない
-    // 別ブラウザ B が同じタイマーを削除しようとするケース。
-    // 冪等な削除 API のため、B 側もエラートーストが出ず正常完了する。
     const timerName = `冪等削除_${uniqueTestName("e2e")}`;
 
     const ctxA = await browser.newContext(makeContextOptions());
-    // ブラウザ B は SSE エンドポイントへの接続を遮断する (= 切断中の状態を模擬)
     const ctxB = await browser.newContext(makeContextOptions());
     await ctxB.route("**/api/events", (route) => route.abort());
 
@@ -504,7 +456,6 @@ test.describe("timers", () => {
         pageA.waitForResponse((res) => res.url().includes("/api/trpc")),
       ]);
 
-      // A でタイマー作成
       await pageA.click('[data-testid="timer-add-btn"]');
       await pageA.locator('[data-testid="timer-name-input"]').waitFor();
       await pageA.fill('[data-testid="timer-name-input"]', timerName);
@@ -516,7 +467,6 @@ test.describe("timers", () => {
         .filter({ hasText: timerName });
       await expect(cardA).toBeVisible({ timeout: 10000 });
 
-      // B でタイマー一覧を初期ロード（この時点でタイマーが表示されている）
       await Promise.all([
         pageB.goto("/timers"),
         pageB.waitForResponse((res) => res.url().includes("/api/trpc")),
@@ -526,15 +476,11 @@ test.describe("timers", () => {
         .filter({ hasText: timerName });
       await expect(cardB).toBeVisible({ timeout: 10000 });
 
-      // A で削除 (B は SSE を遮断しているので通知されない)
       await deleteTimerCard(pageA, cardA);
 
-      // B 側ではタイマーがまだ表示されている (取りこぼしを模擬)
       await expect(cardB).toBeVisible();
 
-      // B で削除を試みる → 冪等なためエラートーストが出ず、カードが消える
       await deleteTimerCard(pageB, cardB);
-      // エラートーストが出ていないこと
       await expect(pageB.locator('[data-testid="toast-error"]')).toHaveCount(0);
     } finally {
       await ctxA.close();
@@ -546,7 +492,6 @@ test.describe("timers", () => {
     const timerName = `編集前_${uniqueTestName("e2e")}`;
     const newName = `編集後_${uniqueTestName("e2e")}`;
 
-    // タイマー作成
     await page.click('[data-testid="timer-add-btn"]');
     await page.locator('[data-testid="timer-name-input"]').waitFor();
     await page.fill('[data-testid="timer-name-input"]', timerName);
@@ -558,35 +503,29 @@ test.describe("timers", () => {
       .filter({ hasText: timerName });
     await expect(card).toBeVisible({ timeout: 10000 });
 
-    // 編集ダイアログを開く
     await card.locator('[data-testid="timer-edit-btn"]').click();
     await page.locator('[data-testid="timer-name-input"]').waitFor();
 
-    // 名前を変更
     await page.fill('[data-testid="timer-name-input"]', newName);
     await page.click('[data-testid="timer-submit-btn"]');
 
-    // 名前が変更されている
     const newCard = page
       .locator('[data-testid="timer-card"]')
       .filter({ hasText: newName });
     await expect(newCard).toBeVisible({ timeout: 10000 });
 
-    // 後片付け
     await deleteTimerCard(page, newCard);
   });
 
   test("一時タイマーを追加し満了時に確認なしで削除できる", async ({ page }) => {
     const timerName = `一時_${uniqueTestName("e2e")}`;
 
-    // 一時追加ボタンをクリック → 専用タイトルのダイアログが開く
     await page.click('[data-testid="timer-add-ephemeral-btn"]');
     await page.locator('[data-testid="timer-name-input"]').waitFor();
     await expect(page.locator('[data-testid="timer-dialog-title"]')).toHaveText(
       "一時タイマー追加",
     );
 
-    // 2 秒タイマーとして送信
     await page.fill('[data-testid="timer-name-input"]', timerName);
     await page.fill('[data-testid="timer-base-time-input"]', "00:00:02");
     await Promise.all([
@@ -599,15 +538,11 @@ test.describe("timers", () => {
       .filter({ hasText: timerName });
     await expect(card).toBeVisible({ timeout: 10000 });
 
-    // 追加直後から自動で動き、開始操作なしで残り0秒へ到達する
     await expect(card.locator('[data-testid="timer-display"]')).toHaveText(
       "00:00:00",
       { timeout: 10000 },
     );
 
-    // confirm を受け入れるリスナーは敢えて設定しない。
-    // 一時タイマーの満了状態では confirm が発火しないため、
-    // リスナー無しでも削除が成立することを確認する。
     await card.locator('[data-testid="timer-delete-btn"]').click();
     await expect(card).not.toBeVisible({ timeout: 10000 });
   });
@@ -615,8 +550,6 @@ test.describe("timers", () => {
   test("鳴らす時間の秒数指定と既定値保存が機能する", async ({ page }) => {
     const timerName = `鳴動秒数_${uniqueTestName("e2e")}`;
 
-    // 既定値テストは前回テスト失敗時の状態が残ると誤判定するため、
-    // 冒頭で確実に既定値（3秒）へリセットしてから本題に入る
     const ringInput = page.locator('[data-testid="timer-ring-seconds-input"]');
     await page.click('[data-testid="timer-add-btn"]');
     await page.locator('[data-testid="timer-name-input"]').waitFor();
@@ -628,14 +561,11 @@ test.describe("timers", () => {
     ]);
     await page.keyboard.press("Escape");
 
-    // リセット後の状態でダイアログを再度開く
     await page.click('[data-testid="timer-add-btn"]');
     await page.locator('[data-testid="timer-name-input"]').waitFor();
 
-    // 鳴らす時間の初期値は3秒
     await expect(ringInput).toHaveValue("3");
 
-    // 値を変更し、既定として保存
     await page.fill('[data-testid="timer-adjust-input"]', "7");
     await ringInput.fill("120");
     await Promise.all([
@@ -643,7 +573,6 @@ test.describe("timers", () => {
       page.click('[data-testid="timer-save-default-btn"]'),
     ]);
 
-    // タイマーを作成
     await page.fill('[data-testid="timer-name-input"]', timerName);
     await page.fill('[data-testid="timer-base-time-input"]', "00:05:00");
     await Promise.all([
@@ -656,7 +585,6 @@ test.describe("timers", () => {
       .filter({ hasText: timerName });
     await expect(card).toBeVisible({ timeout: 10000 });
 
-    // ダイアログを再度開くと、既定値が反映される
     await page.click('[data-testid="timer-add-btn"]');
     await page.locator('[data-testid="timer-name-input"]').waitFor();
     await expect(ringInput).toHaveValue("120");
@@ -664,13 +592,10 @@ test.describe("timers", () => {
       page.locator('[data-testid="timer-adjust-input"]'),
     ).toHaveValue("7");
 
-    // ダイアログを閉じる
     await page.keyboard.press("Escape");
 
-    // 後片付け
     await deleteTimerCard(page, card);
 
-    // 既定値をリセットして次のテストへ影響を残さない
     await page.click('[data-testid="timer-add-btn"]');
     await page.locator('[data-testid="timer-name-input"]').waitFor();
     await ringInput.fill("3");
@@ -690,8 +615,6 @@ test.describe("timers", () => {
     const ringInput = page.locator('[data-testid="timer-ring-seconds-input"]');
     const dialogTitle = page.locator('[data-testid="timer-dialog-title"]');
 
-    // 検証で止まる場合はサーバーへ送信しないことを確認するため mutation を数える。
-    // クエリの定期再取得は GET のため POST に限定して数える。
     let trpcMutationCount = 0;
     const countTrpcMutation = (req: Request) => {
       if (req.method() === "POST" && req.url().includes("/api/trpc")) {
@@ -706,7 +629,6 @@ test.describe("timers", () => {
       await page.fill('[data-testid="timer-name-input"]', timerName);
       await page.fill('[data-testid="timer-base-time-input"]', "00:05:00");
 
-      // 鳴らす時間が未入力の場合は送信ボタンで入力を促す検証エラーになる
       await ringInput.fill("");
       await page.click('[data-testid="timer-submit-btn"]');
       expect(
@@ -716,7 +638,6 @@ test.describe("timers", () => {
       ).toBe(true);
       await expect(dialogTitle).toBeVisible();
 
-      // 鳴らす時間が上限超過の場合は範囲の検証エラーになる
       await ringInput.fill("5000");
       await page.click('[data-testid="timer-submit-btn"]');
       expect(
@@ -726,7 +647,6 @@ test.describe("timers", () => {
       ).toBe(true);
       await expect(dialogTitle).toBeVisible();
 
-      // 延長/削減の単位が未入力の場合は既定値保存ボタンでも検証エラーになる
       await ringInput.fill("3");
       await adjustInput.fill("");
       await page.click('[data-testid="timer-save-default-btn"]');
@@ -736,7 +656,6 @@ test.describe("timers", () => {
         ),
       ).toBe(true);
 
-      // 延長/削減の単位が下限未満の場合も既定値保存ボタンで検証エラーになる
       await adjustInput.fill("0");
       await page.click('[data-testid="timer-save-default-btn"]');
       expect(
@@ -745,13 +664,11 @@ test.describe("timers", () => {
         ),
       ).toBe(true);
 
-      // いずれの操作もサーバーへ送信していない
       expect(trpcMutationCount).toBe(0);
     } finally {
       page.off("request", countTrpcMutation);
     }
 
-    // ダイアログを閉じ、タイマーが作成されていないことを確認する
     await page.keyboard.press("Escape");
     await expect(dialogTitle).not.toBeVisible();
     await expect(
@@ -764,7 +681,6 @@ test.describe("timers", () => {
   }) => {
     const timerName = `一時未満了_${uniqueTestName("e2e")}`;
 
-    // 一時タイマーを長めの時間で作成
     await page.click('[data-testid="timer-add-ephemeral-btn"]');
     await page.locator('[data-testid="timer-name-input"]').waitFor();
     await page.fill('[data-testid="timer-name-input"]', timerName);
@@ -783,7 +699,6 @@ test.describe("timers", () => {
     await page.reload();
     await expect(card.getByTestId("timer-pause-btn")).toBeVisible();
 
-    // 動作中で未満了の削除は確認ダイアログを表示する
     await card.locator('[data-testid="timer-delete-btn"]').click();
     const confirmDialog = page.locator('[role="dialog"]', {
       hasText: "削除",

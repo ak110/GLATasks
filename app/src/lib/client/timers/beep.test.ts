@@ -1,7 +1,3 @@
-/**
- * @fileoverview ビープ音ユーティリティのユニットテスト
- */
-
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   playStartBeep,
@@ -26,7 +22,6 @@ describe("startLoopBeep / stopLoopBeep", () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     startLoopBeep(1, 3);
     expect(warnSpy).toHaveBeenCalledOnce();
-    // stop は no-op として安全に呼べる
     stopLoopBeep(1);
   });
 
@@ -54,18 +49,15 @@ describe("startLoopBeep / stopLoopBeep", () => {
     vi.stubGlobal("AudioContext", MockAudioContext);
 
     startLoopBeep(42, 3600);
-    // 同一IDの再起動は無視される（インスタンスは1つだけ）
     startLoopBeep(42, 3600);
     expect(MockAudioContext).toHaveBeenCalledOnce();
 
-    // 数サイクル分時間を進める
     await vi.advanceTimersByTimeAsync(2000);
     expect(startFn.mock.calls.length).toBeGreaterThan(0);
 
     stopLoopBeep(42);
     expect(closeFn).toHaveBeenCalledOnce();
 
-    // stop 後は再起動可能
     startLoopBeep(42, 3600);
     expect(MockAudioContext).toHaveBeenCalledTimes(2);
   });

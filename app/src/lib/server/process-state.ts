@@ -13,10 +13,6 @@
  * DB接続プールは`db.ts`が同じ方針で保持する。
  */
 
-/**
- * `globalThis`上のキーの接頭辞。`Symbol.for`で世代間に同じキーを得る。
- * `db.ts`のプール（`glatasks.server.db.pool`）と区別し、テスト用の破棄の対象を本モジュールの状態に限る。
- */
 const KEY_PREFIX = "glatasks.server.state.";
 
 type Holder = Record<symbol, unknown>;
@@ -25,11 +21,6 @@ function holder(): Holder {
   return globalThis as unknown as Holder;
 }
 
-/**
- * 名前ごとに世代を越えて保持する状態を返す。未作成なら`create`で作成する。
- *
- * 同じ名前に異なる型の状態を割り当てないこと（名前は保持先の識別子である）。
- */
 export function processState<T>(name: string, create: () => T): T {
   const key = Symbol.for(KEY_PREFIX + name);
   const store = holder();
@@ -42,22 +33,12 @@ interface IntervalEntry {
   timer: ReturnType<typeof setInterval> | undefined;
 }
 
-/** 周期処理の操作。開始・停止は世代を越えて同じタイマーを対象にする。 */
 export interface ProcessInterval {
-  /** タイマーが無ければ開始する。開始済みなら何もしない。 */
   start(): void;
-  /** タイマーを取り消す。 */
   stop(): void;
-  /** タイマーが動作中かを返す。 */
   readonly running: boolean;
 }
 
-/**
- * 名前ごとに1本の周期タイマーを保持し、呼び出す処理を`handler`へ差し替える。
- *
- * モジュールのトップレベルで呼ぶと、再評価のたびに処理参照だけが更新される。
- * `unref`を真にするとタイマーがプロセスの生存を妨げない。
- */
 export function processInterval(
   name: string,
   intervalMs: number,
@@ -86,12 +67,6 @@ export function processInterval(
   };
 }
 
-/**
- * テスト用: 保持した状態とタイマーを全て破棄する。
- *
- * 周期タイマーは取り消してから破棄する。業務上の後始末（transportのcloseなど）は
- * 各モジュールの停止処理が担う。
- */
 export function _resetProcessStateForTest(): void {
   const store = holder();
   for (const key of Object.getOwnPropertySymbols(store)) {

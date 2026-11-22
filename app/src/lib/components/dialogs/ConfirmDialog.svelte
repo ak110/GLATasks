@@ -1,14 +1,5 @@
 <script lang="ts">
     import Dialog from "#lib/components/dialogs/Dialog.svelte";
-    /**
-     * @fileoverview 確認ダイアログ（globalThis.confirm の代替）
-     *
-     * OK/Cancelボタンを持つため `onCancel`/`onConfirm` 命名を採用している。
-     * 既存の `onClose`/`onSubmit` 命名（TaskEditDialog等）とは意図的に分離している。
-     */
-
-    // タイトルあり時は <h2> の id を aria-labelledby で参照し、
-    // タイトルなし時は aria-label でフォールバックする
 
     interface Props {
         open: boolean;
@@ -17,7 +8,6 @@
         confirmLabel?: string;
         cancelLabel?: string;
         confirmDisabled?: boolean;
-        /** "danger" を指定すると確認ボタンが赤系になる */
         variant?: "default" | "danger";
         onConfirm: () => void | Promise<void>;
         onCancel: () => void;
@@ -37,8 +27,6 @@
 
     let cancelButtonEl = $state<HTMLButtonElement | null>(null);
 
-    // open が偽から真へ遷移した瞬間にキャンセルボタンへフォーカスを移す
-    // $state にすることで $effect の依存追跡が正しく機能する
     let prevOpen = $state(false);
     $effect(() => {
         if (open && !prevOpen) {

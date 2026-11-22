@@ -2,9 +2,6 @@
     import type { RouterInputs, RouterOutputs } from "#lib/client/trpc.ts";
     import { inputClass } from "#lib/components/ui/styles.ts";
     import { getUtcOffsetMinutes } from "#lib/date-time.ts";
-    /**
-     * @fileoverview 期間を指定したカロリー記録の一括追加と一括削除
-     */
 
     import ConfirmDialog from "#lib/components/dialogs/ConfirmDialog.svelte";
 
@@ -34,8 +31,6 @@
     let deleteStart = $state("");
     let deleteEnd = $state("");
     let deleteItemName = $state("");
-    // 送信後も条件を欄に残すため、最後に処理した条件を、未保存の入力が無いとみなす値として欄に示す。
-    // 処理に成功した条件が残るだけでは未保存の入力とみなさず、自動の再読み込みを妨げない（user-busy.ts）
     let savedCreate = $state({
         start: "",
         end: "",
@@ -72,7 +67,6 @@
             .join("。"),
     );
 
-    /** `<input type="date">`の値（yyyy-MM-dd）をAPIの日付形式（yyyy/MM/dd）へ変換する */
     function toApiDate(value: string): string {
         return value.replaceAll("-", "/");
     }

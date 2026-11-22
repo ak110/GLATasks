@@ -22,7 +22,6 @@
         unrated: "border border-dashed border-gray-300 dark:border-gray-600",
     };
 
-    // 昨日が達成日なら、ブロック全体を淡い緑系の配色へ変える
     const achieved = $derived(achievement.streakDays > 0);
     const streakText = $derived(
         achievement.streakDays >= achievement.days.length
@@ -43,7 +42,6 @@
     }
 </script>
 
-<!-- 横幅が足りる場合は見出し・連続日数・今日の残量・点を1行へ並べ、足りない場合は折り返す -->
 <section
     aria-labelledby="calorie-achievement-title"
     class={`mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 rounded border p-4 ${

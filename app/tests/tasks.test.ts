@@ -9,9 +9,6 @@ import {
 } from "./helpers/common";
 import { test, expect } from "@playwright/test";
 import { createConnection } from "mysql2/promise";
-/**
- * @fileoverview タスク CRUD の e2e テスト
- */
 
 const LIST_NAME = `タスクテスト_${uniqueTestName("e2e")}`;
 
@@ -32,7 +29,6 @@ test.describe("tasks", () => {
     await page.click(
       `[data-testid="list-select-btn"]:has-text("${LIST_NAME}")`,
     );
-    // リスト選択後、タスク追加フォームが表示されるのを待つ
     await page
       .locator('[data-testid="task-add-form"]')
       .waitFor({ timeout: 15000 });
@@ -59,7 +55,6 @@ test.describe("tasks", () => {
     await expect(
       page.locator('[data-testid="task-item"]').filter({ hasText: taskTitle }),
     ).toBeVisible({ timeout: 15000 });
-    // 送信成功後は追加ボタンが非表示（expanded=false）に戻る
     await expect(submitBtn).toBeHidden({ timeout: 15000 });
   });
 
@@ -317,7 +312,6 @@ test.describe("tasks", () => {
     const tagName = `ラベル_${uniqueTestName("e2e")}`;
 
     await page.fill('textarea[placeholder*="タスクを追加"]', title);
-    // フォーカス後にタグ入力欄を表示させる
     await page.locator('[data-testid="task-add-form"] textarea').focus();
     await page
       .locator('[data-testid="task-add-form"] [data-testid="tag-editor-input"]')

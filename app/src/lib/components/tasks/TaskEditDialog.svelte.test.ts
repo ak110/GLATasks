@@ -1,11 +1,3 @@
-/**
- * @fileoverview TaskEditDialog コンポーネントのsmoke test
- *
- * open=true でマウントしてフォーム要素（テキストエリア・タグ欄・リスト選択・ボタン）が
- * 表示されることを確認する。添付ファイルの追加・削除操作でtRPCクライアントの
- * mutateが発火することも確認する。
- */
-
 import { render, screen, fireEvent, waitFor } from "@testing-library/svelte";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
@@ -25,7 +17,6 @@ vi.mock("#lib/client/trpc.ts", () => ({
   },
 }));
 
-/** テスト用のデフォルト props */
 function makeDefaultProps() {
   return {
     open: true,

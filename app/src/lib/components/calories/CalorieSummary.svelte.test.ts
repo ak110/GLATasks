@@ -1,7 +1,3 @@
-/**
- * @fileoverview カロリー集計カードの表示値と色境界テスト
- */
-
 import { fireEvent, render } from "@testing-library/svelte";
 import { describe, expect, it, vi } from "vitest";
 

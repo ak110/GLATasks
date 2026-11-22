@@ -1,9 +1,3 @@
-/**
- * @fileoverview common.ts の純粋関数ユニットテスト
- *
- * DB 依存のない parseTags / serializeTags を対象にする。
- */
-
 import { describe, expect, it } from "vitest";
 
 import { parseTags, serializeTags } from "./common.js";
@@ -35,7 +29,6 @@ describe("parseTags", () => {
     ]);
     const result = parseTags(raw);
     expect(result).toHaveLength(3);
-    // ソート後も全要素が存在することを確認（ソート順は compareTagName に依存）
     expect(result.map((t) => t.name)).toContain("仕事");
     expect(result.map((t) => t.name)).toContain("個人");
     expect(result.map((t) => t.name)).toContain("買い物");
@@ -118,7 +111,6 @@ describe("parseTags / serializeTags ラウンドトリップ", () => {
     ];
     const serialized = serializeTags(original);
     const parsed = parseTags(serialized);
-    // parseTags はソートを行うので順序が変わる場合がある。要素の存在を確認する
     expect(parsed).toHaveLength(original.length);
     for (const tag of original) {
       expect(parsed).toContainEqual(tag);
@@ -126,7 +118,6 @@ describe("parseTags / serializeTags ラウンドトリップ", () => {
   });
 
   it("serializeTags → parseTags でデータが保持される（特殊文字含み）", () => {
-    // JSON.stringify がダブルクォートやアングルブラケットを適切にエスケープすることを確認する
     const original = [{ name: 'タグ"1"&2', color: "amber" as const }];
     const serialized = serializeTags(original);
     const parsed = parseTags(serialized);

@@ -1,7 +1,3 @@
-/**
- * @fileoverview タグ並び順ユーティリティのテスト
- */
-
 import { describe, it, expect } from "vitest";
 import type { TagInfo } from "./types";
 import { compareTagName } from "./tag-sort";
@@ -28,7 +24,6 @@ describe("compareTagName", () => {
       makeTag("!"),
       makeTag("_"),
     ].sort(compareTagName);
-    // コードポイント: "!"=0x21, "1"=0x31, "A"=0x41, "_"=0x5F, "あ"=0x3042
     expect(sorted.map((t) => t.name)).toEqual(["!", "1", "A", "_", "あ"]);
   });
 

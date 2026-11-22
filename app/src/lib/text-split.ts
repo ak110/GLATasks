@@ -1,10 +1,3 @@
-/**
- * @fileoverview タスクテキスト（`title\n\nnotes` 形式）の分割ユーティリティ
- *
- * サーバー側DB保存値とクライアント側楽観的更新の双方で同一ロジックを使うため、
- * client/server から参照可能な共通モジュールとして配置する。
- */
-
 export function splitTitle(text: string): string {
   return text
     .split("\n", 1)[0]

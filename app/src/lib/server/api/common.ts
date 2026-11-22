@@ -1,7 +1,4 @@
 import { ApiError } from "../api-errors";
-/**
- * @fileoverview サーバーAPI共通ユーティリティ（DB更新ヘルパー・変換関数・タグ操作）
- */
 
 import { and, eq } from "drizzle-orm";
 
@@ -15,35 +12,14 @@ type Database = ReturnType<typeof getDb>;
 export type DbConnection =
   Database | Parameters<Parameters<Database["transaction"]>[0]>[0];
 
-// ── 日時変換ヘルパー ──
-
-/**
- * DB の TIMESTAMP 型から読み込んだ Date を UTC ISO 文字列に変換する。
- *
- * TIMESTAMP 型は内部的に UTC で保存され、mysql2 が Date オブジェクトとして返す。
- * toISOString() でそのまま UTC 表現になる。
- */
 export function toUtcIso(dt: Date): string {
   return dt.toISOString();
 }
 
-/**
- * クライアントから受け取った UTC ISO 文字列を DB に保存する Date に変換する。
- *
- * new Date(isoString) で UTC ミリ秒の Date を生成し、
- * TIMESTAMP 型に INSERT すると MariaDB が UTC として格納する。
- */
 export function fromUtcIso(isoStr: string): Date {
   return new Date(isoStr);
 }
 
-// ── タグのシリアライズ ──
-
-/**
- * DB の tags カラム（JSON文字列）を TagInfo 配列に復元する。
- *
- * 破損データや旧仕様のレコードに備え、パース失敗時は空配列にフォールバックする。
- */
 export function parseTags(raw: string | null | undefined): TagInfo[] {
   if (!raw) return [];
   const knownColors = new Set<string>(TAG_COLOR_KEYS);
@@ -70,20 +46,14 @@ export function parseTags(raw: string | null | undefined): TagInfo[] {
   }
 }
 
-/** TagInfo 配列を DB 保存用の JSON 文字列に変換する。 */
 export function serializeTags(value: TagInfo[]): string {
   return JSON.stringify(value);
 }
-
-// ── タスクの title/notes 分割 ──
 
 // SSOTは #lib/text-split.ts。サーバー・クライアント両方から参照されるため
 // このファイルでは re-export のみとし、片側で再実装しない。
 export { splitTitle, splitNotes } from "#lib/text-split.ts";
 
-// ── DB 更新ヘルパー ──
-
-/** リストの last_updated を現在時刻に更新する */
 export async function touchListUpdated(
   listId: number,
   db: DbConnection = getDb(),
@@ -93,8 +63,6 @@ export async function touchListUpdated(
     .set({ last_updated: new Date() })
     .where(eq(lists.id, listId));
 }
-
-// ── 所有権チェック ──
 
 export async function getOwnedList(
   listId: number,

@@ -1,7 +1,3 @@
-/**
- * @fileoverview 認証関連API（ログイン・ユーザー登録）
- */
-
 import bcrypt from "bcryptjs";
 import { eq } from "drizzle-orm";
 
@@ -14,7 +10,6 @@ export type UserInfo = {
   user: string;
 };
 
-/** ログイン認証。成功時にユーザー情報を返し、失敗時に null を返す。 */
 export async function validateCredentials(
   user: string,
   password: string,
@@ -37,7 +32,6 @@ export async function validateCredentials(
   return { id: row.id, user: row.user };
 }
 
-/** 検証済みの利用者情報を登録する。 */
 export async function registerUser(
   userId: string,
   password: string,

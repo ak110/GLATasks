@@ -10,9 +10,6 @@ import {
   type Locator,
   type Page,
 } from "@playwright/test";
-/**
- * @fileoverview カロリー計算のエンドユーザー操作テスト
- */
 
 export async function openCalories(page: Page): Promise<void> {
   await Promise.all([
@@ -43,11 +40,6 @@ export async function addItem(
   ).toBeVisible();
 }
 
-/**
- * 編集ダイアログの欄のラベルと入力欄の配置を検証する
- *
- * 横幅が足りる場合はラベルが入力欄の左で同じ行に、狭い場合はラベルが入力欄の上に並ぶ。
- */
 export async function expectLabelPlacement(
   dialog: Locator,
   label: string,
@@ -83,9 +75,7 @@ export async function createContext(browser: Browser) {
   return browser.newContext(makeContextOptions());
 }
 
-/** 他のテストの記録に影響されないよう、新しく登録した利用者でカロリー計算を開く */
 export async function openCaloriesAsNewUser(browser: Browser) {
-  // 設定ファイルの共通テスト利用者のログイン状態を引き継がないよう空の状態を渡す
   const context = await browser.newContext(
     makeContextOptions({ storageState: { cookies: [], origins: [] } }),
   );
@@ -103,18 +93,12 @@ export async function openCaloriesAsNewUser(browser: Browser) {
   return { context, page };
 }
 
-/**
- * 早朝4時で区切った日で、指定した日数前の確定日の日付を返す
- *
- * 深夜0時〜4時に実行しても、記録が意図した確定日へ入るようにする。
- */
 export function confirmedDay(daysAgo: number): string {
   const date = new Date(Date.now() - (4 + daysAgo * 24) * 60 * 60 * 1000);
   const pad = (value: number) => String(value).padStart(2, "0");
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
-/** 指定した日数前の範囲の各確定日の正午へ、品目の記録を1件ずつ追加する */
 export async function bulkCreate(
   page: Page,
   itemName: string,
@@ -149,6 +133,5 @@ export async function addRecordNow(
     .getByRole("button", { name: "追加", exact: true })
     .click();
   await response;
-  // フォームは一覧の再取得後に空へ戻るため、続けて入力する前に空になるのを待つ
   await expect(page.locator("#calorie-record-item")).toHaveValue("");
 }

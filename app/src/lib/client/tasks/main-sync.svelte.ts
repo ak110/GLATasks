@@ -14,8 +14,6 @@ export function subscribeMainSync(
   state: MainState,
   resetActiveTasks: () => Promise<void>,
 ) {
-  // リスト集合の id+status に変化があった場合のみアクティブタスクキャッシュをリセットする
-  // rename はリセット不要、archive/unarchive/delete/merge はリセット要
   async function syncLists(): Promise<void> {
     debugLog("sync", "lists");
     const prevLists =
@@ -36,14 +34,9 @@ export function subscribeMainSync(
     if (prevKey !== newKey) {
       debugLog("sync", "lists-reset-cache");
       await resetActiveTasks();
-      // 注: 本ハンドラは async で動作するため、tasksUpdated と並走した場合
-      // state.updatedTaskIds の差分検知が空キャッシュを参照する可能性がある。
-      // その場合 state.updatedTaskIds が一時的に空になるが、後続のSSE/操作で復元されるので許容。
     }
   }
 
-  // 差分同期とページの再取得は全タブで行う。他タブ/他端末・
-  // フォールバック経路では差分キャッシュを比較し、変更タスクIDも記録する。
   async function syncTasks(fromOwnTab: boolean): Promise<void> {
     debugLog("sync", "tasks", { fromOwnTab });
     const oldCache = queryClient.getQueryData<ActiveTasksCache>(
@@ -69,13 +62,11 @@ export function subscribeMainSync(
     }
   }
 
-  // 定期TODOスケジュール一覧の再取得
   async function syncSchedules(): Promise<void> {
     debugLog("sync", "schedules");
     await invalidateEventQueries(queryClient, SSE_EVENTS.schedulesUpdated);
   }
 
-  // SSE: サーバーからの通知でクエリを再取得（フォールバックはSSE不健全時のポーリング経路）
   subscribeOnMount({
     [SSE_EVENTS.listsUpdated]: {
       handler: () => {
@@ -92,7 +83,6 @@ export function subscribeMainSync(
         });
         void syncTasks(fromOwnTab);
       },
-      // フォールバック経路は発信元タブを判別できないため、常に他端末扱いで差分検出する
       fallback: () => syncTasks(false),
     },
     [SSE_EVENTS.schedulesUpdated]: {

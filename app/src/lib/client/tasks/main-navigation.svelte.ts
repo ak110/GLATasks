@@ -34,7 +34,6 @@ export function createMainNavigation(
       clearSelection();
     }
   }
-  // URLハッシュからリストIDを解析
   function parseHashListId(): number | null {
     const hash = window.location.hash;
     if (!hash || hash === "#") return null;
@@ -42,8 +41,6 @@ export function createMainNavigation(
     return isNaN(id) ? null : id;
   }
 
-  // hashchange イベントで URL ハッシュと状態を同期
-  // ブラウザのバック/フォワード操作やモバイルのリスト⇔タスク画面遷移を検知する
   $effect(() => {
     function onHashChange() {
       const hashId = parseHashListId();
@@ -58,14 +55,10 @@ export function createMainNavigation(
     return () => window.removeEventListener("hashchange", onHashChange);
   });
 
-  // リストデータ到着時に選択状態を復元（初回のみ）
-  // URLハッシュ > URL パラメータ `list` > localStorage の優先順
-  // SSR ではなく $effect で行う理由: window/localStorage/location はブラウザ専用 API のため
   $effect(() => {
     if (!isListsReady()) return;
     if (!initialized) {
       initialized = true;
-      // URLハッシュ（ブックマーク・直接アクセス等）
       const hashId = parseHashListId();
       if (getLists().length === 0) {
         clearSelection();
@@ -82,14 +75,12 @@ export function createMainNavigation(
         return;
       }
 
-      // URL パラメータ（share/ingest からのリダイレクト等、互換性のため残す）
       const urlListId = Number(
         new SvelteURLSearchParams(window.location.search).get("list"),
       );
       if (urlListId && getLists().some((l) => l.id === urlListId)) {
         state.selectedListId = urlListId;
         localStorage.setItem("selectedList", String(urlListId));
-        // ?list= をハッシュに置換
         history.replaceState(
           {},
           "",
@@ -99,7 +90,6 @@ export function createMainNavigation(
         return;
       }
 
-      // localStorage フォールバック（ハッシュは付けない → モバイルではリスト一覧から）
       const saved = localStorage.getItem("selectedList");
       const savedId = saved ? parseInt(saved) : null;
       const initial = getLists().find((l) => l.id === savedId) ?? getLists()[0];
@@ -109,7 +99,6 @@ export function createMainNavigation(
       }
     }
 
-    // 無効なハッシュ対策: リストデータにハッシュのIDが存在しなければハッシュを除去
     if (state.hasHash) {
       const hashId = parseHashListId();
       if (hashId && !getLists().some((l) => l.id === hashId)) {
@@ -124,7 +113,6 @@ export function createMainNavigation(
     state.selectedListId = listId;
     state.addTaskText = "";
     state.updatedTaskIds.clear();
-    // ハッシュ更新 → hashchange イベントで state.hasHash と localStorage が同期される
     location.hash = "#" + listId;
   }
 

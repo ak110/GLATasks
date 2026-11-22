@@ -4,9 +4,6 @@
         grayButtonClass,
         nameAreaClass,
     } from "#lib/components/ui/styles.ts";
-    /**
-     * @fileoverview タスクリストヘッダー（リスト名 + モバイル戻るボタン + 完了済みを非表示ボタン）
-     */
 
     interface Props {
         title: string;
@@ -21,7 +18,6 @@
     class="flex shrink-0 items-center justify-between gap-2 border-b border-gray-200 bg-blue-50 px-4 py-3 dark:border-gray-700 dark:bg-blue-900/30"
 >
     <div class="flex min-w-0 flex-1 items-center gap-1">
-        <!-- モバイル用戻るボタン -->
         <button
             onclick={onBack}
             class="shrink-0 cursor-pointer rounded p-1 text-gray-500 hover:bg-gray-200 hover:text-gray-700 sm:hidden dark:text-gray-400 dark:hover:bg-gray-600 dark:hover:text-gray-200"

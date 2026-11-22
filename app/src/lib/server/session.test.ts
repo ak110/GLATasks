@@ -1,7 +1,3 @@
-/**
- * @fileoverview セッションの用途検証とCookie設定のテスト
- */
-
 import { SignJWT } from "jose";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
@@ -13,7 +9,6 @@ import {
 } from "./session";
 import { createAccessToken, createRefreshToken } from "./mcp/oauth";
 
-// 鍵管理は外部境界として差し替え、実際のJWT発行・検証を通す。
 vi.mock("./env", () => ({
   getJwtSecret: () => Buffer.alloc(32, 1).toString("base64"),
 }));

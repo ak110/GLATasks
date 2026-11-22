@@ -34,7 +34,6 @@ test.describe("calories", () => {
     };
     page.on("request", observeRequest);
     try {
-      // beforeEachの表示とは別に、監視を開始してから初期表示の全クエリを待つ。
       await Promise.all([
         ...[
           "calories.items",
@@ -56,7 +55,6 @@ test.describe("calories", () => {
       const itemRow = page
         .getByTestId("calorie-item-row")
         .filter({ hasText: itemName });
-      // 初期の30日分には当日1件だけが表示されるが、使用件数には45日前も含まれる。
       await expect(
         page.getByTestId("calorie-record-row").filter({ hasText: itemName }),
       ).toHaveCount(1);
@@ -95,7 +93,6 @@ test.describe("calories", () => {
         .getByTestId("calorie-item-row")
         .filter({ hasText: itemName });
       if ((await itemRow.count()) > 0) {
-        // 固有の品目と期間を指定し、このテストが実DBに作成した記録だけを削除する。
         const deleteForm = page.getByTestId("calorie-bulk-delete-form");
         await deleteForm.getByLabel("開始日").fill(confirmedDay(45));
         await deleteForm.getByLabel("終了日").fill(confirmedDay(0));
@@ -150,7 +147,6 @@ test.describe("calories", () => {
     const remainingValue = page.getByTestId("calorie-summary-remaining-value");
     await expect(remaining).toHaveText(/あと|超過/);
 
-    // 見出しと値の縦範囲が重なれば同じ行に並んでいる
     for (const days of [1, 7, 28]) {
       const card = page.getByTestId(`calorie-summary-${days}`);
       const heading = await requireBoundingBox(card.getByRole("heading"));
@@ -175,7 +171,6 @@ test.describe("calories", () => {
     await expect(remainingValue).toHaveCSS("font-weight", "700");
     await expect(remaining).toHaveCSS("font-weight", "400");
 
-    // 左右のカード列は同じ高さに揃い、左カードの内容は上下中央に置かれる
     const dailyCard = page.getByTestId("calorie-summary-1");
     const daily = await requireBoundingBox(dailyCard);
     const averageColumn = await requireBoundingBox(
@@ -248,7 +243,6 @@ test.describe("calories", () => {
     await addRecordNow(page, itemName);
     await page.setViewportSize({ width: 320, height: 800 });
 
-    /** 要素の内容が、幅0でない列の幅に収まっているか */
     const fitsInCell = (cell: Locator) =>
       expect
         .poll(() =>
@@ -273,7 +267,6 @@ test.describe("calories", () => {
         await fitsInCell(header);
       }
     }
-    // 品目名は省略表示するため、日時・数量・kcalの値を確かめる
     const cells = page
       .getByTestId("calorie-record-row")
       .filter({ hasText: itemName })
@@ -292,7 +285,6 @@ test.describe("calories", () => {
       .filter({ hasText: itemName });
     const status = page.getByTestId("calorie-bulk-status");
 
-    // 記録表の既定表示（今日までの30日間）に入る直近3日間を指定する
     const day = (offset: number) => {
       const date = new Date(Date.now() - offset * 24 * 60 * 60 * 1000);
       const pad = (value: number) => String(value).padStart(2, "0");
@@ -360,7 +352,6 @@ test.describe("calories", () => {
       await recordRow.getByRole("menuitem", { name: "編集" }).click();
       const recordDialog = page.getByRole("dialog", { name: "記録の編集" });
       await expect(recordDialog).toBeVisible();
-      // 幅393ではダイアログの内容が狭く、ラベルの下に入力欄を置く
       const sideBySide = width === 1280;
       for (const label of ["日時", "品目", "数量"]) {
         await expectLabelPlacement(recordDialog, label, sideBySide);
@@ -372,7 +363,6 @@ test.describe("calories", () => {
       const submitBox = await requireBoundingBox(
         recordDialog.getByRole("button", { name: "変更", exact: true }),
       );
-      // 変換ボタンを左端側、変更ボタンを右端側へ置く
       expect(convertBox.x - dialogBox.x).toBeLessThan(
         dialogBox.x + dialogBox.width - (convertBox.x + convertBox.width),
       );
@@ -456,7 +446,6 @@ test.describe("calories", () => {
   }) => {
     const itemName = `コピー_${uniqueTestName("e2e")}`;
     await addItem(page, itemName);
-    // 実行日によらず「前の30日」の内側に入り、端末と同じタイムゾーンになる日時を使う。
     const pastDateTime = await page.evaluate(() => {
       const date = new Date();
       date.setDate(date.getDate() - 45);
@@ -530,7 +519,6 @@ test.describe("calories", () => {
     await page.getByRole("button", { name: "記録をエクスポート" }).click();
     const download = await downloadPromise;
     expect(download.suggestedFilename()).toBe("カロリー記録.csv");
-    // 取り込んだ一時項目は、エクスポートで一時項目の列が1の行になる
     const exported = await readFile(await download.path(), "utf8");
     expect(exported).toContain(`2026/09/01 19:00,${temporaryName},850,1`);
     expect(exported).toContain(`2026/09/01 12:00,${itemName},2,`);

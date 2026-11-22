@@ -29,7 +29,6 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      // タッチ専用テスト（*.mobile.test.ts）はモバイルプロジェクトでのみ動かす
       testIgnore: /\.mobile\.test\.ts$/,
       use: {
         ...devices["Desktop Chrome"],

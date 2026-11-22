@@ -1,13 +1,3 @@
-/**
- * @fileoverview 共有の取り込み画面（`/share/ingest`）の入力欄の初期値を組み立てる
- *
- * 共有元（AndroidのWeb Share Target、Chrome拡張）が渡す`title`・`text`・`url`から、
- * URLの抽出と正規化、X投稿の投稿者名と本文（日本語訳）の取得、初期値の組み立てを行う。
- * X投稿の取得はFxTwitter APIを先に使い、失敗時にX公式のoEmbedへ切り替える。
- * 取得の失敗は画面のエラーにせず、共有元が渡した内容を初期値に使う。
- */
-
-/** 外部取得に使う`fetch`。試験で差し替えるため引数で受け取る。 */
 export type FetchLike = (
   input: string,
   init?: { signal?: AbortSignal; headers?: Record<string, string> },
@@ -17,10 +7,8 @@ export type XPostRef = { screenName: string; id: string };
 
 export type XPostContent = { name: string; screenName: string; text: string };
 
-/** 外部取得1回あたりの時間上限（ミリ秒）。FxTwitterとoEmbedの合計で画面の表示を長く止めないための値。 */
 export const X_FETCH_TIMEOUT_MS = 3000;
 
-/** 入力欄へ入れる本文の最大文字数（コードポイント）。Chrome拡張が渡すタブ名と同じく、1行で途中までを示す長さにする。 */
 export const X_POST_TEXT_MAX_CHARS = 200;
 
 const X_HOSTS = new Set([
@@ -32,7 +20,6 @@ const X_HOSTS = new Set([
   "mobile.twitter.com",
 ]);
 
-/** 追跡用として除くクエリパラメーター（`utm_`で始まるものも除く）。 */
 const TRACKING_PARAMS = new Set([
   "fbclid",
   "gclid",
@@ -75,7 +62,6 @@ export function parseXPostUrl(raw: string): XPostRef | undefined {
   return { screenName: match[1], id: match[2] };
 }
 
-/** X以外のURLは、ページの表示に要るクエリがありうるため、既知の追跡用パラメーターだけを除く。 */
 export function normalizeUrl(raw: string): string {
   const post = parseXPostUrl(raw);
   if (post) return `https://x.com/${post.screenName}/status/${post.id}`;
@@ -123,11 +109,8 @@ function nonEmptyString(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() !== "" ? value : undefined;
 }
 
-// 多言語の警告文の後半に日本語があっても訳として採用しない。
 const TRANSLATION_PROBE_LENGTH = 120;
-// 英字の句読点は直後が空白か末尾の時だけ文末とみなし、「Node.js」「v1.2」のような語中の記号を文の区切りとしない。
 const SENTENCE_END = /[。！？\r\n]|[.!?](?=\s|$)/gu;
-// 「Mr. Smith」のような敬称や頭文字の略記のピリオドは文末としない。
 const ABBREVIATION_BEFORE_PERIOD = /(?:^|\s)(?:[A-Za-z]|[A-Z][a-z]{1,2})$/u;
 const DEEPL_VERSION_WARNING =
   /older version of DeepL|ältere Version von DeepL|古いバージョンのDeepLを使用/iu;
@@ -143,7 +126,6 @@ function leadingSentence(text: string): string {
   return text.slice(0, TRANSLATION_PROBE_LENGTH);
 }
 
-/** FxTwitterの`/2/`を含むv2形式ではなく、v1形式（`tweet.author.screen_name`など）の属性名で読む。 */
 export function parseFxTwitter(
   body: unknown,
   log: (message: string) => void = () => {},
@@ -198,7 +180,6 @@ function decodeHtmlEntities(value: string): string {
   );
 }
 
-/** oEmbedは本文を構造化した値で返さないため、`html`の`<p>`要素から取り出す。訳は無く、長文は末尾を「…」で省略して返す。 */
 export function parseOEmbed(
   body: unknown,
   screenName: string,
@@ -216,7 +197,6 @@ export function parseOEmbed(
   return { name, screenName, text };
 }
 
-/** 取得の失敗で共有の画面をエラーにしないため、理由は`log`へ渡して例外を送出しない。 */
 export async function fetchXPost(
   post: XPostRef,
   options: {
@@ -262,7 +242,6 @@ export async function fetchXPost(
   return undefined;
 }
 
-/** 改行と連続した空白を1つの空白へまとめ、上限を超える分を省いて末尾に「…」を付ける。 */
 export function toSingleLine(
   value: string,
   maxChars: number = X_POST_TEXT_MAX_CHARS,

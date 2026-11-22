@@ -1,7 +1,3 @@
-/**
- * @fileoverview 翻訳画面の要求、準備、実行と設定の状態管理
- */
-
 import { untrack } from "svelte";
 import { extractErrorMessage } from "#lib/client/ui/extract-error-message.ts";
 import {
@@ -214,10 +210,8 @@ export function createTranslationController() {
     });
   }
 
-  /** 準備要求を陳腐化としてマークする */
   function markPendingPreparationStale(): void {
     if (work.phase === "preparing") {
-      // 原文が変わっても共有モデル作成は続ける。その間も新しい原文の準備要否は独立して判定する。
       work = { ...work, phase: "refreshing", latest: { phase: "idle" } };
     } else if (work.phase === "waiting") {
       work = { ...work, stale: true };
@@ -228,12 +222,6 @@ export function createTranslationController() {
     }
   }
 
-  /**
-   * 準備対象を陳腐化としてマークし、進行中の要求と共有作成を中断する
-   *
-   * 言語・エンジンの変更は準備対象を変えるため、以前の対象の作成を継続しない。
-   * 要求を先に中断することで、共有作成の放棄が状態表示へ到達しないようにする。
-   */
   function invalidatePendingPreparation(): void {
     transition({ phase: "idle" });
     abandonEngineCreations();
@@ -265,12 +253,6 @@ export function createTranslationController() {
     resetSettings();
   }
 
-  /**
-   * 原文の変更を反映する
-   *
-   * 原文はTranslatorの言語ペアもPromptの準備キーも変えないため、進行中のモデル作成は
-   * 中断せず、準備要求の陳腐化だけを記録する。
-   */
   function handleSourceInput(value: string): void {
     if (sourceText === value) return;
     sourceText = value;
@@ -509,7 +491,6 @@ export function createTranslationController() {
       }
     } finally {
       const current = currentPreparation();
-      // 準備されたモデルは共有資源に残るが、操作が古ければ画面には反映しない。
       if (current?.phase === "refreshing") work = current.latest;
       else if (current) transition({ phase: "idle" });
     }
@@ -572,7 +553,6 @@ export function createTranslationController() {
   }
 
   $effect(() => {
-    // 準備から再開する時にも方向を確定するため、その更新だけでは先頭から再実行しない。
     const request = makeCurrentRequest(untrack(() => selectedDirection));
     if (!availabilityReady) return;
     void availableEngines;

@@ -1,17 +1,9 @@
-/**
- * @fileoverview TimerCard コンポーネントのsmoke test
- *
- * マウントできて主要要素（タイマー名・操作ボタン）が表示されることを確認する。
- * タイマーの表示秒数は内部 setInterval に依存するため、ここでは要素の存在のみを検証する。
- */
-
 import { render, screen } from "@testing-library/svelte";
 import { describe, expect, it, vi } from "vitest";
 
 import type { TimerInfo } from "#lib/types.ts";
 import TimerCard from "./TimerCard.svelte";
 
-/** テスト用タイマーデータのデフォルト値 */
 function makeTimer(overrides?: Partial<TimerInfo>): TimerInfo {
   return {
     id: 1,
@@ -31,7 +23,6 @@ function makeTimer(overrides?: Partial<TimerInfo>): TimerInfo {
   };
 }
 
-/** TimerCard に必要な最小限の props */
 function makeDefaultProps(overrides?: Partial<TimerInfo>) {
   return {
     timer: makeTimer(overrides),

@@ -1,7 +1,3 @@
-/**
- * @fileoverview 翻訳ページのe2eテスト
- */
-
 import { expect, test } from "@playwright/test";
 import {
   expectStubbedPageReady,

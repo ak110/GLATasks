@@ -1,10 +1,3 @@
-/**
- * @fileoverview MCP OAuth2.1認可サーバーの永続化層
- *
- * - 登録クライアント（DCR で生成）はファイルへ永続化する
- * - 認可コードは短命なため、プロセス内Mapで保持する（モジュールの再評価をまたいで共有する）
- */
-
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
@@ -36,10 +29,8 @@ export interface AuthorizationCodeRecord {
   expires_at: number;
 }
 
-/** 認可コードの有効期間（秒）。OAuth 2.1 は 10分以内を推奨する */
 const AUTH_CODE_TTL_SECONDS = 600;
 
-/** 登録クライアントの保存先 */
 function getClientsPath(): string {
   return path.join(getEnv().DATA_DIR, ".mcp_clients.json");
 }
@@ -84,12 +75,6 @@ export function registerClient(
   return client;
 }
 
-// ── 認可コード（短命・プロセス内） ──
-
-/**
- * 発行済みの認可コード。モジュールの再評価をまたいで保持し、再評価前に発行した
- * 未失効のコードを再評価後のトークンエンドポイントで消費できるようにする（`process-state.ts`を参照）。
- */
 const codes = processState<Map<string, AuthorizationCodeRecord>>(
   "oauth.codes",
   () => new Map(),
@@ -108,7 +93,6 @@ export function issueAuthorizationCode(
   return code;
 }
 
-/** 認可コードを消費する（1回だけ取得可能）。期限切れ・未知の場合は null。 */
 export function consumeAuthorizationCode(
   code: string,
 ): AuthorizationCodeRecord | null {

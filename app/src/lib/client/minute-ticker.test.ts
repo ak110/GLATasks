@@ -1,7 +1,3 @@
-/**
- * @fileoverview 分の切り替わりごとに処理を呼ぶタイマーのテスト
- */
-
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { startMinuteTicker } from "#lib/client/minute-ticker.ts";

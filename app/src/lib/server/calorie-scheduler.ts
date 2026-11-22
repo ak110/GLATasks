@@ -1,5 +1,3 @@
-/** スケジューラーが呼ぶカロリー自動記録の定期処理。 */
-
 import { and, eq, lte } from "drizzle-orm";
 import { DAY_MS } from "#lib/calorie-date.ts";
 import { getDb } from "./db";
@@ -18,14 +16,6 @@ export function collectDueCalorieAutoRecordRuns(
   return { consumedAts, nextRunAt: new Date(next) };
 }
 
-/**
- * ONの自動記録設定のうち次回時刻が`now`以前のものについて、過ぎた時刻ごとに記録を追加し、
- * 記録を追加したユーザーのIDと、全設定を正常に処理できたかを返す。
- *
- * 次回時刻から1日刻みで`now`以前の時刻を記録し、次回時刻を`now`より後へ進める。
- * 1件の失敗が他の設定の処理を止めないよう、設定ごとに例外を捕捉する。
- * 単一プロセスから60秒間隔で呼ばれる前提であり、並行呼び出しの排他は持たない。
- */
 export async function processCalorieAutoRecords(
   now: Date,
 ): Promise<{ userIds: number[]; succeeded: boolean }> {

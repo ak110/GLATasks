@@ -1,5 +1,4 @@
 <script module lang="ts">
-    // DOMの配置順ではなく、showModalで開いた順を使う。
     interface OpenDialog {
         dialog: HTMLDialogElement;
         previousFocus: HTMLElement | null;
@@ -75,12 +74,10 @@
             void tick().then(() => {
                 let target = entry.previousFocus;
                 let previous = entry.previousDialog;
-                // 破棄確定で複数層を閉じても、取り外した編集画面へは戻さない。
                 while (previous && !openDialogs.includes(previous)) {
                     target = previous.previousFocus;
                     previous = previous.previousDialog;
                 }
-                // 更新中に別のモーダルを開いた場合、そのフォーカスを奪わない。
                 if (openDialogs.at(-1) !== previous) return;
                 if (
                     target?.isConnected &&
@@ -131,7 +128,6 @@
         const first = targets[0];
         const last = targets.at(-1);
         const active = document.activeElement;
-        // 内部の通常移動はブラウザーに任せ、ブラウザーUIへ抜ける両端だけ循環させる。
         if (
             !first ||
             !targets.includes(active as HTMLElement) ||
@@ -151,7 +147,6 @@
 </script>
 
 {#if open}
-    <!-- 既存のダイアログ属性セレクターも共通部品で受理する。 -->
     <!-- svelte-ignore a11y_no_redundant_roles -->
     <dialog
         {@attach showDialog}

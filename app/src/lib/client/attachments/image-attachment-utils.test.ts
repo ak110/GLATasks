@@ -1,9 +1,3 @@
-/**
- * @fileoverview image-attachment-utilsの単体テスト
- *
- * `trpc.attachments.download.query`をモックしてBlob URLキャッシュの分岐を検証する。
- */
-
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const { downloadQueryMock } = vi.hoisted(() => ({
@@ -20,7 +14,6 @@ vi.mock("#lib/client/trpc.ts", () => ({
 
 import { createBlobUrlCache } from "#lib/client/attachments/image-attachment-utils.ts";
 
-/** URL.createObjectURL / revokeObjectURLをスパイに差し替える */
 function installUrlSpies() {
   let counter = 0;
   const revoked: string[] = [];
@@ -35,12 +28,10 @@ function installUrlSpies() {
   return { createSpy, revokeSpy, revoked };
 }
 
-/** `attachments.download.query`の既定レスポンス */
 function makeDownloadResponse(id: number) {
   return {
     filename: `file-${id}.png`,
     mimeType: "image/png",
-    // 1バイト分のbase64（"AQ==" → 0x01）
     data: "AQ==",
   };
 }
@@ -123,7 +114,6 @@ describe("createBlobUrlCache", () => {
     const first = await cache.ensure(1);
     cache.syncWith([]);
     expect(revoked).toContain(first);
-    // 再度アクティブ化した後のensureで新しいURLが返る
     cache.syncWith([1]);
     downloadQueryMock.mockResolvedValue(makeDownloadResponse(1));
     const second = await cache.ensure(1);
@@ -156,11 +146,9 @@ describe("createBlobUrlCache", () => {
     );
     const cache = createBlobUrlCache();
     const pending = cache.ensure(1);
-    // ダウンロード完了前にID:1を非アクティブ化
     cache.syncWith([]);
     resolveDownload!(makeDownloadResponse(1));
     await expect(pending).rejects.toThrow(/取得中に削除されました/);
-    // 生成されたBlob URLがrevokeされている
     expect(revoked.length).toBeGreaterThan(0);
   });
 });

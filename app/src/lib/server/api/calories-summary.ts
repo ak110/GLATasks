@@ -1,5 +1,3 @@
-/** 集計に必要な記録と設定を取得し、純粋な集計関数へ渡す。 */
-
 import { and, asc, eq, gte, lte } from "drizzle-orm";
 import {
   calculateCalorieSummary,

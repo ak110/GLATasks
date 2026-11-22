@@ -69,7 +69,6 @@ test.describe("calories temporary items", () => {
   test("使われていない品目だけを削除でき、使用中の品目は理由を示して削除させない", async ({
     browser,
   }) => {
-    // 削除する品目を表の最後の行にし、メニューが表の下端より外へ出る場合も確かめる
     const { context, page } = await openCaloriesAsNewUser(browser);
     try {
       const unusedName = "品目Z_未使用";
@@ -93,7 +92,6 @@ test.describe("calories temporary items", () => {
         .filter({ hasText: unusedName });
       await openItemMenu(unusedRow);
       const unusedDelete = unusedRow.getByRole("menuitem", { name: "削除" });
-      // メニューが周囲の要素に切り取られず、項目の中心を押すとその項目自身に届く
       await expect
         .poll(() =>
           unusedDelete.evaluate((element) => {
@@ -145,14 +143,12 @@ test.describe("calories temporary items", () => {
       });
       const confirm = page.getByRole("dialog", { name: "一時項目への変換" });
 
-      // 変換ボタンは品目名が品目表と一致する間だけ表示する
       const itemInput = recordDialog.getByLabel("品目", { exact: true });
       await itemInput.fill("");
       await expect(convertButton).toHaveCount(0);
       await itemInput.fill(name);
       await expect(convertButton).toBeVisible();
 
-      // キャンセルとEscapeでは確認だけを閉じ、編集ダイアログと記録を保つ
       await convertButton.click();
       await expect(confirm).toContainText("240 kcal（120 kcal × 2）");
       await confirm.getByRole("button", { name: "キャンセル" }).click();
@@ -170,7 +166,6 @@ test.describe("calories temporary items", () => {
       await expect(row.locator("td").nth(1)).toHaveText(name);
       await expect(row.locator("td").nth(2)).toHaveText("2");
 
-      // キーボードで確認ボタンへ移ると、どちらにフォーカスがあるかを枠で示す
       await convertButton.click();
       const confirmButton = confirm.getByRole("button", {
         name: "変換",
@@ -190,7 +185,6 @@ test.describe("calories temporary items", () => {
       await expect(row.locator("td").nth(2)).toHaveText("");
       await expect(row.locator("td").nth(3)).toHaveText("240");
 
-      // 変換後は品目のkcalを変えても記録のkcalは変わらない
       const itemRow = page
         .getByTestId("calorie-item-row")
         .filter({ hasText: name });

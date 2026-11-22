@@ -28,7 +28,6 @@ import {
 } from "../passkey-cookies";
 import { createSessionToken, setSessionCookie } from "../session";
 
-// 名前を送らない旧版のクライアントには、ブラウザーを判別できない場合と同じ名前を付ける。
 const UNKNOWN_BROWSER_NAME = "このブラウザー";
 
 export async function publicPasskey(
@@ -157,7 +156,6 @@ export async function publicPasskey(
   return { success: true, codes: "codes" in result ? result.codes : undefined };
 }
 
-/** 失敗回数をcommitしてから入口で拒否する。例外によるrollbackで制限を無効化しない。 */
 export async function recover(userName: string, code: string) {
   const result = await getDb().transaction(
     async (tx) => {

@@ -2,7 +2,6 @@ import { tick } from "svelte";
 
 type MenuState = { open: boolean; onClose: () => void };
 
-/** トリガーとメニューを囲む要素で、ARIAと外側クリック・Escを管理する。 */
 export function menuBehavior(node: HTMLElement, initial: MenuState) {
   let state = initial;
   function update(next: MenuState) {

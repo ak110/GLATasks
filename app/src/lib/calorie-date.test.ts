@@ -1,5 +1,3 @@
-/** 現地日時のUTC換算、30日窓、朝4時の区切りを境界で検証する。 */
-
 import { describe, expect, it } from "vitest";
 
 import {

@@ -20,9 +20,7 @@
         onDelete: (
             itemId: RouterInputs["calories"]["deleteItem"]["itemId"],
         ) => unknown;
-        /** 追加フォームの品目名欄の値。ページが両表の検索語として使う */
         addName?: string;
-        /** 前後の空白を除いた検索語。大文字小文字を区別せず、全ての語がそれぞれ品目名か備考に含まれる品目だけを表示する */
         filterKeywords: string[];
         onClearFilter: () => void;
     }
@@ -50,7 +48,6 @@
     let deleting = $state<symbol | undefined>();
 
     let deleteTarget = $state<Item | undefined>();
-    // 編集ダイアログの品目名欄は追加フォームと別に持ち、編集中の名前を検索語にしない
     let editName = $state("");
     const name = $derived(editingId === undefined ? addName : editName);
     let kcal = $state("");
@@ -66,7 +63,6 @@
         }),
     );
 
-    /** 使用中の品目は削除できないため、削除の代わりに使用件数を示す文言を返す */
     function usageText(item: Item): string | undefined {
         const counts = {
             records: item.recordCount,
@@ -112,7 +108,6 @@
         session = Symbol();
         openMenuId = undefined;
         editingId = item.id;
-        // 編集の開始で追加フォームの入力を破棄するため、検索も解除される
         addName = "";
         editName = item.name;
         kcal = String(item.kcal);
@@ -219,7 +214,6 @@
                 >
                     {sendingMessage}
                 </p>{/if}
-            <!-- ダイアログの幅が足りればラベルを左・入力欄を右に並べ、狭ければラベルの下に入力欄を置く -->
             <form class="@container" onsubmit={submit}>
                 <div
                     class="grid gap-3 @sm:grid-cols-[4rem_minmax(0,1fr)] @sm:items-center"
@@ -330,7 +324,6 @@
                                         class={menuBlueItemClass}
                                         role="menuitem">編集</button
                                     >
-                                    <!-- 使用中の品目を削除すると記録の品目名とkcalが失われるため、削除を無効にして理由を示す -->
                                     <button
                                         type="button"
                                         disabled={inUse !== undefined}

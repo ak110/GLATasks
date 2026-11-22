@@ -6,14 +6,6 @@ import {
   toggleTaskAndWaitForUpdate,
 } from "./helpers/common";
 import { test, expect } from "@playwright/test";
-/**
- * @fileoverview TODO区分タスクの通知バッジ表示に関する e2e テスト
- *
- * 発火機構やスケジュールには依存せず、TODO区分タスクのCRUD操作のみで検証する。
- * バッジ件数はリスト単位の集計値であるため、他テストのタスクが残っていると
- * 件数アサーションが汚染される。そのためリストをテストごとに作成・削除し、
- * 集計対象をテスト単体に閉じる。
- */
 
 test.describe("todo-badge", () => {
   let listName: string;

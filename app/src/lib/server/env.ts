@@ -1,7 +1,3 @@
-/**
- * @fileoverview 環境変数の型安全な管理
- */
-
 import fs from "node:fs";
 import crypto from "node:crypto";
 import { z } from "zod";
@@ -17,10 +13,8 @@ const envSchema = z.object({
   WEBAUTHN_ORIGINS: z.string().optional(),
 });
 
-/** ビルド時のpostbuild分析で実行されるため遅延評価する */
 let _env: z.infer<typeof envSchema> | null = null;
 
-/** 環境変数を取得する（初回呼び出し時にバリデーション） */
 export function getEnv(): z.infer<typeof envSchema> {
   if (!_env) {
     _env = envSchema.parse(process.env);
@@ -28,14 +22,9 @@ export function getEnv(): z.infer<typeof envSchema> {
   return _env;
 }
 
-// ── 暗号化キー・JWT秘密鍵の管理 ──
-
 let _encryptKey: string | null = null;
 let _jwtSecret: string | null = null;
 
-/**
- * 鍵ファイルを読み込む（32バイトバイナリ形式、Base64文字列として返す）
- */
 function loadOrCreateKey(keyPath: string): string {
   fs.mkdirSync(getEnv().DATA_DIR, { recursive: true });
 
@@ -48,9 +37,6 @@ function loadOrCreateKey(keyPath: string): string {
   return fs.readFileSync(keyPath).toString("base64");
 }
 
-/**
- * 暗号化キーを取得する（初回起動時に自動生成）
- */
 export function getEncryptKey(): string {
   if (!_encryptKey) {
     _encryptKey = loadOrCreateKey(`${getEnv().DATA_DIR}/.encrypt_key`);
@@ -58,9 +44,6 @@ export function getEncryptKey(): string {
   return _encryptKey;
 }
 
-/**
- * JWT署名用秘密鍵を取得する（初回起動時に自動生成）
- */
 export function getJwtSecret(): string {
   if (!_jwtSecret) {
     _jwtSecret = loadOrCreateKey(`${getEnv().DATA_DIR}/.secret_key`);

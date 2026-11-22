@@ -11,9 +11,6 @@ import {
 import { test, expect, type Request, type Response } from "@playwright/test";
 import { createConnection } from "mysql2/promise";
 import { holdTaskCreate, dragTaskAfter } from "./helpers/task-page";
-/**
- * @fileoverview タスク CRUD の e2e テスト
- */
 
 const LIST_NAME = `タスクテスト_${uniqueTestName("e2e")}`;
 
@@ -34,7 +31,6 @@ test.describe("task-optimistic", () => {
     await page.click(
       `[data-testid="list-select-btn"]:has-text("${LIST_NAME}")`,
     );
-    // リスト選択後、タスク追加フォームが表示されるのを待つ
     await page
       .locator('[data-testid="task-add-form"]')
       .waitFor({ timeout: 15000 });
@@ -347,7 +343,6 @@ test.describe("task-optimistic", () => {
     try {
       const title = "経過後復元_" + uniqueTestName("e2e");
       await addTask(page, title);
-      // DBの更新時刻を同期窓より前へ戻し、差分応答へ再掲されない状態にする。
       const row = page.getByTestId("task-item").filter({ hasText: title });
       const taskId = Number(await row.getAttribute("data-reorder-id"));
       const db = await createConnection(
@@ -364,8 +359,6 @@ test.describe("task-optimistic", () => {
       } finally {
         await db.end();
       }
-      // DBだけを古くするとキャッシュのupdatedと一致しないため、全件読込で一致させる。
-      // この読込の同期時刻は、10秒前に戻した対象タスクのupdatedより後になる。
       const fixtureReloaded = page.waitForResponse((response) =>
         isTrpcUrl(response.url(), "tasks.listActive"),
       );

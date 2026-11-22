@@ -1,10 +1,3 @@
-/**
- * @fileoverview 接続・同期経路デバッグログヘルパーのユニットテスト
- *
- * カテゴリと事象名を含む整形ラベルが `console.debug` へ渡ることを、
- * 付随データ有無の2ケースで検証する。
- */
-
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { debugLog } from "#lib/client/debug-log.ts";
 

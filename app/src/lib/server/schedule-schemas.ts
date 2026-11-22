@@ -14,7 +14,6 @@ import { rrulestr } from "rrule";
 import { TagsSchema } from "#lib/schemas.ts";
 import { SCHEDULE_TIMEZONE } from "#lib/date-time.ts";
 
-/** RFC5545構文としての妥当性を検証する（Asia/Tokyo基準で復元できるかを確認する） */
 const RruleStringSchema = z.string().refine(
   (v) => {
     try {

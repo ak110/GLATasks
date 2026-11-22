@@ -1,10 +1,3 @@
-/**
- * @fileoverview モジュールの再評価をまたぐ状態・周期処理の所有機構と、それを使うschedulerの試験
- *
- * 開発サーバーは同じNode.jsプロセスでサーバーモジュールを再評価する。`vi.resetModules()`と
- * 動的importで同じ状況を用意し、再評価前の状態と再評価後の処理の組合せを確かめる。
- */
-
 import {
   afterEach,
   beforeAll,
@@ -91,8 +84,6 @@ describe("processInterval", () => {
 });
 
 describe("schedulerのモジュール再評価", () => {
-  // schedulerと監視APIの依存の初回変換は数秒かかり、並行実行の負荷下では最初の試験の上限を超える。
-  // 変換結果はモジュールの読み込み直しをまたいで再利用されるため、試験の前に1回読み込んで済ませる。
   beforeAll(async () => {
     await import("./scheduler");
     await import("../../routes/healthcheck/ready/+server");
@@ -103,10 +94,6 @@ describe("schedulerのモジュール再評価", () => {
     ready: typeof import("../../routes/healthcheck/ready/+server");
   };
 
-  /**
-   * 新しい世代として読み込み直す。カロリー自動記録の処理は世代ごとに別の関数へ差し替え、
-   * 周期処理がどの世代の処理を呼んだかを`generations.calls`へ記録する。
-   */
   async function loadGeneration(): Promise<Generation> {
     vi.resetModules();
     const generation = ++generations.evaluated;
@@ -132,10 +119,8 @@ describe("schedulerのモジュール再評価", () => {
     after.scheduler.startScheduler();
     await vi.advanceTimersByTimeAsync(0);
     expect(vi.getTimerCount()).toBe(1);
-    // 再評価後の起動呼出しは起動済みの実行を引き継ぎ、即時の処理を重ねない
     expect(generations.calls).toEqual([1]);
 
-    // 再評価後のhealthが再評価前に起動した実行の結果を返す
     const response = await after.ready.GET();
     expect(response.status).toBe(200);
     expect((await response.json()).scheduler).toMatchObject({
@@ -143,7 +128,6 @@ describe("schedulerのモジュール再評価", () => {
       last_success_at: "2026-01-01T00:00:00.000Z",
     });
 
-    // 次の周期は最新の評価の処理を呼ぶ
     await vi.advanceTimersByTimeAsync(60_000);
     expect(generations.calls).toEqual([1, 2]);
     expect(after.scheduler.getSchedulerHealth().last_success_at).toBe(
@@ -173,7 +157,6 @@ describe("schedulerのモジュール再評価", () => {
     await vi.advanceTimersByTimeAsync(0);
 
     const after = await loadGeneration();
-    // 実行中の周期が終わらないまま次の周期の時刻に達しても、再評価後の処理は開始しない
     await vi.advanceTimersByTimeAsync(60_000);
     expect(generations.calls).toEqual([]);
     expect(after.scheduler.getSchedulerHealth().status).toBe("starting");

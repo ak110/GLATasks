@@ -8,9 +8,6 @@ import {
   waitForSuccessfulMutationResponse,
 } from "./helpers/common";
 import { test, expect, type Locator } from "@playwright/test";
-/**
- * @fileoverview リスト CRUD の e2e テスト
- */
 
 test.describe("lists", () => {
   test.beforeEach(async ({ page }) => {
@@ -22,7 +19,6 @@ test.describe("lists", () => {
     ]);
   });
 
-  /** ⋮ メニューから対象リストを削除する。後片付け用ヘルパー */
   async function deleteListFromMenu(
     page: import("@playwright/test").Page,
     listName: string,
@@ -32,7 +28,6 @@ test.describe("lists", () => {
       .filter({ hasText: listName });
     await listRow.locator('[data-testid="list-menu-btn"]').click();
     await page.click('[data-testid="list-delete-btn"]');
-    // ConfirmDialog の確認ボタン（「削除」テキスト）を押下する
     await page
       .locator('[role="dialog"] button:has-text("削除")')
       .last()
@@ -61,7 +56,6 @@ test.describe("lists", () => {
       const editor = page.getByRole("dialog", { name: "タスクの編集" });
       await expect(editor).toBeVisible();
 
-      // 各方向にフォーカス可能な要素の数以上を2周し、背面へ移らないことを確かめる。
       async function cycleFocus(dialog: Locator) {
         const steps =
           2 *
@@ -100,7 +94,6 @@ test.describe("lists", () => {
         )
         .toBe(true);
 
-      // 未保存の変更を戻して、編集ダイアログ自体をEscapeで閉じる。
       await editor.getByLabel("内容").fill(taskTitle);
       await page.keyboard.press("Escape");
       await expect(editor).not.toBeVisible();
@@ -127,7 +120,6 @@ test.describe("lists", () => {
         .getByTestId("list-select-btn")
         .filter({ hasText: existingName })
         .click();
-      // 作成後の選択ボタンをクリックしない。作成そのものによる選択を検証する。
       await createListFromPage(page, createdName, false);
       await expect(
         page.getByRole("heading", { name: createdName, exact: true }),
@@ -144,7 +136,6 @@ test.describe("lists", () => {
       expect(createdIndex).toBeGreaterThanOrEqual(0);
       expect(existingIndex).toBeGreaterThan(createdIndex);
 
-      // 公開編集フォームのリスト選択肢から作成IDを取得し、URLと実際の所属先を照合する。
       const task = await addTask(page, uniqueTestName("新規リスト所属"));
       await task.getByTestId("task-edit-btn").click();
       const editor = page.getByRole("dialog", { name: "タスクの編集" });
@@ -181,7 +172,6 @@ test.describe("lists", () => {
       .locator(`[data-testid="list-select-btn"]:has-text("${listName}")`)
       .waitFor({ timeout: 15000 });
     await page.click(`[data-testid="list-select-btn"]:has-text("${listName}")`);
-    // リストが選択されるとタスク追加フォームが表示される
     await expect(page.locator('[data-testid="task-add-form"]')).toBeVisible({
       timeout: 15000,
     });
@@ -192,7 +182,6 @@ test.describe("lists", () => {
     const originalName = `名変テスト_${uniqueTestName("e2e")}`;
     const newName = `名変後_${uniqueTestName("e2e")}`;
 
-    // リスト追加
     await createListFromPage(page, originalName, false);
     await expect(
       page.locator(
@@ -200,7 +189,6 @@ test.describe("lists", () => {
       ),
     ).toBeVisible({ timeout: 15000 });
 
-    // ⋮ メニューを開いて名前変更を選ぶ → PromptDialog の入力欄から確定する
     const listRow = page
       .locator('[data-testid="list-item"]')
       .filter({ hasText: originalName });
@@ -221,13 +209,11 @@ test.describe("lists", () => {
   test("⋮ メニューから削除できる", async ({ page }) => {
     const listName = `削除テスト_${uniqueTestName("e2e")}`;
 
-    // リスト追加
     await createListFromPage(page, listName, false);
     await expect(
       page.locator(`[data-testid="list-select-btn"]:has-text("${listName}")`),
     ).toBeVisible({ timeout: 15000 });
 
-    // ⋮ メニューから削除（ConfirmDialog 経由）
     const listRow = page
       .locator('[data-testid="list-item"]')
       .filter({ hasText: listName });

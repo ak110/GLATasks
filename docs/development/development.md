@@ -50,10 +50,6 @@ AGENTS.mdが指定する`writing-standards`・`review-standards`と該当するr
 
 ### workspaceと型生成
 
-`app`はアプリの依存、スクリプト、`#lib/*`のimportsを持つ正式なpnpm workspaceパッケージである。
-ルートは開発ツールとアプリのスクリプトへの転送を持つ。
-SvelteKitの設定は`app/vite.config.ts`に置く。
-`app/tsconfig.json`はSvelteKitの生成した型を継承し、ルートのtsconfigは検証対象へ合わせて参照する。
 新しいworktreeでは依存を導入し、`pnpm --dir app exec svelte-kit sync`で型を生成する。
 ルートの`pnpm run check`と`pnpm run test:unit`はアプリでsyncを実行してから検証する。
 静的import、動的import、mock指定は拡張子を含む`#lib`参照を使う。
@@ -152,10 +148,7 @@ Dockerを使わずにビルドする場合は`pnpm --dir docs build`を実行す
 ## Docker構成
 
 サービス構成・環境変数は`compose.yaml` / `.env`を参照。
-プロファイルは`production`、`staging`、`development`から選ぶ。
-`staging`はproductionのサービス構成を共有し、`COMPOSE_PROFILE`の名前を保持する。
 DBの接続資格情報はComposeとMakeの設定を使い、各テストとスクリプトで再定義しない。
-本文の容量上限とnginxの一時バッファ設定を同じ運用設定で管理する。
 
 ## DBマイグレーション運用
 
@@ -215,11 +208,7 @@ DBが半端な状態になった場合は`make sql`から`__drizzle_migrations`�
 ## CI/CD
 
 masterへのpushおよびPR時に`ci.yaml`が自動実行される（`.github/workflows/ci.yaml`参照）。
-masterへのpushで`docs/`配下に変更があれば`docs.yaml`ワークフローが自動実行され、
-サイトのビルドと全HTMLのリンク先の確認に成功した場合だけGitHub Pagesへデプロイされる。
-ビルド時はMarkdown本文の内部リンクを確認する。
-後続のlycheeでは、トップページの紹介とナビゲーションを含む全リンクと見出しの実在を確かめる。
-外部URLから429・5xx応答が返った場合やタイムアウトした場合は、lycheeが一時的な障害として許容する。
+masterへのpushで`docs/`配下に変更があれば`docs.yaml`ワークフローが[ドキュメントサイト運用](#ドキュメントサイト運用)の確認を経てGitHub Pagesへデプロイする。
 `release.yaml`はリリースを作成し、`deploy.yaml`を起動してアプリをデプロイする。
 integration jobはproduction環境でMakeのDB・E2E検証を呼び出す。
 依存の脆弱性監査は`audit.yaml`が毎日06:00 UTC（JST 15:00）に定期実行し、

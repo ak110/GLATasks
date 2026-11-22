@@ -20,8 +20,6 @@ type Row = typeof timers.$inferSelect;
 
 beforeEach(() => vi.clearAllMocks());
 
-// 行ロック取得前に別要求が新しい実行を保存するDB境界を模擬する。
-// 非ロック読取は古いsnapshotを返し、FOR UPDATEは現在の保存値を返す。
 function setupRace(oldRunning = 1) {
   const oldStart = new Date("2026-01-01T00:00:00Z");
   const newStart = new Date("2026-01-01T00:01:00Z");
@@ -203,7 +201,6 @@ it("単一タイマーの有界な操作列で保存状態と拒否条件を保�
           for (const first of actions) {
             for (const second of actions) {
               const read = isolatedRow(initial);
-              // 2要求は同じ保存状態を見て送信され、DBで両方の順序を取り得る。
               const pair = [first, second];
               for (const [index, [name, run]] of pair.entries()) {
                 vi.setSystemTime(epoch.getTime() + (elapsed + index) * 1000);

@@ -1,9 +1,4 @@
 <script lang="ts">
-    /**
-     * @fileoverview ファイル選択inputと、任意で選択済みファイル一覧を表示する共通コンポーネント
-     * タスク追加フォーム・タスク編集ダイアログの双方から利用する
-     */
-
     interface Props {
         attachments?: File[];
         onAdd: (files: File[]) => void;

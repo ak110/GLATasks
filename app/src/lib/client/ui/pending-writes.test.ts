@@ -1,9 +1,3 @@
-/**
- * @fileoverview QueryClientを経由しない保存処理の進行状況のユニットテスト
- *
- * 保存処理の実行中だけ進行中と判定し、成功・失敗のどちらで終わっても進行中でなくなることを検証する。
- */
-
 import { describe, expect, it } from "vitest";
 import {
   hasPendingDirectWrites,

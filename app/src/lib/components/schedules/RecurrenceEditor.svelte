@@ -4,12 +4,6 @@
         SCHEDULE_TIMEZONE,
         SCHEDULE_UTC_OFFSET_MS,
     } from "#lib/date-time.ts";
-    /**
-     * @fileoverview 繰り返しルール編集フォーム（頻度・間隔・曜日/日/月・時刻・終了条件）
-     *
-     * タイトル・タグの入力は `ScheduleDialog.svelte` が担当し、本コンポーネントは
-     * 繰り返しルールの入力とRFC5545形式のRRULE文字列生成に専念する。
-     */
 
     import { RRule, rrulestr, datetime } from "rrule";
     import type { Weekday } from "rrule";
@@ -54,14 +48,6 @@
         { code: "SU", label: "日" },
     ];
 
-    /**
-     * 曜日コード文字列からrruleの `Weekday` インスタンスへの変換テーブル。
-     *
-     * `RRule` コンストラクタの `byweekday` オプションは `Weekday` インスタンスまたは
-     * 数値インデックスのみを受け付ける。曜日コード文字列（`"MO"` 等）をそのまま渡すと
-     * `toString()` でのRRULE文字列組み立て時に `BYDAY=undefined` となり、
-     * サーバー側のRFC5545バリデーションで拒否される
-     */
     const WEEKDAY_CODE_TO_RRULE: Record<string, Weekday> = {
         MO: RRule.MO,
         TU: RRule.TU,
@@ -82,7 +68,6 @@
     let count = $state(10);
     let untilDateStr = $state("");
 
-    /** DTSTART組み立て用の年月日。既存value有無に関わらずAsia/Tokyoの暦日で保持する */
     let dtstartDate = $state(getTokyoTodayParts());
 
     /**
@@ -109,13 +94,6 @@
         return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}`;
     }
 
-    /**
-     * UTC形式（末尾Z付き）のUNTIL文字列を組み立てる（RFC5545規定に従う）。
-     *
-     * `d` は `datetime()` で組み立てたAsia/Tokyo市民時刻23:59:59であり、UTCとして
-     * マークされたDateオブジェクトである。そのまま`toISOString()`すると9時間分
-     * 早いUTC時刻になってしまうため、9時間分を減算してからUTC形式へ変換する。
-     */
     function formatUntilUtc(d: Date): string {
         const utcMs = d.getTime() - SCHEDULE_UTC_OFFSET_MS;
         return new Date(utcMs)
@@ -130,8 +108,6 @@
         const o = rule.options;
         freq = RRULE_TO_FREQ[o.freq] ?? "WEEKLY";
         interval = o.interval;
-        // rrule は頻度に応じて byweekday/bymonthday/bymonth が `null` になる
-        // （配列ではなく）ため、非該当頻度でのアクセスに備えてnull安全にする
         selectedWeekdays = (o.byweekday ?? []).map(
             (w) => WEEKDAY_OPTIONS[w]!.code,
         );
@@ -140,8 +116,6 @@
         const bymonth = o.bymonth ?? [];
         if (bymonth.length > 0) yearMonth = bymonth[0]!;
         timeStr = `${pad2(o.dtstart.getUTCHours())}:${pad2(o.dtstart.getUTCMinutes())}`;
-        // DTSTARTの暦日を復元する。元のrrule文字列が保持するAsia/Tokyoの年月日を
-        // そのまま引き継ぎ、編集のたびにDTSTARTが今日へずれてしまうことを防ぐ
         dtstartDate = {
             year: o.dtstart.getUTCFullYear(),
             month: o.dtstart.getUTCMonth() + 1,

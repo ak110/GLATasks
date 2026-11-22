@@ -1,8 +1,3 @@
-/**
- * @fileoverview ConfirmDialog コンポーネントの smoke test
- *
- * 主要な表示パターン（open 状態・title 有無・カスタムラベル）を検証する。
- */
 import { render, screen } from "@testing-library/svelte";
 import { describe, expect, it, vi } from "vitest";
 import ConfirmDialog from "./ConfirmDialog.svelte";

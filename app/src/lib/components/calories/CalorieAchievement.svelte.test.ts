@@ -1,7 +1,3 @@
-/**
- * @fileoverview カロリーの達成状況の表示条件テスト
- */
-
 import { render } from "@testing-library/svelte";
 import { describe, expect, it } from "vitest";
 
@@ -9,7 +5,6 @@ import CalorieAchievement from "./CalorieAchievement.svelte";
 
 type Status = "achieved" | "missed" | "unrated";
 
-/** 古い順の区分から28確定日分の達成状況を組み立てる（不足分は先頭を判定対象外で埋める） */
 function makeAchievement(
   latestStatuses: Status[],
   overrides: {

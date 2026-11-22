@@ -1,15 +1,3 @@
-/**
- * @fileoverview SSE エンドポイント（リアルタイム通知用）
- *
- * Cookie 認証済みユーザーに対して SSE 接続を提供する。
- * mutation 完了時にイベント種別（lists:updated 等）のみを配信する。
- *
- * 再接続時はリクエストの `Last-Event-ID` ヘッダー（EventSource 自動再接続）
- * または URL クエリーパラメータ `lastEventId`（明示再接続）を読み取り、
- * `replayEvents()` でサーバー側バッファから差分をcatchupする。
- * 両方が提供された場合はヘッダーを優先する。
- */
-
 import type { RequestHandler } from "./$types";
 import {
   addConnection,
@@ -40,18 +28,14 @@ export const GET: RequestHandler = async ({ locals, request, url }) => {
       savedController = controller;
       addConnection(userId, controller);
       if (lastEventId !== null) {
-        // 差分catchup: バッファ外れの場合は `reset` イベントが送信される
         replayEvents(userId, lastEventId, controller);
       } else {
-        // 初回接続: 既存挙動を維持し connected で全 invalidate を促す
         controller.enqueue(
           new TextEncoder().encode(
             formatEvent(undefined, SSE_EVENTS.connected, String(Date.now())),
           ),
         );
       }
-      // 30秒間隔でハートビートイベントを送出する
-      // 設計は docs/development/architecture.md のリアルタイム同期節を参照
       heartbeatInterval = setInterval(() => {
         try {
           controller.enqueue(
@@ -59,9 +43,7 @@ export const GET: RequestHandler = async ({ locals, request, url }) => {
               formatEvent(undefined, SSE_EVENTS.heartbeat, String(Date.now())),
             ),
           );
-        } catch {
-          /* closed */
-        }
+        } catch {}
       }, 30_000);
     },
     cancel() {
@@ -79,7 +61,6 @@ export const GET: RequestHandler = async ({ locals, request, url }) => {
   });
 };
 
-/** Last-Event-ID をヘッダー優先で数値解釈する。無効値や負数は null とする */
 function parseLastEventId(
   headerValue: string | null,
   queryValue: string | null,

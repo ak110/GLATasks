@@ -1,7 +1,3 @@
-/**
- * @fileoverview カロリー記録フォームの日時検証・日時の自動更新・一覧表示・取消操作、行操作メニューおよび検索語による表示のテスト
- */
-
 import { fireEvent, render, screen } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -140,7 +136,6 @@ describe("CalorieRecordTable", () => {
   });
 
   it("入力した日時・数量は作業中とみなし、取消で初期値へ戻ると作業中でなくなる", async () => {
-    // 自動の再読み込みの見送り判定は、data-clean-valueと異なる欄だけを未保存の入力とみなす
     const stopTracking = startEditedFieldTracking();
     try {
       renderTable();

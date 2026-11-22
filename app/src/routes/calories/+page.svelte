@@ -11,9 +11,6 @@
         subscribeQueryEvents,
     } from "#lib/client/query-sync.ts";
     import { getUtcOffsetMinutes } from "#lib/date-time.ts";
-    /**
-     * @fileoverview カロリー計算ページ
-     */
 
     import { onMount } from "svelte";
     import {
@@ -49,7 +46,6 @@
     let windowOffset = $state(0);
     let deleteTarget = $state<RecordRow | undefined>();
     let deleting = $state<symbol | undefined>();
-    // 記録と品目の追加フォームへの入力を、両表の検索語として共有する
     let recordAddItemName = $state("");
     let itemAddName = $state("");
     const filterKeywords = $derived(
@@ -82,7 +78,6 @@
         SSE_EVENTS.usersPreferencesUpdated,
     ]);
 
-    // 集計は現在時刻を基準に変わるため、記録の日時欄と同じ分の切り替わりで取り直す
     onMount(() =>
         startMinuteTicker(() => {
             void queryClient.invalidateQueries({

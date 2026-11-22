@@ -1,20 +1,7 @@
 # アーキテクチャ
 
-## アーキテクチャ図（Docker Compose 内部構成）
-
-```mermaid
-flowchart TB
-    Browser["Chrome拡張 / ブラウザ"]
-    Nginx["nginx（ポート 38180:443）"]
-    SK["SvelteKit サーバー"]
-    DB["MariaDB"]
-
-    Browser -- "HTTPS + AES-GCM 難読化" --> Nginx
-    Nginx -- "全リクエスト" --> SK
-    SK -- "Drizzle ORM" --> DB
-```
-
-AES-GCMが保護する範囲は[通信の難読化](#通信の難読化)を参照。
+コードから直接読めない設計判断と外部の制約だけを記す。
+構成とスキーマは`compose.yaml`と`app/src/lib/server/schema.ts`を参照する。
 
 ## サーバーと画面の責務
 
@@ -27,292 +14,80 @@ api層はDB操作と所有権の確認を担当する。
 
 APIの入力と戻り値はcamelCaseを使う。
 DB列名とCSV列名は保存形式として個別に扱う。
-入力スキーマは`schemas.ts`へ集める。
-値だけで判断できる制約は、入力スキーマを使って検証する。
-所有権、関連行の存在、保存済み値と組み合わせる制約はapi層で検証する。
-クライアントはtRPCの`RouterInputs`と`RouterOutputs`から型を推論する。
-
-画面の共通クエリー定義はキーと取得処理をまとめ、SSEのイベント別に再取得対象を決める。
-メイン画面はクエリー、操作、同期、URLとローカル保存、キーボード、ダイアログの状態を分ける。
-翻訳画面は状態をcontrollerで管理し、ブラウザー内蔵AIの共有インスタンスの準備・取得・破棄はクライアントモジュールが担当する。
+値だけで判断できる制約は入力スキーマ（`schemas.ts`）で検証し、所有権、関連行の存在、保存済み値と組み合わせる制約はapi層で検証する。
 
 ### 再評価をまたいで保持するサーバー状態
 
 開発サーバーはコード更新のたびに同じNode.jsプロセスでサーバーモジュールを再評価する。
 接続や発行済みの値をモジュール変数に置くと、再評価前に始まった接続や要求が旧世代の表に残り、再評価後の処理から到達できなくなる。
 周期タイマーも評価のたびに増える。
-このため、世代を越えて保持する状態は`app/src/lib/server/process-state.ts`の共通の所有機構で取得する。
-
-- 保持するのは状態（表・カウンター・フラグ）と周期タイマーに限る。
-  `processState`は名前ごとに`globalThis`上の値を返し、`processInterval`は名前ごとに1本のタイマーを保持して、評価のたびに呼び出す処理を最新の関数へ差し替える
-- 業務処理は各モジュールの最新の評価に置く。再評価後の次の要求と次の周期は更新後のコードで動く
-- 保持する対象はMCPのsession表と回収周期、SSEの接続・再送バッファ・採番、OAuthの認可コード、schedulerの起動済み・実行中・healthの状態とポーリング周期である。
-  DB接続プールは`db.ts`が同じ方針で保持し、Drizzleのインスタンスは評価ごとに作成し直す
-- OAuthの登録クライアントはファイルから再読込できるため、保持の対象にしない
-- 本番では各モジュールが1回だけ評価されるため、保持の有無で挙動は変わらない
-- 試験は`vi.resetModules()`と動的importで同じプロセス内に2世代を用意し、保持状態は`_resetProcessStateForTest`で試験ごとに破棄する
-
+このため、世代を越えて保持する状態と周期タイマーは`app/src/lib/server/process-state.ts`の共通の所有機構で取得し、業務処理は各モジュールの最新の評価に置く。
 新しい常駐状態や周期処理を加える場合も同じ機構で取得する。
 
 ## リアルタイム同期（SSE）
 
-mutation完了時にSSE (Server-Sent Events) で他タブ・他端末へ即座に通知する。
+mutation完了時にSSEで他タブ・他端末へ通知する。
 
-```mermaid
-sequenceDiagram
-    participant A as ブラウザ A
-    participant S as SvelteKit
-    participant B as ブラウザ B
-
-    A->>S: tRPC mutation（タスク更新）
-    S->>S: DB 更新
-    S-->>A: SSE: tasks:updated
-    Note over A: 自タブも再取得（変更タスクの強調表示は更新しない）
-    A->>S: invalidateQueries → 再取得
-    S-->>B: SSE: tasks:updated
-    B->>S: invalidateQueries → 再取得
-    S-->>A: mutation成功応答
-    A->>S: 操作成功後の再取得
-```
-
-- エンドポイント: `GET /api/events`（Cookie認証）
-- 利用者データは含めずイベント種別と送出元のタブIDを送信
- （`lists:updated` / `tasks:updated` / `timers:updated` / `schedules:updated` /
+- エンドポイントは`GET /api/events`（Cookie認証）で、利用者データは含めずイベント種別と送出元のタブIDだけを送る
+  （`lists:updated` / `tasks:updated` / `timers:updated` / `schedules:updated` /
   `users:preferences:updated` / `calories:updated` / `reset`）
-- クライアントはイベント受信時にTanStack Queryの `invalidateQueries` で該当データを再取得
-- サーバーは送出元タブにも通知し、共有接続は全購読者へ配送する。
-  メイン画面の`lists:updated`は送出元を区別せずリスト一覧を再取得する。
-  `tasks:updated`も自タブを含めて再取得するが、自タブ発の場合は変更タスクの強調表示を更新しない
-- 品目、記録または自動記録設定を変更した場合は`calories:updated`を通知し、受信側はカロリーページの全データを再取得する。
-  目標値を変更した場合は既存の`users:preferences:updated`を通知し、カロリーページは目標値と期間集計を再取得する
-- 接続の健全性はクライアント側で監視する。`EventSource`の自動再接続に加え、
-  受信ウォッチドッグ（30秒周期で判定、最終受信から75秒経過で強制再接続）・
-  `error`イベント発火時の`readyState=CLOSED`即時再接続・
-  `visibilitychange`での可視復帰時の前倒し判定を組み合わせ、
-  ブラウザのネットワークタイマー減速等で接続がゾンビ化した際の差分同期取りこぼしを防ぐ
-- 接続・再送バッファ・イベントIDの採番は[再評価をまたいで保持するサーバー状態](#再評価をまたいで保持するサーバー状態)に置く。
-  開発サーバーの再評価前に開いた接続へも、再評価後のoperationsの通知と`Last-Event-ID`による再送が届く
-- nginx: `/api/events` に `proxy_buffering off` を設定（SSEがバッファされると配信遅延が発生するため）
-- 検出と同期の役割を分離する。同期はSSEイベント受信時の再取得が担い、
-  SSE応答が長期間届かない事態に備えてポーリングフォールバック機構を併設する。
-  初回接続後10秒または受信途絶60秒で不健全と判定し、SSE経由で再取得対象となる全クエリーへ
-  即時1回のフォールバック実行と30秒間隔の継続ポーリングを起動する。
-  SSE側で何らかのイベントを受信した時点で健全へ復帰しポーリングを停止する。
-  フォールバックはデータ再取得に専念し、リロード誘導は行わない。
-  SSE接続自体はポーリング期間中も維持する
-- 接続の不健全検出はSSEの受信途絶監視とは独立した仕組みが担う。`/healthcheck`へ能動的に問い合わせ、
-  HTTPステータス200・`application/json`・本文の`status`値が`ok`の3点が揃った場合のみ健全と判断する。
-  キャプティブポータルはステータス200で認証用HTMLを返すことがあるため、
-  ステータスだけで判別せず`Content-Type`と本文の値まで確かめる。
-  定期ポーリング（30秒間隔・非表示タブでは停止）に加え、可視復帰・オンライン復帰・
-  SSE不健全遷移・操作失敗を前倒しトリガーとする。
-  判定は健全・到達不能・応答の横取りの3区分とする（`classifyHealth`）。
-  到達不能（通信エラー・タイムアウト・511以外の5xx）では再読み込みせず、可視の間は2秒間隔で判定し直して回復を早く捉える。
-  到達不能が6秒以上続いた場合だけバナーで案内し、回復検知時に自動解除する。このバナーは再読み込みボタンを持たない。
-  通信断の間に再読み込みすると画面の取得に失敗し、Service Workerのオフライン画面へ移って表示中の画面を失うためである
-  （AndroidのPWAで別アプリや画面オフから戻った直後に、通信が再開しきっていない場合など）。
-  HTTPSの通信自体を遮断する認証画面は通信エラーとなり到達不能と区別できないため、このバナーにも「認証画面を開く」ボタンを置く。
-  非表示へ移った時点で継続時間・再判定・到達不能のバナーを打ち切り、非表示の間の通信断は猶予に数えず、復帰直後の数秒の通信断ではバナーを出さない。
-  `/healthcheck`はリダイレクトに従わずに取得する。認証画面は別オリジンやhttpへリダイレクトすることが多く、従うとCORSや混在コンテンツの拒否で通信エラーになるためである。
-  応答の横取り（リダイレクト、511、5xx以外の非200、200の非JSONや`status`不一致）では、まず同一オリジンの`/healthcheck`を非表示のiframeで読み込み、
-  利用者の入力なしで通過する認証画面かを試す（`app/src/lib/client/sse/silent-pass.ts`）。
-  通過して健全に戻れば画面を遷移せずに案内を消し、失敗していた取得を取り直す。
-  埋め込みを拒否する認証画面や入力が必要な認証画面では通過しないため、次の誘導へ進み、失敗後60秒は通過を試し直さない。
-  通過しない場合は、非入力中なら即時リロードして認証画面への遷移を促し、
-  入力中なら再読み込みボタンと「認証画面を開く」ボタン付きのバナーで案内し、回復検知時に自動解除する。
-  「認証画面を開く」は同一オリジンの`/healthcheck`を別ウィンドウで開き、横取りする側が差し替えた認証画面をそこへ表示させる。
-  開いている間は2秒間隔で判定し直し、健全で別ウィンドウを閉じてバナーを消す。利用者が別ウィンドウを閉じたら判定を止め、バナーは残す。
-  ポップアップの阻止を避けるため、別ウィンドウは利用者のクリックでだけ開く。
-  Service Workerは`/healthcheck`へのナビゲーションを横取りしない。通信が遮断された状態で別ウィンドウや非表示のiframeをオフライン画面へ置き換えると、ブラウザーや認証画面の案内が表示されないためである
-  操作失敗を起点とした判定が応答の横取りなら、その操作の個別のエラー通知は出さない（`app/src/lib/client/operation-error-notice.ts`）。
-  横取りでは複数の操作が続けて失敗し、再読み込みか案内へ進む前に同じ原因の通知が何件も並ぶためである
-  接続状態で処置が分かれる処理のテストは、通信エラーを独立した区分として代表値を持たせる
-- 新しい版を検知（`updated.current`）した後、作業中・保存中でなく接続が健全なら自動で再読み込みする。
-  条件が揃わない間は更新案内のバナーを表示し、3秒間隔で条件を確かめ直す（`app/src/lib/client/ui/update-reload.ts`）。
-  作業中かの判定は接続回復と共通の`app/src/lib/client/ui/user-busy.ts`が担う。
-  入力欄へのフォーカスとダイアログ表示に加え、利用者が入力して値が残っている欄（フォーカスが外れた後とフォームの送信後も含む。保存に失敗して残った入力も守るため）と、
-  コンポーネントが申告した未保存の入力（選択済みのタグ・添付）を作業中とみなす。
-  保存後も値を欄に残す部品（1日目標、一括操作の条件）と、保存後に空でない初期値へ戻す部品（記録追加の日時・数量、自動記録追加の数量）の欄は、
-  `data-clean-value`属性で示す「未保存の入力が無いとみなす値」と異なる間だけを作業中とみなす。
-  保存中は、QueryClientのmutationに加えて、tRPCを直接呼ぶ添付の送信・削除（`app/src/lib/client/ui/pending-writes.ts`）を含む
-- オフライン画面は表示直後に1回判定し、可視の間は5秒間隔で`/healthcheck`を確かめ、健全か応答の横取りなら再読み込みする。
-  横取りの応答は通信エラーにならずService Workerがそのまま返すため、再読み込みで認証画面へ進み、オフライン画面へは戻らない。
-  間隔は通信断の長さによらず伸ばさず、非表示の間は止める。
-  オフライン画面のURL（`/offline.html`）を直接開いた場合は、再読み込みすると同じ判定で再読み込みを繰り返すため、トップ画面へ移る
-- 再読み込み（`location.reload()`）と`location.href`・`assign`・`replace`による完全な遷移は、ESLint（`eslint.config.js`）で検出する。
-  通信断でも実行してよい理由を抑止コメントに書いた箇所だけを許可する
-- 接続判定と検出トリガーは`app/src/lib/client/sse/connectivity-check.js`が定める。アプリ本体の
-  `connection-recovery.svelte.ts`とService Workerが返すオフライン画面
-  （`app/src/routes/offline.html/+server.ts`）が同じモジュールを使う。オフライン画面は、
-  オフライン時に追加のスクリプトを取得できずキャッシュ対象を増やせないため、Viteの`?raw`で
-  共有モジュールをインライン展開する
+- クライアントはイベント受信時にTanStack Queryの`invalidateQueries`で該当データを再取得する
+- nginxは`/api/events`に`proxy_buffering off`を設定する。SSEがバッファされると配信が遅れるためである
+- ブラウザーのネットワークタイマー減速などで接続がゾンビ化するため、`EventSource`の自動再接続だけに頼らず、受信途絶の監視と強制再接続、ポーリングによる再取得を併用する
+- heartbeatは名前付きイベント（`event: heartbeat`）で送る。
+  コメント行形式（`:\n\n`）では`EventSource`がイベントとして通知せず、受信途絶の監視が最終受信時刻を更新できない
+- heartbeatのサーバー時刻ではタイマーの時刻オフセットを更新しない。
+  SSEは片道通信でRTTを測れず、tRPC応答のRTT/2補正で得た値が片道遅延の分だけ劣化するためである
+
+### 接続の不健全検出
+
+SSEの受信途絶の監視とは独立に、`/healthcheck`への能動的な問い合わせで判定する（`app/src/lib/client/sse/connectivity-check.js`）。
+
+- キャプティブポータルはステータス200で認証用HTMLを返すことがあるため、ステータスに加えて`Content-Type`と本文の`status`値まで確かめる
+- `/healthcheck`はリダイレクトに従わずに取得する。認証画面は別オリジンやhttpへリダイレクトすることが多く、従うとCORSや混在コンテンツの拒否で通信エラーになる
+- 通信断の間は再読み込みしない。画面の取得に失敗してService Workerのオフライン画面へ移り、表示中の画面を失うためである
+  （AndroidのPWAで別アプリや画面オフから戻った直後など）。
+  再読み込みと完全な画面遷移はESLint（`eslint.config.js`）で検出し、通信断でも実行してよい理由を抑止コメントに書いた箇所だけを許可する
+- Service Workerは`/healthcheck`へのナビゲーションを横取りしない。
+  通信が遮断された状態で別ウィンドウや非表示のiframeをオフライン画面へ置き換えると、ブラウザーや認証画面の案内が表示されないためである
+- 別ウィンドウで認証画面を開く操作は、ポップアップの阻止を避けるため利用者のクリックでだけ行う
+- オフライン画面は追加のスクリプトを取得できずキャッシュ対象を増やせないため、判定モジュールをViteの`?raw`でインライン展開する
 
 ## 運用監視
 
-`GET /healthcheck`はHTTP応答の生存確認とブラウザの接続回復に使う。
-DB接続と定期処理の状態を監視する場合は`GET /healthcheck/ready`を使う。
-この応答はキャッシュせず、利用者データや接続情報、例外詳細を含めない。
-
-- DBの`SELECT 1`が2秒以内に成功し、定期処理が健全ならHTTP 200と`status: "ok"`を返す。
-  それ以外はHTTP 503と`status: "error"`を返す
-- `database`は`ok`か`error`、`scheduler.status`は`ok`、`starting`、`error`、`stale`を返す。
-  `starting`は起動後の正常実行が未完了、`error`は直近の定期処理に失敗、
-  `stale`は最後の正常実行から2ポーリング周期を超えた状態を表す
-- `scheduler.last_success_at`と`last_finished_at`はUTCのISO8601文字列で、
-  対応する実行がまだ無ければ`null`となる。個別の定期TODOやカロリー自動記録に失敗した場合も、その周期を正常実行として扱わない。
-  他の予定の処理は継続し、次の正常な周期で健全へ戻る
-- HTTP 503の応答は`next_action`に、DBの不健全を優先して状態ごとの確認先（`make ps`、`make logs`、`make logs-app`の`[scheduler]`行、`make restart-app`）を返す
-
+`GET /healthcheck`はHTTP応答の生存確認とブラウザーの接続回復に使う。
+DB接続と定期処理の状態を監視する場合は`GET /healthcheck/ready`を使い、不健全ならHTTP 503と状態ごとの確認先（`next_action`）を返す。
 DBが不健全な場合はDBの稼働状況を、定期処理が不健全な場合はアプリの`[scheduler]`ログを確認する。
 運用監視による障害検知とコンテナーの生存確認を分け、DB障害だけでアプリの再起動を繰り返さない。
 
-## タイマー時刻同期
-
-タイマーの残り時間をブラウザで正確に計算するため、サーバーとの時刻差（オフセット）を管理する。
-
-### オフセット計算
-
-tRPCレスポンスでRTT/2補正付きの精密なオフセットを計算する:
-
-```text
-offset = serverTime - (requestStart + requestEnd) / 2
-```
-
-### オフセット更新の流れ
-
-```text
-SSE connected (初回接続)  ──→ setServerOffset(暫定値)
-tRPC response (1分間隔)   ──→ setServerOffset(RTT/2補正値)
-tRPC response (SSEイベント後) → setServerOffset(RTT/2補正値)
-SSE heartbeat (30秒ごと)  ──→ 接続維持のみ（オフセット更新なし）
-```
-
-SSEは片道通信のためRTTを測定できない。heartbeatのサーバー時刻でオフセットを上書きすると、
-tRPCのRTT/2補正で得た精密値が片道遅延分だけズレた値に劣化するため、heartbeatは接続維持のみに使用する。
-
-heartbeatの送出形式には名前付きイベント（`event: heartbeat`）を採用する。
-コメント行形式（`:\n\n`）では`EventSource`がイベントとして通知せず、
-クライアント側の受信ウォッチドッグが`addEventListener("heartbeat", ...)`で
-最終受信時刻を更新できない。
-
 ## 定期処理スケジューラー
 
-`schedules`テーブルのRRULE（`app/src/lib/server/schema.ts`）を起点に、
-サーバー内`setInterval`が定期的にTODOタスクを自動生成する。実装は`app/src/lib/server/scheduler.ts`。
-
-```mermaid
-sequenceDiagram
-    participant K as SvelteKit init
-    participant T as setInterval (60秒)
-    participant D as DB
-
-    K->>D: 起動時フィルフォワード（未発火分の遡り生成）
-    loop 60秒ごと
-        T->>D: enabledなscheduleを走査し発火判定
-        T->>D: 発火予定ごとにtasks/schedulesを更新
-    end
-```
-
-- 起動時と定期ポーリングの双方でfill-forward方式を採用する。
-  各スケジュールの`last_fired`（未設定時は`created`）を起点に、現在時刻までの未発火分を遡って生成する
-- fill-forwardは`rrule`のiteratorで発火予定を1件ずつ取り出し、
-  上限30件に達した時点で走査を打ち切る。
-  長期未発火の日次スケジュールでも全発火予定を配列化せずメモリ使用量を抑える
-- 上限30件を超える発火予定は31件目以降を生成せずスキップする。
-  この方式は上限の範囲内で重複発火を許容する設計であり、
-  上限を超えるフィルフォワードでは一部の発火予定が生成されずに終わる場合がある
-- 全発火予定の生成後に1回、`rule.before(now, true)`で求めた直近の発火予定を対象スケジュールの`last_fired`へ設定し、次回ポーリングでの再検出（二重発火）を防ぐ
-- 起動済み・実行中・healthの状態とポーリング周期は[再評価をまたいで保持するサーバー状態](#再評価をまたいで保持するサーバー状態)に置く。
-  開発サーバーの再評価後に`init`が再び呼ばれても周期は増えず、排他と`/healthcheck/ready`は同じ実行を表し、次の周期は更新後の処理を呼ぶ
-- 発火機構は単一プロセスを前提とする。
-  現行のDocker Compose構成はアプリケーションサーバーが単一プロセスであるため、
-  複数プロセスワーカー間の発火競合は考慮しない。
-  複数プロセス構成へ拡張する場合、同一スケジュールへの並行発火は
-  `list.user_id`と`last_fired`の更新競合により上記の重複許容範囲に収まる
-- スケジュールの`rrule`列は`DTSTART;TZID=Asia/Tokyo`形式でタイムゾーンを保持する。
-  `rrule`の`between()`が返す`Date`はAsia/Tokyoのローカル時刻をUTCとしてマークした値であるため、
-  市民時刻の時・分の取り出しには`getHours()`ではなく`getUTCHours()`等のUTC系アクセサを使う
-- 発火予定の計算はアプリのプロセスの時刻帯に依存しない。
-  `rrule`は`tzid`を指定すると、プロセスの時刻帯の壁時計の時刻をUTCの成分に持つ日時で境界を受け取り結果を返すため、
-  `scheduler.ts`は`between()`と`before()`へ渡す境界をその表現へ変換し、返った日時を真の時刻へ戻してから比較と`last_fired`の保存に使う。
+- 発火機構は単一プロセスを前提とし、複数プロセスワーカー間の発火競合は考慮しない
+- fill-forwardは1回の走査で30件を上限とし、上限の範囲内で重複発火を許容する。上限を超えた発火予定は生成しない
+- `rrule`は`tzid`を指定すると、プロセスの時刻帯の壁時計の時刻をUTCの成分に持つ日時で境界を受け取り結果を返す。
   本番イメージは`TZ=Asia/Tokyo`、開発用のappと試験のコンテナーはUTCで動くため、`make test-db`はnode projectを両方の時刻帯で実行する
 
-同じポーリングでカロリーの自動記録も処理する。
-
-- 各設定は次に記録する時刻を`calorie_auto_record.next_run_at`（UTC）に持つ。
-  ONの設定のうち`next_run_at`が現在時刻以前のものは、そこから1日刻みで現在時刻以前の時刻ごとに記録を追加し、
-  `next_run_at`を現在時刻より後の最初の時刻へ進める。記録を追加した利用者へ`calories:updated`を通知する
-- 設定の作成・変更（ON/OFFの切替を含む）のたびに`next_run_at`を現在時刻より後へ置き直す。
-  OFFの間に過ぎた時刻をONへ戻した時に遡って記録しないためである
-
 ## 認証設計
-
-CookieベースのJWT/HS256セッション。実装詳細は `hooks.server.ts` / `session.ts` を参照。
-
-セッションJWTは専用の`aud`で用途を限定する。署名・期限が有効な既存の`aud`無しセッションは受理し、
-同じ署名鍵を使うMCPのアクセストークン・リフレッシュトークンと未知の用途のJWTはブラウザ認証で拒否する。
-
-### パスキーと復旧
-
-WebAuthnの生成・署名検証はSimpleWebAuthnを使用する。
-discoverable credentialと必須のuser verificationを要求し、challenge・RP ID・許可origin・user handleと資格情報の所有者をサーバーで照合する。
-RP IDとoriginは配備設定から取得する。
-認証試行は用途別のhttpOnly・Secure Cookieでブラウザーへ結び付け、DBのchallengeを5分以内に条件付き更新で1回だけ消費する。
-登録の取消や失敗でユーザーIDを占有しないよう、利用者・資格情報・復旧コードは署名検証後の単一transactionで作る。
-既存の利用者とパスワードは保持し、`pass_hash`のNULLをパスワード未設定・無効として扱う。
-
-認証手段の変更は利用者行をロックする。署名・用途・利用者・世代が一致するセッションの発行から15分以内は、本人確認を省略できる。
-期限を超えた場合はパスワードかパスキーで本人確認し、成功時にセッションを再発行する。
-期限はサーバーで強制し、明示された本人確認情報は期限内でも検証する。
-パスキー追加とパスワード無効化の完了は、認可済みの開始処理で発行した5分間・1回限りのchallengeで検証する。
-パスワードが無い利用者の最後のパスキーを削除しない。
-復旧コードは十分な乱数から10個生成し、サーバーのJWT秘密鍵によるHMACだけをDBへ保存する。
-コードの消費と試行制限も利用者行のロック下で行い、連続失敗10回で15分拒否する。
-復旧用Cookieは15分有効の別audのJWTであり、通常のセッションとして使えない。
-復旧完了時に旧パスキー・復旧コードを置き換え、セッション世代番号を上げる。
-hooksは要求ごとにJWTの世代番号とDBを照合し、世代番号の無い既存JWTは0として扱う。
-
-未認証のJSON通信は`/auth/passkey`、復旧画面は`/auth/recover`が担当する。
-管理操作は`security`の`encryptedProcedure`を使用し、画面は更新後に再取得する。
-セキュリティ設定は他画面の共有データを変更しないためSSE通知を発行しない。
 
 ### CSRF 対策
 
 Chrome拡張のポップアップ内iframeでログイン状態を使うため、セッションCookieは`SameSite=None`・`Secure`である。
 このCookieは他サイト経由の通信にも付くため、補償として次の不変条件をCookieが届く全ルートに対して持つ。
 
-- Cookie認証の更新要求（POST・PUT・PATCH・DELETE）は同一オリジンからだけ受け付ける。
-  `hooks.server.ts`の`handle`が、パスを問わず`Sec-Fetch-Site`が`same-site`・`cross-site`の要求を403にする。
-  正規の送信元はGLATasks自身の画面（`same-origin`）とブラウザーの直接操作（`none`）だけである。
-  `Sec-Fetch-Site`を送らない要求（ブラウザー以外のクライアント）は通す
-- 除外はセッションCookieを読まないルート（`/oauth/token`・`/oauth/register`・`/mcp`）だけとし、`auth-routes.ts`の`COOKIELESS_MUTATION_PATHS`に理由とともに置く。
-  新しいルートは追加した時点で判定の対象になる
-- 画面は許可した埋め込み元以外から埋め込めない。ルートの処理を経た全応答へ`Content-Security-Policy: frame-ancestors 'self'`と`X-Frame-Options: SAMEORIGIN`を付ける。
-  `handle`がルートの処理より前に返す応答（他オリジンからの更新要求の403、未ログインのAPIの401、ログイン画面への転送）は画面を含まないため付けない。
-  Chrome拡張が開く`/share/ingest`・`/auth/login`・`/auth/regist_user`だけは`frame-ancestors 'self' chrome-extension:`とし、`X-Frame-Options`を付けない
-- ログアウトをPOSTに限定する（GETリクエストによるCSRFを防止するため）
+- Cookie認証の更新要求は同一オリジンからだけ受け付ける。
+  `hooks.server.ts`の`handle`が、パスを問わず`Sec-Fetch-Site`が`same-site`・`cross-site`の要求を403にする
+- 除外はセッションCookieを読まないルートだけとし、`auth-routes.ts`の`COOKIELESS_MUTATION_PATHS`に置く
+- 画面は許可した埋め込み元以外から埋め込めない。
+  Chrome拡張が開く画面だけは`frame-ancestors 'self' chrome-extension:`とし、`X-Frame-Options`を付けない
 
 SvelteKitが組み込みで行うOriginヘッダーの判定は、リバースプロキシ経由の利用でブラウザーのOriginとアプリの認識するオリジンが一致しないため無効にしている（`vite.config.ts`の`trustedOrigins: ["*"]`）。
 `Sec-Fetch-Site`はブラウザーが自分の見ているオリジン同士で判定するため、プロキシ経由でも同じ画面からの送信は`same-origin`になる。
-確認方法: E2Eの`app/tests/csrf-framing.test.ts`が、稼働中のアプリへHTTPで`app/src/routes`の全ルートを要求し、除外以外の各ルートへの他オリジンからの更新要求が拒否されること、ルートの処理を経た応答が埋め込みを制限するヘッダーを持つことを確かめる。
-SSEの`/api/events`は応答の本文が終わらず応答全体を受け取る方法で取得できないため、ヘッダーの確認から外している。
-SvelteKitのルーティングとhookを通った応答を判定するため、フレームワークの版更新や設定・`handle`の構成変更で保護が外れた場合も不変条件の違反として検出する。
-`hooks.server.test.ts`は同じルートの列挙で`handle`の判定を単体で確かめる。
+E2Eの`app/tests/csrf-framing.test.ts`が全ルートについて不変条件を確かめ、フレームワークの版更新や`handle`の構成変更で保護が外れた場合も検出する。
 
-セッションCookie名は環境変数`SESSION_COOKIE_NAME`で指定し、未指定時は`__Host-gla-session`とする。
-`__Host-`接頭辞はSecure・`Path=/`・Domain指定なしのCookieだけに使え、同じ親ドメインの別サブドメインから上書きされない。
-本番（aws.tqzh.tk）はサーバー上の`.env`で従来の名前`gla-session`を指定して運用する（端末ごとの再ログインと移行処理を避けるため）。
+### セッションCookie名
 
-認証の必要な画面とAPIは`hooks.server.ts`で保護し、未認証の場合は画面のログイン誘導とAPIの認証エラーを使い分ける。
-認証画面、OAuthの公開エンドポイント、ヘルスチェックなどは公開ルートの定義に従う。
-tRPCはユーザーデータを扱う全手続きを`encryptedProcedure`で定義する。
-MCPはBearerトークンで認証し、不明なセッションIDへのPOSTは404とする。
-MCPセッションは24時間使われなければ破棄する。
-MCPのsession表と無活動sessionの回収周期、OAuthの認可コードは[再評価をまたいで保持するサーバー状態](#再評価をまたいで保持するサーバー状態)に置く。
-開発サーバーの再評価後も、開始済みのsessionへのPOST・GET・DELETEと発行済みの認可コードの消費が成立する。
-回収周期は1本で、明示停止は周期の取消と保持中のtransportの終了を対にする。
-OAuthのクライアント秘密値は共通の認証処理で比較する。
-認可の許可、拒否、エラーのリダイレクトは、登録済みクライアントとリダイレクト先を確認してから組み立てる。
+未指定時は`__Host-gla-session`とする。
+本番（aws.tqzh.tk）はサーバー上の`.env`の`SESSION_COOKIE_NAME`で従来の名前`gla-session`を指定して運用する（端末ごとの再ログインと移行処理を避けるため）。
 
 ## 通信の難読化
 
@@ -320,100 +95,26 @@ HTTPSを通信の保護に使い、AES-GCMはtRPCの本文を追加で難読化�
 対象はmutationの要求本文と、`encryptedProcedure`の全手続きの応答である。
 クエリーの入力はGETのURLに含まれるため、検索語などは平文となる。
 クライアント側の暗号化に失敗した場合は平文の入力で送信し、サーバーもその入力を受け付ける。
-暗号化処理の失敗だけで操作不能になることを避けるための扱いであり、アクセス制御はセッションと所有権の確認が担当する。
+アクセス制御はセッションと所有権の確認が担当する。
 
 ## tRPCミドルウェア設計
 
-tRPC v11のミドルウェア（`t.middleware`）内で下流のprocedureが送出した例外を捕捉するには、
-`try/catch` ではなく `await next()` の戻り値の `result.ok` を判定する。
-tRPC v11の `next()` は例外を再送出せず `{ok: false, error}` で返す仕様のため、
-`try/catch` 側は到達しない。
-
-実例は `app/src/lib/server/trpc.ts` の `withApiErrors` にある。
-同ミドルウェアは型付きの`ApiError`を共通の対応表から日本語の文言とエラー分類へ変換する。
-未知の例外はログへ記録し、応答には内部の例外詳細を含めない。
-Zodの入力エラーはerrorFormatterが構造化して返し、クライアントがmessage文字列のJSONを解析する処理に依存しない。
-要点を簡略化すると次の形になる。
-
-```ts
-const withApiErrors = t.middleware(async ({ next }) => {
-  const result = await next();
-  if (!result.ok) {
-    // result.error を検査してマッピングする
-  }
-  return result;
-});
-```
-
-`withEncryption` も同じ `result.ok` パターンを使う。
-新しいミドルウェアを追加・改修する際は同じ判定形式に揃える。
+tRPC v11の`next()`は下流の例外を再送出せず`{ok: false, error}`で返すため、ミドルウェアでは`try/catch`ではなく`await next()`の戻り値の`result.ok`で判定する。
 
 ## DB 設計方針
 
-テーブル定義は `app/src/lib/server/schema.ts` を参照。以下はコードから読み取りにくい設計判断:
-
 - MariaDB（12.3系）は`innodb_snapshot_isolation=ON`で、既定の分離レベルはREPEATABLE READである。
   transactionの最初の読み取りで作られた読み取りビューの後に、別の接続が同じ行を更新してcommitすると、
-  その行の削除・更新は`ER_CHECKREAD`（1020）で失敗する。別の値の行の更新では発生しない。
-  試験のfixture回収（`cleanupFixtures`）のように、読み取りビューの一貫性を要しない読み取り後の削除はREAD COMMITTEDにする。
-  定期処理（`processSchedules`）は全リストの有効な予定を走査して更新するため、試験用DBは`make test-db`のファイルロックで同時に1つの実行だけが使う
-
-- `task.status`は`active`・`running`・`completed`・`archived`の4値を取り得る。
-  `running`は未完了としてTODOバッジへ計上し、`lists.clear`（完了済みタスクの非表示）の対象外とする
-
+  その行の削除・更新は`ER_CHECKREAD`（1020）で失敗する。
+  読み取りビューの一貫性を要しない読み取り後の削除・更新はREAD COMMITTEDにする
 - 日時カラムはTIMESTAMP型でUTC保存し、APIではISO8601文字列で返す
-- カロリー入力の現地時刻と日付は`tzOffsetMinutes`でサーバーがUTCへ変換する。日ごとの達成状況と今日の残量は現地の早朝4時を日境界とする
-- 定期TODOは`Asia/Tokyo`を使用し、RRULE文字列に`DTSTART;TZID=Asia/Tokyo`形式で保持する
-- タスクとタイマーの並び順は `sort_order` INTカラム（昇順、1000刻み）。刻み幅を大きくすることで、挿入時に周囲のレコードを更新せずに済む。
-  タスク（`tasks.create`）は `sort_order = 既存最小値 - 1000` で先頭挿入、
-  タイマー（`timers.create`）は `sort_order = 既存最大値 + 1000` で末尾追加
-- リスト（`lists.create`）も `sort_order = 既存最小値 - 1000` を保存するが、
-  リスト一覧（`lists.list`）は `title` の昇順で返す
-- タイマー一覧の取得ではサーバーが残り秒数を計算し、期限切れを停止する。
-  クライアントは`remainingSeconds`、`startedAt`、`serverTime`から表示中の残り時間を計算する。
-  秒単位の表示更新にはポーリングを使わない
-- タイマーの `ephemeral` カラムは1回限り使用するタイマーを識別するフラグ。
-  作成時のみ設定でき、`adjust` / `reset` / `setTime` などの操作で変更されない。
-  クライアント側では満了到達時に削除ボタンを強調し、確認ダイアログを省略して削除できる体験に用いる
-- カロリー計算では、品目を利用者内で一意に保持し、記録は品目IDを参照する。
-  品目名またはkcalを変更すると、既存記録の表示と期間集計へ反映される。
-  品目表へ登録しない一時項目の記録は品目IDを持たず、名前（`temporary_name`）とkcal（`quantity`）を記録自身が持つ。
-  品目IDと一時項目名はどちらか一方だけを持つ。
-  MariaDBは`ON UPDATE CASCADE`の外部キー列をCHECK制約に使えないため、この不変条件は書き込み側で守る。
-  記録の一覧と集計は品目を外部結合し、品目を参照しない一時項目の行も結果へ含める
-  kcal、数量および1日当たり目標値は整数で保持する。
-  利用者ごとの1日当たり目標値は`users.preferences.calorieGoalKcal`へ保持する
-- カロリーの自動記録設定（`calorie_auto_record`）は現地の時刻`time_of_day`と登録時の`tz_offset_minutes`を組で保持する。
-  他のカロリー入力と同じく固定の時差で解釈するため、夏時間の切り替えには追随しない
-
-list、task、timer、attachment、scheduleの親列は索引と`ON DELETE RESTRICT`・`ON UPDATE RESTRICT`の外部キーで関連を保つ。
-親を削除する処理は子を先に削除する。
-削除対象が無い場合や他のユーザーの行の場合は変更せず成功する。
-更新や取得で必要な行が無い場合のエラーとは区別する。
-status、kind、modeはvarcharの列へ保存し、TypeScriptの列型と入力スキーマの列挙値を合わせる。
-既存環境の外部キー名と索引名の違いはマイグレーションで解消し、定義とsnapshotと実DBを合わせる。
+- MariaDBは`ON UPDATE CASCADE`の外部キー列をCHECK制約に使えないため、カロリー記録の品目IDと一時項目名のどちらか一方だけを持つ不変条件は書き込み側で守る
+- 親列は`ON DELETE RESTRICT`・`ON UPDATE RESTRICT`の外部キーで関連を保ち、親を削除する処理は子を先に削除する。
+  削除対象が無い場合や他のユーザーの行の場合は変更せず成功する
 
 ### バイナリ保存と `max_allowed_packet`
 
-`mediumblob`・`longblob` カラムへバイナリを保存する場合、
-drizzle-orm mysql2ドライバーの `db.transaction` は
-内部で `client.query()`（テキストプロトコル）を採用する。
-`Buffer` パラメーターは16進数リテラルへ変換されて送信されるため、
-実バイト数の約2倍のSQLテキストがサーバーへ送信される。
-`db/my.cnf` の `max_allowed_packet` は元の想定バイナリサイズの3倍以上に設定する
-（現行値は `64M`）。添付ファイル上限が10 MiBのため、
-テキスト膨張とプロトコルオーバーヘッドを吸収する余裕を確保している。
+drizzle-orm mysql2ドライバーの`db.transaction`は内部でテキストプロトコルを使い、
+`Buffer`パラメーターを16進数リテラルへ変換して送るため、実バイト数の約2倍のSQLテキストがサーバーへ送られる。
+`db/my.cnf`の`max_allowed_packet`は想定するバイナリサイズの3倍以上に設定する（添付ファイル上限10 MiBに対し現行値は`64M`）。
 新しいBLOB系カラムを追加する場合は同基準で再点検する。
-
-## アーカイブ一覧と検索のページ取得
-
-画面は `tasks.listPage` と `tasks.searchPage` で50件ずつ取得する。
-MCPなどが使用する `tasks.list` と `tasks.search` は全件取得の契約を維持する。
-DBで所有者と表示種別を限定する。検索は一致したタスクをリスト別の順位で並べてからページを切り出す。
-タスク本文と添付の応答への変換は対象ページだけに行う。
-アーカイブの編集用タグ候補はページと分け、編集時にリスト全体から取得する。
-アーカイブの検索結果からタスクを選ぶと、`tasks.findArchivePage` で対象の前に並ぶ件数からページ番号を求め、そのページを開く。
-
-キャッシュキーにはリスト、検索語、表示種別、ページのうち取得条件に使う値を含める。
-SSEと同一タブの更新は一覧と検索のキーを前方一致で無効化する。
-更新で閲覧中のページがなくなった場合は、応答の総件数から最後の有効なページを開く。

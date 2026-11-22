@@ -1,10 +1,3 @@
-/**
- * @fileoverview OAuth 2.0 Dynamic Client Registration エンドポイント (RFC 7591)
- *
- * MCP クライアントが初回接続時に呼び出し、client_id を取得する。
- * 本エンドポイントは認証不要（公開）で運用する。
- */
-
 import { json } from "@sveltejs/kit";
 import { errorResponse } from "#lib/server/mcp/oauth-response.ts";
 import {
@@ -62,7 +55,6 @@ export const POST: RequestHandler = async ({ request }) => {
     client_secret: isPublic
       ? undefined
       : crypto.randomBytes(32).toString("hex"),
-    // client_secret_expires_at=0 は無期限を意味する（RFC 7591）
     client_secret_expires_at: isPublic ? undefined : 0,
   });
   return json(client, { status: 201 });

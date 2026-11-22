@@ -45,7 +45,6 @@ export async function saveChallenge(
   values: Omit<typeof authChallenges.$inferInsert, "id" | "expires">,
   db: AuthTransaction | ReturnType<typeof getDb> = getDb(),
 ) {
-  // 終了した試行は期限後に削除する。周期処理を新設せず、次の試行開始時に回収する。
   await db.delete(authChallenges).where(lt(authChallenges.expires, new Date()));
   const id = randomToken();
   await db

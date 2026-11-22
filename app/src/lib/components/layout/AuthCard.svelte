@@ -1,8 +1,4 @@
 <script lang="ts">
-    /**
-     * @fileoverview 認証ページ共通カードラッパー（ログイン・ユーザー登録で使用）
-     */
-
     import type { Snippet } from "svelte";
 
     interface Props {

@@ -7,7 +7,6 @@
 
     let { data }: Props = $props();
 
-    /** 戻り先を検証できない失敗の理由。次の操作はどの失敗もMCPクライアントからの接続のやり直しである */
     const errorReasons: Record<string, string> = {
         unknown_client: "このクライアントは登録されていません。",
         invalid_redirect_uri:

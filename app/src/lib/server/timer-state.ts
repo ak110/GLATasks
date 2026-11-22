@@ -39,7 +39,6 @@ export function timerStateColumns(state: TimerState) {
   };
 }
 
-/** 延長時には期限超過分も差し引くため、負の残秒数を保つ。 */
 export function timerRemainingSeconds(state: TimerState, now: Date): number {
   if (state.kind === "expired") return 0;
   return (

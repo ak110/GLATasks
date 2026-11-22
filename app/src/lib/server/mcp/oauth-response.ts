@@ -7,13 +7,10 @@ import { json } from "@sveltejs/kit";
  * 英語で書き、`"`と`\`を含めない。受け取るのはMCPクライアントとその開発者である。
  */
 export interface OAuthErrorDescription {
-  /** 起きた事実。ピリオドで終える */
   reason: string;
-  /** クライアントが次に行う操作。ピリオドで終える */
   nextAction: string;
 }
 
-/** 理由と次の操作をつないで`error_description`の値にする。 */
 export function formatOAuthErrorDescription(
   description: OAuthErrorDescription,
 ): string {
@@ -35,6 +32,5 @@ export function errorResponse(
   );
 }
 
-/** 認可をクライアントからやり直す操作。コードやトークンを取得し直す失敗で共通に使う */
 export const RESTART_AUTHORIZATION =
   "Restart the authorization from the MCP client to obtain a new authorization code.";

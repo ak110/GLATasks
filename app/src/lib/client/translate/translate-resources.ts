@@ -1,5 +1,3 @@
-/** ブラウザ内蔵AIの有無と共有作成・置換・解放を所有する */
-
 type ModelInstances = {
   detector: LanguageDetector;
   translator: Translator;
@@ -60,10 +58,6 @@ export function ensurePreparationActive(
   }
 }
 
-/**
- * 外部APIの中断信号受理に依存せず、共有作成の待機と登録を所有する。
- * 放棄後に外部作成が完了した場合は、採用せず作成物を解放する。
- */
 function getOrCreateShared<T extends { destroy(): void }>(
   creations: Map<string, SharedCreation<T>>,
   key: string,
@@ -133,7 +127,6 @@ function abandonSharedCreations(
   creations.clear();
 }
 
-/** 同じ種類・キーの作成を共有し、最新の置換だけを採用する */
 export function createSharedModel<K extends keyof ModelInstances>(
   kind: K,
   key: string,
@@ -144,7 +137,6 @@ export function createSharedModel<K extends keyof ModelInstances>(
   signal?: AbortSignal,
 ): Promise<ModelInstances[K]> {
   ensurePreparationActive(generation, signal);
-  // 種類とインスタンス型の対応はmodelSlotsの定義で固定する。
   const slot: ModelSlot<ModelInstances[K]> = modelSlots[kind];
   if (slot.resource?.key === key)
     return Promise.resolve(slot.resource.instance);
@@ -166,7 +158,6 @@ export function createSharedModel<K extends keyof ModelInstances>(
   );
 }
 
-/** 要求の中断とは分けて、準備対象の変更時に共有作成を放棄する */
 export function abandonEngineCreations(): void {
   resourceGeneration += 1;
   const reason = makePreparationAbortError();

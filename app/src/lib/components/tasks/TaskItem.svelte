@@ -7,9 +7,6 @@
     import { clampDetector } from "#lib/actions/clamp.ts";
     import { taskTextColor } from "#lib/task-colors.ts";
     import NotesExpandButton from "./NotesExpandButton.svelte";
-    /**
-     * @fileoverview タスクアイテム（チェックボックス + テキスト表示 + 編集・コピーボタン）
-     */
 
     import type { TaskStatus } from "#lib/schemas.ts";
     import type { TaskListItem } from "#lib/types.ts";
@@ -268,7 +265,6 @@
             />
         {/if}
     </div>
-    <!-- ドラッグハンドル + リモート更新マーク -->
     {#if onDragStart || isRemoteUpdated}
         <div class="flex flex-col items-center gap-1">
             {#if onDragStart}

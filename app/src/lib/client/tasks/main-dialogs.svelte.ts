@@ -2,7 +2,6 @@ import type { TaskKind } from "#lib/schemas.ts";
 import type { TagInfo } from "#lib/types.ts";
 
 export function createMainDialogs() {
-  // タスク編集ダイアログの状態
   type EditDialog = {
     sessionId: number;
     open: boolean;
@@ -28,7 +27,6 @@ export function createMainDialogs() {
     kind: "normal",
   });
 
-  // 定期TODOスケジュール管理ダイアログの対象リストID（null は非表示）
   let schedulesDialogListId = $state<number | null>(null);
 
   type MergeSource = {
@@ -72,7 +70,6 @@ export function createMainDialogs() {
     return succeeded;
   }
 
-  // リスト削除確認ダイアログの状態
   type ConfirmDeleteListDialog = {
     open: boolean;
     listId: number;
@@ -82,7 +79,6 @@ export function createMainDialogs() {
     listId: 0,
   });
 
-  // リストアーカイブ確認ダイアログの状態
   type ConfirmArchiveListDialog = {
     open: boolean;
     listId: number;
@@ -92,7 +88,6 @@ export function createMainDialogs() {
     listId: 0,
   });
 
-  // リスト名変更入力ダイアログの状態
   type RenameListDialog = {
     open: boolean;
     listId: number;

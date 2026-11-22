@@ -1,10 +1,3 @@
-/**
- * @fileoverview ブラウザ側 AES-GCM 暗号化
- */
-
-/**
- * 暗号化
- */
 export async function encrypt(
   plaintext: string,
   keyString: string,
@@ -33,9 +26,6 @@ export async function encrypt(
   return globalThis.btoa(binary);
 }
 
-/**
- * 復号
- */
 export async function decrypt(
   ciphertext: string,
   keyString: string,

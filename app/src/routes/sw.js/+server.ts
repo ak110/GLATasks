@@ -1,10 +1,3 @@
-/**
- * @fileoverview サービスワーカー配信エンドポイント
- *
- * オフライン時に offline.html を表示する PWA 機能を提供する。
- * v2.8.0 の FastAPI テンプレートから移植。
- */
-
 const SW_SCRIPT = `\
 // offline.html/+server.ts または connectivity-check.js を変更したら更新する。
 const OFFLINE_VERSION = 6;

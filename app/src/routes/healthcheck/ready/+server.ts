@@ -1,10 +1,8 @@
-/** DB接続と定期処理の健全性を確認する運用監視用エンドポイント。 */
 import { json } from "@sveltejs/kit";
 import { sql } from "drizzle-orm";
 import { getDb } from "#lib/server/db.ts";
 import { getSchedulerHealth } from "#lib/server/scheduler.ts";
 
-/** 不健全な応答で返す、状態ごとの次の操作。運用者がホストで実行する確認先を示す */
 const DATABASE_ERROR_ACTION =
   "DBが2秒以内に応答しません。make psでdbコンテナーの稼働を、make logsでdbのログを確認してください。";
 const SCHEDULER_ACTIONS = {

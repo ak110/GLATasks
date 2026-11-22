@@ -13,23 +13,16 @@ import {
   waitForTaskUpdateResponse,
 } from "./helpers/common";
 import { test, expect, type Request } from "@playwright/test";
-/**
- * @fileoverview activeTasks 差分sync・楽観的更新・SSE経路の e2e テスト
- */
 
 const STAMP = uniqueTestName("e2e");
 
 test.describe("activeTasks 差分sync・楽観的更新", () => {
-  // ---------------------------------------------------------------------------
-  // シナリオ1: リスト切替がフェッチを経由せず即時表示される
-  // ---------------------------------------------------------------------------
   test("リスト切替で差分syncが発火せず即時表示される", async ({ browser }) => {
     const listAName = `切替A_${STAMP}`;
     const listBName = `切替B_${STAMP}`;
     const taskATitle = `タスクA_${STAMP}`;
     const taskBTitle = `タスクB_${STAMP}`;
 
-    // リストA・Bとそれぞれのタスクを準備する
     await setupTestList(browser, listAName);
     await setupTestList(browser, listBName);
 
@@ -38,13 +31,11 @@ test.describe("activeTasks 差分sync・楽観的更新", () => {
     try {
       const page = await ctx.newPage();
 
-      // 初期ロード: tRPCレスポンスを待ってhydration完了を確保する
       await Promise.all([
         page.goto("/"),
         page.waitForResponse((res) => res.url().includes("/api/trpc")),
       ]);
 
-      // リストAへ切り替えてタスクを追加する
       await page.click(
         `[data-testid="list-select-btn"]:has-text("${listAName}")`,
       );
@@ -58,7 +49,6 @@ test.describe("activeTasks 差分sync・楽観的更新", () => {
           .filter({ hasText: taskATitle }),
       ).toBeVisible({ timeout: 15000 });
 
-      // リストBへ切り替えてタスクを追加する
       await page.click(
         `[data-testid="list-select-btn"]:has-text("${listBName}")`,
       );
@@ -72,7 +62,6 @@ test.describe("activeTasks 差分sync・楽観的更新", () => {
           .filter({ hasText: taskBTitle }),
       ).toBeVisible({ timeout: 15000 });
 
-      // リストAに切り替えてタスクA1が表示されるのを待つ
       await page.click(
         `[data-testid="list-select-btn"]:has-text("${listAName}")`,
       );
@@ -82,8 +71,6 @@ test.describe("activeTasks 差分sync・楽観的更新", () => {
           .filter({ hasText: taskATitle }),
       ).toBeVisible({ timeout: 15000 });
 
-      // 切替後のリクエストを記録するハンドラを仕掛ける
-      // SSEの /api/events は除外し、/api/trpc リクエストのみカウントする
       let trpcRequestCount = 0;
       await page.route("**/api/trpc/**", async (route) => {
         const url = route.request().url();
@@ -95,31 +82,24 @@ test.describe("activeTasks 差分sync・楽観的更新", () => {
         await route.continue();
       });
 
-      // リストBへ切り替える
       await page.click(
         `[data-testid="list-select-btn"]:has-text("${listBName}")`,
       );
 
-      // リストB内のタスクB1が 500ms 以内に表示されることを検証する（即時表示）
       await expect(
         page
           .locator('[data-testid="task-item"]')
           .filter({ hasText: taskBTitle }),
       ).toBeVisible({ timeout: 500 });
 
-      // 切替によって tasks.listActive（差分sync）が実行されないことを検証する
-      // 切替に伴う描画フレームを完了してから要求の有無を確認する
       await page.evaluate(
         () =>
           new Promise<void>((resolve) =>
             requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
           ),
       );
-      // listActive リクエストが発火した場合は count > 0 になる
-      // リスト切替だけでは trpc リクエストは不要な設計であることを確認する
       expect(trpcRequestCount).toBe(0);
 
-      // ルートを解除する
       await page.unroute("**/api/trpc/**");
     } finally {
       await ctx.close();
@@ -128,9 +108,6 @@ test.describe("activeTasks 差分sync・楽観的更新", () => {
     }
   });
 
-  // ---------------------------------------------------------------------------
-  // シナリオ2: タスク追加がネットワーク遅延下でもUI即応する（楽観的更新）
-  // ---------------------------------------------------------------------------
   test("タスク追加が2秒遅延下でも500ms以内に一覧へ反映される", async ({
     browser,
   }) => {
@@ -147,7 +124,6 @@ test.describe("activeTasks 差分sync・楽観的更新", () => {
         page.waitForResponse((res) => res.url().includes("/api/trpc")),
       ]);
 
-      // テスト用リストへ切り替えてタスク追加フォームを開く
       await page.click(
         `[data-testid="list-select-btn"]:has-text("${listName}")`,
       );
@@ -155,8 +131,6 @@ test.describe("activeTasks 差分sync・楽観的更新", () => {
         .locator('[data-testid="task-add-form"]')
         .waitFor({ timeout: 15000 });
 
-      // /api/trpc リクエストを2秒遅延させる
-      // SSEの /api/events を巻き込まないよう除外する
       await ctx.route("**/api/trpc/**", async (route) => {
         const url = route.request().url();
         if (url.includes("/api/events")) {
@@ -176,7 +150,6 @@ test.describe("activeTasks 差分sync・楽観的更新", () => {
         .locator('[data-testid="task-add-form"] button[type="submit"]')
         .click();
 
-      // mutation応答を待たずに、500ms以内にタスクが一覧に表示されることを検証する（楽観的更新）
       await expect(
         page
           .locator('[data-testid="task-item"]')
@@ -202,9 +175,6 @@ test.describe("activeTasks 差分sync・楽観的更新", () => {
     }
   });
 
-  // ---------------------------------------------------------------------------
-  // シナリオ3: タスク編集がネットワーク遅延下でもUI即応する（楽観的更新）
-  // ---------------------------------------------------------------------------
   test("タスク編集（completed化）が2秒遅延下でも500ms以内に打ち消し線が表示される", async ({
     browser,
   }) => {
@@ -222,7 +192,6 @@ test.describe("activeTasks 差分sync・楽観的更新", () => {
         page.waitForResponse((res) => res.url().includes("/api/trpc")),
       ]);
 
-      // テスト用リストへ切り替えてタスクを追加する
       await page.click(
         `[data-testid="list-select-btn"]:has-text("${listName}")`,
       );
@@ -238,10 +207,8 @@ test.describe("activeTasks 差分sync・楽観的更新", () => {
 
       const checkbox = taskRow.locator('input[type="checkbox"]');
 
-      // 遅延のない状態で active → running へ遷移させる
       await toggleTaskAndWaitForUpdate(page, checkbox);
 
-      // 2回目のtasks.updateだけを2秒遅延させる
       await ctx.route("**/api/trpc/**", async (route) => {
         const url = route.request().url();
         if (!url.includes("/api/trpc/tasks.update")) {
@@ -252,11 +219,9 @@ test.describe("activeTasks 差分sync・楽観的更新", () => {
         await route.continue();
       });
 
-      // 実行中から completed へ遷移させる
       const updateResponse = waitForTaskUpdateResponse(page);
       await checkbox.dispatchEvent("click");
 
-      // mutation応答を待たずに、500ms以内に打ち消し線が表示されることを検証する（楽観的更新）
       await expect(
         taskRow.locator('[data-testid="task-text"].line-through'),
       ).toBeVisible({ timeout: 500 });
@@ -265,7 +230,6 @@ test.describe("activeTasks 差分sync・楽観的更新", () => {
         throw new Error(`tasks.updateがHTTP ${response.status()}で失敗した`);
       }
 
-      // 遅延ルートを解除する
       await ctx.unroute("**/api/trpc/**");
     } finally {
       await ctx.close();
@@ -273,9 +237,6 @@ test.describe("activeTasks 差分sync・楽観的更新", () => {
     }
   });
 
-  // ---------------------------------------------------------------------------
-  // シナリオ4: SSE再接続後の差分sync経路（取りこぼし更新の反映）
-  // ---------------------------------------------------------------------------
   test("SSEブロック中に別コンテキストで追加したタスクが再接続後に反映される", async ({
     browser,
   }) => {
@@ -290,7 +251,6 @@ test.describe("activeTasks 差分sync・楽観的更新", () => {
     const ctxB = await browser.newContext(ctxOptions);
 
     try {
-      // --- コンテキストA: リストを開いてタスクを1件追加する ---
       const pageA = await ctxA.newPage();
       await Promise.all([
         pageA.goto("/"),
@@ -309,10 +269,8 @@ test.describe("activeTasks 差分sync・楽観的更新", () => {
       await expect(taskARow).toBeVisible({ timeout: 15000 });
       await waitForPersistedTask(taskARow);
 
-      // コンテキストAをオフラインにして、SSE切断状態を再現する
       await ctxA.setOffline(true);
 
-      // --- コンテキストB: 同一storageStateで別ページを開いてタスクを追加する ---
       const pageB = await ctxB.newPage();
       await Promise.all([
         pageB.goto("/"),
@@ -325,24 +283,20 @@ test.describe("activeTasks 差分sync・楽観的更新", () => {
         .locator('[data-testid="task-add-form"]')
         .waitFor({ timeout: 15000 });
       await addTask(pageB, taskByCtxB);
-      // コンテキストBでタスクが追加されたことを確認する
       const taskBRow = pageB
         .locator('[data-testid="task-item"]')
         .filter({ hasText: taskByCtxB });
       await expect(taskBRow).toBeVisible({ timeout: 15000 });
       await waitForPersistedTask(taskBRow);
 
-      // オンライン復帰でSSEを再接続する
       await ctxA.setOffline(false);
 
-      // コンテキストAのタスク一覧にコンテキストBで追加したタスクが現れることを検証する
       await expect(
         pageA
           .locator('[data-testid="task-item"]')
           .filter({ hasText: taskByCtxB }),
       ).toBeVisible({ timeout: 15000 });
     } finally {
-      // コンテキストB → A の順でクローズする
       await ctxB.close();
       await ctxA.close();
       await cleanupTestList(browser, listName);
@@ -427,7 +381,6 @@ test.describe("activeTasks 差分sync・楽観的更新", () => {
         if (!rawInput) throw new Error("tasks.listActive の入力がありません");
         const payload = JSON.parse(rawInput) as Record<string, unknown>;
         const procedures = url.pathname.slice("/api/trpc/".length).split(",");
-        // HTTPバッチはURLの手続き順と入力番号が対応する。他手続きの入力は除外する。
         return procedures.some((procedure, index) => {
           if (procedure !== "tasks.listActive") return false;
           const input =

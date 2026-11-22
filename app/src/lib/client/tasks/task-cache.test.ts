@@ -1,7 +1,3 @@
-/**
- * @fileoverview task-cache ユーティリティのテスト
- */
-
 import { describe, expect, it, vi } from "vitest";
 import type { TaskListItem } from "#lib/types.ts";
 import {
@@ -97,7 +93,6 @@ describe("mergeActiveTasks", () => {
   });
 
   it("delta モードのupsertでは prev 側の _key を保持する", () => {
-    // 楽観追加直後: id は実ID（onSuccess 反映後）に、_key は仮IDのまま残る状況。
     const tempKey = -1700000000000;
     const prev: ActiveTasksCache = {
       tasks: [makeTask({ id: 10, _key: tempKey, title: "旧" })],

@@ -1,10 +1,3 @@
-/**
- * @fileoverview 画像添付のBlob URL取得とキャッシュ管理
- *
- * TaskItem・TaskEditDialogの双方でサムネイル表示に使用する。
- * Blob URLの寿命管理（作成・キャッシュ・破棄）を一箇所へ集約する。
- */
-
 import { trpc } from "#lib/client/trpc.ts";
 import { base64ToBytes } from "#lib/base64.ts";
 
@@ -14,13 +7,6 @@ export interface BlobUrlCache {
   clear(): void;
 }
 
-/**
- * 添付IDをキーとするBlob URLのキャッシュを生成する。
- *
- * - `ensure`: 未取得の場合はサーバーから画像を取得しBlob URLを生成しキャッシュする
- * - `syncWith`: 現在アクティブな添付ID集合と比較し、集合から外れたキャッシュエントリーをrevoke＋削除する
- * - `clear`: 全キャッシュを破棄する（コンポーネントアンマウント時のクリーンアップで呼ぶ）
- */
 export function createBlobUrlCache(): BlobUrlCache {
   type CacheEntry =
     | { status: "loading"; promise: Promise<string> }
@@ -44,7 +30,6 @@ export function createBlobUrlCache(): BlobUrlCache {
             const bytes = base64ToBytes(result.data);
             const blob = new Blob([bytes], { type: result.mimeType });
             const url = URL.createObjectURL(blob);
-            // 同じIDが再追加されても、除外前の取得が新エントリーを上書きしない。
             if (
               destroyed ||
               cache.get(attachmentId) !== entry ||

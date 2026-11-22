@@ -6,12 +6,6 @@ import {
   setupTestLists,
 } from "./helpers/common";
 import { test, expect, type Page, type Request } from "@playwright/test";
-/**
- * @fileoverview モバイル相当の viewport におけるタスクD&Dのe2eテスト
- *
- * 2ペイン表示にならない幅では、D&Dをリスト内の並び替えに限定し、
- * ドラッグ中もリスト一覧へ切り替えず別リストへの移動を受け付けないことを検証する。
- */
 
 const stamp = uniqueTestName("e2e");
 const sourceListName = `タッチ並び替え元_${stamp}`;
@@ -124,7 +118,6 @@ test.describe("dnd task reorder (mobile viewport)", () => {
       });
       await dispatchPointerEvent(page, "pointermove", 1, startX, startY + 20);
 
-      // ドラッグ中もタスク一覧を表示したままとし、リスト一覧へ切り替えない
       await expect(page.getByTestId("task-add-form")).toBeVisible();
       await expect(otherList).not.toBeVisible();
 
@@ -170,15 +163,10 @@ test.describe("dnd task reorder (mobile viewport)", () => {
     const scrollArea = page.getByTestId("task-list-scroll");
     const initialOrder = await taskTitlesInOrder(page, titles);
     expect(initialOrder).toHaveLength(titles.length);
-    // 表示範囲を超えていることを前提条件として確認する
     expect(
       await scrollArea.evaluate((el) => el.scrollHeight > el.clientHeight),
     ).toBe(true);
 
-    /**
-     * 指定タスクのハンドルを掴み、スクロール領域の端付近で保持して自動スクロールさせ、
-     * 端まで達した後に端のタスクの外側半分でドロップする。
-     */
     async function dragToEdge(
       title: string,
       edge: "bottom" | "top",
@@ -204,7 +192,6 @@ test.describe("dnd task reorder (mobile viewport)", () => {
         edge === "bottom" ? areaBox.y + areaBox.height - 8 : areaBox.y + 8;
       await dispatchPointerEvent(page, "pointermove", pointerId, x, holdY);
 
-      // 指を止めたまま端までスクロールするのを待つ
       await expect
         .poll(
           () =>

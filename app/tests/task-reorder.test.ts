@@ -8,9 +8,6 @@ import {
 } from "./helpers/common";
 import { test, expect } from "@playwright/test";
 import { holdTaskReorder, performTaskDragAfter } from "./helpers/task-page";
-/**
- * @fileoverview タスク CRUD の e2e テスト
- */
 
 const LIST_NAME = `タスクテスト_${uniqueTestName("e2e")}`;
 
@@ -31,18 +28,15 @@ test.describe("task-reorder", () => {
     await page.click(
       `[data-testid="list-select-btn"]:has-text("${LIST_NAME}")`,
     );
-    // リスト選択後、タスク追加フォームが表示されるのを待つ
     await page
       .locator('[data-testid="task-add-form"]')
       .waitFor({ timeout: 15000 });
   });
 
   test("ドラッグハンドルでタスクを並び替えできる", async ({ page }) => {
-    // 並び替え用に専用リストへ切り替え（既存テストデータの順序に影響しないよう独立リストを用意）
     const reorderListName = `並び替え_${uniqueTestName("e2e")}`;
     await createListFromPage(page, reorderListName);
 
-    // タスクを 3 件追加（新規追加は先頭挿入仕様 → 表示順は C, B, A）
     const stamp = uniqueTestName("e2e");
     const titles = [`A_${stamp}`, `B_${stamp}`, `C_${stamp}`];
     for (const title of titles) {
@@ -51,11 +45,9 @@ test.describe("task-reorder", () => {
 
     const items = page.locator('[data-testid="task-item"]');
     await expect(items).toHaveCount(3, { timeout: 15000 });
-    // 初期順序: 先頭が C（最後に追加）、末尾が A
     await expect(items.first()).toContainText(`C_${stamp}`);
     await expect(items.last()).toContainText(`A_${stamp}`);
 
-    // 先頭タスク（C）のハンドルを末尾タスク（A）の下端へドラッグ
     const handle = items.first().locator('[data-testid="task-drag-handle"]');
     const lastItem = items.last();
     const handleBox = await handle.boundingBox();
@@ -69,9 +61,7 @@ test.describe("task-reorder", () => {
 
     await page.mouse.move(startX, startY);
     await page.mouse.down();
-    // ドラッグ閾値（既定 5px）を確実に超えるための明示的な中間移動
     await page.mouse.move(startX + 20, startY + 20);
-    // 並び替え mutation の発射を mouse.up と同時に待機する
     const reorderResponsePromise = page.waitForResponse((response) =>
       isTrpcUrl(response.url(), "tasks.reorder"),
     );
@@ -84,12 +74,10 @@ test.describe("task-reorder", () => {
       );
     }
 
-    // 期待順序: B, A, C（C を末尾に移動）
     await expect(items.nth(0)).toContainText(`B_${stamp}`, { timeout: 10000 });
     await expect(items.nth(1)).toContainText(`A_${stamp}`, { timeout: 10000 });
     await expect(items.nth(2)).toContainText(`C_${stamp}`, { timeout: 10000 });
 
-    // 後片付け: 並び替え用リストを削除
     await cleanupTestList(page.context().browser()!, reorderListName);
   });
 

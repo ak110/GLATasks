@@ -1,4 +1,3 @@
-/** DB統合テストで所有する利用者と、その子のfixtureを作成・回収する。 */
 import { randomUUID } from "node:crypto";
 import { inArray } from "drizzle-orm";
 import { describe } from "vitest";
@@ -58,11 +57,8 @@ export async function createFixtureTask(userId?: number) {
   return { ...fixture, taskId };
 }
 
-/** `cleanupFixtures`の試験用の差し込み口。回収の競合を決定的に再現する試験だけが使う。 */
 export type CleanupFixturesOptions = {
-  /** 回収transactionの分離レベル。既定はREAD COMMITTED。 */
   isolationLevel?: "read committed" | "repeatable read";
-  /** 最初の読み取り（読み取りビューの作成）の直後に呼ぶ処理。 */
   afterFirstRead?: () => Promise<void>;
 };
 

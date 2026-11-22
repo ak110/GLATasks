@@ -1,7 +1,3 @@
-/**
- * @fileoverview カロリー計算APIの統合テスト
- */
-
 import { eq } from "drizzle-orm";
 import { afterAll, expect, it } from "vitest";
 
@@ -34,7 +30,6 @@ import {
   describeDb,
 } from "../db-test-helpers";
 
-/** 品目を1件作成し、作成した品目を返す */
 async function createFixtureItem(userId: number, name: string) {
   await createCalorieItem(userId, { name, kcal: 100, note: "" });
   const item = (await getCalorieItems(userId)).find(
@@ -113,7 +108,6 @@ describeDb("カロリー計算API", () => {
       0,
       new Date("2026-09-01T12:00:00.000Z"),
     );
-    // ペースは850×e^-1+200×e^-0.75、7日間平均は1050kcalを7日、28日間平均は28日で割った値
     expect(summary.periods.map((period) => period.dailyKcal)).toEqual([
       407, 150, 38,
     ]);
@@ -226,7 +220,6 @@ describeDb("カロリー計算API", () => {
       new Date("2026-09-01T12:00:00.000Z"),
     );
     expect(summary.goalKcal).toBe(1615);
-    // ペースは1日前の記録がe^-1、7日前と28日前の記録がそれぞれの期間の境界に入る
     expect(summary.periods.map((period) => period.dailyKcal)).toEqual([
       37, 29, 11,
     ]);
@@ -293,7 +286,6 @@ describeDb("カロリー計算API", () => {
       ["2026-08-31T22:30:00.000Z", 2],
     ]);
 
-    // 終了日が開始日より前の指定は1件も追加しない
     expect(
       await bulkCreateCalorieRecords(userId, {
         ...input,
@@ -356,7 +348,6 @@ describeDb("カロリー計算API", () => {
     const userId = await createFixtureUser();
     userIds.push(userId);
     const item = await createFixtureItem(userId, "牛乳");
-    // 現地（UTC+9）8月1日9時に「毎日8時」を登録すると、初回は8月2日8時（UTC 8月1日23時）になる
     await createCalorieAutoRecord(
       userId,
       {

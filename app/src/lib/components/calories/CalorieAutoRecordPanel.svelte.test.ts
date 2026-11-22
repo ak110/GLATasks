@@ -1,7 +1,3 @@
-/**
- * @fileoverview カロリーの自動記録の追加欄が、保存後に初期値へ戻った後の作業中判定を妨げないことのテスト
- */
-
 import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
 import { describe, expect, it, vi } from "vitest";
 
@@ -13,7 +9,6 @@ import CalorieAutoRecordPanel from "./CalorieAutoRecordPanel.svelte";
 
 describe("CalorieAutoRecordPanel", () => {
   it("入力した追加欄は作業中とみなし、追加に成功して初期値へ戻ると作業中でなくなる", async () => {
-    // 自動の再読み込みの見送り判定は、data-clean-valueと異なる欄だけを未保存の入力とみなす
     const stopTracking = startEditedFieldTracking();
     try {
       const onCreate = vi.fn().mockResolvedValue(undefined);

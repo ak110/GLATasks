@@ -1,7 +1,4 @@
 import { ApiError } from "../api-errors";
-/**
- * @fileoverview タスク関連API（取得・追加・更新・検索・並び替え）
- */
 
 import {
   and,
@@ -45,7 +42,6 @@ import {
 
 export type { TagInfo } from "#lib/schemas.ts";
 
-/** updateTask の data 引数型（UpdateTaskSchema から listId・taskId を除いた型） */
 type UpdateTaskData = Omit<
   z.infer<typeof UpdateTaskSchema>,
   "listId" | "taskId"
@@ -72,20 +68,9 @@ export type GetTasksResult = Awaited<ReturnType<typeof listTasks>>;
 export type GetActiveTasksResult = Awaited<ReturnType<typeof listActiveTasks>>;
 export type TaskListItem = GetActiveTasksResult["tasks"][number];
 
-/**
- * ユーザーの全アクティブタスクを取得する（差分syncサポート）。
- *
- * - `since` 未指定（初回・全件モード）: archived でない全タスクを返す。
- * - `since` 指定（差分モード）: updated が since 以降のタスクを archived 含めて全件返す。
- * - ユーザーがアクティブリストを1件も持たない場合は、上記によらず空配列を返す
- *   （mode 判定は since の有無に従う）。
- *
- * `serverTime` は DB の TIMESTAMP 秒精度の取りこぼしを避けるため 1 秒 overlap させた値とする。
- */
 export async function listActiveTasks(userId: number, since?: Date) {
   const db = getDb();
 
-  // ユーザーの全アクティブリストを取得
   const userLists = await db
     .select({ id: lists.id })
     .from(lists)
@@ -99,14 +84,12 @@ export async function listActiveTasks(userId: number, since?: Date) {
     rows = [];
     mode = since ? "delta" : "full";
   } else if (since) {
-    // 差分モード: updated >= since のタスクを全件返す（archived 含む）
     rows = await db
       .select()
       .from(tasks)
       .where(and(inArray(tasks.list_id, listIds), gte(tasks.updated, since)));
     mode = "delta";
   } else {
-    // 全件モード: archived でないタスクのみ返す
     rows = await db
       .select()
       .from(tasks)
@@ -136,7 +119,6 @@ export async function listActiveTasks(userId: number, since?: Date) {
   return { tasks: taskList, serverTime, mode };
 }
 
-/** リストのタスク一覧を取得する（If-Modified-Since キャッシュ対応）。 */
 export async function listTasks(
   userId: number,
   listId: number,
@@ -150,9 +132,7 @@ export async function listTasks(
       const clientMs = new Date(ifModifiedSince).getTime();
       const serverMs = list.last_updated.getTime();
       if (serverMs <= clientMs) return { status: 304 as const };
-    } catch {
-      // パースに失敗した場合は通常のレスポンスを返す
-    }
+    } catch {}
   }
 
   const db = getDb();
@@ -167,7 +147,6 @@ export async function listTasks(
   return { status: 200 as const, data, lastModified };
 }
 
-/** タスクを先頭に追加する。渡された接続がある場合は呼出元のトランザクションへ参加する。 */
 export async function createTask(
   userId: number,
   listId: number,
@@ -180,7 +159,6 @@ export async function createTask(
     await getOwnedList(listId, userId, db);
     const cleanText = text.trimEnd();
     const now = new Date();
-    // 現在の最小 sort_order を取得
     const [{ minOrder }] = await db
       .select({ minOrder: min(tasks.sort_order) })
       .from(tasks)
@@ -205,17 +183,6 @@ export async function createTask(
   return connection ? insertTask(connection) : getDb().transaction(insertTask);
 }
 
-/**
- * タスクを更新する（部分更新）。
- *
- * data のキーに応じて以下の更新パターンを処理する:
- * - text: テキスト変更 + keepOrder=false なら先頭移動
- * - status: ステータス変更（未完了状態から completed への変更時に completed 日時を自動セット）
- * - completed: 完了日時の明示的な上書き（null でクリア）
- * - moveTo: 別リストへの移動（移動先リストの先頭に配置）
- *
- * 各パターンは同時に適用可能（例: テキスト変更 + リスト移動）。
- */
 export async function updateTask(
   userId: number,
   listId: number,
@@ -276,7 +243,6 @@ export async function updateTask(
       if (moveTo !== listId) {
         await getOwnedList(moveTo, userId, db);
         updates.list_id = moveTo;
-        // 移動先リストの先頭に配置
         const [{ minOrder }] = await db
           .select({ minOrder: min(tasks.sort_order) })
           .from(tasks)
@@ -363,7 +329,6 @@ export async function listTaskPage(
   });
 }
 
-/** 対象がアーカイブ済みでなくなっていれば、一覧の先頭として0ページ目を返す。 */
 export async function findArchivePage(
   userId: number,
   listId: number,
@@ -431,7 +396,6 @@ async function convertSearchRows(
   }));
 }
 
-/** 全リスト横断でタスクを LIKE 検索する */
 export async function searchTasks(
   userId: number,
   query: string,
@@ -460,7 +424,6 @@ export async function searchTaskPage(
       .from(tasks)
       .innerJoin(lists, eq(tasks.list_id, lists.id))
       .where(filter);
-    // 一致タスクごとにウィンドウ関数を評価せず、リスト単位の最小順位を再利用する。
     const groups = db
       .select({
         listId: tasks.list_id,
@@ -551,7 +514,6 @@ export function planArchivePageReorder(
     }
   }
 
-  // 同値の中でID順が逆転する場合だけ振り直し、ページ外の相対順も保つ。
   const needsRenumber =
     change.kind !== "reorder" ||
     ordered.some(
@@ -593,7 +555,6 @@ export async function reorderArchivePage(
   );
 }
 
-/** タスクの並び順を更新する */
 export async function reorderTasks(
   userId: number,
   listId: number,
@@ -602,7 +563,6 @@ export async function reorderTasks(
   await getDb().transaction(async (db) => {
     await getOwnedList(listId, userId, db);
     const now = new Date();
-    // taskIds の順に sort_order を 0, 1000, 2000... で再割当
     await Promise.all(
       taskIds.map((id, i) =>
         db

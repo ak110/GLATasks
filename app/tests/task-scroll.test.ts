@@ -16,9 +16,6 @@ import {
   verifyTaskListInternalScroll,
 } from "./helpers/task-list-scroll";
 import { holdTaskCreate } from "./helpers/task-page";
-/**
- * @fileoverview タスク CRUD の e2e テスト
- */
 
 const LIST_NAME = `タスクテスト_${uniqueTestName("e2e")}`;
 
@@ -39,7 +36,6 @@ test.describe("task-scroll", () => {
     await page.click(
       `[data-testid="list-select-btn"]:has-text("${LIST_NAME}")`,
     );
-    // リスト選択後、タスク追加フォームが表示されるのを待つ
     await page
       .locator('[data-testid="task-add-form"]')
       .waitFor({ timeout: 15000 });
@@ -222,8 +218,6 @@ test.describe("task-scroll", () => {
   test("アーカイブ表示でタスク追加した場合は一覧位置を維持する", async ({
     page,
   }) => {
-    // 18件の作成と各2回の完了操作など約55回の往復を直列に行う。開発用サーバーでは1往復が約0.4秒かかり、
-    // 既定の上限（30秒）に近づくか超えるため、上限を3倍にする（CIの本番構成では数秒で終わる）
     test.slow();
     await prepareScrollableTaskList(page);
     const taskItems = page.getByTestId("task-item");

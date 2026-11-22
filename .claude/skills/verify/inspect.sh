@@ -5,7 +5,6 @@ phase=$1
 shift
 compose=("$@")
 project="${PWD##*/}-e2e"
-# 停止を求める条件ごとに、観測した値と次の操作を run.log へ残す。
 fail() {
   printf 'inspect.sh %s: %s\n次の操作: %s\n' "$phase" "$1" "$2" >&2
   exit 1
@@ -41,7 +40,6 @@ web=$(service_id web)
   fail "実行中のサービスが揃っていません（app=${app:-なし} db=${db:-なし} web=${web:-なし}）。" \
     "run.log の起動ログと、保存されていれば failure.log を確認してください。$rerun"
 
-# 実行中サービスを調べる。env や全 inspect のダンプは資格情報を含む。
 actual=$(docker inspect --format '{{index .Config.Labels "com.docker.compose.project"}}' "$app")
 [[ "$actual" == "$project" ]] ||
   fail "appのComposeプロジェクトが $actual で、試験用の $project ではありません。" \

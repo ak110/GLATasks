@@ -1,8 +1,4 @@
 <script lang="ts">
-    /**
-     * @fileoverview 共通ヘッダーコンポーネント
-     */
-
     import { getContext, onMount } from "svelte";
     import { resolve } from "$app/paths";
     import type { Theme } from "#lib/client/ui/theme.ts";
@@ -77,10 +73,6 @@
     ] as const;
 </script>
 
-<!--
-    幅が足りない場合は右側の操作群を次の行へ折り返し、高さは内容に合わせる。
-    検索欄のフォーカス時の拡大や読み込み中の表示で操作が画面外へ出ないようにするためである。
--->
 <header
     class="z-10 flex min-h-12 shrink-0 flex-wrap items-center gap-x-1 gap-y-1 bg-gray-800 px-2 py-1.5 text-white shadow sm:gap-x-2 sm:px-4 dark:bg-gray-950"
 >
@@ -91,7 +83,6 @@
             >
         {/if}
         {#if page === item.key}
-            <!-- 狭い画面ではラベルを隠してアイコンだけを表示するため、名前を属性でも持たせる -->
             <span
                 class="text-sm font-semibold text-gray-200"
                 data-testid={"header-nav-" + item.key}

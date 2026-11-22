@@ -1,11 +1,3 @@
-/**
- * @fileoverview 開発サーバーのモジュール再評価をまたいだOAuth認可コードの発行と消費の試験
- *
- * 認可コードは発行から消費まで短時間だけプロセス内に保持する。発行した世代と消費する
- * トークンエンドポイントの世代が異なっても、既存の期限・一度だけの消費・クライアントと
- * 戻り先とPKCEの検証に従うことを確かめる。
- */
-
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
@@ -32,7 +24,6 @@ const CHALLENGE = createHash("sha256").update(VERIFIER).digest("base64url");
 let dataDir: string;
 const savedEnv = { ...process.env };
 
-/** 開発サーバーのモジュール再評価と同じく、新しい世代として読み込み直す。 */
 async function loadStore(): Promise<Store> {
   vi.resetModules();
   return import("./store");

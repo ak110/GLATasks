@@ -1,9 +1,3 @@
-/**
- * @fileoverview PromptDialog コンポーネントのsmoke test
- *
- * open=true でマウントして入力欄・ボタンが表示されることを確認する。
- */
-
 import { render, screen } from "@testing-library/svelte";
 import { describe, expect, it, vi } from "vitest";
 

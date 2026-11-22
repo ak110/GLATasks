@@ -316,7 +316,6 @@ describeDb("アーカイブと検索のページ取得", () => {
           )
           .$returningId()
       ).map(({ id }) => id);
-    // IDの大小と並び順の値の大小を逆にし、どちらか一方だけで数えると結果が変わる配置にする。
     const middle = await insert(10, 50);
     const [head] = await insert(5);
     const [tail] = await insert(20);

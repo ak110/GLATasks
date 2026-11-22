@@ -1,17 +1,9 @@
-/**
- * @fileoverview TaskItem コンポーネントのsmoke test
- *
- * マウントできて主要要素（チェックボックス・タイトル・タグ・編集ボタン）が
- * 表示されることを確認する。
- */
-
 import { fireEvent, render, screen } from "@testing-library/svelte";
 import { describe, expect, it, vi } from "vitest";
 
 import type { TaskListItem } from "#lib/types.ts";
 import TaskItem from "./TaskItem.svelte";
 
-/** テスト用タスクデータのデフォルト値 */
 function makeTask(overrides: Partial<TaskListItem> = {}): TaskListItem {
   const id = overrides.id ?? 1;
   return {

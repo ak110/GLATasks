@@ -21,7 +21,6 @@
         "id" | "name" | "kcal"
     >;
     type RecordRow = RouterOutputs["calories"]["records"]["records"][number];
-    /** 品目の記録は`itemId`を、一時項目の記録は`temporaryName`を持つ */
     type RecordInput = RouterInputs["calories"]["createRecord"];
     interface Props {
         items: Item[];
@@ -35,9 +34,7 @@
         onCreate: (input: RecordInput) => unknown;
         onUpdate: (input: RouterInputs["calories"]["updateRecord"]) => unknown;
         onDelete: (record: RecordRow) => void;
-        /** 追加フォームの品目欄の値。ページが両表の検索語として使う */
         addItemName?: string;
-        /** 前後の空白を除いた検索語。大文字小文字を区別せず、全ての語を品目名に含む記録だけを表示する */
         filterKeywords: string[];
         onClearFilter: () => void;
     }
@@ -80,7 +77,6 @@
         keepTemporary: false,
     });
     const editingId = $derived(form.kind === "add" ? undefined : form.recordId);
-    // 同名の品目があっても、編集・コピー元が一時項目ならその扱いを保持する
     const keepTemporary = $derived(form.keepTemporary);
     const conversion = $derived(
         form.kind === "temporary" ? form.conversion : undefined,
@@ -104,13 +100,9 @@
             : "",
     );
     let openMenuId = $state<number | undefined>();
-    // 追加・取消の後に戻す数量。日時を手で修正していない間の日時とともに、未保存の入力が無いとみなす値として
-    // 欄に示し、保存後に初期値へ戻った欄が自動の再読み込みを止めないようにする（user-busy.ts）
     const DEFAULT_QUANTITY = "1";
     let consumedAt = $state(formatLocalMinute(new Date()));
-    // 追加欄の日時は現在時刻へ追従させ、手で修正した後は追加か取消までその値を保つ
     let consumedAtEdited = $state(false);
-    // 編集ダイアログの品目欄は追加フォームと別に持ち、編集中の名前を検索語にしない
     let editItemName = $state("");
     const itemName = $derived(
         editingId === undefined ? addItemName : editItemName,
@@ -128,7 +120,6 @@
     const matchedItem = $derived(
         items.find((item) => item.name === itemName.trim()),
     );
-    // 品目表に無い名前は一時項目として記録し、数量欄の値をkcalとして扱う。品目欄が空の間は判定しない
     const temporary = $derived(
         itemName.trim() !== "" && (keepTemporary || matchedItem === undefined),
     );
@@ -173,7 +164,6 @@
             keepTemporary: record.temporary,
         };
         consumedAt = formatLocalMinute(new Date(record.consumedAt));
-        // 編集の開始で追加フォームの入力を破棄するため、検索も解除される
         addItemName = "";
         editItemName = record.itemName;
         quantity = String(record.quantity);
@@ -260,7 +250,6 @@
         }
     }
 
-    /** 入力中の品目と数量から変換後のkcalを求め、確認ダイアログを開く */
     function requestConversion() {
         const numericQuantity = parseQuantity();
         if (
@@ -387,7 +376,6 @@
             class={inputClass}
         />
     {/snippet}
-    <!-- 追加欄は数量の欄のラベルを表示しないため、kcalを入力することも案内する -->
     {#snippet temporaryNotice(inDialog: boolean)}
         <p
             class="text-sm text-gray-600 dark:text-gray-300"
@@ -439,7 +427,6 @@
                 >
                     {sendingMessage}
                 </p>{/if}
-            <!-- ダイアログの幅が足りればラベルを左・入力欄を右に並べ、狭ければラベルの下に入力欄を置く -->
             <form bind:this={editForm} class="@container" onsubmit={submit}>
                 <div
                     class="grid gap-3 @sm:grid-cols-[4rem_minmax(0,1fr)] @sm:items-center"
@@ -501,7 +488,6 @@
                     >
                 </div>
             </form>
-            <!-- 編集ダイアログはshowModalで最前面に表示されるため、確認ダイアログをその内側へ描画して操作可能にする -->
             <ConfirmDialog
                 open={conversion !== undefined}
                 title="一時項目への変換"
@@ -573,7 +559,6 @@
         </p>{/if}
     <CalorieFilterStatus keywords={filterKeywords} onClear={onClearFilter} />
     <table class="w-full table-fixed text-left text-sm">
-        <!-- 狭い画面でも品目の列幅を残すため、日時を2行にし、数値の列を詰める -->
         <colgroup
             ><col class="w-14 sm:w-36" /><col /><col class="w-12 sm:w-16" /><col
                 class="w-14 sm:w-16"
@@ -616,7 +601,6 @@
                     <td class="truncate p-2" title={record.itemName}>
                         {record.itemName}
                     </td>
-                    <!-- 一時項目は数量欄の値をkcalとして持つため、数量の列は空にする -->
                     <td
                         class="p-2 text-right"
                         aria-label={record.temporary

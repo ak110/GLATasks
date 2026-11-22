@@ -1,7 +1,3 @@
-/**
- * @fileoverview ブラウザ内蔵AI APIの可用性判定、準備、翻訳実行
- */
-
 import {
   modelSlots,
   createSharedModel,
@@ -23,11 +19,9 @@ import {
   type TranslateEngine,
 } from "#lib/client/translate/translate.ts";
 
-/** 言語の組を変える操作。画面の入力欄の表示名で案内する */
 const CHANGE_LANGUAGE =
   "「入力側の言語（母語）」か「母語のときの翻訳先」を別の言語へ変更してください";
 
-/** Translator APIを使えない場合の代わりの操作 */
 const USE_PROMPT_INSTEAD =
   "翻訳エンジンでPrompt APIを選ぶか、Chrome 138以降のデスクトップ版で開いてください";
 
@@ -111,10 +105,6 @@ function getDirectionLabel(direction: TranslationDirectionChoice): string {
     : "相手言語 → 母語";
 }
 
-/**
- * 利用できる翻訳エンジンを既定順で返す。
- * Translator APIとPrompt APIの双方が利用できる場合はTranslator APIを先に返す。
- */
 export async function detectEngineAvailability(
   nativeLanguage: string,
   foreignLanguage: string,
@@ -365,7 +355,6 @@ async function makeDirectionPreparations(
         targetLanguage: candidate.targetLanguage,
         direction: candidate.direction,
         availability,
-        // Detector未準備の方向選択は、available/downloadingでも1回の明示操作で確定する。
         requiresUserActivation: true,
         requiresDirectionChoice: true,
       };
@@ -415,13 +404,6 @@ async function consumeStream(
   }
 }
 
-/**
- * 作成済みの内蔵AIインスタンスで翻訳し、必要な準備があればその対象を返す。
- * 実行ごとのAbortSignalは検出・翻訳・Prompt実行へ渡す。モデル作成は
- * getResourceGeneration()で共有所有し、個別要求の中断で共有作成Promiseを壊さない。
- * 利用者操作起点のcreate()自体は、この関数から呼び出す準備処理の呼び出し
- * スタック内で開始する。
- */
 export async function runTranslation(
   text: string,
   nativeLanguage: string,
@@ -737,7 +719,6 @@ async function runDetectedTranslation(
   return { status: "translated" };
 }
 
-/** 翻訳方向の選択肢を利用者向けの日本語へ変換する */
 export function describePreparationDirection(
   target: TranslationPreparationTarget,
 ): string {

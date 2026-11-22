@@ -1,23 +1,12 @@
-/**
- * @fileoverview 能動検出とリロード経路のユニットテスト
- *
- * `checkConnectivity` の判定区分ごとの回復誘導（再読み込みか案内か）、到達不能の継続時間による案内の表示、
- * 到達不能の間の短い間隔の再判定、検知後の入力中／非入力中分岐、回復時の案内の自動解除を同値分割でカバーする。
- * `fetch` は引数注入で差し替え、`location.reload` のみグローバルを差し替える。時間経過はfake timersで制御する。
- */
-
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 type Recovery = typeof import("#lib/client/sse/connection-recovery.svelte.ts");
 
-// 非表示iframeの読み込みはhappy-domで完了しないため、読み込みの完了だけを模す。
-// 通過したかは読み込み後の判定（注入したfetch）で決まる。
 const { loadHiddenFrame } = vi.hoisted(() => ({
   loadHiddenFrame: vi.fn(async () => {}),
 }));
 vi.mock("#lib/client/sse/silent-pass.ts", () => ({ loadHiddenFrame }));
 
-/** 注入用の fetch スタブを生成する。`reject` 指定時はネットワークエラー相当で失敗させる */
 function makeFetch(opts: {
   status?: number;
   contentType?: string;
@@ -27,7 +16,6 @@ function makeFetch(opts: {
   redirect?: boolean;
 }): typeof fetch {
   if (opts.redirect) {
-    // redirect: "manual" の取得でリダイレクトを受けた時の応答（status 0）。Responseのコンストラクターでは作れないため形だけを模す
     return vi.fn(async () => ({
       type: "opaqueredirect",
       status: 0,
@@ -35,7 +23,6 @@ function makeFetch(opts: {
     })) as unknown as typeof fetch;
   }
   if (opts.timeout) {
-    // AbortSignal.timeoutの打ち切りと同じ種別の例外で失敗させる
     return vi.fn(() =>
       Promise.reject(new DOMException("timed out", "TimeoutError")),
     ) as unknown as typeof fetch;
@@ -56,14 +43,12 @@ function makeFetch(opts: {
   ) as unknown as typeof fetch;
 }
 
-/** 指定要素を body に追加してフォーカスする */
 function focusElement(tag: "input" | "textarea" | "select"): void {
   const el = document.createElement(tag);
   document.body.appendChild(el);
   el.focus();
 }
 
-/** 呼ばれるたびに次の応答を返すfetchスタブ。末尾に達したら最後の応答を返し続ける */
 function sequenceFetch(...fetches: (typeof fetch)[]): typeof fetch {
   let index = 0;
   return vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
@@ -99,9 +84,6 @@ describe("connection-recovery", () => {
     document.body.innerHTML = "";
   });
 
-  // 接続判定の詳細な同値分割は connectivity-check.dom.test.ts が担う。
-  // ここでは判定の3区分ごとの1回目の判定直後の回復誘導を、各区分の代表値で検証する。
-  // 到達不能は猶予の間は案内しない（継続時の案内は別のテストで検証する）。
   it.each([
     {
       label: "健全（200・JSON・ok）",
@@ -169,7 +151,6 @@ describe("connection-recovery", () => {
     await recovery.checkConnectivity(fetch);
     expect(recovery.connectivityState.notice).toBe("none");
 
-    // 2秒間隔の再判定を猶予（6秒）まで進めると案内が出る
     await vi.advanceTimersByTimeAsync(recovery.UNREACHABLE_NOTICE_DELAY_MS);
     expect(fetch).toHaveBeenCalledTimes(
       1 +
@@ -194,7 +175,6 @@ describe("connection-recovery", () => {
     expect(fetch).toHaveBeenCalledTimes(2);
     expect(recovery.connectivityState.notice).toBe("none");
 
-    // 健全を検知した後は短い間隔の再判定を続けない
     await vi.advanceTimersByTimeAsync(
       recovery.UNREACHABLE_RECHECK_INTERVAL_MS * 5,
     );
@@ -213,7 +193,6 @@ describe("connection-recovery", () => {
     await vi.advanceTimersByTimeAsync(recovery.UNREACHABLE_NOTICE_DELAY_MS * 2);
     expect(fetch).toHaveBeenCalledTimes(1);
 
-    // 可視復帰直後の判定も到達不能だが、猶予を数え直すため案内はまだ出さない
     visibility.mockReturnValue("visible");
     await recovery.checkConnectivity(fetch);
     expect(recovery.connectivityState.notice).toBe("none");
@@ -226,7 +205,6 @@ describe("connection-recovery", () => {
     const visibility = vi
       .spyOn(document, "visibilityState", "get")
       .mockReturnValue("visible");
-    // 監視のトリガー（可視復帰）は既定のfetchで判定するため、グローバルのfetchを到達不能へ差し替える
     const fetch = sequenceFetch(makeFetch({ reject: true }));
     vi.stubGlobal("fetch", fetch);
     recovery.startConnectivityWatch();
@@ -235,7 +213,6 @@ describe("connection-recovery", () => {
       await vi.advanceTimersByTimeAsync(recovery.UNREACHABLE_NOTICE_DELAY_MS);
       expect(recovery.connectivityState.notice).toBe("unreachable");
 
-      // 非表示へ移った時点で案内を消し、予約済みの再判定も通信しない
       visibility.mockReturnValue("hidden");
       document.dispatchEvent(new Event("visibilitychange"));
       expect(recovery.connectivityState.notice).toBe("none");
@@ -245,14 +222,12 @@ describe("connection-recovery", () => {
       );
       expect(fetch).toHaveBeenCalledTimes(callsAtHidden);
 
-      // 可視復帰の判定でもまだ到達不能だが、非表示前の継続時間を持ち越さないため案内しない
       visibility.mockReturnValue("visible");
       document.dispatchEvent(new Event("visibilitychange"));
       await vi.advanceTimersByTimeAsync(0);
       expect(fetch).toHaveBeenCalledTimes(callsAtHidden + 1);
       expect(recovery.connectivityState.notice).toBe("none");
 
-      // 新しい可視期間で猶予を超えて続いた場合だけ案内する
       await vi.advanceTimersByTimeAsync(recovery.UNREACHABLE_NOTICE_DELAY_MS);
       expect(recovery.connectivityState.notice).toBe("unreachable");
     } finally {
@@ -261,8 +236,6 @@ describe("connection-recovery", () => {
     }
   });
 
-  // フォーカスや未編集のダイアログだけでは再読み込みを妨げない。
-  // 到達不能（503など）は入力中かどうかを判定せずに案内の判断へ進むため、入力中の判定を通る横取りの代表値（511）を使う。
   it.each([
     { label: "INPUT 要素にフォーカス", setup: () => focusElement("input") },
     {
@@ -356,7 +329,6 @@ describe("connection-recovery", () => {
     await recovery.checkConnectivity(makeFetch({ status: 511 }));
     expect(recovery.connectivityState.notice).toBe("reload-required");
 
-    // 回復検知で案内を自動解除する（入力中のため reload はしない）
     await recovery.checkConnectivity(makeFetch({}));
     expect(recovery.connectivityState.notice).toBe("none");
     expect(reloadMock).not.toHaveBeenCalled();
@@ -374,7 +346,6 @@ describe("connection-recovery", () => {
       recovery.checkConnectivity(fetch),
     ]);
     expect([first, second]).toEqual(["intercepted", "intercepted"]);
-    // 判定1回と、横取りの自動通過を試した後の判定1回
     expect(fetch).toHaveBeenCalledTimes(2);
     expect(await recovery.checkConnectivity(makeFetch({}))).toBe("healthy");
   });
@@ -428,7 +399,6 @@ describe("connection-recovery", () => {
   });
 
   describe("認証画面の別ウィンドウ", () => {
-    /** `window.open`が返す別ウィンドウのスタブ */
     function stubAuthWindow(): {
       closed: boolean;
       close: ReturnType<typeof vi.fn>;
@@ -467,14 +437,12 @@ describe("connection-recovery", () => {
       recovery.openAuthWindow(fetch);
       expect(openMock).toHaveBeenCalledWith("/healthcheck", "glatasks-auth");
 
-      // 1回目の再判定は横取りのまま（入力中なので再読み込みしない）
       await vi.advanceTimersByTimeAsync(
         recovery.UNREACHABLE_RECHECK_INTERVAL_MS,
       );
       expect(authWindow.close).not.toHaveBeenCalled();
       expect(recovery.connectivityState.notice).toBe("reload-required");
 
-      // 2回目の再判定で健全になり、別ウィンドウを閉じて案内を消す
       await vi.advanceTimersByTimeAsync(
         recovery.UNREACHABLE_RECHECK_INTERVAL_MS,
       );
@@ -536,7 +504,6 @@ describe("connection-recovery", () => {
         await vi.advanceTimersByTimeAsync(
           recovery.UNREACHABLE_RECHECK_INTERVAL_MS,
         );
-        // 30秒ポーリングとは別に、両方の短周期の予約が残る。
         expect(vi.getTimerCount()).toBe(3);
         await vi.advanceTimersByTimeAsync(
           recovery.UNREACHABLE_RECHECK_INTERVAL_MS,

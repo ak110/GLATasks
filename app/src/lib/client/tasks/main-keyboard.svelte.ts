@@ -1,4 +1,3 @@
-/** 入力欄やモーダルを操作していないときだけ、メイン画面のショートカットを受け付ける。 */
 export function handleMainKeyboard(event: KeyboardEvent) {
   const target = event.target as HTMLElement | null;
   if (

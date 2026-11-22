@@ -5,9 +5,6 @@
         nameAreaClass,
     } from "#lib/components/ui/styles.ts";
     import { getUtcOffsetMinutes } from "#lib/date-time.ts";
-    /**
-     * @fileoverview タイマーカードコンポーネント
-     */
 
     import type { RouterInputs } from "#lib/client/trpc.ts";
     import type { TimerInfo } from "#lib/types.ts";
@@ -59,13 +56,10 @@
 
     let displaySeconds = $state(0);
 
-    // 時刻編集状態
     let editing = $state(false);
     let editValue = $state("");
 
-    /** 残り秒数を計算する */
     function calcRemaining(): number {
-        // 停止中のアラームは wall clock からライブ計算
         if (
             timer.mode === "alarm" &&
             !timer.running &&
@@ -78,14 +72,12 @@
         );
     }
 
-    // 停止中アラームかどうか（カウントダウン非表示・インターバル不要）
     const isStoppedAlarm = $derived(
         timer.mode === "alarm" &&
             !timer.running &&
             timer.targetMinutes !== null,
     );
 
-    // 1秒ごとに表示更新
     $effect(() => {
         displaySeconds = calcRemaining();
 
@@ -99,16 +91,11 @@
 
     const isExpired = $derived(timer.expired && !timer.running);
 
-    // 満了到達判定 (ephemeral タイマーの削除強調・確認省略に使用)。
-    // displaySeconds <= 0 は countdown 到達直後の即時発火用、
-    // expired && !running は alarm 停止後に displaySeconds が翌日分へ
-    // wrap しても判定を継続させるためのフォールバック。
     const isTimeUp = $derived(
         displaySeconds <= 0 || (timer.expired && !timer.running),
     );
     const showEphemeralDeleteEmphasis = $derived(timer.ephemeral && isTimeUp);
 
-    /** 時刻表示クリック → 編集モードに切り替え */
     function startEditing() {
         if (timer.running) return;
         editing = true;
@@ -119,7 +106,6 @@
         }
     }
 
-    /** 編集確定 */
     function commitEdit() {
         editing = false;
         if (timer.mode === "alarm") {
@@ -136,12 +122,10 @@
         }
     }
 
-    /** 編集キャンセル */
     function cancelEdit() {
         editing = false;
     }
 
-    /** 編集中のキー入力処理 */
     function handleEditKeydown(e: KeyboardEvent) {
         if (e.key === "Enter") {
             e.preventDefault();
@@ -164,7 +148,6 @@
     data-reorder-id={timer.id}
     role="listitem"
 >
-    <!-- ヘッダー: ドラッグハンドル + タイマー名 + 操作ボタン -->
     <div class="mb-3 flex items-center justify-between gap-2">
         {#if onDragStart}
             <span
@@ -214,7 +197,6 @@
         </div>
     </div>
 
-    <!-- アラームモード: 目標時刻表示 -->
     {#if timer.mode === "alarm" && timer.targetMinutes !== null}
         {#if editing}
             <div
@@ -248,7 +230,6 @@
         {/if}
     {/if}
 
-    <!-- 残り時間表示（停止中アラームでは非表示） -->
     {#if !isStoppedAlarm}
         <div
             class="mb-4 text-center font-mono text-3xl font-bold sm:text-4xl"
@@ -276,7 +257,6 @@
         </div>
     {/if}
 
-    <!-- 操作ボタン -->
     <div class="flex flex-wrap items-center justify-center gap-2">
         <div class="flex flex-nowrap items-center gap-2">
             {#if timer.running}

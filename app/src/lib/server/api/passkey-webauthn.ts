@@ -39,7 +39,6 @@ export async function beginRegistration(
     userName,
     userID: Buffer.from(handle, "base64url"),
     attestationType: "none",
-    // ランタイムのPQC対応で要求方式が変わらないよう、対応実績のある方式を明示する。
     supportedAlgorithmIDs: [-8, -7, -257],
     authenticatorSelection: {
       residentKey: "required",
@@ -80,7 +79,6 @@ export async function verifiedRegistration(
       response.clientExtensionResults.credProps?.rk === false
     )
       throw new ApiError("auth_failed");
-    // aaguidは提供元の識別子で、登録時のパスキー名を決めるために返す。
     return {
       credential: result.registrationInfo.credential,
       aaguid: result.registrationInfo.aaguid,

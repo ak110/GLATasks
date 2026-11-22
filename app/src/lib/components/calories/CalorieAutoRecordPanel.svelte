@@ -8,9 +8,6 @@
         menuDangerItemClass,
     } from "#lib/components/ui/styles.ts";
     import { getUtcOffsetMinutes } from "#lib/date-time.ts";
-    /**
-     * @fileoverview カロリーの自動記録設定（毎日指定時刻に記録を追加する）の一覧と編集
-     */
 
     import Dialog from "#lib/components/dialogs/Dialog.svelte";
     import ConfirmDialog from "#lib/components/dialogs/ConfirmDialog.svelte";
@@ -47,8 +44,6 @@
 
     let timeOfDay = $state("");
     let itemName = $state("");
-    // 保存・取消の後に戻す数量。未保存の入力が無いとみなす値として欄に示し、
-    // 保存後に初期値へ戻った欄が自動の再読み込みを止めないようにする（user-busy.ts）
     const DEFAULT_QUANTITY = "1";
     let quantity = $state(DEFAULT_QUANTITY);
 
@@ -232,7 +227,6 @@
         >
             {sendingMessage}
         </p>{/if}
-    <!-- 狭い画面でも品目の列幅を残すため、行の操作は「⋯」メニューへまとめる -->
     <table class="w-full table-fixed text-left text-sm">
         <colgroup
             ><col class="w-16" /><col /><col class="w-14" /><col

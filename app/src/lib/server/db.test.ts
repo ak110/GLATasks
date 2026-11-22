@@ -1,4 +1,3 @@
-/** 開発サーバーの再評価でプールを共有し、クライアントは再評価後のスキーマで作成することを検証する。 */
 import { int, mysqlTable } from "drizzle-orm/mysql-core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -8,7 +7,6 @@ const createPool = vi.hoisted(() => vi.fn());
 
 vi.mock("mysql2/promise", () => ({ default: { createPool } }));
 
-/** `db.ts`を新しく評価し直す（開発サーバーのコード更新に相当する）。 */
 async function evaluateDbModule() {
   vi.resetModules();
   return await import("./db");

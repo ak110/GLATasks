@@ -6,9 +6,6 @@
 
 import { z } from "zod";
 
-// ── タグ色相定数 ──
-
-/** 利用可能な色相キー。色覚特性の差があっても区別しやすい配色。 */
 export const TAG_COLOR_KEYS = [
   "amber",
   "sky",
@@ -20,10 +17,7 @@ export const TAG_COLOR_KEYS = [
   "slate",
 ] as const;
 
-/** タグの色相キー型 */
 export type TagColorKey = (typeof TAG_COLOR_KEYS)[number];
-
-// ── 共通スキーマ ──
 
 export const TaskStatusSchema = z.enum([
   "active",
@@ -34,13 +28,9 @@ export const TaskStatusSchema = z.enum([
 export const ShowTypeSchema = z.enum(["active", "archived", "all"]);
 export const ListStatusSchema = z.enum(["active", "archived"]);
 
-/** タスク区分。"todo" は通知バッジ集計・定期TODO発火の対象となる。 */
 export const TaskKindSchema = z.enum(["normal", "todo"]);
 export type TaskKind = z.infer<typeof TaskKindSchema>;
 
-// ── タグスキーマ ──
-
-/** タスクに付与する個別タグ */
 export const TagInfoSchema = z.object({
   name: z
     .string()
@@ -51,10 +41,7 @@ export const TagInfoSchema = z.object({
   color: z.enum(TAG_COLOR_KEYS).describe("タグの色"),
 });
 
-/** タスクに付与するタグ配列（同一タスク内での上限は32個） */
 export const TagsSchema = z.array(TagInfoSchema).max(32);
-
-// ── 検索スキーマ ──
 
 export const SearchTasksSchema = z.object({
   query: z
@@ -67,12 +54,6 @@ export const SearchTasksSchema = z.object({
   ),
 });
 
-// ── タスク操作スキーマ ──
-
-/**
- * タスク本文の最大バイト数（UTF-8）。
- * DBカラム（mediumtext、最大16,777,215バイト）に安全余裕を残した値とする。
- */
 export const MAX_TASK_TEXT_BYTES = 16_000_000;
 
 const taskTextEncoder = new TextEncoder();
@@ -154,8 +135,6 @@ export const UpdateTaskSchema = z
     },
   );
 
-// ── リスト操作スキーマ ──
-
 export const CreateListSchema = z.object({
   title: z
     .string()
@@ -216,38 +195,21 @@ export const ReorderArchivePageSchema = ListTaskPageSchema.extend({
   ]),
 });
 
-// ── タイマーデフォルト値 ──
-
-/** タイマー作成時のベース時間デフォルト（分） */
 export const TIMER_DEFAULT_BASE_MINUTES = 30;
 
-/** 延長/削減のデフォルト分数 */
 export const TIMER_DEFAULT_ADJUST_MINUTES = 10;
 
-/**
- * ビープを鳴らす秒数のデフォルト値。
- * 上限3600秒はユーザーフィードバックで提示された値、
- * 既定値3秒は従来のオプトインOFF時の鳴動時間（実測約2.8秒）とほぼ同じ長さになるよう選定した。
- */
 export const TIMER_DEFAULT_RING_SECONDS = 3;
 
-/** タイマーモード */
 export const TIMER_MODES = ["countdown", "alarm"] as const;
 export const TimerModeSchema = z.enum(TIMER_MODES);
 export type TimerMode = z.infer<typeof TimerModeSchema>;
 
-/** タイマー系で共有する入力範囲。 */
 export const TimezoneOffsetSchema = z.number().int().min(-720).max(840);
 export const TimerSecondsSchema = z.number().int().min(0).max(359999);
 export const TimerRingSecondsSchema = z.number().int().min(1).max(3600);
 export const TimerAdjustMinutesSchema = z.number().int().min(1).max(999);
 
-// ── 利用者デフォルト値スキーマ ──
-
-/**
- * 新規タイマー作成時の既定値（利用者ごと）。
- * 各フィールドはオプショナル。欠落時はコード側のフォールバック定数で補う。
- */
 export const UserPreferencesSchema = z.object({
   ringSeconds: TimerRingSecondsSchema.optional().describe(
     "新規タイマーが時間切れ後に音を鳴らす秒数（1～3600）",
@@ -271,15 +233,12 @@ export const UserPreferencesSchema = z.object({
 });
 export type UserPreferences = z.infer<typeof UserPreferencesSchema>;
 
-// ── カロリー計算スキーマ ──
-
 export const DEFAULT_CALORIE_GOAL_KCAL = 1615;
 export const MAX_CALORIE_CSV_ROWS = 10_000;
 
 const PositiveCalorieIntegerSchema = z.number().int().positive().max(1_000_000);
 const NonNegativeCalorieIntegerSchema = z.number().int().min(0).max(1_000_000);
 
-/** 年月日・時分がそのまま実在する日時を表すかを返す（2月30日や25時を拒否する） */
 function isRealDateTime(
   year: number,
   month: number,
@@ -338,10 +297,6 @@ export const CalorieItemIdSchema = z.object({
   itemId: z.number().int().positive(),
 });
 
-/**
- * 記録の入力項目。品目の記録は`itemId`を、品目表へ登録しない一時項目の記録は
- * `temporaryName`を、どちらか一方だけ指定する。一時項目の`quantity`はkcalとして扱う
- */
 const CalorieRecordFieldsSchema = z.object({
   consumedAt: LocalMinuteSchema,
   itemId: z.number().int().positive().optional(),
@@ -404,7 +359,6 @@ export const CalorieRecordCsvRowSchema = z.object({
   consumed_at: LocalMinuteSchema,
   item_name: z.string().min(1).max(255),
   quantity: NonNegativeCalorieIntegerSchema,
-  // 一時項目の行は品目表と照合せず、quantityをkcalとして取り込む
   temporary: z.boolean().default(false),
 });
 
@@ -450,8 +404,6 @@ export const CalorieAutoRecordIdSchema = z.object({
   autoRecordId: z.number().int().positive(),
 });
 
-// ── タイマー操作スキーマ ──
-
 export const CreateTimerSchema = z
   .object({
     name: z
@@ -482,14 +434,12 @@ export const CreateTimerSchema = z
     ).describe(
       `画面の延長・短縮ボタン1回分の分数（1～999）。省略時は${TIMER_DEFAULT_ADJUST_MINUTES}`,
     ),
-    // 1回限りのタイマー。満了時に削除ボタンを強調し、確認ダイアログを省略する
     ephemeral: z
       .boolean()
       .default(false)
       .describe(
         "true の場合は1回限りのタイマーとして作成と同時に開始し、満了後の削除を確認なしで行えるようにする。省略時は false",
       ),
-    // 期限切れ後にビープを鳴らす秒数（上限・既定値の根拠は TIMER_DEFAULT_RING_SECONDS のコメントを参照）
     ringSeconds: TimerRingSecondsSchema.default(
       TIMER_DEFAULT_RING_SECONDS,
     ).describe(
@@ -577,7 +527,6 @@ export const ResetTimerSchema = z.object({
 
 export const TimerStopSchema = z.object({
   timerId: TimerIdFieldSchema,
-  // アラーム発火時の startedAt。リセット/再開されていないことを確認するために使用
   startedAt: z
     .string()
     .datetime()
@@ -613,8 +562,6 @@ export const SetTimerTimeSchema = z.object({
   ),
 });
 
-// ── 認証スキーマ ──
-
 export const RegisterUserSchema = z.object({
   userId: z
     .string()
@@ -625,9 +572,6 @@ export const RegisterUserSchema = z.object({
   password: z.string().min(1, "パスワードは必須です"),
 });
 
-// ── 差分syncスキーマ ──
-
-/** 全アクティブタスク取得（差分 sync 対応）の入力スキーマ */
 export const GetActiveTasksSchema = z.object({
   since: z
     .string()
@@ -637,8 +581,6 @@ export const GetActiveTasksSchema = z.object({
       "差分取得の基準日時（ISO 8601形式のUTC）。前回の応答の serverTime を渡す。省略時はアーカイブ済み以外の全タスクを返す",
     ),
 });
-
-// ── リスト統合スキーマ ──
 
 export const MergeListSchema = z.object({
   sourceListId: z
@@ -652,8 +594,6 @@ export const MergeListSchema = z.object({
     .positive()
     .describe("統合先のリストのID。統合元と異なるリストを指定する"),
 });
-
-// ── 並び替えスキーマ ──
 
 export const ReorderTasksSchema = z.object({
   listId: z.number().int().positive().describe("並べ替えるリストのID"),
@@ -676,8 +616,6 @@ export const ReorderTimersSchema = z.object({
     .describe("新しい並び順の全タイマーID（重複不可）。先頭が一番上になる"),
 });
 
-// ── 添付スキーマ ──
-
 export const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 export const MAX_ATTACHMENTS_PER_TASK = 99;
 export const MAX_ATTACHMENT_BASE64_LENGTH =
@@ -698,11 +636,8 @@ export const DownloadAttachmentSchema = z.object({
   attachmentId: z.number().int().positive(),
 });
 
-// ── 型エクスポート ──
-
 export type TaskStatus = z.infer<typeof TaskStatusSchema>;
 export type ShowType = z.infer<typeof ShowTypeSchema>;
-/** タグ情報型（`TagInfoSchema` からの推論） */
 export type TagInfo = z.infer<typeof TagInfoSchema>;
 
 export type CalorieItemInput = z.infer<typeof CreateCalorieItemSchema>;

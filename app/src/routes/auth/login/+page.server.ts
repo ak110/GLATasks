@@ -1,7 +1,3 @@
-/**
- * @fileoverview ログインページのサーバーサイド処理（認証・セッション発行）
- */
-
 import { fail, redirect } from "@sveltejs/kit";
 import * as api from "#lib/server/api.ts";
 import { getSessionGeneration } from "#lib/server/api/passkey-common.ts";

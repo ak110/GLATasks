@@ -1,11 +1,4 @@
 <script lang="ts">
-    /**
-     * @fileoverview エラートースト通知コンポーネント
-     *
-     * 画面右下に赤系のエラーメッセージを表示し、文面の長さに応じた時間（最短5秒）の後に自動消去する。
-     * TimerAlarmMonitor のトースト（top-14）と重ならないよう bottom-4 に配置。
-     */
-
     import {
         getToasts,
         dismissToast,

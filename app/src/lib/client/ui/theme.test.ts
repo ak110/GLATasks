@@ -1,7 +1,3 @@
-/**
- * @fileoverview テーマ管理のユニットテスト
- */
-
 import { describe, test, expect, beforeEach, vi } from "vitest";
 import {
   getStoredTheme,
@@ -10,7 +6,6 @@ import {
   cycleTheme,
 } from "#lib/client/ui/theme.ts";
 
-// localStorage モック
 const storage = new Map<string, string>();
 const localStorageMock = {
   getItem: (key: string) => storage.get(key) ?? null,
@@ -19,7 +14,6 @@ const localStorageMock = {
   clear: () => storage.clear(),
 };
 
-// document.documentElement.classList モック
 const classList = new Set<string>();
 const classListMock = {
   add: (cls: string) => classList.add(cls),
@@ -80,7 +74,6 @@ describe("theme", () => {
 
     test("system テーマで prefers-color-scheme に従う", () => {
       applyTheme("system");
-      // matchMedia モックが matches: false のためライトモード
       expect(classList.has("dark")).toBe(false);
     });
   });

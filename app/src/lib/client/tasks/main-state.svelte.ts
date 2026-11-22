@@ -4,7 +4,6 @@ import { SvelteSet } from "svelte/reactivity";
 export function createMainState() {
   let selectedListId = $state<number | null>(null);
   let showType = $state<"active" | "archived" | "all">("active");
-  // 他端末で更新されたタスクのIDセット（リスト切り替えでクリア）
   let updatedTaskIds = new SvelteSet<number>();
   let addListTitle = $state("");
   let addTaskText = $state("");

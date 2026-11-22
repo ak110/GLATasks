@@ -1,10 +1,3 @@
-/**
- * @fileoverview タイマー純粋関数のユニットテスト
- *
- * DB 依存がない calcAlarmRemainingSeconds / calcAlarmSecondsOrThrow を対象にする。
- * 基準時刻を引数で渡して計算する。
- */
-
 import { describe, expect, it } from "vitest";
 
 import {
@@ -26,9 +19,6 @@ function calcWithFixedTime(
 
 describe("calcAlarmRemainingSeconds", () => {
   it("ターゲット時刻が現在より未来の場合は正の秒数を返す", () => {
-    // UTC 12:00:00、JST(+9h=+540min) では 21:00:00
-    // ターゲット: JST 22:00 = 22*60=1320分
-    // 残り: 60分 = 3600秒
     const remaining = calcWithFixedTime(
       "2025-01-01T12:00:00.000Z",
       22 * 60,
@@ -38,9 +28,6 @@ describe("calcAlarmRemainingSeconds", () => {
   });
 
   it("ターゲット時刻が現在と同分で秒が0のとき残り0秒", () => {
-    // UTC 12:00:00、JST 21:00:00
-    // ターゲット: JST 21:00 = 21*60=1260分、秒=0
-    // diffMinutes=0、nowLocalSeconds=0 → 条件未達で 24h 加算なし → 0秒
     const remaining = calcWithFixedTime(
       "2025-01-01T12:00:00.000Z",
       21 * 60,
@@ -50,9 +37,6 @@ describe("calcAlarmRemainingSeconds", () => {
   });
 
   it("ターゲット時刻が過去（現地時間）の場合は翌日分を返す", () => {
-    // UTC 12:00:00、JST 21:00:00
-    // ターゲット: JST 10:00 = 600分（現地時間で過去）
-    // 翌日 10:00 まで: (24*60 - (21*60 - 10*60)) = 24*60 - 11*60 = 13*60分 = 780分 = 46800秒
     const remaining = calcWithFixedTime(
       "2025-01-01T12:00:00.000Z",
       10 * 60,
@@ -62,9 +46,6 @@ describe("calcAlarmRemainingSeconds", () => {
   });
 
   it("ターゲット時刻が同分で秒が0より大きいとき翌日分になる", () => {
-    // UTC 12:00:30、JST 21:00:30
-    // ターゲット: JST 21:00（同じ時・分だが秒が過ぎている）
-    // → 翌日の JST 21:00 まで: 24*60*60 - 30秒
     const remaining = calcWithFixedTime(
       "2025-01-01T12:00:30.000Z",
       21 * 60,
@@ -74,16 +55,11 @@ describe("calcAlarmRemainingSeconds", () => {
   });
 
   it("UTC オフセット0（UTC 直接）でも正しく計算する", () => {
-    // UTC 10:00:00、ターゲット: UTC 11:00 = 660分
-    // 残り: 60分 = 3600秒
     const remaining = calcWithFixedTime("2025-01-01T10:00:00.000Z", 11 * 60, 0);
     expect(remaining).toBe(3600);
   });
 
   it("マイナスオフセット（例: UTC-5）でも正しく計算する", () => {
-    // UTC 15:00:00、EST(-5h=-300min) では 10:00:00
-    // ターゲット: EST 12:00 = 720分
-    // 残り: 120分 = 7200秒
     const remaining = calcWithFixedTime(
       "2025-01-01T15:00:00.000Z",
       12 * 60,
@@ -97,7 +73,6 @@ describe("calcAlarmSecondsOrThrow", () => {
   const nowUtcMs = Date.parse("2025-01-01T12:00:00.000Z");
 
   it("target_minutes と tzOffsetMinutes が両方指定されているとき正常に計算する", () => {
-    // JST(+540) 21:00:00 → ターゲット JST 22:00 = 3600秒後
     const result = calcAlarmSecondsOrThrow(22 * 60, 540, nowUtcMs);
     expect(result).toBe(3600);
   });

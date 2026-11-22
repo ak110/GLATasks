@@ -40,7 +40,6 @@ describe("共通ダイアログ", () => {
     expect(dialog).toHaveAttribute("open");
   });
   it("TabとShift+Tabを両端で循環させ、隠れた要素・disabled・inertを除く", async () => {
-    // DOM環境にレイアウトはないため、可視候補の矩形だけを補う。
     const rectangles = vi
       .spyOn(HTMLElement.prototype, "getClientRects")
       .mockReturnValue(
@@ -110,7 +109,6 @@ describe("共通ダイアログ", () => {
       )
         event.preventDefault();
     });
-    // 実際の破棄確認と同じく、後で開く内側のDOM配置を外側より前に用意する。
     const innerTarget = document.createElement("div");
     document.body.appendChild(innerTarget);
     const outer = render(Dialog, {
@@ -238,7 +236,6 @@ describe("共通ダイアログ", () => {
             within(confirmation).getByRole("button", { name: "閉じる" }),
           ).toHaveFocus(),
         );
-        // 実装と同じく、DOM取り外しを伴う経路で復帰を検査する。
         if (order === "外側と内側を同時に閉じる") {
           unmountOuter?.();
           unmountOuter = undefined;

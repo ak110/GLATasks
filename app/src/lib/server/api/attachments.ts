@@ -1,7 +1,4 @@
 import { ApiError } from "../api-errors";
-/**
- * @fileoverview 添付ファイル関連API（追加・削除・ダウンロード・一覧紐づけ）
- */
 
 import { and, count, eq, inArray } from "drizzle-orm";
 
@@ -25,13 +22,6 @@ function toAttachmentMeta(row: Omit<typeof attachments.$inferSelect, "data">) {
 
 export type AttachmentMeta = ReturnType<typeof toAttachmentMeta>;
 
-/**
- * タスクへ添付ファイルを追加する。
- *
- * トランザクション内で親タスク行を `FOR UPDATE` でロックし、件数上限判定と挿入を
- * 排他制御する。同一タスクへの並行追加や `deleteList` による親タスク削除との
- * 競合を防ぐ。
- */
 export async function createAttachment(params: {
   userId: number;
   taskId: number;
@@ -93,13 +83,6 @@ export async function createAttachment(params: {
   });
 }
 
-/**
- * 添付ファイルを削除する。
- *
- * トランザクション内で親タスク行を `FOR UPDATE` でロックしてから削除する。
- * `createAttachment` の件数上限判定と同じ行をロック対象にすることで、
- * 削除と追加が競合しても不整合が生じない。
- */
 export async function deleteAttachment(params: {
   userId: number;
   attachmentId: number;
@@ -137,7 +120,6 @@ export async function deleteAttachment(params: {
   });
 }
 
-/** 添付ファイル本体をダウンロード用に取得する（所有権はタスク経由で確認する）。 */
 export async function downloadAttachment(params: {
   userId: number;
   attachmentId: number;
@@ -165,12 +147,6 @@ export async function downloadAttachment(params: {
   };
 }
 
-/**
- * 複数タスクの添付メタ情報をまとめて取得する。
- *
- * `data` 列は除外し、`task_id` ごとにグループ化した `Map` を返す。
- * タスク一覧APIから呼び出し、ペイロード肥大化を避ける。
- */
 export async function listAttachmentsForTasks(
   taskIds: number[],
   db: DbConnection = getDb(),

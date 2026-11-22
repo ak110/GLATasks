@@ -2,9 +2,6 @@
     import { untrack } from "svelte";
     import { dialogInputClass } from "#lib/components/ui/styles.ts";
     import Dialog from "#lib/components/dialogs/Dialog.svelte";
-    /**
-     * @fileoverview リスト統合ダイアログ（統合元リストの全タスクを統合先に移動）
-     */
 
     import type { ListInfo } from "#lib/types.ts";
 
@@ -35,12 +32,10 @@
     const sourceId = $derived(sourceList.id);
     const dialogOpen = $derived(open);
 
-    // 統合先の候補: アクティブなリスト（自分自身を除く）
     let targetCandidates = $derived(
         allLists.filter((l) => l.status === "active" && l.id !== sourceList.id),
     );
 
-    // 候補の再取得は編集中の選択や送信snapshotを変更しない。
     $effect(() => {
         void dialogSession;
         void sourceId;

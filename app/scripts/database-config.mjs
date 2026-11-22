@@ -1,4 +1,3 @@
-/** アプリと運用コマンドのDB接続URLを解決する。 */
 export function getDatabaseUrl() {
     const value = process.env.DATABASE_URL;
     if (!value) {

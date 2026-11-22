@@ -7,13 +7,6 @@
         grayButtonClass,
     } from "#lib/components/ui/styles.ts";
     import Dialog from "#lib/components/dialogs/Dialog.svelte";
-    /**
-     * @fileoverview 定期TODOスケジュール管理ダイアログ
-     *
-     * 指定リストのスケジュール一覧表示、新規追加・編集・削除の各操作を提供する。
-     * 一覧表示は `ScheduleList.svelte` へ、繰り返しルールの入力は
-     * `RecurrenceEditor.svelte` へ委譲する。
-     */
 
     import {
         createQuery,
@@ -44,9 +37,7 @@
 
     const schedules = $derived(schedulesQuery.data ?? []);
 
-    // 編集フォームの状態。null は非表示、"new" は新規追加、ScheduleInfo は編集対象
     let formTarget = $state<ScheduleInfo | "new" | null>(null);
-    // 一覧とeditorの切替はQueryを変えないため、描画後に通知resourceだけを照合する。
     $effect(() => {
         void formTarget;
         void reconcileVisibleQueryErrorToasts();

@@ -20,7 +20,6 @@ describe("ログアウト", () => {
       await expect(
         POST({ cookies: { delete: del } } as unknown as LogoutEvent),
       ).rejects.toMatchObject({ status: 302, location: "/auth/login" });
-      // `__Host-`のCookieは非Secureの削除が無視されるため、発行時と同じ属性で削除する
       expect(del).toHaveBeenCalledWith(expected, {
         path: "/",
         httpOnly: true,

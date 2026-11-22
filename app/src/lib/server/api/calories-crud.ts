@@ -1,5 +1,4 @@
 import { ApiError } from "../api-errors";
-/** 品目・記録・自動記録のCRUDとCSVの保存境界。DBとCSVの列名はそれぞれの形式を保つ。 */
 
 import { and, desc, eq, gte, isNotNull, lt, or, sql } from "drizzle-orm";
 import {
@@ -69,7 +68,6 @@ async function assertOwnedItem(userId: number, itemId: number): Promise<void> {
 }
 
 export async function getCalorieItems(userId: number) {
-  // SELECTの単一テーブル向け最適化による修飾除去を避け、相関先を品目のIDへ固定する。
   const itemId = sql`${calorieItems}.${sql.identifier(calorieItems.id.name)}`;
   const rows = await getDb()
     .select({
@@ -142,12 +140,6 @@ export async function updateCalorieItem(
   }
 }
 
-/**
- * 記録と自動記録のどちらからも使われていない品目を削除する
- *
- * 使われている品目を削除すると記録の品目名とkcalが失われるため、
- * 両テーブルの外部キー制約（ON DELETE RESTRICT）が拒否した削除を`calorie_item_in_use`として返す。
- */
 export async function deleteCalorieItem(
   userId: number,
   itemId: number,
@@ -166,12 +158,6 @@ export async function deleteCalorieItem(
   }
 }
 
-/**
- * ユーザーの記録を選ぶ条件（品目との外部結合と組で使う）
- *
- * 一時項目の記録は品目を参照しないため外部結合で残し、
- * 品目の記録はユーザー自身の品目を参照するものだけを対象とする。
- */
 export function ownRecordCondition(userId: number) {
   return and(
     eq(calorieRecords.user_id, userId),
@@ -232,11 +218,6 @@ export async function getAllCalorieRecords(
   return selectRecords(userId);
 }
 
-/**
- * 記録の品目参照または一時項目名を保存値へ変換する
- *
- * 一時項目名は品目表から検索しない。同名の品目があっても一時項目のまま保存し、掛け算の対象にしない。
- */
 async function recordTargetValues(
   userId: number,
   input: { itemId?: number; temporaryName?: string },
@@ -310,7 +291,6 @@ export async function deleteCalorieRecord(
     );
 }
 
-/** 開始日から終了日まで、各日の指定時刻に記録を1件ずつ追加する */
 export async function bulkCreateCalorieRecords(
   userId: number,
   input: BulkCreateCalorieRecordsInput,
@@ -336,7 +316,6 @@ export async function bulkCreateCalorieRecords(
   return { added: values.length };
 }
 
-/** 開始日の0時から終了日の翌日0時までにある、指定品目の記録を削除する */
 export async function bulkDeleteCalorieRecords(
   userId: number,
   input: BulkDeleteCalorieRecordsInput,
@@ -408,11 +387,6 @@ async function assertOwnedAutoRecord(
   if (rows.length === 0) throw new ApiError("calorie_auto_record_not_found");
 }
 
-/**
- * 自動記録設定の保存値を組み立てる。
- * 作成・変更のたびに次回時刻を`now`より後へ置き直すため、
- * OFFの間に過ぎた時刻はONへ戻しても遡って記録しない。
- */
 function autoRecordValues(input: CalorieAutoRecordInput, now: Date) {
   return {
     item_id: input.itemId,

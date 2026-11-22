@@ -1,10 +1,3 @@
-/**
- * @fileoverview OAuth 2.0 Authorization Server Metadata (RFC 8414)
- *
- * MCP クライアントがリソースサーバーから WWW-Authenticate で示された
- * Protected Resource Metadata 経由で本エンドポイントを発見する。
- */
-
 import { json } from "@sveltejs/kit";
 import {
   OAUTH_PATHS,

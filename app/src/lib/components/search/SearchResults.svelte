@@ -2,12 +2,6 @@
     import { taskTextColor } from "#lib/task-colors.ts";
     import NotesExpandButton from "#lib/components/tasks/NotesExpandButton.svelte";
     import { grayButtonClass } from "#lib/components/ui/styles.ts";
-    /**
-     * @fileoverview 検索結果表示コンポーネント
-     *
-     * 全文検索の結果をリスト別グループで表示する。
-     * 各タスクの notes の折りたたみ状態と clamp 検知を内包する。
-     */
 
     import { SvelteSet } from "svelte/reactivity";
     import type { SearchTaskResult } from "#lib/types.ts";
@@ -15,19 +9,15 @@
     import { linkify } from "#lib/client/search/linkify.ts";
 
     interface Props {
-        /** 現在の検索クエリ（見出し表示用） */
         query: string;
-        /** 検索結果をリスト id でグループ化したマップ */
         searchResultsByList: Map<
             number,
             { title: string; tasks: SearchTaskResult[] }
         >;
-        /** 検索クエリ実行中フラグ */
         isLoading: boolean;
         error?: string;
         queryErrorKey?: string;
         onRetry?: () => void;
-        /** リスト見出しまたはタスクをクリックしたときのコールバック。タスクの時だけ taskId を渡す */
         onGoToResult: (listId: number, taskId?: number) => void;
     }
 
@@ -41,9 +31,7 @@
         onGoToResult,
     }: Props = $props();
 
-    // notes のクランプ状態（scrollHeight > clientHeight になっている id セット）
     let clampedNotes = new SvelteSet<number>();
-    // ユーザーが明示的に展開した id セット
     let expandedNotes = new SvelteSet<number>();
 
     function toggleExpand(taskId: number) {
@@ -51,7 +39,6 @@
         else expandedNotes.add(taskId);
     }
 
-    /** clampDetector アクション用コールバックを task id ごとに生成 */
     function makeClampCallback(taskId: number) {
         return (isClamped: boolean) => {
             if (isClamped) clampedNotes.add(taskId);
@@ -60,7 +47,6 @@
     }
 </script>
 
-<!-- 検索結果見出し -->
 <div
     class="border-b border-gray-200 bg-blue-50 px-4 py-3 dark:border-gray-700 dark:bg-blue-900/30"
 >
@@ -105,7 +91,6 @@
             >
                 <div class="min-w-0 flex-1 wrap-break-word break-all">
                     {#if !task.title && task.notes}
-                        <!-- タイトルなし: notes を主表示として折りたたみ -->
                         <button
                             class="cursor-pointer text-left leading-tight {taskTextColor(
                                 task.status,

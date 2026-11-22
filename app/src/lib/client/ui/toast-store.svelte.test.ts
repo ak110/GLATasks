@@ -1,4 +1,3 @@
-/** エラートーストの自動消去までの表示時間が、文面の長さに応じて延びることを検証する。 */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/svelte";
 import { tick } from "svelte";
@@ -21,7 +20,6 @@ afterEach(() => {
 });
 
 describe("getToastDurationMs", () => {
-  // 境界値: 最短5秒を保つ長さ（33文字）と、それを超えて延びる長さ（34文字）
   it.each([
     { length: 0, expected: 5000 },
     { length: 33, expected: 5000 },

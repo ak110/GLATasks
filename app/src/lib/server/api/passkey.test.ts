@@ -77,7 +77,6 @@ describeDb("パスキーの認証と復旧の不変条件", () => {
   }
   it("本人確認後15分の境界・再確認・全操作の省略条件をserverで強制する", async () => {
     const f = await registered();
-    // DBの接続・タイムアウトは実時間のまま、JWTと期限判定の時計だけを固定する。
     vi.useFakeTimers({ toFake: ["Date"] });
     const start = Math.floor(Date.now() / 1000) * 1000;
     vi.setSystemTime(start);
@@ -131,7 +130,6 @@ describeDb("パスキーの認証と復旧の不変条件", () => {
       await expect(
         manageSecurity(f.user.id, f.jar.cookies, { action: "codes" }),
       ).resolves.toBeDefined();
-      // 省略認可は最後の認証手段の削除を許可するものではない。
       const disable = await manageSecurity(f.user.id, f.jar.cookies, {
         action: "prepareDisable",
       });
@@ -408,7 +406,6 @@ describeDb("パスキーの認証と復旧の不変条件", () => {
       throw new Error(
         "登録オプションがない。publicPasskeyのbeginRecoveryの戻り値を確認する。",
       );
-    // 取消後も同じ短期状態で新しい試行を開始できる。
     const retry = await publicPasskey(
       { action: "beginRecovery" },
       f.jar.cookies,
@@ -501,7 +498,6 @@ describeDb("パスキーの認証と復旧の不変条件", () => {
     expect(deleted.filter((r) => r.status === "fulfilled")).toHaveLength(1);
     expect((await listSecurity(f.user.id)).passkeys).toHaveLength(1);
     const password = "temporary-pass";
-    // 残った認証器を使う。削除結果から所有している鍵だけを選ぶ。
     const [remaining] = await getDb()
       .select()
       .from(passkeys)
@@ -590,8 +586,6 @@ describeDb("パスキーの認証と復旧の不変条件", () => {
     const legacy = await register(authenticator());
     expect(await names(legacy.user.id)).toEqual(["このブラウザー"]);
 
-    // 復旧後の登録
-    // 登録直後のセッションは本人確認の期限内のため、証明なしで復旧コードを発行できる。
     const reissued = await manageSecurity(google.user.id, google.jar.cookies, {
       action: "codes",
     });
@@ -625,7 +619,6 @@ describeDb("パスキーの認証と復旧の不変条件", () => {
     );
     expect(await names(google.user.id)).toEqual(["1Password"]);
 
-    // アカウント設定画面からの追加
     const add = await manageSecurity(unknown.user.id, unknown.jar.cookies, {
       action: "beginAdd",
     });

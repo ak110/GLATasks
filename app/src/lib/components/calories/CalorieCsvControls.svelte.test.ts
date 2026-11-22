@@ -1,7 +1,3 @@
-/**
- * @fileoverview カロリーCSVの解析エラー通知テスト
- */
-
 import {
   fireEvent,
   render,

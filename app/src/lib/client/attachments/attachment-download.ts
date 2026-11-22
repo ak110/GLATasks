@@ -1,14 +1,6 @@
-/**
- * @fileoverview 添付ファイルのダウンロード処理
- *
- * tRPCの`attachments.download`でbase64データを取得し、
- * Blob化してブラウザネイティブのダウンロード動作を発火する。
- */
-
 import { base64ToBytes } from "#lib/base64.ts";
 import { trpc } from "#lib/client/trpc.ts";
 
-/** 添付ファイルをダウンロードする */
 export async function downloadAttachment(attachmentId: number): Promise<void> {
   const { filename, mimeType, data } = await trpc.attachments.download.query({
     attachmentId,

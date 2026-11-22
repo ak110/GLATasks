@@ -1,7 +1,3 @@
-/**
- * @fileoverview サーバーサイド AES-GCM 暗号化（ブラウザ側と互換）
- */
-
 import { getEncryptKey } from "./env";
 
 async function getCryptoKey(usage: KeyUsage[]): Promise<CryptoKey> {
@@ -16,9 +12,6 @@ async function getCryptoKey(usage: KeyUsage[]): Promise<CryptoKey> {
   );
 }
 
-/**
- * オブジェクトを JSON 化して AES-GCM 暗号化し、base64 文字列で返す。
- */
 export async function encryptObject(obj: unknown): Promise<string> {
   const key = await getCryptoKey(["encrypt"]);
   const iv = globalThis.crypto.getRandomValues(new Uint8Array(12));
@@ -34,9 +27,6 @@ export async function encryptObject(obj: unknown): Promise<string> {
   return Buffer.from(full).toString("base64");
 }
 
-/**
- * base64 の AES-GCM 暗号文を復号して文字列で返す。
- */
 export async function decryptToString(ciphertext: string): Promise<string> {
   const key = await getCryptoKey(["decrypt"]);
   const data = new Uint8Array(Buffer.from(ciphertext, "base64"));

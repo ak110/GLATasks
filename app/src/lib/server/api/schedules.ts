@@ -1,10 +1,4 @@
 import { ApiError } from "../api-errors";
-/**
- * @fileoverview 定期TODOスケジュール関連API（一覧・作成・更新・削除）
- *
- * ユーザー操作起点のCRUDに限定する。発火処理（スケジュール評価・タスク生成・
- * last_fired更新）は `../scheduler.ts` へ分離する。
- */
 
 import { and, asc, eq, min } from "drizzle-orm";
 import type { z } from "zod";
@@ -19,13 +13,11 @@ import { parseTags, serializeTags, toUtcIso, getOwnedList } from "./common";
 
 export type ScheduleInfo = ReturnType<typeof toScheduleInfo>;
 
-/** updateSchedule の data 引数型（UpdateScheduleSchema から scheduleId を除いた型） */
 type UpdateScheduleData = Omit<
   z.infer<typeof UpdateScheduleSchema>,
   "scheduleId"
 >;
 
-/** DB の schedule 行を ScheduleInfo に変換する */
 function toScheduleInfo(row: typeof schedules.$inferSelect) {
   return {
     id: row.id,
@@ -39,7 +31,6 @@ function toScheduleInfo(row: typeof schedules.$inferSelect) {
   };
 }
 
-/** スケジュールの所有権チェック（list 経由）。 */
 async function getOwnedSchedule(scheduleId: number, userId: number) {
   const db = getDb();
   const rows = await db
@@ -52,7 +43,6 @@ async function getOwnedSchedule(scheduleId: number, userId: number) {
   return rows[0]!.schedule;
 }
 
-/** 指定リストのスケジュール一覧を取得する */
 export async function listSchedules(
   userId: number,
   listId: number,
@@ -67,7 +57,6 @@ export async function listSchedules(
   return rows.map(toScheduleInfo);
 }
 
-/** スケジュールを作成する */
 export async function createSchedule(
   userId: number,
   input: z.infer<typeof CreateScheduleSchema>,
@@ -75,8 +64,6 @@ export async function createSchedule(
   await getOwnedList(input.listId, userId);
   const db = getDb();
   const now = new Date();
-  // リスト・タスクと同じく、既存最小値 - 1000 で先頭配置する
-  // （既存 schedule が無い場合は 0）
   const [{ minOrder }] = await db
     .select({ minOrder: min(schedules.sort_order) })
     .from(schedules)
@@ -103,7 +90,6 @@ export async function createSchedule(
   return toScheduleInfo(rows[0]!);
 }
 
-/** スケジュールを更新する（部分更新） */
 export async function updateSchedule(
   userId: number,
   scheduleId: number,
@@ -128,7 +114,6 @@ export async function updateSchedule(
   return toScheduleInfo(rows[0]!);
 }
 
-/** スケジュールを削除する */
 export async function deleteSchedule(
   userId: number,
   scheduleId: number,

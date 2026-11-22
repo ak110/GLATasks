@@ -10,10 +10,6 @@
     } from "#lib/components/ui/styles.ts";
     import type { Proof } from "./verification.ts";
 
-    /**
-     * 本人確認の期限を過ぎた状態で操作を押した時に、その操作の直前で本人確認を求める。
-     * onVerifyは証明を使う最初の操作を実行し、失敗をこのダイアログ内に示して再入力させる。
-     */
     interface Props {
         open: boolean;
         passwordEnabled: boolean;
@@ -30,7 +26,6 @@
     let passwordEl = $state<HTMLInputElement | null>(null);
     const usePassword = $derived(passwordEnabled && method === "password");
 
-    // 開くたびに既定の方法と入力を初期化し、前回の失敗を持ち越さない。
     let prevOpen = $state(false);
     $effect(() => {
         if (open && !prevOpen) {

@@ -1,9 +1,6 @@
 <script lang="ts">
     import { createAttachmentInput } from "#lib/client/attachments/task-attachments.svelte.ts";
     import Dialog from "#lib/components/dialogs/Dialog.svelte";
-    /**
-     * @fileoverview タスク編集ダイアログ（内容編集・区分切替・タグ設定・リスト移動・完了状態変更）
-     */
 
     import type { AttachmentMeta, TagInfo } from "#lib/types.ts";
     import type { TaskEditSubmission } from "#lib/client/tasks/task-form-types.ts";
@@ -69,7 +66,6 @@
     let localTags = $state<TagInfo[]>([]);
     let localKind = $state<TaskEditSubmission["kind"]>("normal");
     let textareaEl = $state<HTMLTextAreaElement | null>(null);
-    // 未保存変更がある状態で閉じようとしたときの確認ダイアログ
     let confirmCloseOpen = $state(false);
     let saving = $state<{
         sessionId: number;
@@ -77,21 +73,14 @@
         snapshot: string;
     }>();
     let attachmentOperations = $state(0);
-    // ダイアログ本体へのファイルドラッグアンドドロップ中かどうか
     const attachmentInput = createAttachmentInput(handleAddAttachments);
 
-    // 未保存判定の基準値。本文・リスト・完了状態・タグの4項目について、
-    // ダイアログ初期化時または直近の保存後に同期された props を記録し、
-    // 現在の編集中値との差分から未保存フラグを派生させる
     let baselineText = $state("");
     let baselineMoveTo = $state("");
     let baselineCompleted = $state(false);
-    // タグは順序込みで比較したいため JSON 文字列化して扱う
     let baselineTagsKey = $state("[]");
     let baselineKind = $state<TaskEditSubmission["kind"]>("normal");
 
-    // 添付一覧はダイアログ内の編集状態として保持し、追加・削除の更新処理成功後に
-    // onAttachmentChange 経由で親側キャッシュが更新され次第、プロパティ経由で反映する
     let localAttachments = $state<AttachmentMeta[]>([]);
     $effect(() => {
         if (!open) return;
@@ -123,7 +112,6 @@
             saving = undefined;
             attachmentOperations = 0;
             thumbnails.close();
-            // tick 後にフォーカス
             queueMicrotask(() => textareaEl?.focus());
         }
         prevOpen = open;
@@ -131,8 +119,6 @@
         prevTaskId = taskId;
     });
 
-    // 開いた瞬間と、open のまま親が保存後の値を同期してきたタイミングで baseline を取り直す。
-    // 失敗時は親側で props を更新しないため baseline も更新されず、未保存のまま扱われる
     $effect(() => {
         if (!open) return;
         baselineText = text;
@@ -154,11 +140,6 @@
 
     async function handleSubmit(closeAfter: boolean) {
         if (saving || !open) return;
-        // 保存ボタンの役割分担:
-        // - 「保存」（closeAfter=false）: 編集続行用。同一リスト内編集では並び順を維持する
-        // - 「保存して閉じる」（closeAfter=true）: 同一リスト内編集では並び順を更新して閉じる
-        // リスト変更を伴う場合は両ボタンとも移動先リストの先頭へ配置される（サーバー仕様）。
-        // keepOrder の値は呼び出し側で closeAfter から決定する
         const request = { sessionId, taskId, snapshot: inputSnapshot() };
         saving = request;
         const data: TaskEditSubmission = {
@@ -205,14 +186,12 @@
         }
     }
 
-    /** ファイル群を順次アップロードする（`<input type="file">`経路とドラッグアンドドロップ経路の共通処理） */
     async function uploadFiles(files: FileList | File[]) {
         const targetTaskId = taskId;
         const targetSessionId = sessionId;
         const attachmentChange = onAttachmentChange;
         attachmentOperations += 1;
         try {
-            // 複数ファイル選択時は順次アップロードする（並列は不要）
             for (const file of Array.from(files)) {
                 try {
                     await uploadAttachment(targetTaskId, file);
@@ -249,7 +228,6 @@
         const attachmentChange = onAttachmentChange;
         attachmentOperations += 1;
         try {
-            // ダイアログを閉じた後も削除は続くため、自動再読み込みが中断しないよう保存中として数える
             await trackPendingWrite(() =>
                 trpc.attachments.delete.mutate({ attachmentId }),
             );

@@ -1,7 +1,3 @@
-/**
- * @fileoverview タグの色割り当てロジックのテスト
- */
-
 import { describe, it, expect } from "vitest";
 import type { TagInfo } from "./types";
 import { TAG_COLOR_KEYS } from "./types";

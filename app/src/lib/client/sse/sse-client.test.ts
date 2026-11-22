@@ -1,12 +1,5 @@
-/**
- * @fileoverview SSE クライアントのユニットテスト
- *
- * EventSource は環境に存在しないためモックを注入する。
- */
-
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-/** EventSource モック: addEventListener / dispatch / readyState を最小実装 */
 class MockEventSource {
   static CONNECTING = 0 as const;
   static OPEN = 1 as const;
@@ -30,7 +23,6 @@ class MockEventSource {
     arr.push(cb);
   }
 
-  /** テスト用: 指定タイプのイベントを発火する。lastEventIdも与えられる */
   dispatch(type: string, data: string = "", lastEventId: string = ""): void {
     const event = { data, lastEventId } as MessageEvent;
     for (const cb of this.listeners.get(type) ?? []) cb(event);
@@ -45,7 +37,6 @@ describe("sse-client", () => {
   beforeEach(() => {
     vi.resetModules();
     MockEventSource.instances = [];
-    // 既存の EventSource 型と衝突するため unknown 経由で差し替える
     (
       globalThis as unknown as { EventSource: typeof MockEventSource }
     ).EventSource = MockEventSource;
@@ -58,8 +49,6 @@ describe("sse-client", () => {
   });
 
   it("connected イベント受信時に queryClient.resetQueries を呼ぶ", async () => {
-    // 切断中に取りこぼしたかもしれない更新を取り直すため、初回接続および
-    // EventSource の自動再接続のたびに全クエリーを reset する。
     const { connect, disconnect } =
       await import("#lib/client/sse/sse-client.ts");
     const reset = vi.fn().mockResolvedValue(undefined);
@@ -71,11 +60,9 @@ describe("sse-client", () => {
     expect(MockEventSource.instances.length).toBe(1);
 
     const es = MockEventSource.instances[0];
-    // 1回目 (初回接続)
     es.dispatch("connected", String(Date.now()));
     expect(reset).toHaveBeenCalledTimes(1);
 
-    // 2回目 (再接続シミュレーション): 同じ listener が再発火する
     es.dispatch("connected", String(Date.now()));
     expect(reset).toHaveBeenCalledTimes(2);
 
@@ -93,7 +80,6 @@ describe("sse-client", () => {
     const serverMs = Date.now() + 5000;
     MockEventSource.instances[0].dispatch("connected", String(serverMs));
 
-    // オフセットは ±数 ms の誤差があるため範囲で確認
     const { getServerOffset } = await import("#lib/client/timers/time-sync.ts");
     const offset = getServerOffset();
     expect(offset).toBeGreaterThan(4900);
@@ -102,9 +88,6 @@ describe("sse-client", () => {
     disconnect();
   });
 
-  // 同値分割: 経過時間（閾値内 / 閾値超過）
-  // 境界値: 74秒（閾値直前）・75秒（閾値ちょうど）・76秒（閾値直後）
-  // 閾値75秒以上で強制再接続が発火し、新規 EventSource が生成される
   it.each([
     { label: "74秒（閾値直前）", elapsedMs: 74_000, shouldReconnect: false },
     {
@@ -129,11 +112,9 @@ describe("sse-client", () => {
       connect(queryClient);
       expect(MockEventSource.instances.length).toBe(1);
 
-      // 経過時間ぶんシステム時刻を進めて健全性チェックを呼ぶ
       vi.setSystemTime(baseTime + elapsedMs);
       checkConnection();
 
-      // 強制再接続時は新規 EventSource が生成されるため instances が増える
       const expectedInstances = shouldReconnect ? 2 : 1;
       expect(MockEventSource.instances.length).toBe(expectedInstances);
 
@@ -141,9 +122,6 @@ describe("sse-client", () => {
     },
   );
 
-  // 同値分割: 接続状態（CONNECTING / OPEN / CLOSED）
-  // error イベント発火時、CLOSED のときのみ強制再接続する
-  // （CONNECTING/OPEN ではブラウザの自動再接続に委ねる）
   it.each([
     {
       label: "CONNECTING",
@@ -184,8 +162,6 @@ describe("sse-client", () => {
   );
 
   it("reset イベント受信時に全クエリーを reset する", async () => {
-    // バッファ外れやサーバー再起動時、サーバーが reset を送出する。
-    // クライアントは connected と同等の全クエリーresetで整合性を回復する。
     const { connect, disconnect } =
       await import("#lib/client/sse/sse-client.ts");
     const reset = vi.fn().mockResolvedValue(undefined);
@@ -203,8 +179,6 @@ describe("sse-client", () => {
   });
 
   it("reset イベント受信後の再接続URLには lastEventId パラメータを付けない", async () => {
-    // reset 受信時に保持中の lastEventId をクリアし、次回再接続を connected 経路へ戻す。
-    // これにより、サーバー側バッファ復元不能時に reset が返り続けるループを避ける。
     const { connect, disconnect } =
       await import("#lib/client/sse/sse-client.ts");
     const queryClient = {
@@ -214,12 +188,9 @@ describe("sse-client", () => {
     connect(queryClient);
     const es1 = MockEventSource.instances[0];
 
-    // 先に有効なIDを受信して保持させる
     es1.dispatch("connected", String(Date.now()), "5");
-    // reset 受信で lastEventId をクリア
     es1.dispatch("reset", "", "");
 
-    // 強制再接続を発火させる
     es1.readyState = MockEventSource.CLOSED;
     es1.dispatch("error");
 
@@ -241,11 +212,6 @@ describe("sse-client", () => {
     disconnect();
   });
 
-  // 同値分割: 受信イベントのID保持パターン
-  // - 有効なID付き: 保持してURLに反映
-  // - 空文字ID: 維持（更新しない）
-  // - lastEventId プロパティ自体が欠落: 維持
-  // 再接続時のURLに反映するため、forceReconnect 経由で2つ目のEventSourceのURLを観測する
   it.each([
     {
       label: "有効なID付き",
@@ -282,7 +248,6 @@ describe("sse-client", () => {
         es1.dispatch("connected", String(Date.now()), id);
       }
 
-      // forceReconnect を発火するため CLOSED の error を起こす
       es1.readyState = MockEventSource.CLOSED;
       es1.dispatch("error");
 
@@ -293,9 +258,6 @@ describe("sse-client", () => {
     },
   );
 
-  // 同値分割: 初回接続フェーズの経過時間（閾値以内 / 閾値超過）
-  // 境界値: 9秒（直前）・10秒（境界）・11秒（直後）
-  // `"initial"` 状態のまま閾値10秒に達した時点で `"unhealthy"` へ遷移する
   it.each([
     { label: "9秒（直前）", elapsedMs: 9_000, expectUnhealthy: false },
     { label: "10秒（境界）", elapsedMs: 10_000, expectUnhealthy: true },
@@ -320,9 +282,6 @@ describe("sse-client", () => {
     },
   );
 
-  // 同値分割: 接続後フェーズの受信途絶経過時間（閾値以内 / 閾値超過）
-  // 境界値: 59秒（直前）・60秒（境界）・61秒（直後）
-  // イベント受信で `"healthy"` に遷移後、閾値60秒に達した時点で `"unhealthy"` へ遷移する
   it.each([
     { label: "59秒（直前）", elapsedMs: 59_000, expectUnhealthy: false },
     { label: "60秒（境界）", elapsedMs: 60_000, expectUnhealthy: true },
@@ -348,10 +307,6 @@ describe("sse-client", () => {
     },
   );
 
-  // 健全性状態の遷移パターン
-  // - `"initial"` → 受信 → `"healthy"`
-  // - `"healthy"` → 受信途絶60秒 → `"unhealthy"`
-  // - `"unhealthy"` → 受信 → `"healthy"`
   it.each([
     {
       label: "initial → 受信 → healthy",
@@ -399,8 +354,6 @@ describe("sse-client", () => {
   });
 
   it("イベント受信で不健全判定タイマーが60秒へリセットされる", async () => {
-    // 接続から9秒経過後、heartbeat 受信で60秒タイマーへ切り替わる。
-    // その後さらに60秒経過するまで unhealthy 遷移しないことを境界値で確認する。
     vi.useFakeTimers();
     const { connect, disconnect, getHealth } =
       await import("#lib/client/sse/sse-client.ts");
@@ -412,15 +365,12 @@ describe("sse-client", () => {
     await vi.advanceTimersByTimeAsync(9_000);
     expect(getHealth()).toBe("initial");
 
-    // 受信で healthy へ遷移し、60秒タイマーへ切り替わる
     MockEventSource.instances[0].dispatch("heartbeat");
     expect(getHealth()).toBe("healthy");
 
-    // さらに59秒経過 → healthy 維持（10秒タイマーが残っていたら unhealthy になるはず）
     await vi.advanceTimersByTimeAsync(59_000);
     expect(getHealth()).toBe("healthy");
 
-    // 60秒経過 → unhealthy
     await vi.advanceTimersByTimeAsync(1_000);
     expect(getHealth()).toBe("unhealthy");
 
@@ -428,8 +378,6 @@ describe("sse-client", () => {
   });
 
   it("connect 前後で同一イベントを購読しても各ハンドラーは1回ずつ呼ばれる", async () => {
-    // connect 前後どちらで購読しても、各購読者は受信ごとに1回だけ呼ばれることを確認する。
-    // 配送はイベント種別ごとの単一ディスパッチャーへ集約され、多重配送されない。
     const { connect, subscribe, disconnect } =
       await import("#lib/client/sse/sse-client.ts");
     const queryClient = {
@@ -439,17 +387,14 @@ describe("sse-client", () => {
     const cbBeforeConnect = vi.fn();
     const cbAfterConnect = vi.fn();
 
-    // connect 前に購読（onMount の子→親順で connect より先に実行される経路）
     subscribe("tasks:updated", cbBeforeConnect);
     connect(queryClient);
-    // connect 後に同一イベントを購読（ページ再訪などで connect 後に実行される経路）
     const unsubAfter = subscribe("tasks:updated", cbAfterConnect);
 
     MockEventSource.instances[0].dispatch("tasks:updated", "src-tab");
     expect(cbBeforeConnect).toHaveBeenCalledTimes(1);
     expect(cbAfterConnect).toHaveBeenCalledTimes(1);
 
-    // 解除後の購読者は配送対象から外れ、残る購読者のみ呼ばれる
     unsubAfter();
     MockEventSource.instances[0].dispatch("tasks:updated", "src-tab");
     expect(cbBeforeConnect).toHaveBeenCalledTimes(2);
@@ -459,8 +404,6 @@ describe("sse-client", () => {
   });
 
   it("heartbeat イベント受信でウォッチドッグの最終受信時刻が更新される", async () => {
-    // heartbeat 受信時刻が最終受信時刻として記録され、
-    // 以降のウォッチドッグ判定基準時刻となる。
     vi.useFakeTimers();
     const baseTime = new Date("2026-01-01T00:00:00Z").getTime();
     vi.setSystemTime(baseTime);
@@ -474,16 +417,13 @@ describe("sse-client", () => {
     connect(queryClient);
     const es = MockEventSource.instances[0];
 
-    // 60秒後に heartbeat 受信 → 最終受信時刻が更新される
     vi.setSystemTime(baseTime + 60_000);
     es.dispatch("heartbeat", String(baseTime + 60_000));
 
-    // さらに 60秒経過（heartbeat からは 60秒 < 75秒）→ 再接続しない
     vi.setSystemTime(baseTime + 120_000);
     checkConnection();
     expect(MockEventSource.instances.length).toBe(1);
 
-    // heartbeat からさらに 15秒（合計 75秒）経過 → 再接続する
     vi.setSystemTime(baseTime + 60_000 + 75_000);
     checkConnection();
     expect(MockEventSource.instances.length).toBe(2);

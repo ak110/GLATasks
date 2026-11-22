@@ -1,6 +1,5 @@
 import type { ShowType } from "#lib/schemas.ts";
 
-/** アーカイブ表示では、アクティブなリスト内のアーカイブ済みタスクも対象にする。 */
 export function matchesShowType(
   status: string,
   showType: ShowType,

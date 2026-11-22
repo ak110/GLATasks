@@ -1,9 +1,3 @@
-/**
- * @fileoverview `describeSchedule` の日本語要約文生成のユニットテスト
- *
- * DBアクセスを伴わない純粋関数のテストのため、vitest実行のみで完結する。
- */
-
 import { describe, expect, it } from "vitest";
 import { describeSchedule } from "./schedule-utils";
 

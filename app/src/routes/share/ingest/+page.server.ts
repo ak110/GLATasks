@@ -1,7 +1,3 @@
-/**
- * @fileoverview 共有タスク追加ページのサーバーサイド処理
- */
-
 import { fail, redirect } from "@sveltejs/kit";
 import * as operations from "#lib/server/operations/index.ts";
 import { getErrorStatus, getPublicError } from "#lib/server/api-errors.ts";
@@ -12,7 +8,6 @@ import type { Actions, PageServerLoad } from "./$types";
 export const load: PageServerLoad = async ({ locals, url, fetch }) => {
   if (!locals.user_id) redirect(302, "/auth/login");
   const [initialText, lists] = await Promise.all([
-    // X投稿は投稿者名と本文（日本語訳）を外部サービスから補う。失敗しても共有元の内容で画面を開く。
     buildShareInitialText(
       {
         title: url.searchParams.get("title") ?? "",
@@ -21,7 +16,6 @@ export const load: PageServerLoad = async ({ locals, url, fetch }) => {
       },
       {
         fetch,
-        // 取得失敗はどれも共有元の内容や原文で続行し、運用者の対応を要さないため、診断用の情報として記録する。
         log: (message) => console.info(`[share/ingest] ${message}`),
       },
     ),
@@ -54,8 +48,6 @@ export const actions: Actions = {
       return fail(getErrorStatus(e), { error: getPublicError(e).message });
     }
 
-    // Chrome拡張のポップアップは本画面をiframeへ埋め込む。メイン画面は拡張からの埋め込みを許可しないため、
-    // 転送するとブラウザーが表示を拒否する。ポップアップでは同じ画面で追加結果を表示する。
     if (url.searchParams.get("in_popup") === "1") {
       return { added: { listId } };
     }

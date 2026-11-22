@@ -2,18 +2,11 @@ import { requireBoundingBox } from "./common";
 import { expect, type Page } from "@playwright/test";
 import { openStubbedPage } from "./translate-page";
 export { requireBoundingBox } from "./common";
-/**
- * @fileoverview 画面横断のスクロール境界テスト用ヘルパー
- *
- * ヘッダーを配置する各画面の遷移と、文書ルート・スクロール領域の寸法取得を共通化する。
- */
 
-/** 共通ヘッダーを配置する画面 */
 export const PAGE_NAMES = ["tasks", "timers", "translate", "calories"] as const;
 
 export type PageName = (typeof PAGE_NAMES)[number];
 
-/** 指定した画面を開き、ヘッダーの描画完了まで待つ */
 export async function openPage(page: Page, name: PageName): Promise<void> {
   if (name === "translate") {
     // ブラウザ内蔵AI APIはPlaywright同梱のChromiumに存在しないため、スタブを注入して開く
@@ -28,7 +21,6 @@ export async function openPage(page: Page, name: PageName): Promise<void> {
   await expect(page.getByTestId("theme-toggle")).toBeVisible();
 }
 
-/** 文書ルートの`scrollHeight`から`clientHeight`を引いた値を返す */
 export function getRootOverflow(page: Page): Promise<number> {
   return page.evaluate(() => {
     const root = document.scrollingElement;
@@ -37,7 +29,6 @@ export function getRootOverflow(page: Page): Promise<number> {
   });
 }
 
-/** ヘッダー下のスクロール領域が内部でスクロールし、文書ルートが動かないことを確認する */
 export async function verifyScrollAreaScrollsAlone(page: Page): Promise<void> {
   const scrollArea = page.getByTestId("page-scroll-area");
   const dimensions = await scrollArea.evaluate((element) => ({

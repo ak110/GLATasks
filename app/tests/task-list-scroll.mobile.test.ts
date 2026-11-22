@@ -10,9 +10,6 @@ import {
   verifyTaskAdditionScrollsToTop,
   verifyTaskListInternalScroll,
 } from "./helpers/task-list-scroll";
-/**
- * @fileoverview モバイル表示におけるタスク一覧の内部スクロール回帰テスト
- */
 
 const LIST_NAME = `モバイルスクロール_${uniqueTestName("e2e")}`;
 

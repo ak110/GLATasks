@@ -3,8 +3,6 @@ import os from "node:os";
 import path from "node:path";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-// 更新トークンの検証は署名鍵をDATA_DIRへ作成する。make test-dbのようにDATABASE_URLがある実行で
-// 作業ツリーの既定の保存先へ書かないよう、ルートを読み込む前に一時ディレクトリを指定する
 const dataDir = fs.mkdtempSync(
   path.join(os.tmpdir(), "glatasks-oauth-endpoints-"),
 );
@@ -58,10 +56,6 @@ function event(params: Record<string, string> = {}, decision = "allow") {
   } as Parameters<typeof load>[0];
 }
 
-/**
- * `error_description`が理由と次の操作の2文を持ち、RFC 6749 5.2の文字種に収まることを確かめる。
- * 次の操作は動詞で始まる2文目以降として現れる。
- */
 function expectDescriptionWithNextAction(description: unknown) {
   expect(typeof description).toBe("string");
   const text = description as string;

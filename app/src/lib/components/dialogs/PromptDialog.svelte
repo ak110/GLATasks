@@ -1,15 +1,6 @@
 <script lang="ts">
     import { dialogInputClass } from "#lib/components/ui/styles.ts";
     import Dialog from "#lib/components/dialogs/Dialog.svelte";
-    /**
-     * @fileoverview 入力ダイアログ（globalThis.prompt の代替）
-     *
-     * OK/Cancelボタンを持つため `onCancel`/`onSubmit` 命名を採用している。
-     * 既存の `onClose`/`onSubmit` 命名（TaskEditDialog等）とは意図的に分離している。
-     */
-
-    // タイトルあり時は <h2> の id を aria-labelledby で参照し、
-    // タイトルなし時は aria-label でフォールバックする
 
     interface Props {
         open: boolean;
@@ -21,7 +12,6 @@
         cancelLabel?: string;
         onSubmit: (value: string) => void | Promise<void>;
         onCancel: () => void;
-        /** バリデーター。エラーメッセージを返す。問題なければ null を返す */
         validator?: (value: string) => string | null;
     }
 
@@ -43,8 +33,6 @@
 
     const validationError = $derived(validator ? validator(inputValue) : null);
 
-    // open が偽から真へ遷移した瞬間にローカル状態を初期化し、input へフォーカスを移す
-    // $state にすることで $effect の依存追跡が正しく機能する
     let prevOpen = $state(false);
     $effect(() => {
         if (open && !prevOpen) {

@@ -1,13 +1,8 @@
-/**
- * @fileoverview 認証フロー（ログイン・ログアウト・登録）の e2e テスト
- */
-
 import { test, expect } from "@playwright/test";
 
 const TEST_USER = "e2etest";
 const TEST_PASSWORD = "e2etestpass123";
 
-// 未ログイン状態のテスト（storageState を空にして実行）
 test.describe("未ログイン状態", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
@@ -77,7 +72,6 @@ test.describe("未ログイン状態", () => {
     await page.goto("/auth/login");
     await page.fill('[name="user"]', TEST_USER);
     await page.fill('[name="password"]', TEST_PASSWORD);
-    // SvelteKit form action による POST → 303 リダイレクト → "/" の遷移を待つ
     await Promise.all([
       page.waitForURL("/"),
       page.click('button[type="submit"]'),
@@ -85,7 +79,6 @@ test.describe("未ログイン状態", () => {
   });
 
   test("未ログインで開いた画面へ、ログイン後に戻る", async ({ page }) => {
-    // Chrome拡張のポップアップはタスク追加画面を埋め込み、ログイン後もこの画面を表示し続ける必要がある
     await page.goto("/share/ingest?text=e2e&in_popup=1");
     await expect(page).toHaveURL(/\/auth\/login\?returnTo=/);
     await page.fill('[name="user"]', TEST_USER);
@@ -99,7 +92,6 @@ test.describe("未ログイン状態", () => {
   test("登録画面を経由してログインしても、未ログインで開いた画面へ戻る", async ({
     page,
   }) => {
-    // ポップアップ内でも登録画面を経由してからログインする利用があり、戻り先を失うと埋め込めない画面へ移る
     await page.goto("/share/ingest?text=e2e&in_popup=1");
     await expect(page).toHaveURL(/\/auth\/login\?returnTo=/);
     await page.getByRole("link", { name: "登録" }).click();
@@ -129,7 +121,6 @@ test.describe("未ログイン状態", () => {
   });
 });
 
-// ログイン済み状態のテスト（storageState を使用）
 test.describe("ログイン済み状態", () => {
   test("ログアウトするとログインページへリダイレクト", async ({ page }) => {
     await page.goto("/");

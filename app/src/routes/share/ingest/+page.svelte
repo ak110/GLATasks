@@ -1,8 +1,4 @@
 <script lang="ts">
-    /**
-     * @fileoverview 共有タスク追加ページ（Chrome拡張・Android共有から利用）
-     */
-
     import type { ActionData, PageData } from "./$types";
 
     interface Props {

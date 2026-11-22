@@ -1,11 +1,4 @@
 <script lang="ts">
-    /**
-     * @fileoverview ヘッダー下のスクロール領域
-     *
-     * ルートレイアウトの縦flexの残り高を占め、内側だけをスクロールさせる。
-     * `Header.svelte`を置く画面のページ本体は、最上位要素としてこのコンポーネントを使う。
-     */
-
     import type { Snippet } from "svelte";
 
     interface Props {

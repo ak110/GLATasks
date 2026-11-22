@@ -1,10 +1,3 @@
-/**
- * @fileoverview 他オリジンからの更新要求の拒否と、画面の埋め込み制限を稼働中のアプリへのHTTP要求で確かめるe2eテスト
- *
- * `hooks.server.test.ts`は`handle`を直接呼ぶため、フレームワークの版更新や設定変更でhookが実行経路から外れても成功する。
- * 本テストはSvelteKitのルーティングとhookを通った応答だけを判定し、`app/src/routes`の全ルートを対象にする。
- */
-
 import { expect, test } from "@playwright/test";
 import {
   COOKIELESS_MUTATION_PATHS,
@@ -20,7 +13,6 @@ const STREAMING_PATHS = new Set(["/api/events"]);
 test("Cookieを読まない入口以外は、他オリジンからの更新要求を拒否する", async ({
   request,
 }) => {
-  // ログイン済みのCookieを持つ要求として送り、セッション認証の判定より前に拒否されることを確かめる
   const protectedRoutes = routes.filter(
     (pathname) => !COOKIELESS_MUTATION_PATHS.has(pathname),
   );

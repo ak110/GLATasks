@@ -11,10 +11,6 @@ import type {
   RegistrationResponseJSON,
 } from "@simplewebauthn/server";
 
-/**
- * DB試験では署名検証を差し替えず、試験が所有するソフトウェア認証器で署名する。
- * aaguidは登録応答に載せる提供元の識別子で、既定は提供元を示さないゼロ埋めとする。
- */
 export function authenticator(aaguid = "00000000-0000-0000-0000-000000000000") {
   const keys = generateKeyPairSync("ec", { namedCurve: "prime256v1" });
   const jwk = keys.publicKey.export({ format: "jwk" });

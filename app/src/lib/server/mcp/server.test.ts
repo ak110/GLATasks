@@ -1,7 +1,3 @@
-/**
- * @fileoverview MCP公開ツールの一覧と呼び出しの契約テスト
- */
-
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
@@ -47,10 +43,6 @@ const { sendEvent } = await import("../sse");
 
 type ToolKind = "readOnly" | "additive" | "destructive";
 
-/**
- * ツール名ごとの注釈の区分と入力プロパティ。
- * 区分は参照だけのツールを readOnly、追加だけのツールを additive、既存の状態を上書き・削除するツールを destructive とする。
- */
 const TOOL_CONTRACTS: Record<string, readonly [ToolKind, readonly string[]]> = {
   "lists.list": ["readOnly", ["showType"]],
   "lists.create": ["additive", ["title"]],
@@ -133,7 +125,6 @@ const EXPECTED_ANNOTATIONS: Record<ToolKind, Record<string, boolean>> = {
   destructive: { readOnlyHint: false, destructiveHint: true },
 };
 
-/** 用途が近く取り違えやすいため、説明で互いを名指しして使い分けを示すツールの組。 */
 const SIBLING_GROUPS = [
   ["tasks.list", "tasks.listActive", "tasks.search"],
   ["lists.archive", "lists.clear", "lists.delete", "lists.merge"],
@@ -147,7 +138,6 @@ const SIBLING_GROUPS = [
   ["calories.summary", "calories.listRecords", "calories.listItems"],
 ] as const;
 
-/** Claude Codeが初期送信でツール説明とinstructionsを切り詰める文字数。 */
 const MAX_DESCRIPTION_LENGTH = 4096;
 
 const AUTH_INFO: AuthInfo = {

@@ -4,12 +4,6 @@ import {
   cleanupTestList,
 } from "./helpers/common";
 import { test, expect, type Page } from "@playwright/test";
-/**
- * @fileoverview 定期TODOスケジュールのCRUD操作とダイアログ表示に関する e2e テスト
- *
- * 仮想時計やサーバー時刻操作には依存しない。発火タイミングの検証は行わない
- * （発火ロジックはサーバー側vitestの `scheduler.test.ts` が担当する）。
- */
 
 const LIST_NAME = `定期TODOテスト_${uniqueTestName("e2e")}`;
 
@@ -29,7 +23,6 @@ test.describe("schedule", () => {
     ]);
   });
 
-  /** リストの ⋮ メニューから「定期TODO」を選び、スケジュール管理ダイアログを開く */
   async function openScheduleDialog(page: Page) {
     const listRow = page
       .locator('[data-testid="list-item"]')
@@ -42,7 +35,6 @@ test.describe("schedule", () => {
     });
   }
 
-  /** 追加フォームを開き、タイトル入力 + 毎週月曜日の繰り返しルールで確定する */
   async function createWeeklySchedule(page: Page, title: string) {
     await page.click('[data-testid="schedule-add-btn"]');
     await page.fill('[data-testid="schedule-title-input"]', title);

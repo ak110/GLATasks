@@ -8,9 +8,6 @@ import {
   setupTestLists,
 } from "./helpers/common";
 import { test, expect, type Page, type Response } from "@playwright/test";
-/**
- * @fileoverview 検索表示種別と選択中リスト優先表示のe2eテスト
- */
 
 const STAMP = uniqueTestName("e2e");
 
@@ -294,7 +291,6 @@ test("アーカイブと検索をページ巡回し、条件変更とページ�
     await expect(pager).toContainText("1 / 2");
     await expect(lastResult).toHaveCount(0);
 
-    // 2ページ目の検索結果から選んだタスクを、アーカイブ一覧の同じページで操作する。
     await destination.fill("2");
     await destination.press("Enter");
     await lastResult.click();

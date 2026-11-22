@@ -77,10 +77,6 @@ const PROVIDER_NAMES: Readonly<Record<string, string>> = {
   "7c596f1a-3e42-4b8d-9a0f-5d2ce1b84493": "Cyclop Passkey",
 };
 
-/**
- * 登録したパスキーの名前を返す。
- * 対応表に無い識別子、ゼロ埋めの識別子、識別子が無い場合は、呼び出し元が渡すブラウザー名を使う。
- */
 export function passkeyName(
   aaguid: string | undefined,
   browserName: string,

@@ -138,7 +138,6 @@ describe("一括操作の最後に完了した結果", () => {
 });
 
 describe("送信後も欄に残る条件の、未保存の入力が無いとみなす値", () => {
-  // 自動の再読み込みの見送り判定（user-busy.ts）は、data-clean-valueと異なる欄だけを未保存の入力とみなす
   function cleanValues(kind: "create" | "delete") {
     const form = screen.getByTestId(`calorie-bulk-${kind}-form`);
     return ["開始日", "終了日", "品目"].map((label) => {

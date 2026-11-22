@@ -1,7 +1,3 @@
-/**
- * @fileoverview カロリー計算のCSV入出力
- */
-
 import Papa from "papaparse";
 
 import {
@@ -14,7 +10,6 @@ import {
 
 const ITEM_HEADERS = ["品目", "kcal", "備考"] as const;
 const RECORD_HEADERS = ["日時", "品目", "数量", "一時項目"] as const;
-/** 一時項目の列を持たない旧形式。全行を品目の記録として取り込む */
 const LEGACY_RECORD_HEADERS = ["日時", "品目", "数量"] as const;
 
 export type CalorieItemCsvExportRow = {

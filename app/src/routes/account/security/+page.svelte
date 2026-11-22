@@ -27,7 +27,6 @@
     let newPassword = $state("");
     let newPasswordConfirm = $state("");
     let passwordError = $state("");
-    // 入力の誤りがある欄。送信を止めた後、利用者がその欄から直せるように操作位置を移す。
     let passwordErrorField = $state<"new" | "confirm">();
     let newPasswordEl = $state<HTMLInputElement>();
     let newPasswordConfirmEl = $state<HTMLInputElement>();
@@ -43,7 +42,6 @@
     let message = $state("");
     let feedback: HTMLDivElement;
     let codesPanel = $state<HTMLDivElement>();
-    // 本人確認ダイアログで実行を待っている、証明を最初に使う操作。
     let pendingVerification = $state<{
         verify: (proof: Proof) => Promise<void>;
         cancel: () => void;
@@ -51,12 +49,6 @@
     const CANCELLED = Symbol("cancelled");
     const dateFormat = { dateStyle: "medium", timeStyle: "short" } as const;
 
-    /**
-     * 証明を最初に使う操作を実行する。
-     * 本人確認の期限内はそのまま実行し、期限切れの場合はダイアログで確認してから実行する。
-     * サーバーは最初の操作で証明を消費するため、失敗した場合はダイアログ内で再入力させる。
-     * キャンセルした場合はCANCELLEDを返し、呼び出し元は後続の手順を実行しない。
-     */
     function withProof<T>(
         step: (proof?: Proof) => Promise<T>,
     ): Promise<T | typeof CANCELLED> {
@@ -75,7 +67,6 @@
             };
         });
     }
-    /** 操作を実行し、成功時は操作が返した結果の文言を表示する。undefinedを返した操作は何も表示しない。 */
     async function run(operation: () => Promise<string | undefined>) {
         busy = true;
         error = "";
@@ -90,7 +81,6 @@
         } finally {
             busy = false;
             await tick();
-            // 発行後の保存欄や操作結果がスクロール外に追加されても、次の手順へ移れるようにする。
             (error || !codes.length ? feedback : codesPanel)?.focus();
         }
     }
@@ -110,7 +100,6 @@
         await manage({
             action: "finishAdd",
             response: await startRegistration({ optionsJSON: result.options }),
-            // 名前はサーバーが提供元の識別子から決め、判別できない場合にこのブラウザー名を使う。
             name: defaultPasskeyName(navigator.userAgent),
         });
         return "パスキーを追加しました。";
@@ -127,7 +116,6 @@
         if (result === CANCELLED) return;
         return "パスキーを削除しました。";
     }
-    /** 送信前に入力を検証し、誤りがあれば理由を示してその欄へ操作位置を移す。 */
     async function submitPassword() {
         if (!newPassword) {
             passwordError = "新しいパスワードを入力してください。";
@@ -172,8 +160,6 @@
         const result = await withProof((proof) =>
             manage({ action: "codes", proof }),
         );
-        // キャンセル・失敗では、無効化の保存待ちなど既存の状態を変えない。
-        // 再発行が成功した時点で表示中のコードは再発行分に置き換わるため、無効化の保存待ちを解除する。
         if (result === CANCELLED) return;
         disabling = false;
         return "新しい復旧コードを保存してください。";

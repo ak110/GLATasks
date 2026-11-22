@@ -1,7 +1,4 @@
 import { ApiError } from "../api-errors";
-/**
- * @fileoverview タイマー関連API（CRUD・開始・停止・リセット・調整・並び替え）
- */
 
 import { and, eq, max } from "drizzle-orm";
 import type { z } from "zod";
@@ -26,9 +23,6 @@ type TimerConnection =
   | ReturnType<typeof getDb>
   | Parameters<Parameters<ReturnType<typeof getDb>["transaction"]>[0]>[0];
 
-// ── 内部ヘルパー ──
-
-/** タイマーの所有権チェック */
 async function getOwnedTimer(
   timerId: number,
   userId: number,
@@ -44,7 +38,6 @@ async function getOwnedTimer(
   return rows[0];
 }
 
-// 保存値による条件検査と更新を同じ行ロック内で行い、別要求の遷移を上書きしない。
 async function changeTimer(
   userId: number,
   timerId: number,
@@ -62,10 +55,6 @@ async function changeTimer(
   });
 }
 
-/**
- * running 中のタイマーが 0 以下なら自動停止する。
- * 全クライアントが閉じていても DB の正しさを保証する。
- */
 async function autoStopIfExpired(
   timer: typeof timers.$inferSelect,
   db: TimerConnection,
@@ -73,7 +62,6 @@ async function autoStopIfExpired(
   const state = decodeTimerState(timer);
   const next = transitionTimer(state, { kind: "autoExpire" }, new Date());
   if (next === state) return timer;
-  // 期限切れ → 自動停止
   await db
     .update(timers)
     .set({
@@ -87,7 +75,6 @@ async function autoStopIfExpired(
   };
 }
 
-/** DB の timer 行を TimerInfo に変換する */
 function toTimerInfo(row: typeof timers.$inferSelect) {
   return {
     id: row.id,
@@ -106,9 +93,6 @@ function toTimerInfo(row: typeof timers.$inferSelect) {
   };
 }
 
-// テスト目的でexport。本来はモジュール内部関数。api.ts バレルからのre-exportは行わない。
-
-/** target_minutes と tz_offset から remaining_seconds を計算する（サーバー側 UTC 基準） */
 export function calcAlarmRemainingSeconds(
   targetMinutes: number,
   tzOffsetMinutes: number,
@@ -125,12 +109,6 @@ export function calcAlarmRemainingSeconds(
   return diffMinutes * 60 - nowLocalSeconds;
 }
 
-/**
- * アラームモード用の共通バリデーションと remaining_seconds 計算をまとめたヘルパー。
- *
- * target_minutes または tzOffsetMinutes が未指定の場合は alarm_missing_params を throw する。
- * 有効な場合は計算した remaining_seconds を返す。
- */
 export function calcAlarmSecondsOrThrow(
   targetMinutes: number | null | undefined,
   tzOffsetMinutes: number | null | undefined,
@@ -145,9 +123,6 @@ export function calcAlarmSecondsOrThrow(
   return calcAlarmRemainingSeconds(targetMinutes, tzOffsetMinutes, nowUtcMs);
 }
 
-// ── 公開API ──
-
-/** タイマー一覧取得 + サーバー時刻返却 */
 export async function listTimers(
   userId: number,
 ): Promise<{ timers: TimerInfo[]; serverTime: string }> {
@@ -158,7 +133,6 @@ export async function listTimers(
       .where(eq(timers.user_id, userId))
       .orderBy(timers.sort_order, timers.created)
       .for("update");
-    // 期限切れタイマーを自動停止
     const processed = await Promise.all(
       rows.map((timer) => autoStopIfExpired(timer, db)),
     );
@@ -169,7 +143,6 @@ export async function listTimers(
   });
 }
 
-/** タイマーを作成する（sort_order は既存の最大値 + 1000 で末尾追加） */
 export async function createTimer(params: CreateTimerParams): Promise<void> {
   const {
     userId,
@@ -189,7 +162,6 @@ export async function createTimer(params: CreateTimerParams): Promise<void> {
     ? calcAlarmRemainingSeconds(targetMinutes!, tzOffsetMinutes!, now.getTime())
     : baseSeconds;
   const db = getDb();
-  // 現在の最大 sort_order を取得
   const [{ maxOrder }] = await db
     .select({ maxOrder: max(timers.sort_order) })
     .from(timers)
@@ -213,7 +185,6 @@ export async function createTimer(params: CreateTimerParams): Promise<void> {
   });
 }
 
-/** タイマー設定を変更する */
 export async function updateTimer(
   userId: number,
   timerId: number,
@@ -227,7 +198,6 @@ export async function updateTimer(
       updates.adjust_minutes = data.adjustMinutes;
     if (data.ringSeconds !== undefined) updates.ring_seconds = data.ringSeconds;
 
-    // モード変更処理
     if (data.mode !== undefined && data.mode !== timer.mode) {
       if (state.kind === "running") throw new ApiError("timer_is_running");
       updates.mode = data.mode;
@@ -240,7 +210,6 @@ export async function updateTimer(
           now.getTime(),
         );
       } else {
-        // alarm → countdown
         if (data.baseSeconds === undefined)
           throw new ApiError("countdown_missing_base_seconds");
         updates.base_seconds = data.baseSeconds;
@@ -248,12 +217,10 @@ export async function updateTimer(
         updates.remaining_seconds = data.baseSeconds;
       }
     } else {
-      // モード変更なしの場合
       if (data.baseSeconds !== undefined)
         updates.base_seconds = data.baseSeconds;
       if (data.targetMinutes !== undefined) {
         updates.target_minutes = data.targetMinutes;
-        // アラームモードで target_minutes を変更した場合は remaining_seconds も再計算
         if (
           (data.mode ?? timer.mode) === "alarm" &&
           data.tzOffsetMinutes !== undefined
@@ -278,7 +245,6 @@ export async function updateTimer(
   });
 }
 
-/** タイマーを削除する */
 export async function deleteTimer(
   userId: number,
   timerId: number,
@@ -290,7 +256,6 @@ export async function deleteTimer(
     .where(and(eq(timers.id, timerId), eq(timers.user_id, userId)));
 }
 
-/** タイマーを開始する */
 export async function startTimer(
   userId: number,
   timerId: number,
@@ -312,7 +277,6 @@ export async function startTimer(
   });
 }
 
-/** タイマーを一時停止する */
 export async function pauseTimer(
   userId: number,
   timerId: number,
@@ -324,11 +288,6 @@ export async function pauseTimer(
   );
 }
 
-/**
- * タイマーをリセットする（トグル動作）。
- * - カウントダウン: running中 or 途中使用中 → base_seconds に戻す / base_seconds と一致 → 0 にクリア
- * - アラーム: 次のターゲット時刻までの秒数をサーバー側で再計算
- */
 export async function resetTimer(
   userId: number,
   timerId: number,
@@ -346,7 +305,6 @@ export async function resetTimer(
       );
     } else {
       const currentRemaining = Math.max(0, timerRemainingSeconds(state, now));
-      // トグルロジック: base_seconds と一致 → 0、それ以外 → base_seconds
       newRemaining =
         state.kind !== "running" && currentRemaining === timer.base_seconds
           ? 0
@@ -359,14 +317,12 @@ export async function resetTimer(
   });
 }
 
-/** タイマーの残り時間を延長/削減する */
 export async function adjustTimer(
   userId: number,
   timerId: number,
   minutes: number,
 ): Promise<void> {
   await changeTimer(userId, timerId, (timer, now) => {
-    // アラームモード: target_minutes も連動して更新
     const targetMinutesUpdate =
       timer.mode === "alarm" && timer.target_minutes !== null
         ? (((timer.target_minutes + minutes) % 1440) + 1440) % 1440
@@ -386,11 +342,6 @@ export async function adjustTimer(
   });
 }
 
-/**
- * タイマーを停止する（0秒到達時）。
- * startedAt が指定された場合、タイマーがリセット/再開されていないことを確認する。
- * これにより、遅延した stop リクエストが新しいセッションを上書きするのを防ぐ。
- */
 export async function stopTimer(
   userId: number,
   timerId: number,
@@ -407,7 +358,6 @@ export async function stopTimer(
   );
 }
 
-/** タイマーの残り時間を直接設定する（停止中のみ） */
 export async function setTimerTime(
   userId: number,
   timerId: number,
@@ -439,13 +389,11 @@ export async function setTimerTime(
   });
 }
 
-/** タイマーの並び順を更新する（全件一致を検証） */
 export async function reorderTimers(
   userId: number,
   timerIds: number[],
 ): Promise<void> {
   await getDb().transaction(async (db) => {
-    // ユーザーの全タイマーIDを取得して全件一致を検証
     const owned = await db
       .select({ id: timers.id })
       .from(timers)
@@ -458,8 +406,6 @@ export async function reorderTimers(
     ) {
       throw new ApiError("invalid_timer_ids");
     }
-    // timerIds の順に sort_order を 0, 1000, 2000... で再割当
-    // 依存関係のないタイマーを並列更新し、直列実行による RTT の線形増大を回避する
     await Promise.all(
       timerIds.map((id, i) =>
         db

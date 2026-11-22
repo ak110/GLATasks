@@ -56,7 +56,6 @@ mv -- "$staging" "$destination"
 staging=""
 echo "バックアップが完了しました: $destination"
 
-# 完成世代だけを古い順に削除する。生成中の隠しディレクトリは対象外。
 shopt -s nullglob
 generations=("$backup_root"/[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]_[0-9][0-9][0-9][0-9][0-9][0-9])
 remove_count=$((${#generations[@]} - keep))

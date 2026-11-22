@@ -1,7 +1,3 @@
-/**
- * @fileoverview Tanstack Query クライアント設定
- */
-
 import { browser } from "$app/env";
 import {
   QueryClient,
@@ -28,9 +24,6 @@ const queryCache = new QueryCache({
 });
 
 export const queryClient = new QueryClient({
-  // 個別 onError は既定の onError を上書きするが、Cache のグローバル onError は
-  // 個別処理の有無に左右されず全 query・mutation のエラーで必ず呼ばれる。
-  // エラー通知と接続の能動チェックをここへ集約し、保存失敗時の通知欠落を解消する。
   queryCache,
   mutationCache: new MutationCache({ onError: (error) => handleError(error) }),
   defaultOptions: {
@@ -40,22 +33,20 @@ export const queryClient = new QueryClient({
       // Node.jsプロセスが例外終了するため、取得はブラウザでだけ行う。
       // 個別にenabledを指定するqueryは、SSR時の初期状態で条件が偽になることを前提とする
       enabled: browser,
-      staleTime: 5 * 60 * 1000, // 5分間はキャッシュ有効
-      gcTime: 10 * 60 * 1000, // 10分間はガベージコレクション対象外
+      staleTime: 5 * 60 * 1000,
+      gcTime: 10 * 60 * 1000,
       refetchOnWindowFocus: "always",
       retry: 1,
     },
   },
 });
 
-// 認証画面を画面遷移なしで自動通過して回復した場合は、横取り中に失敗したqueryを取り直す。
 if (browser) {
   window.addEventListener(CONNECTIVITY_RECOVERED_EVENT, () => {
     void queryClient.invalidateQueries();
   });
 }
 
-// 画面到達で別Queryのobserverだけが変わる場合も、可視DOMのhashに対応する通知を回収する。
 queryCache.subscribe((event) => {
   if (event.type === "updated" && event.action.type === "success") {
     dismissQueryToast(event.query);
@@ -79,7 +70,6 @@ queryCache.subscribe((event) => {
   }
 });
 
-/** Query更新を伴わない表示切替でも、描画されたinlineへ自身の通知を集約する。 */
 export async function reconcileVisibleQueryErrorToasts(): Promise<void> {
   if (!browser) return;
   await tick();
@@ -121,7 +111,6 @@ function dismissQueryToast(query: object) {
   queryToasts.delete(query);
 }
 
-/** mutation等の失敗通知と接続確認（応答の横取りでは通知を省く。理由は`operation-error-notice.ts`） */
 function handleError(error: unknown): void {
   void (async () => {
     if (await shouldNotifyFailure()) showErrorToast(extractErrorMessage(error));

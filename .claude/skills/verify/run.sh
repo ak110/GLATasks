@@ -24,7 +24,6 @@ head=$(git rev-parse HEAD)
 [[ -z "$(git status --porcelain)" ]] ||
   fail "作業ツリーに未commitの変更か未追跡のファイルがあります（git status --short で確認できます）。" \
     "検証する変更をcommitし、作業ツリーの差分を無くしてから実行してください。"
-# 作業ツリーのパスはMakeの変数とComposeの--envへ引用符なしで渡るため、空白や記号を含むと分割・展開される。
 [[ "$PWD" =~ ^/[a-zA-Z0-9_./-]+$ ]] ||
   fail "主作業ツリーのパス $PWD に英数字・「_」「.」「/」「-」以外の文字があります。" \
     "これらの文字だけから成るパスへ主作業ツリーを置いてください。"
@@ -53,7 +52,6 @@ GID=$(id -g)
 export UID GID
 unset MAKEFLAGS MFLAGS MAKEFILES GNUMAKEFLAGS
 export CI=
-# Compose の interpolation にも .env の値でなく試験専用の設定を渡す。
 export COMPOSE_PROFILE=development DB_CREDENTIAL=glatasks
 status=0
 make test-e2e CI= COMPOSE_PROFILE=development DB_CREDENTIAL=glatasks E2E_VERIFY=1 \

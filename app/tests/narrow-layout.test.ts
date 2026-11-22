@@ -1,7 +1,3 @@
-/**
- * @fileoverview 狭い画面で長い名前と共通ヘッダーの操作が画面内に収まることの回帰テスト
- */
-
 import {
   expect,
   test,
@@ -27,16 +23,10 @@ import {
 const NARROW = { width: 320, height: 800 };
 const DESKTOP = { width: 1280, height: 800 };
 
-/** 分割できる位置を持たない長い名前を返す */
 function longName(prefix: string): string {
   return `${uniqueTestName(prefix)}_${"W".repeat(60)}`;
 }
 
-/**
- * 要素が表示幅の内側にあり、中心点のヒット判定が自身を返し、操作要素ならフォーカスできることを確かめる。
- * スクロール領域の内側の要素は先に表示位置へスクロールする。
- * 現在の画面を示すナビゲーション項目のような操作でない要素は`focusable: false`で渡す。
- */
 async function expectReachable(
   page: Page,
   target: Locator,
@@ -44,7 +34,6 @@ async function expectReachable(
 ): Promise<void> {
   await target.scrollIntoViewIfNeeded();
   await expect(target).toBeVisible();
-  // 横方向のスクロールで操作を表示位置へ移した場合は、操作が行の幅を超えた位置にある
   const scrolledHorizontally = await target.evaluate((element) => {
     for (let node = element.parentElement; node; node = node.parentElement) {
       if (node.scrollLeft !== 0) return true;
@@ -70,7 +59,6 @@ async function expectReachable(
   await expect(target).toBeFocused();
 }
 
-/** 名前の全文が要素の幅に収まり、名前を含む行やカードも横幅を超えないことを確かめる */
 async function expectFullName(name: Locator, container: Locator) {
   for (const element of [name, container]) {
     const overflow = await element.evaluate(
@@ -140,7 +128,6 @@ test.describe("狭い画面の共通ヘッダー", () => {
       for (const name of PAGE_NAMES) {
         await openPage(page, name);
         await expectHeaderActionsReachable(page, name);
-        // 狭い画面でラベルを隠しても、遷移先とログアウトを名前で識別できる
         const header = page.locator("header");
         for (const [item, label] of [
           ["tasks", "タスク"],
@@ -173,14 +160,12 @@ test.describe("狭い画面の共通ヘッダー", () => {
   test("読み込み中の表示があってもヘッダーの操作が画面内で操作できる", async ({
     browser,
   }) => {
-    // サービスワーカー経由の要求はpage.routeで止められないため、この検証では無効にする
     const ctx = await browser.newContext(
       makeContextOptions({ serviceWorkers: "block", viewport: NARROW }),
     );
     try {
       const page = await ctx.newPage();
       for (const name of ["tasks", "timers", "calories"] as const) {
-        // tRPCの応答を保留し、読み込み中の表示がヘッダーへ並ぶ状態にする
         let release: () => void = () => {};
         const blocked = new Promise<void>((resolve) => {
           release = resolve;
@@ -215,11 +200,9 @@ test.describe("狭い画面の共通ヘッダー", () => {
     const search = header.getByTestId("search-input");
     const showType = header.locator("select");
 
-    // 非フォーカス
     await expectReachable(page, showType);
     await expectHeaderActionsReachable(page, "tasks");
 
-    // フォーカス中（入力欄が広がる）と入力後
     await search.focus();
     await expect(search).toBeFocused();
     await expectReachable(page, showType);
@@ -229,12 +212,10 @@ test.describe("狭い画面の共通ヘッダー", () => {
     await expect(search).toHaveValue("狭い画面の検索");
     await expectHeaderActionsReachable(page, "tasks");
 
-    // 解除
     await search.fill("");
     await expect(search).toHaveValue("");
     await expectHeaderActionsReachable(page, "tasks");
 
-    // 表示切替の各選択肢
     for (const value of ["archived", "all", "active"]) {
       await showType.selectOption(value);
       await expect(showType).toHaveValue(value);
@@ -328,7 +309,6 @@ test.describe("狭い画面の長い名前", () => {
     browser,
   }) => {
     const listName = longName("list");
-    // 狭い画面では作成直後にそのリストが選択されて一覧が隠れるため、作成と選択は広い画面で行う
     await page.setViewportSize(DESKTOP);
     await openPage(page, "tasks");
     try {
@@ -338,7 +318,6 @@ test.describe("狭い画面の長い名前", () => {
         name: listName,
         exact: true,
       });
-      // 見出しの親は戻るボタンと名前の組、その親が非表示ボタンを含む行
       await expectFullName(heading, heading.locator("../.."));
       await expectReachable(
         page,

@@ -1,4 +1,3 @@
-/** 公開するエラーの文面が理由と次の操作を持ち、入口へ両方を返すことを検証する。 */
 import { describe, expect, it, vi } from "vitest";
 
 import {

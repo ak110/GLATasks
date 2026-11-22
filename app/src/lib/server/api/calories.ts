@@ -1,5 +1,3 @@
-/** カロリーAPIの公開関数。保存・取得の責務ごとのモジュールをまとめる。 */
-
 export {
   getCalorieItems,
   createCalorieItem,

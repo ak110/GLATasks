@@ -1,16 +1,7 @@
-/**
- * @fileoverview 作業中判定のうち、フォーカスが外れた後も残る未保存の入力の扱いのユニットテスト
- *
- * フォーカスとダイアログによる判定は`connection-recovery.svelte.test.ts`が検証する。
- * ここでは利用者が入力した欄の追跡（値の有無・送信後の扱い・未保存の入力が無いとみなす値との比較・画面からの除去・対象の種類）と、
- * `holdUnsavedDraft`による申告を検証する。
- */
-
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 type UserBusy = typeof import("#lib/client/ui/user-busy.ts");
 
-/** 欄を追加して利用者の入力を模し、フォーカスを外す */
 function typeInto(
   field: HTMLInputElement | HTMLTextAreaElement,
   value: string,
@@ -68,7 +59,6 @@ describe("isUserBusy（未保存の入力）", () => {
     );
     expect(userBusy.isUserBusy()).toBe(true);
 
-    // 保存に成功して部品が入力を消すと作業中でなくなる
     textarea.value = "";
     expect(userBusy.isUserBusy()).toBe(false);
   });
@@ -83,11 +73,9 @@ describe("isUserBusy（未保存の入力）", () => {
     typeInto(input, "1800");
     expect(userBusy.isUserBusy()).toBe(true);
 
-    // 保存に成功すると部品が示す値を保存した値へ更新し、値が欄に残っていても作業中でなくなる
     input.dataset.cleanValue = "1800";
     expect(userBusy.isUserBusy()).toBe(false);
 
-    // 示す値を空にした変更も未保存の入力として扱う
     typeInto(input, "");
     expect(userBusy.isUserBusy()).toBe(true);
   });

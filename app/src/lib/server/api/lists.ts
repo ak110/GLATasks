@@ -1,7 +1,4 @@
 import { ApiError } from "../api-errors";
-/**
- * @fileoverview リスト関連API（CRUD・統合・アーカイブ）
- */
 
 import { and, asc, count, eq, inArray, min } from "drizzle-orm";
 
@@ -42,7 +39,6 @@ async function countTodoTasksByList(
   return new Map(rows.map((r) => [r.listId, r.todoCount]));
 }
 
-/** リスト一覧を取得する。タイトル昇順で返す。 */
 export async function listLists(userId: number, showType: ShowType) {
   const db = getDb();
   const rows = await db
@@ -63,13 +59,11 @@ export async function listLists(userId: number, showType: ShowType) {
     }));
 }
 
-/** リストを作成する。sort_order は既存の最小値 - 1000（先頭追加）。 */
 export async function createList(
   userId: number,
   title: string,
 ): Promise<number> {
   const db = getDb();
-  // 現在の最小 sort_order を取得
   const [{ minOrder }] = await db
     .select({ minOrder: min(lists.sort_order) })
     .from(lists)
@@ -88,7 +82,6 @@ export async function createList(
   return result[0].id;
 }
 
-/** 完了済みタスクを archived にする。 */
 export async function clearList(userId: number, listId: number): Promise<void> {
   await getDb().transaction(async (db) => {
     await getOwnedList(listId, userId, db);
@@ -100,7 +93,6 @@ export async function clearList(userId: number, listId: number): Promise<void> {
   });
 }
 
-/** リスト名を変更する。 */
 export async function renameList(
   userId: number,
   listId: number,
@@ -113,7 +105,6 @@ export async function renameList(
   });
 }
 
-/** リストとその全タスク・添付・スケジュールを削除する。 */
 export async function deleteList(
   userId: number,
   listId: number,
@@ -147,7 +138,6 @@ export async function deleteList(
   });
 }
 
-/** リストを archived にする。 */
 export async function archiveList(
   userId: number,
   listId: number,
@@ -160,13 +150,6 @@ export async function archiveList(
     .where(eq(lists.id, listId));
 }
 
-/**
- * 2つのリストを統合する。
- *
- * source の全タスクを target に移動し、source リストを削除する。
- * 並び順は各リスト内の sort_order を維持しつつ、updated でインターリーブする。
- * sort_order と updated が矛盾する箇所は線形補間で補正する。
- */
 export async function mergeLists(
   userId: number,
   sourceListId: number,
@@ -182,7 +165,6 @@ export async function mergeLists(
       throw new ApiError("list_not_active");
     }
 
-    // 両リストの全タスクを sort_order 昇順で取得
     const [sourceTasks, targetTasks] = await Promise.all([
       db
         .select()
@@ -196,17 +178,14 @@ export async function mergeLists(
         .orderBy(asc(tasks.sort_order)),
     ]);
 
-    // 各リストの updated を sort_order と整合するよう線形補間で補正
     const sourceAdjusted = adjustUpdatedTimestamps(sourceTasks);
     const targetAdjusted = adjustUpdatedTimestamps(targetTasks);
 
-    // マージソートのマージステップで統合（adjusted 降順）
     const merged = mergeByTimestamp(
       targetTasks.map((t, i) => ({ task: t, adjusted: targetAdjusted[i]! })),
       sourceTasks.map((t, i) => ({ task: t, adjusted: sourceAdjusted[i]! })),
     );
 
-    // sort_order を 0, 1000, 2000... で再割り当てし、依存関係のないタスクを並列更新
     await Promise.all(
       merged.map(({ task, adjusted }, i) => {
         const newSortOrder = i * 1000;
@@ -215,7 +194,6 @@ export async function mergeLists(
           .set({
             list_id: targetListId,
             sort_order: newSortOrder,
-            // 補正された updated のみ DB に反映
             ...(adjusted !== task.updated.getTime() && {
               updated: new Date(adjusted),
             }),
@@ -224,20 +202,16 @@ export async function mergeLists(
       }),
     );
 
-    // source リストに紐づく schedule を target リストへ移動
     await db
       .update(schedules)
       .set({ list_id: targetListId })
       .where(eq(schedules.list_id, sourceListId));
 
-    // source リストを削除
     await db.delete(lists).where(eq(lists.id, sourceListId));
-    // target の last_updated を更新
     await touchListUpdated(targetListId, db);
   });
 }
 
-/** リストを active に戻す。 */
 export async function unarchiveList(
   userId: number,
   listId: number,

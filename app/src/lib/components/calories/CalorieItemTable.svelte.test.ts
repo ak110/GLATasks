@@ -1,7 +1,3 @@
-/**
- * @fileoverview カロリー品目一覧の検索・使用件数・編集時の再読込保留のテスト
- */
-
 import {
   fireEvent,
   render,
@@ -64,7 +60,6 @@ describe("CalorieItemTable", () => {
       const dialog = await screen.findByRole("dialog", { name: "品目の編集" });
       await waitFor(() => expect(dialog).toHaveAttribute("open"));
       expect(dialog.tagName).toBe("DIALOG");
-      // 共通Dialogの非同期の初期フォーカスを待ってから、入力欄以外へ移す。
       await waitFor(() =>
         expect(within(dialog).getByLabelText("品目名")).toHaveFocus(),
       );
@@ -78,13 +73,10 @@ describe("CalorieItemTable", () => {
       expect(submitButton).toHaveFocus();
       expect(document.activeElement?.tagName).toBe("BUTTON");
 
-      // 応答の横取り（511）を検知する公開処理で、復元先がない入力による再読み込みの保留を観測する。
-      // 到達不能（503など）は作業中の判定を通らないため、横取りの代表値を使う。
       const interceptedFetch: typeof fetch = vi.fn(
         async () => new Response(null, { status: 511 }),
       );
       await checkConnectivity(interceptedFetch);
-      // 判定1回と、横取りの自動通過を試した後の判定1回
       expect(interceptedFetch).toHaveBeenCalledTimes(2);
       expect(connectivityState.notice).toBe("reload-required");
       expect(dialog).toHaveAttribute("open");
@@ -109,7 +101,6 @@ describe("CalorieItemTable", () => {
     );
   });
   it("各検索語を品目名か備考に含む品目だけを表示し、該当が無ければ該当なしの文面を表示する", async () => {
-    // 「飲料」は品目名、「み物」は備考だけに含まれる
     const { rerender } = renderTable({
       items,
       filterKeywords: ["飲料", "み物"],
@@ -119,7 +110,6 @@ describe("CalorieItemTable", () => {
     expect(rows).toHaveLength(1);
     expect(rows[0]).toHaveTextContent("飲料水");
 
-    // 各語は別々の品目にだけ含まれる
     await rerender({ filterKeywords: ["飲料", "食事"] });
 
     expect(screen.queryAllByTestId("calorie-item-row")).toHaveLength(0);

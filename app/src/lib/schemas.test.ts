@@ -1,7 +1,3 @@
-/**
- * @fileoverview Zod スキーマのテスト
- */
-
 import { describe, it, expect } from "vitest";
 import {
   CalorieItemCsvRowSchema,
@@ -332,7 +328,6 @@ describe("CreateTaskSchema / UpdateTaskSchema の本文バイト長上限", () =
   });
 
   it("CreateTaskSchema はマルチバイト文字でバイト長を判定する", () => {
-    // 3バイト文字（日本語）を文字数では上限未満だがバイト長では上限超過になる個数だけ並べる
     const charCount = Math.floor(MAX_TASK_TEXT_BYTES / 3) + 1;
     const text = "あ".repeat(charCount);
     expect(text.length).toBeLessThan(MAX_TASK_TEXT_BYTES);

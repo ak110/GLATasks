@@ -1,6 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
 
-// 旧通知の自然消滅を検収結果にしないため、検証中に自動消去されない長さを使う。
 const timerFailure = `タイマー取得失敗。${"接続状態を確認してから再試行してください。".repeat(8)}`;
 const searchFailure = `検索取得失敗。${"接続状態を確認してから再試行してください。".repeat(8)}`;
 const scheduleFailure = `スケジュール取得失敗。${"接続状態を確認してから再試行してください。".repeat(8)}`;

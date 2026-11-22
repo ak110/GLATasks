@@ -1,21 +1,11 @@
-/**
- * @fileoverview MCP OAuth2.1 アクセストークン・リフレッシュトークンの発行と検証
- *
- * 既存セッション用JWT秘密鍵を流用し、`aud` クレームで用途を区別する。
- */
-
 import { createHash } from "node:crypto";
 import { SignJWT, jwtVerify } from "jose";
 import { getSecret } from "../jwt-key";
 
-/** アクセストークンの aud クレーム */
 const ACCESS_AUDIENCE = "glatasks-mcp";
-/** リフレッシュトークンの aud クレーム */
 const REFRESH_AUDIENCE = "glatasks-mcp-refresh";
 
-/** アクセストークン有効期間（秒） */
 export const ACCESS_TOKEN_TTL_SECONDS = 60 * 60;
-/** リフレッシュトークン有効期間（秒） */
 export const REFRESH_TOKEN_TTL_SECONDS = 30 * 24 * 60 * 60;
 
 export interface AccessTokenPayload {
@@ -108,10 +98,6 @@ export async function verifyRefreshToken(
   }
 }
 
-/**
- * PKCE の code_verifier が code_challenge と一致するか検証する。
- * 現状は MCP 仕様で必須の S256 のみ許容する（plain は脆弱なため非対応）。
- */
 export function verifyPkce(
   verifier: string,
   challenge: string,

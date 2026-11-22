@@ -24,7 +24,6 @@ const RETRY_INTERVAL_MS = 1000;
 const WAIT_TIMEOUT_MS = 30000;
 const FORM_OP_TIMEOUT_MS = 5000;
 
-/** /auth/ 以外のページに遷移するまで待機する */
 async function waitForNonAuthUrl(
   page: Page,
   timeoutMs = WAIT_TIMEOUT_MS,
@@ -39,7 +38,6 @@ async function waitForNonAuthUrl(
   }
 }
 
-/** フォームの全フィールドに入力してsubmitボタンを押す。要素不在や未表示ならfalseを返す */
 async function tryFillAndSubmit(
   page: Page,
   fields: readonly (readonly [selector: string, value: string])[],
@@ -55,7 +53,6 @@ async function tryFillAndSubmit(
   }
 }
 
-/** 認証ページへ遷移し、非auth URLへリダイレクトされれば認証済みと判定する */
 async function isAuthenticated(page: Page, authPath: string): Promise<boolean> {
   await page.goto(`${BASE_URL}${authPath}`);
   return !page.url().includes("/auth/");
@@ -69,10 +66,6 @@ async function globalSetup(_config: FullConfig) {
   const context = await browser.newContext({ ignoreHTTPSErrors: true });
   const page = await context.newPage();
 
-  // ログイン→登録の順で試行する。dev serverのHMR再読込でURL遷移待ちがタイムアウト
-  // しても、Cookieが既に設定されているケースを救済するため、各試行の冒頭と
-  // フォーム送信後の双方で「認証ページ遷移時の自動リダイレクト」により認証済み
-  // 状態を判定する。
   let authenticated = false;
   for (let attempt = 0; attempt < MAX_ATTEMPTS && !authenticated; attempt++) {
     if (attempt > 0) {
@@ -113,7 +106,6 @@ async function globalSetup(_config: FullConfig) {
     }
   }
 
-  // Cookie確立後に認証必須ページへ到達できることを最終確認する
   if (authenticated) {
     await page.goto(`${BASE_URL}/`);
     if (page.url().includes("/auth/")) {

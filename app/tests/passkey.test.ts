@@ -37,7 +37,6 @@ async function confirmDialog(page: Page, title: string, button: string) {
     .getByRole("button", { name: button })
     .click();
 }
-/** 本人確認ダイアログで登録済みパスキーを選んで確認する。 */
 async function verifyWithPasskey(page: Page) {
   await page.getByTestId("verification-method-passkey").check();
   await page.getByTestId("verification-submit").click();
@@ -124,19 +123,16 @@ test("パスキー: パスワードアカウントの初回追加は認証getな
     await page.keyboard.press("Escape");
     const currentPassword = page.getByTestId("current-password");
     const dialog = page.getByTestId("verification-dialog");
-    // 確認用の再入力が一致しない場合は理由を示し、送信しない。
     await page.getByTestId("new-password").fill("mismatch-password-1");
     await page.getByTestId("new-password-confirm").fill("mismatch-password-2");
     await page.getByTestId("password-set").click();
     await expect(page.getByTestId("new-password-error")).toBeVisible();
-    // 送信を止めた後は、誤りのある確認欄からそのまま直せる。
     await expect(page.getByTestId("new-password-confirm")).toBeFocused();
     await expect(page.getByTestId("password-set")).toHaveText(
       "パスワードを変更",
     );
     await page.getByTestId("new-password").fill("");
     await page.getByTestId("new-password-confirm").fill("");
-    // 本人確認の期限内はダイアログを出さずに追加する。名前の入力欄は無い。
     await expect(page.getByTestId("new-key-name")).toHaveCount(0);
     await page.getByTestId("passkey-add").click();
     await expect(dialog).toHaveCount(0);
@@ -153,14 +149,12 @@ test("パスキー: パスワードアカウントの初回追加は認証getな
     });
     expect(observed).toEqual(["create"]);
     await expect(page.getByTestId("passkey-row")).toHaveCount(1);
-    // 仮想認証器の提供元は対応表に無いため、ブラウザー名が付く。
     await expect(page.getByTestId("passkey-name")).toHaveText("Chrome");
     await expect(page.getByRole("status")).toHaveText(
       "パスキーを追加しました。",
     );
     await expect(page.getByTestId("passkey-add")).toBeEnabled();
     await page.clock.fastForward(900_001);
-    // 期限切れでは操作時にダイアログを出し、キャンセルすれば実行しない。
     await expect(currentPassword).toHaveCount(0);
     await page.getByTestId("passkey-add").click();
     await expect(dialog).toBeVisible();
@@ -177,7 +171,6 @@ test("パスキー: パスワードアカウントの初回追加は認証getな
     await expect(page.getByTestId("passkey-add")).toBeEnabled();
     expect(await calls()).toEqual(["create"]);
     await expect(page.getByTestId("passkey-row")).toHaveCount(1);
-    // 本人確認に失敗した場合はダイアログ内に理由を示し、再入力できる。
     await page.getByTestId("passkey-add").click();
     await currentPassword.fill("incorrect-password");
     await page.getByTestId("verification-submit").click();
@@ -198,18 +191,15 @@ test("パスキー: パスワードアカウントの初回追加は認証getな
     console.log("webauthn-calls-after-expiry", JSON.stringify(await calls()));
     expect(await calls()).toEqual(["create", "create"]);
     await expect(page.getByTestId("passkey-add")).toBeEnabled();
-    // パスワードが有効な場合の代替と、無効な場合の既定経路を同じ実認証器で通す。
     await page.clock.fastForward(900_001);
     await securityOperation(page, "codes-reissue", () =>
       verifyWithPasskey(page),
     );
     await codes(page);
     expect(await calls()).toEqual(["create", "create", "get"]);
-    // 試験の時計はサーバーより進めてあるため、画面は本人確認の期限切れとして再び確認を求める。
     await securityOperation(page, "password-disable", () =>
       verifyWithPasskey(page),
     );
-    // 無効化の保存待ちの間に再発行の本人確認をキャンセルしても、保存待ちのコードで無効化を完了できる。
     await page.clock.fastForward(900_001);
     await page.getByTestId("codes-reissue").click();
     await confirmDialog(page, "復旧コードの再発行", "再発行");
@@ -229,7 +219,6 @@ test("パスキー: パスワードアカウントの初回追加は認証getな
     await page.getByTestId("new-password").fill(password);
     await page.getByTestId("new-password-confirm").fill(password);
     await securityOperation(page, "password-set", async () => {
-      // パスワードが無い間はパスキーだけで確認し、方法の選択とパスワード欄を出さない。
       await expect(dialog).toBeVisible();
       await expect(currentPassword).toHaveCount(0);
       await expect(page.getByTestId("verification-method-passkey")).toHaveCount(
@@ -241,7 +230,6 @@ test("パスキー: パスワードアカウントの初回追加は認証getな
     await expect(page.getByRole("status")).toHaveText(
       "パスワードを設定しました。",
     );
-    // 再有効化後はパスキーの確認を引き継がず、パスワードを既定に戻す。
     await page.clock.fastForward(900_001);
     await second.cdp.send("WebAuthn.removeVirtualAuthenticator", {
       authenticatorId: second.id,
@@ -311,9 +299,7 @@ test("パスキー: 登録・ログイン・管理・パスワード無効化と
     await account.press("ArrowDown");
     await page.keyboard.press("Enter");
     await expect(page).toHaveURL(/\/account\/security/);
-    // 登録画面からの登録にもブラウザー名が付く。
     await expect(page.getByTestId("passkey-name")).toHaveText("Chrome");
-    // 名前の変更はキャンセルすれば元の名前に戻り、保存で確定する。
     await page.getByTestId("passkey-rename").click();
     await page.getByTestId("passkey-name-input").fill("破棄する名前");
     await page.getByTestId("passkey-name-cancel").click();
@@ -341,7 +327,6 @@ test("パスキー: 登録・ログイン・管理・パスワード無効化と
     const target = page
       .getByTestId("passkey-row")
       .filter({ hasText: "端末のパスキー" });
-    // 削除は確認ダイアログの同意後にだけ実行する。
     await target.getByTestId("passkey-delete").click();
     await confirmDialog(page, "パスキーの削除", "キャンセル");
     await expect(page.getByRole("dialog")).toHaveCount(0);
@@ -354,7 +339,6 @@ test("パスキー: 登録・ログイン・管理・パスワード無効化と
     );
     auth.cdp = second.cdp;
     auth.id = second.id;
-    // 再発行も確認ダイアログでキャンセルすれば実行しない。
     await page.getByTestId("codes-reissue").click();
     await confirmDialog(page, "復旧コードの再発行", "キャンセル");
     await expect(page.getByTestId("recovery-codes")).toHaveCount(0);
@@ -397,7 +381,6 @@ test("パスキー: 登録・ログイン・管理・パスワード無効化と
           await context.request.get("/account/security", { maxRedirects: 0 })
         ).status(),
       ).toBe(302);
-      // 本人確認済みのまま復旧状態が失効しても、別の未使用コードでやり直せる。
       await context.clearCookies({ name: "__Host-gla-recovery" });
       await page.getByTestId("passkey-submit").click();
       await expect(page.getByRole("alert")).toContainText(
@@ -410,7 +393,6 @@ test("パスキー: 登録・ログイン・管理・パスワード無効化と
         page.getByText("本人確認が完了しました。15分以内に登録してください。"),
       ).toBeVisible();
       await expect(page.getByTestId("recovery-back")).toBeVisible();
-      // 中断後に開き直した画面から、有効な復旧状態で再登録へ進めることを確かめる。
       await page.reload();
       await page
         .getByRole("button", { name: "本人確認済みの登録を再開" })

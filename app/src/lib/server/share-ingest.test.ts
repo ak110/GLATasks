@@ -133,7 +133,6 @@ describe("buildShareInitialText", () => {
     ],
     [
       "英語・ドイツ語・日本語を含む旧版警告文",
-      // ドイツ語の代名詞は英語の誤字として判定されるため、引用を保ったままエスケープする。
       "You're using an older version of DeepL. To continue using the app, please update to the latest version. \u0053ie verwenden eine ältere Version von DeepL. Bitte aktualisieren \u0053ie die App, um \u0073ie weiterhin nutzen zu können. 古いバージョンのDeepLを使用しています。",
     ],
     [

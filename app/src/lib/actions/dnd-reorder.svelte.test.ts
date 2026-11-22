@@ -1,26 +1,11 @@
-/**
- * @fileoverview D&D 並び替えユーティリティのユニットテスト
- *
- * `createDragReorder` は Svelte 5 の `$state` rune を使うため dom project（svelte.test.ts）で実行する。
- * Svelte コンポーネントはマウントせず、ユーティリティ関数を直接呼び出して状態遷移を検証する。
- *
- * Pointer Events 化に伴い、`document.elementFromPoint` を伴う hit-testing は
- * happy-dom のレイアウト計算が安定しないため `vi.spyOn` でモックする。
- */
-
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createDragReorder } from "./dnd-reorder.svelte.js";
 
-/** テスト用アイテムを生成する */
 function makeItems(ids: number[]) {
   return ids.map((id) => ({ id }));
 }
 
-/**
- * `data-reorder-id` を持つ行要素を生成する。
- * `getBoundingClientRect` を任意の値に固定し、hit-testing と before/after 判定の挙動を制御する。
- */
 function makeRowElement(id: number, rect = { top: 100, height: 100 }) {
   const el = document.createElement("div");
   el.setAttribute("data-reorder-id", String(id));
@@ -38,7 +23,6 @@ function makeRowElement(id: number, rect = { top: 100, height: 100 }) {
   return el;
 }
 
-/** ハンドル要素に対する pointerdown を模した PointerEvent 風オブジェクトを生成する */
 function makeStartEvent(
   handle: Element,
   clientX: number,
@@ -53,26 +37,22 @@ function makeStartEvent(
   } as unknown as PointerEvent;
 }
 
-/** `data-task-drop-list-id` を持つ外部ドロップ先要素を生成する */
 function makeExternalDropTarget(listId: number) {
   const el = document.createElement("div");
   el.setAttribute("data-task-drop-list-id", String(listId));
   return el;
 }
 
-/** window へ pointermove を発火する */
 function dispatchPointerMove(clientX: number, clientY: number, pointerId = 1) {
   window.dispatchEvent(
     new PointerEvent("pointermove", { clientX, clientY, pointerId }),
   );
 }
 
-/** window へ pointerup を発火する */
 function dispatchPointerUp(pointerId = 1) {
   window.dispatchEvent(new PointerEvent("pointerup", { pointerId }));
 }
 
-/** window へ pointercancel を発火する */
 function dispatchPointerCancel(pointerId = 1) {
   window.dispatchEvent(new PointerEvent("pointercancel", { pointerId }));
 }
@@ -126,7 +106,6 @@ describe("createDragReorder", () => {
 
     const row = makeRowElement(2);
     vi.spyOn(document, "elementFromPoint").mockReturnValue(row);
-    // midY=150 より上 → before
     dispatchPointerMove(20, 110);
     expect(dnd.dropTargetId).toBe(2);
     expect(dnd.dropPosition).toBe("before");
@@ -140,7 +119,6 @@ describe("createDragReorder", () => {
 
     const row = makeRowElement(2);
     vi.spyOn(document, "elementFromPoint").mockReturnValue(row);
-    // midY=150 より下 → after
     dispatchPointerMove(20, 160);
     expect(dnd.dropTargetId).toBe(2);
     expect(dnd.dropPosition).toBe("after");
@@ -171,7 +149,6 @@ describe("createDragReorder", () => {
     dispatchPointerMove(20, 110);
     dispatchPointerUp();
 
-    // アイテム 3 をアイテム 2 の前へ移動
     expect(onReorder).toHaveBeenCalledWith([1, 3, 2]);
   });
 
@@ -186,7 +163,6 @@ describe("createDragReorder", () => {
     dispatchPointerMove(20, 160);
     dispatchPointerUp();
 
-    // アイテム 1 をアイテム 2 の後ろへ移動
     expect(onReorder).toHaveBeenCalledWith([2, 1, 3]);
   });
 
@@ -248,11 +224,9 @@ describe("createDragReorder", () => {
     const handle = document.createElement("span");
     dnd.handleDragStart(1, makeStartEvent(handle, 0, 0));
 
-    // 閾値（既定 5px）未満の移動
     dispatchPointerMove(2, 2);
     expect(dnd.isActive).toBe(false);
 
-    // pointerup でドロップ確定するが、isActive=false のため onReorder は呼ばれない
     dispatchPointerUp();
     expect(onReorder).not.toHaveBeenCalled();
     expect(dnd.draggedId).toBeNull();
@@ -266,12 +240,9 @@ describe("createDragReorder", () => {
     const row = makeRowElement(2);
     document.body.appendChild(row);
 
-    // hit-testing で行要素を返すようモック
     vi.spyOn(document, "elementFromPoint").mockReturnValue(row);
 
-    // アイテム 3 をアイテム 2 の前へ移動 → 期待: [1, 3, 2]
     dnd.handleDragStart(3, makeStartEvent(handle, 0, 0));
-    // 閾値超過 + midY=150 より上 → before
     dispatchPointerMove(20, 110);
     expect(dnd.isActive).toBe(true);
     expect(dnd.dropTargetId).toBe(2);
@@ -287,7 +258,6 @@ describe("createDragReorder", () => {
     const dnd = createDragReorder(() => makeItems([1, 2, 3]), vi.fn());
 
     const handle = document.createElement("span");
-    // 並び替え対象の data-reorder-id を持たない要素を返す
     vi.spyOn(document, "elementFromPoint").mockReturnValue(
       document.createElement("div"),
     );
@@ -439,11 +409,9 @@ describe("createDragReorder", () => {
 });
 
 describe("createDragReorder の自動スクロール", () => {
-  /** requestAnimationFrame を手動で進めるためのキュー */
   let frames: Map<number, FrameRequestCallback>;
   let nextFrameId: number;
 
-  /** 予約済みのフレームを1つずつ実行する */
   function runFrames(count: number) {
     for (let i = 0; i < count; i++) {
       const entry = frames.entries().next();
@@ -454,10 +422,6 @@ describe("createDragReorder の自動スクロール", () => {
     }
   }
 
-  /**
-   * 縦スクロール要素（表示高さ400px、内容1000px）と、その内側のハンドルを生成する。
-   * 横範囲は x=0〜300。
-   */
   function setupScrollContainer() {
     const container = document.createElement("div");
     container.style.overflowY = "auto";
@@ -514,7 +478,6 @@ describe("createDragReorder の自動スクロール", () => {
     expect(dnd.dropTargetId).toBe(2);
     expect(frames.size).toBe(1);
 
-    // 指を止めたまま一覧だけが動き、ポインター下の行が変わる
     hit = row3;
     runFrames(1);
     expect(container.scrollTop).toBeGreaterThan(0);

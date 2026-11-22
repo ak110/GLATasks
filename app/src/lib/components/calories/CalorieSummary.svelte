@@ -25,7 +25,6 @@
     const averagePeriods = $derived(
         periods.filter((period) => period.days !== 1),
     );
-    // 数値だけを強調するため、前後の文言と数値を分けて持つ
     const remaining = $derived.by(() => {
         if (!dailyPeriod) return undefined;
         const value = goalKcal - dailyPeriod.dailyKcal;
@@ -40,13 +39,9 @@
         dailyPeriod ? Math.min(Math.max(dailyPeriod.percentage, 0), 100) : 0,
     );
 
-    /** 1食分の目安。ペースの緑と平均の注意色の境目に使う */
     const MEAL_KCAL = 700;
-    /** 平均が目標から離れたとみなす幅。1週間に1食分の差を1日当たりへ換算した値 */
     const AVERAGE_MARGIN_KCAL = MEAL_KCAL / 7;
 
-    // 緑系は達成状況と同じ「目標内」の色とする。
-    // 平均が目標内なら緑系とし、小さな超過は通常の色にする
     const toneClasses = {
         good: "border-emerald-300 bg-emerald-50 text-emerald-950 dark:border-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-100",
         neutral:
@@ -55,7 +50,6 @@
             "border-amber-300 bg-amber-50 text-amber-950 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-100",
     } as const;
 
-    /** 残りが1食分以上なら次の食事を取れる状態として緑系にする。食後の小さな超過は通常の色とする */
     function paceColorClass(dailyKcal: number): string {
         return goalKcal - dailyKcal >= MEAL_KCAL
             ? toneClasses.good
@@ -85,7 +79,6 @@
         >
             カロリー
         </h2>
-        <!-- 保存後も保存値を欄に表示するため、保存値を未保存の入力が無いとみなす値として示す（user-busy.ts） -->
         <form class="flex items-center gap-2" onsubmit={handleGoalSubmit}>
             <label
                 for="calorie-goal"
@@ -108,14 +101,12 @@
         </form>
     </div>
 
-    <!-- 2列表示では左右の高さを揃え、低い側の内容を上下中央へ置いて余白を上下へ均等に分ける -->
     <div class="grid gap-3 md:grid-cols-2">
         {#if dailyPeriod && remaining}
             <article
                 class={`flex items-center gap-4 rounded border p-4 ${paceColorClass(dailyPeriod.dailyKcal)}`}
                 data-testid="calorie-summary-1"
             >
-                <!-- 円周を100とし、目標比の分だけ円弧を伸ばす。目標を超えたら全周を塗る -->
                 <svg
                     viewBox="0 0 36 36"
                     class="size-16 shrink-0 -rotate-90"

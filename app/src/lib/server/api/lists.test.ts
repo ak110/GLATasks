@@ -140,7 +140,6 @@ describeDb("リストの削除と統合", () => {
       .from(lists)
       .where(inArray(lists.id, [source.listId, target.listId]))
       .orderBy(lists.id);
-    // 試験専用の外部キーで最後のDELETEを失敗させ、先行する書き込みのrollbackを観測する。
     const blocker = sql.identifier(
       `test_merge_${randomUUID().replaceAll("-", "")}`,
     );

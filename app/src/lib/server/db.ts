@@ -1,7 +1,3 @@
-/**
- * @fileoverview Drizzle ORM クライアント初期化（mysql2 接続プール）
- */
-
 import { drizzle, type MySql2Database } from "drizzle-orm/mysql2";
 import mysql from "mysql2/promise";
 
@@ -23,11 +19,9 @@ function createPool(): mysql.Pool {
   return mysql.createPool({
     uri: getDatabaseUrl(),
     connectionLimit: 5,
-    // TIMESTAMP型はUTC保存・自動変換されるためtimezone指定不要
   });
 }
 
-/** 開発時は再評価をまたいで共有し、本番ではモジュールごとに作成するプールを返す。 */
 function getPool(): mysql.Pool {
   if (!import.meta.env.DEV) {
     return createPool();
@@ -37,11 +31,6 @@ function getPool(): mysql.Pool {
   return holder[DEV_POOL_KEY];
 }
 
-/**
- * Drizzle クライアントを取得する（モジュールごとのシングルトン）
- *
- * クライアントは再評価後のスキーマを使うため、プールと異なりモジュールごとに作成する。
- */
 export function getDb(): MySql2Database<typeof schema> {
   _db ??= drizzle(getPool(), { schema, mode: "default" });
   return _db;

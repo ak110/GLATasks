@@ -95,7 +95,6 @@ export async function manageSecurity(
   cookies: Cookies,
   input: z.infer<typeof ManageSecuritySchema>,
 ) {
-  // 利用者行を共通の排他単位とし、最後の認証手段の同時削除と復旧の競合を防ぐ。
   return getDb().transaction(
     async (tx) => {
       const user = await lockUser(tx, userId);
@@ -119,7 +118,6 @@ export async function manageSecurity(
           challenge,
           input.response,
         );
-        // 同時に始めた最初の追加でも、先に確定したuser handleを上書きしない。
         if (user.webauthn_handle && user.webauthn_handle !== challenge.handle)
           throw new ApiError("challenge_expired");
         await tx

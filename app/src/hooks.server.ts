@@ -14,14 +14,9 @@ import {
   loginRedirectPath,
 } from "#lib/server/auth-routes.ts";
 
-/** 更新要求を拒否する`Sec-Fetch-Site`の値。正規の送信元はGLATasks自身の画面（same-origin）とブラウザーの直接操作（none）だけである。 */
 const REJECTED_FETCH_SITES = new Set(["same-site", "cross-site"]);
 const MUTATING_METHODS = new Set(["POST", "PATCH", "PUT", "DELETE"]);
 
-/**
- * サーバー起動時に定期処理スケジューラー（定期TODOとカロリー自動記録）を起動する。
- * `building` が真の間（ビルド時）は意図しない初期化処理を避けるため起動しない。
- */
 export const init: ServerInit = () => {
   if (building) return;
   startScheduler();
@@ -51,7 +46,6 @@ export const handle: Handle = async ({ event, resolve }) => {
     );
   }
 
-  // セッション Cookie の検証（JWT/HS256）
   const sessionCookie = event.cookies.get(getSessionCookieName());
   event.locals.user_id = sessionCookie
     ? await verifySessionToken(sessionCookie, getSessionGeneration)
@@ -80,7 +74,6 @@ export const handle: Handle = async ({ event, resolve }) => {
   return response;
 };
 
-/** Chrome拡張のポップアップが埋め込んだ画面からの要求かを返す。拡張は`in_popup=1`を付けて画面を開く。 */
 function isExtensionPopupRequest(url: URL): boolean {
   return (
     EXTENSION_EMBEDDABLE_PATHS.has(url.pathname) &&

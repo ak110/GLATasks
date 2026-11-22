@@ -4,9 +4,6 @@ import {
   uniqueTestName,
 } from "./helpers/common";
 import { test, expect } from "@playwright/test";
-/**
- * @fileoverview オフライン画面の接続回復による自動再読み込みのe2eテスト
- */
 
 test("オフライン画面は接続回復時に自動再読み込みする", async ({ page }) => {
   const marker = `offline-marker-${uniqueTestName("e2e")}`;
@@ -45,7 +42,6 @@ test("オフライン画面は接続回復時に自動再読み込みする", as
       ),
     )
     .toBeUndefined();
-  // 直接開いたオフライン画面は回復後にトップ画面へ移り、再読み込みを繰り返さない
   await expect(page).toHaveURL(/\/$/);
 });
 
@@ -63,7 +59,6 @@ test("オフライン画面はonlineイベントなしでも回復から5秒以�
     (window as typeof window & { __offlineMarker?: string }).__offlineMarker =
       value;
   }, marker);
-  // 表示直後の判定と5秒間隔の判定が続けて失敗する、通信断が続いた状態を作る
   await expect
     .poll(() => blocked, { timeout: 15_000 })
     .toBeGreaterThanOrEqual(3);
@@ -81,7 +76,6 @@ test("オフライン画面はonlineイベントなしでも回復から5秒以�
       ),
     )
     .toBeUndefined();
-  // 直接開いたオフライン画面は回復後にトップ画面へ移り、再読み込みを繰り返さない
   await expect(page).toHaveURL(/\/$/);
 });
 
@@ -94,7 +88,6 @@ test("通信断で可視復帰しても、オフライン画面へ移らず表�
     page.waitForResponse((res) => res.url().includes("/api/trpc")),
   ]);
   const url = page.url();
-  // 再読み込み・遷移で消える印を置き、表示中の画面が保たれたことを確かめる
   const marker = `screen-marker-${uniqueTestName("e2e")}`;
   await page.evaluate((value) => {
     (window as typeof window & { __screenMarker?: string }).__screenMarker =
@@ -102,7 +95,6 @@ test("通信断で可視復帰しても、オフライン画面へ移らず表�
   }, marker);
 
   await context.setOffline(true);
-  // 別アプリや画面オフから戻った直後の可視復帰を発火させ、接続判定を起こす
   await page.evaluate(() =>
     document.dispatchEvent(new Event("visibilitychange")),
   );
@@ -141,17 +133,14 @@ test("到達不能の案内は再読み込みを促さず、回復すると可�
   await page.evaluate(() =>
     document.dispatchEvent(new Event("visibilitychange")),
   );
-  // 到達不能が猶予（6秒）を超えて続いた時点で案内が出る
   await expect(banner).toBeVisible({ timeout: 15_000 });
   await expect(banner.getByRole("button", { name: "再読み込み" })).toHaveCount(
     0,
   );
-  // HTTPSを遮断する認証画面は通信エラーと区別できないため、到達不能の案内からも認証画面を開ける
   await expect(
     banner.getByRole("button", { name: "認証画面を開く" }),
   ).toBeVisible();
 
-  // 可視復帰やonlineイベントを起こさずに通信だけを戻し、到達不能の間の短い間隔の再判定で回復を捉えることを確かめる
   await context.setOffline(false);
   await expect(banner).toHaveCount(0, { timeout: 5_000 });
 });
@@ -159,7 +148,6 @@ test("到達不能の案内は再読み込みを促さず、回復すると可�
 test("オフライン画面は応答の横取りでもonlineイベントなしで再読み込みする", async ({
   page,
 }) => {
-  // 認証画面がHTTP 200のHTMLで通信を差し替えている状態を再現する
   await page.route("**/healthcheck", async (route) => {
     await route.fulfill({
       status: 200,
@@ -168,7 +156,6 @@ test("オフライン画面は応答の横取りでもonlineイベントなし�
     });
   });
   await page.goto("/offline.html");
-  // 表示直後の判定で横取りを検知し、直接開いたオフライン画面からトップ画面へ移る
   await expect(page).toHaveURL(/\/$/, { timeout: 10_000 });
   await expect(page.getByText("You are offline")).toHaveCount(0);
 });
@@ -205,7 +192,6 @@ test.describe("入力中の応答の横取り", () => {
       };
     });
 
-    // 認証画面が全ての通信を差し替え、取得中の操作も失敗する状態を作る
     for (const pattern of ["**/healthcheck**", "**/api/trpc/**"]) {
       await context.route(pattern, async (route) => {
         await route.fulfill({
@@ -215,7 +201,6 @@ test.describe("入力中の応答の横取り", () => {
         });
       });
     }
-    // 可視復帰でQueryを取り直させ（TanStack Queryはwindowで購読する）、差し替えたHTML応答による失敗を観測する
     const failedQuery = page.waitForResponse(
       (res) =>
         res.url().includes("/api/trpc") &&
@@ -231,7 +216,6 @@ test.describe("入力中の応答の横取り", () => {
       "再読み込みすると認証画面が開きますが、入力中の内容が消える場合があります。",
       { timeout: 15_000 },
     );
-    // 横取りによる操作失敗のエラー通知は出さない
     await expect(page.getByTestId("toast-error")).toHaveCount(0);
     await context.unroute("**/api/trpc/**");
 
@@ -241,7 +225,6 @@ test.describe("入力中の応答の横取り", () => {
     ]);
     await expect(popup).toHaveURL(/\/healthcheck$/);
 
-    // 認証が済んで通信が戻った状態にすると、別ウィンドウが閉じてバナーが消える
     await context.unroute("**/healthcheck**");
     await expect(banner).toHaveCount(0, { timeout: 10_000 });
     await expect.poll(() => popup.isClosed(), { timeout: 10_000 }).toBe(true);
@@ -282,7 +265,6 @@ test.describe("入力中の応答の横取り", () => {
         timeout: 15_000,
       });
       await page.unrouteAll();
-      // 同じハッシュ付きURLへの遷移は文書を読み直さないため、認証後の復帰は再読み込みで模す。
       await page.reload();
       await expect(page).toHaveURL(original);
       await expect(input).toHaveValue(typed);
@@ -307,14 +289,12 @@ test.describe("入力中の応答の横取り", () => {
       `[data-testid="list-select-btn"]:has-text("${listName}")`,
     );
     await expect(listButton).toBeVisible();
-    // 再読み込み・遷移で消える印を置き、画面を遷移しなかったことを確かめる
     const marker = `silent-pass-${uniqueTestName("e2e")}`;
     await page.evaluate((value) => {
       (window as typeof window & { __screenMarker?: string }).__screenMarker =
         value;
     }, marker);
 
-    // 利用者の入力なしで通過する認証画面を模す。認証画面が読み込まれると通過し、以後の通信は差し替えない
     let passed = false;
     await context.route("**/__test-portal-pass", async (route) => {
       passed = true;
@@ -333,7 +313,6 @@ test.describe("入力中の応答の横取り", () => {
         });
       });
     }
-    // 可視復帰で取得し直した操作が失敗し、接続の判定が横取りを検知する（TanStack Queryはwindowで購読する）
     const failedQuery = page.waitForResponse(
       (res) =>
         res.url().includes("/api/trpc") &&
@@ -345,7 +324,6 @@ test.describe("入力中の応答の横取り", () => {
     });
     await failedQuery;
 
-    // 自動通過の後、失敗していた取得を画面の遷移なしに取り直して成功する
     const recoveredQuery = page.waitForResponse(
       (res) =>
         passed &&

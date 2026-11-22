@@ -1,12 +1,3 @@
-/**
- * @fileoverview 定期TODOスケジューラー（`processSchedules`）の発火・フィルフォワード・
- * 重複防止ロジックのテスト。
- *
- * 開発用MariaDBへ実接続して検証する（`DATABASE_URL`が到達可能な環境で実行する）。
- * `now` を明示的に引数として渡し、実時刻に依存しないテストとする。
- * 発火予定の計算はプロセスの時刻帯に依存しないため、`make test-db`は本番と同じ`TZ=Asia/Tokyo`でも実行する。
- */
-
 import { eq } from "drizzle-orm";
 import { afterAll, expect, it, vi } from "vitest";
 
@@ -19,7 +10,6 @@ import { getDb } from "./db";
 import { schedules, tasks } from "./schema";
 import { processSchedules } from "./scheduler";
 
-/** テスト用スケジュールを1件作成し、idを返す。 */
 async function insertSchedule(params: {
   listId: number;
   rrule: string;
@@ -45,7 +35,6 @@ async function insertSchedule(params: {
   return result[0]!.id;
 }
 
-/** スケジュールの`last_fired`をISO8601文字列で取得する。 */
 async function getLastFired(scheduleId: number): Promise<string | undefined> {
   const rows = await getDb()
     .select({ last_fired: schedules.last_fired })
@@ -55,7 +44,6 @@ async function getLastFired(scheduleId: number): Promise<string | undefined> {
   return rows[0]?.last_fired?.toISOString();
 }
 
-/** 指定リストに生成された kind="todo" タスクの件数を取得する。 */
 async function countTodoTasks(listId: number): Promise<number> {
   const db = getDb();
   const rows = await db
@@ -68,8 +56,6 @@ async function countTodoTasks(listId: number): Promise<number> {
 describeDb("processSchedules", () => {
   const createdUserIds: number[] = [];
 
-  // postTask は発火予定1件ごとに直列でDB往復するため、既定の5秒では
-  // フィルフォワード検証（最大30件）が実行環境によってはタイムアウトする
   vi.setConfig({ testTimeout: 20_000 });
 
   afterAll(async () => {
@@ -88,9 +74,6 @@ describeDb("processSchedules", () => {
       created: new Date("2026-01-01T00:00:00.000Z"),
     });
 
-    // 01-01, 01-02, 01-03, 01-04, 01-05 (09:00 JST = 00:00 UTC) の5回分を検出する想定。
-    // 初回チェックのため created ちょうどに一致する 01-01 分も未発火として境界に含み、
-    // now ちょうどに一致する 01-05 分も次tickまで待たせず境界に含む
     await processSchedules(new Date("2026-01-05T00:00:00.000Z"));
 
     expect(await countTodoTasks(listId)).toBe(5);
@@ -108,7 +91,6 @@ describeDb("processSchedules", () => {
       created: new Date("2000-01-01T00:00:00.000Z"),
     });
 
-    // dtstart から now までは4000日以上あり、上限30件を大きく超える
     const now = new Date("2026-01-01T00:00:00.000Z");
     await processSchedules(now);
 
@@ -120,15 +102,8 @@ describeDb("processSchedules", () => {
       .from(schedules)
       .where(eq(schedules.id, scheduleId))
       .limit(1);
-    // last_fired は生成済み30件目ではなく、now 以前の実際の最終発火予定まで進む。
-    // DTSTART;TZID=Asia/Tokyo:20000101T090000 は 2000-01-01T00:00:00.000Z に相当し、
-    // 以後24時間ごとの発火予定は常に日付境界（00:00:00.000Z）に一致する。
-    // now=2026-01-01T00:00:00.000Z 自体が発火予定と一致するため、
-    // rule.before(now, true) は now 自身を返す
     expect(rows[0]!.last_fired?.toISOString()).toBe("2026-01-01T00:00:00.000Z");
 
-    // rruleはDTSTARTから発火予定を走査するため、2000年開始の予定は1回の処理に数秒かかる。
-    // 後続の試験のprocessSchedulesが毎回この走査を繰り返さないよう無効化する
     await db
       .update(schedules)
       .set({ enabled: 0 })
@@ -161,7 +136,6 @@ describeDb("processSchedules", () => {
     const { userId, listId } = await createFixtureList();
     createdUserIds.push(userId);
 
-    // UNTIL は RFC5545 の規定に従い UTC 形式（末尾 Z 付き）で保存する
     const rrule =
       "DTSTART;TZID=Asia/Tokyo:20260201T090000\n" +
       "RRULE:FREQ=DAILY;INTERVAL=1;UNTIL=20260203T090000Z";
@@ -171,10 +145,8 @@ describeDb("processSchedules", () => {
       created: new Date("2026-01-31T00:00:00.000Z"),
     });
 
-    // UNTIL より大幅に未来の now を渡しても、UNTIL 以降の発火予定は生成されない
     await processSchedules(new Date("2026-03-01T00:00:00.000Z"));
 
-    // 02-01, 02-02, 02-03 の3回分のみ（UNTIL は境界を含む）
     expect(await countTodoTasks(listId)).toBe(3);
   });
 
@@ -182,9 +154,6 @@ describeDb("processSchedules", () => {
     const { userId, listId } = await createFixtureList();
     createdUserIds.push(userId);
 
-    // 変換前の実装を本番の時刻帯（Asia/Tokyo）で動かすと、日本時間9:00の予定のlast_firedは
-    // 日本時間18:00（T09:00Z）で記録されていた。
-    // 日付は先行する試験の予定のlast_firedより前にし、それらの予定を処理させない
     const rrule =
       "DTSTART;TZID=Asia/Tokyo:20251201T090000\nRRULE:FREQ=DAILY;INTERVAL=1";
     const scheduleId = await insertSchedule({
@@ -194,7 +163,6 @@ describeDb("processSchedules", () => {
       lastFired: new Date("2025-12-04T09:00:00.000Z"),
     });
 
-    // 12-04分は生成済みのため再生成せず、12-05と12-06の日本時間9:00（T00:00Z）の2回分を生成する
     const now = new Date("2025-12-06T00:30:00.000Z");
     await processSchedules(now);
     expect(await countTodoTasks(listId)).toBe(2);
@@ -234,7 +202,6 @@ describeDb("processSchedules", () => {
         created: new Date(created),
       });
 
-      // 日付は先行する試験の予定のlast_firedより前にし、それらの予定を処理させない
       await processSchedules(new Date(now));
       expect(await countTodoTasks(listId)).toBe(expectedCount);
       expect(await getLastFired(scheduleId)).toBe(expectedLastFired);
@@ -245,8 +212,6 @@ describeDb("processSchedules", () => {
     const { userId, listId } = await createFixtureList();
     createdUserIds.push(userId);
 
-    // Zodバリデーション（rrulestrによる構文検証）を経ないDB直接投入を想定し、
-    // rrulestrが例外を送出する不正な文字列を1件混在させる
     await insertSchedule({
       listId,
       rrule: "DTSTART:INVALID\nRRULE:FREQ=DAILY",
@@ -262,7 +227,6 @@ describeDb("processSchedules", () => {
 
     await processSchedules(new Date("2026-01-05T00:00:00.000Z"));
 
-    // 不正スケジュール分は生成されず、正常スケジュール分の5回だけが生成される
     expect(await countTodoTasks(listId)).toBe(5);
   });
 });

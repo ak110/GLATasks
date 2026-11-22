@@ -7,9 +7,6 @@ import {
 } from "./common";
 import { expect, type Locator, type Page } from "@playwright/test";
 import { MAX_ATTACHMENTS_PER_TASK } from "../../src/lib/schemas";
-/**
- * @fileoverview タスク一覧の内部スクロール回帰テスト用ヘルパー
- */
 
 const MINIMUM_TASK_ROWS = 18;
 const MAX_TAGS_PER_TASK = 32;

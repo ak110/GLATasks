@@ -10,7 +10,6 @@ function makeFetch(options: {
   timeout?: boolean;
 }): typeof fetch {
   if (options.timeout) {
-    // AbortSignal.timeoutの打ち切りと同じ種別の例外で失敗させる
     return vi.fn(() =>
       Promise.reject(new DOMException("timed out", "TimeoutError")),
     ) as unknown as typeof fetch;
@@ -49,7 +48,6 @@ describe("connectivity-check", () => {
     vi.useRealTimers();
   });
 
-  // 3区分の同値分割と境界: 到達不能（通信断・511以外の5xx）と応答の横取り（それ以外の不健全）を分ける
   it.each([
     {
       label: "健全（200・JSON・ok）",
@@ -113,7 +111,6 @@ describe("connectivity-check", () => {
   it("リダイレクトに従わずに取得し、リダイレクト応答は応答の横取りと判定する", async () => {
     const connectivity: ConnectivityCheck =
       await import("#lib/client/sse/connectivity-check.js");
-    // redirect: "manual" の取得でリダイレクトを受けた時の応答（status 0）。Responseのコンストラクターでは作れないため形だけを模す
     const fetch = vi.fn(async () => ({
       type: "opaqueredirect",
       status: 0,

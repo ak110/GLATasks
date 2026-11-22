@@ -10,7 +10,6 @@ const PUBLIC_PATHS = new Set([
   "/offline.html",
 ]);
 
-/** 公開経路だけをセッション認証の対象から外す。 */
 export function isPublicPath(pathname: string): boolean {
   return PUBLIC_PATHS.has(pathname);
 }
@@ -40,10 +39,6 @@ export const EXTENSION_EMBEDDABLE_PATHS: ReadonlySet<string> = new Set([
   "/auth/recover",
 ]);
 
-/**
- * `returnTo` を相対パス（先頭が `/` で `//` で始まらないもの）に限定する。
- * 外部URLへリダイレクトする open redirect 脆弱性を防ぐ。
- */
 export function safeReturnTo(value: string | null): string {
   if (!value) return "/";
   if (!value.startsWith("/") || value.startsWith("//")) return "/";

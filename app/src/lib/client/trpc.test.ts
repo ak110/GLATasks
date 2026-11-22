@@ -1,11 +1,3 @@
-/**
- * @fileoverview tRPCクライアントの送信本文の暗号化を、実際のSDKの直列化とサーバーの復号まで通して検証する
- *
- * `createCaller`だけのテストはクライアントの直列化とfetch wrapperを通らず、送信本文が暗号化されなくても
- * サーバーは平文の入力を受け付けて成功するため、暗号化の欠落を検出できない。
- * ここでは公開クライアント`trpc`のfetchをサーバーのHTTPアダプターへ接続し、送信本文と受信側の復号結果の双方を確かめる。
- * DB接続を排除するため、API関数とSSE送信はモック化する。暗号処理は実装をそのまま使う。
- */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 
@@ -40,7 +32,6 @@ const api = await import("#lib/server/api.ts");
 const { decrypt } = await import("#lib/crypto.ts");
 const { trpc, setEncryptKey } = await import("./trpc");
 
-/** クライアントが送った要求（URLと本文）。 */
 const sent: { url: string; body: string | undefined }[] = [];
 
 async function serve(

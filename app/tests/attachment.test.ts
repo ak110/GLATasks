@@ -13,21 +13,16 @@ import {
   type MutationObservationTracker,
 } from "./helpers/mutation-observation";
 import { MAX_ATTACHMENT_BYTES } from "../src/lib/schemas";
-/**
- * @fileoverview タスク添付ファイルの e2e テスト
- */
 
 import * as fs from "node:fs/promises";
 
 const LIST_NAME = `添付テスト_${uniqueTestName("e2e")}`;
 
-// 1x1 透過PNGの最小バイナリ（添付テストのサンプル画像として使用）
 const TINY_PNG_BASE64 =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
 
 type ExpectedAttachmentOutcome = "ok" | "error";
 
-/** 添付UIの失敗時に、同じ操作のmutation境界を診断情報として返す */
 async function expectAttachmentUiResult(
   tracker: MutationObservationTracker,
   assertUi: () => Promise<void>,
@@ -53,8 +48,6 @@ async function expectAttachmentUiResult(
     tracker.stop();
   }
 }
-
-/** タスクを追加し、編集ダイアログを開いた状態にして、タスク行のlocatorを返す */
 
 test.describe("attachments", () => {
   test.beforeAll(async ({ browser }) => {

@@ -1,8 +1,3 @@
-/**
- * @fileoverview TimerEditDialog コンポーネントの smoke test
- *
- * ダイアログのアクセシブル名（aria-labelledby参照先の見出しテキスト）を検証する。
- */
 import { fireEvent, render, screen } from "@testing-library/svelte";
 import { describe, expect, it, vi } from "vitest";
 import TimerEditDialog from "#lib/components/timers/TimerEditDialog.svelte";

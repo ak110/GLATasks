@@ -5,10 +5,6 @@ export type SearchResultGroup = {
   tasks: SearchTaskResult[];
 };
 
-/**
- * 検索結果をリスト別にまとめ、選択中リストを先頭へ移動する。
- * 選択中リストが無い場合は、サーバーから受け取ったグループ順を維持する。
- */
 export function groupSearchResultsByList(
   results: SearchTaskResult[],
   selectedListId: number | null,

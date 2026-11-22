@@ -5,9 +5,6 @@
         menuItemClass,
         menuDangerItemClass,
     } from "#lib/components/ui/styles.ts";
-    /**
-     * @fileoverview リストアイテム（選択ボタン + 操作メニュー）
-     */
 
     import type { ListInfo } from "#lib/types.ts";
 
@@ -68,7 +65,6 @@
             </span>
         {/if}
     </button>
-    <!-- ⋮ メニュー -->
     <div
         class="relative flex-shrink-0"
         use:menuBehavior={{

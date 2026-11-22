@@ -5,15 +5,11 @@ import {
   cleanupTestList,
 } from "./helpers/common";
 import { test, expect } from "@playwright/test";
-/**
- * @fileoverview share/ingest ページの e2e テスト
- */
 
 const LIST_NAME = `shareテスト_${uniqueTestName("e2e")}`;
 
 test.describe("share/ingest", () => {
   test.beforeAll(async ({ browser }) => {
-    // POST テスト用にリストを1つ作成しておく
     await setupTestList(browser, LIST_NAME);
   });
 
@@ -44,23 +40,18 @@ test.describe("share/ingest", () => {
     page,
   }) => {
     await page.goto("/share/ingest?title=ingestテスト");
-    // リストが選択肢として現れるまで待機
     await expect(page.locator("#list_id option")).not.toHaveCount(0, {
       timeout: 10000,
     });
     await page.locator("#list_id").selectOption({ index: 0 });
     await page.click('button[type="submit"]');
-    // リダイレクト先（メインページ）に遷移することを確認
     await page.waitForURL(/\/#\d+$/, { timeout: 10000 });
-    // メインページのタスク一覧が表示される
     await expect(page.locator("main")).toBeVisible({ timeout: 10000 });
   });
 
   test("拡張のポップアップから追加すると同じ画面で結果を表示し、拡張からの埋め込みを保つ", async ({
     page,
   }) => {
-    // ポップアップはiframeで本画面を開く。メイン画面へ転送すると拡張からの埋め込みが拒否され、
-    // 「接続が拒否されました」と表示されるため、追加後も埋め込みを許可する画面に留まることを確かめる
     await page.goto("/share/ingest?title=popupテスト&in_popup=1");
     await expect(page.locator("#list_id option")).not.toHaveCount(0, {
       timeout: 10000,
@@ -97,12 +88,6 @@ test.describe("share/ingest", () => {
     expect(textareaValue).toContain(url);
   });
 
-  // ---------------------------------------------------------------------------
-  // 共有追加→別コンテキストへのSSE反映
-  //
-  // 共有追加でタスクを追加すると更新通知が送出され、追加先のリストを表示中の
-  // 別ブラウザコンテキストへSSE経由でタスクが反映されることを検証する。
-  // ---------------------------------------------------------------------------
   test("共有追加したタスクが別コンテキストのメインページへSSEで反映される", async ({
     browser,
   }) => {
@@ -112,13 +97,10 @@ test.describe("share/ingest", () => {
 
     const ctxOptions = makeContextOptions();
 
-    // ctxView: メインページで対象リストを表示して反映を待つ側
-    // ctxShare: 共有追加ページからフォーム送信する側
     const ctxView = await browser.newContext(ctxOptions);
     const ctxShare = await browser.newContext(ctxOptions);
 
     try {
-      // --- ctxView: メインページを開いて対象リストを選択する ---
       const pageView = await ctxView.newPage();
       await Promise.all([
         pageView.goto("/"),
@@ -131,7 +113,6 @@ test.describe("share/ingest", () => {
         .locator('[data-testid="task-add-form"]')
         .waitFor({ timeout: 15000 });
 
-      // --- ctxShare: 共有追加ページからフォーム送信する ---
       const pageShare = await ctxShare.newPage();
       await pageShare.goto(
         `/share/ingest?title=${encodeURIComponent(taskTitle)}`,
@@ -143,8 +124,6 @@ test.describe("share/ingest", () => {
       await pageShare.click('button[type="submit"]');
       await pageShare.waitForURL(/\/#\d+$/, { timeout: 10000 });
 
-      // --- ctxView: 共有追加したタスクがSSE経由で現れることを検証する ---
-      // 更新通知の受信と差分syncの完了を待つため、タイムアウトを15秒に設定する。
       await expect(
         pageView
           .locator('[data-testid="task-item"]')

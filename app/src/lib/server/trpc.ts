@@ -1,7 +1,3 @@
-/**
- * @fileoverview tRPC ルーター定義と暗号化ミドルウェア
- */
-
 import { initTRPC, TRPCError } from "@trpc/server";
 import type { Cookies } from "@sveltejs/kit";
 import { ManageSecuritySchema } from "#lib/passkey-schemas.ts";
@@ -61,15 +57,11 @@ import {
 import * as operations from "./operations";
 import { decryptToString, encryptObject } from "./crypto";
 
-// ── Context 型定義 ──
-
 interface Context {
   cookies?: Cookies;
   userId: number | null;
   tabId: string | null;
 }
-
-// ── tRPC 初期化 ──
 
 const t = initTRPC.context<Context>().create({
   errorFormatter({ shape, error }) {
@@ -85,11 +77,6 @@ const t = initTRPC.context<Context>().create({
   },
 });
 
-// ── ミドルウェア ──
-
-/**
- * 認証必須ミドルウェア
- */
 const isAuthed = t.middleware(({ ctx, next }) => {
   if (!ctx.userId) {
     throw new TRPCError({
@@ -106,14 +93,9 @@ const isAuthed = t.middleware(({ ctx, next }) => {
   });
 });
 
-/**
- * 暗号化ミドルウェア: 入力を復号化し、出力を暗号化する
- */
 const withEncryption = t.middleware(async ({ getRawInput, next }) => {
-  // getRawInput() で生の入力を取得（tRPC v11 API）
   const rawInput = await getRawInput();
 
-  // 入力が暗号化されている場合は復号化
   let decryptedInput = rawInput;
   if (
     typeof rawInput === "object" &&
@@ -136,12 +118,10 @@ const withEncryption = t.middleware(async ({ getRawInput, next }) => {
     }
   }
 
-  // 次のミドルウェア/プロシージャを実行（復号化した入力を渡す）
   const result = await next({
     getRawInput: async () => decryptedInput,
   });
 
-  // 出力を暗号化して返す（result を直接変更し型推論を保持する）
   if (result.ok) {
     assignEncryptedData(result, {
       encrypted: await encryptObject(result.data),
@@ -168,24 +148,6 @@ const withApiErrors = t.middleware(async ({ next }) => {
   return result;
 });
 
-// ── ヘルパー関数 ──
-
-/**
- * `withEncryption` ミドルウェアがハンドラーの平文 `data` フィールドを暗号化済みの値で上書きするためのヘルパー。
- *
- * なぜこの上書きが必要か:
- *   `withEncryption` ミドルウェアは、ハンドラーが返した平文の `data` フィールドを
- *   暗号化後の値（`{ encrypted: string }` 形式）で置き換えてクライアントへ返す必要がある。
- *
- * なぜキャストが必要か:
- *   tRPC の内部結果型（`TRPCResultMessage` 等）は `unknown` 扱いであり、
- *   Drizzle/Zod から推論されるハンドラーの戻り値型と直接合わない。
- *   型推論を壊さずに `data` フィールドだけを差し替えるため、二重キャストでアクセスする。
- *
- * 制約:
- *   呼び出し側（`withEncryption` ミドルウェア）は、`result` が `{ data: <平文の値> }` 形式であることを
- *   ミドルウェアの位置（`result.ok` チェック後）で保証している。
- */
 function assignEncryptedData(
   result: unknown,
   data: { encrypted: string },
@@ -193,12 +155,8 @@ function assignEncryptedData(
   (result as unknown as Record<string, unknown>).data = data;
 }
 
-// ── プロシージャ定義 ──
-
 const protectedProcedure = t.procedure.use(isAuthed).use(withApiErrors);
 const encryptedProcedure = protectedProcedure.use(withEncryption);
-
-// ── ルーター定義 ──
 
 export const appRouter = t.router({
   security: t.router({
@@ -210,7 +168,6 @@ export const appRouter = t.router({
       .input(ManageSecuritySchema)
       .mutation(({ ctx, input }) => security.manage(ctx, input)),
   }),
-  // ── 利用者設定 ──
   users: t.router({
     getPreferences: encryptedProcedure.query(({ ctx }) =>
       operations.users.getPreferences(ctx),
@@ -223,7 +180,6 @@ export const appRouter = t.router({
       ),
   }),
 
-  // ── カロリー計算 ──
   calories: t.router({
     items: encryptedProcedure.query(({ ctx }) =>
       operations.calories.items(ctx),
@@ -318,7 +274,6 @@ export const appRouter = t.router({
       ),
   }),
 
-  // ── リスト操作 ──
   lists: t.router({
     list: encryptedProcedure
       .input(ShowTypeSchema)
@@ -353,7 +308,6 @@ export const appRouter = t.router({
       .mutation(({ ctx, input }) => operations.lists.merge(ctx, input)),
   }),
 
-  // ── タスク操作 ──
   tasks: t.router({
     list: encryptedProcedure
       .input(GetListTasksSchema)
@@ -404,7 +358,6 @@ export const appRouter = t.router({
       .mutation(({ ctx, input }) => operations.tasks.reorder(ctx, input)),
   }),
 
-  // ── 添付ファイル操作 ──
   attachments: t.router({
     create: encryptedProcedure
       .input(CreateAttachmentSchema)
@@ -419,7 +372,6 @@ export const appRouter = t.router({
       .query(({ ctx, input }) => operations.attachments.download(ctx, input)),
   }),
 
-  // ── 定期TODOスケジュール操作 ──
   schedules: t.router({
     list: encryptedProcedure
       .input(ListSchedulesSchema)
@@ -438,7 +390,6 @@ export const appRouter = t.router({
       .mutation(({ ctx, input }) => operations.schedules.delete(ctx, input)),
   }),
 
-  // ── タイマー操作 ──
   timers: t.router({
     list: encryptedProcedure.query(({ ctx }) => operations.timers.list(ctx)),
 

@@ -10,8 +10,6 @@ import {
   waitForSuccessfulMutationResponse,
 } from "./helpers/common";
 
-/** リスト通知と、切断中に取りこぼした古いタスクの復旧を検証する。 */
-
 function listRow(page: Page, name: string) {
   return page.getByTestId("list-item").filter({ hasText: name });
 }
@@ -31,7 +29,6 @@ async function selectList(page: Page, name: string) {
   await expect(page.getByTestId("task-add-form")).toBeVisible();
 }
 
-/** menuBehaviorが付与するmenuitemに合わせ、ダイアログのbuttonと区別する。 */
 async function renameList(page: Page, name: string, renamed: string) {
   await listRow(page, name).getByTestId("list-menu-btn").click();
   await page.getByRole("menuitem", { name: "名前変更", exact: true }).click();
@@ -94,7 +91,6 @@ async function deleteList(page: Page, name: string) {
   await expect(listRow(page, name)).toHaveCount(0);
 }
 
-/** 途中失敗でアーカイブが残った場合も共通cleanupから削除できるように戻す。 */
 async function restoreArchivedLists(page: Page, names: readonly string[]) {
   if (page.url() === "about:blank") return;
   await page.locator("header select").selectOption("all");
@@ -119,7 +115,6 @@ async function restoreArchivedLists(page: Page, names: readonly string[]) {
   }
 }
 
-/** 他手続きの入力で誤判定しないよう、バッチ内のlistActiveの位置だけを確認する。 */
 function activeTasksInput(request: Request): Record<string, unknown> | null {
   if (!isTrpcUrl(request.url(), "tasks.listActive")) return null;
   const url = new URL(request.url());
@@ -191,7 +186,6 @@ test("別タブのリスト名前変更・アーカイブ・削除が検索語�
     await expect(result(targetTitle)).toBeVisible();
     await expect(input).toHaveValue(keyword);
 
-    // 全件表示でも同じ検索語を保持し、削除の通知を独立して検証する。
     await pageA.locator("header select").selectOption("all");
     await expect(result(sourceTitle)).toBeVisible({ timeout: 15_000 });
     await pageB.locator("header select").selectOption("all");
@@ -228,8 +222,6 @@ for (const event of ["connected", "reset"] as const) {
         const contextB = await browser.newContext(makeContextOptions());
         const pageA = await contextA.newPage();
         const pageB = await contextB.newPage();
-        // 実EventSourceを保持し、connectedとresetの受入を別々に検証する。
-        // 接続をcloseした後、指定イベントだけを同じインスタンスへ配送する。
         await pageA.addInitScript(() => {
           const NativeEventSource = window.EventSource;
           window.EventSource = class extends NativeEventSource {
@@ -259,7 +251,6 @@ for (const event of ["connected", "reset"] as const) {
           if (!databaseUrl) throw new Error("DATABASE_URL が必要です");
           const db = await createConnection(databaseUrl);
           try {
-            // sinceより十分古くし、updatedによる差分で偶然復旧するのを防ぐ。
             await db.execute(
               "UPDATE task SET updated = DATE_SUB(UTC_TIMESTAMP(), INTERVAL 2 HOUR) WHERE id IN (?, ?, ?)",
               [...sourceIds, targetId],
@@ -279,7 +270,6 @@ for (const event of ["connected", "reset"] as const) {
           }
           await selectList(pageA, target);
           await expect.poll(() => taskIds(pageA)).toEqual([targetId]);
-          // APIは通したまま、SSE実接続と後続の再接続を遮断する。
           await contextA.route("**/api/events**", (route) => route.abort());
           await pageA.evaluate(() => {
             const source = (
@@ -293,7 +283,6 @@ for (const event of ["connected", "reset"] as const) {
           else if (operation === "merge")
             await mergeList(pageB, source, target);
           else await deleteList(pageB, source);
-          // 復旧イベントより前はAの既存キャッシュが残っていることを確かめる。
           await expect.poll(() => taskIds(pageA)).toEqual([targetId]);
           await expect(listRow(pageA, source)).toHaveCount(
             operation === "unarchive" ? 0 : 1,

@@ -9,9 +9,6 @@
     import { createMainMutations } from "#lib/client/tasks/main-mutations.svelte.ts";
     import { createMainQueries } from "#lib/client/tasks/main-queries.svelte.ts";
     import { createMainState } from "#lib/client/tasks/main-state.svelte.ts";
-    /**
-     * @fileoverview タスクメモ管理メインページ（リスト一覧 + タスク一覧）
-     */
 
     import { useQueryClient, hashKey } from "@tanstack/svelte-query";
     import { reconcileVisibleQueryErrorToasts } from "#lib/client/query-client.ts";
@@ -59,8 +56,6 @@
         void reconcileVisibleQueryErrorToasts();
     });
 
-    // 検索クエリの debounce（300ms）
-    // state.searchQuery の変更ごとにタイマーをリセットし、入力停止後に検索を実行する
     $effect(() => {
         const q = state.searchQuery;
         const timer = setTimeout(() => (state.debouncedQuery = q), 300);
@@ -92,7 +87,6 @@
         reorderArchivePageMutation,
     } = createMainMutations(queryClient, state, resetActiveTasks);
 
-    // 派生状態
     const lists = $derived(listsQuery.data ?? []);
     const tasks = $derived.by((): TaskListItem[] => {
         if (state.showType === "archived") {
@@ -118,12 +112,10 @@
             filterByList(cache.tasks, state.selectedListId, state.showType),
         );
     });
-    // 編集ダイアログ対象タスクの添付一覧。tasksキャッシュから常に最新値を導出する
     const editDialogAttachments = $derived(
         tasks.find((t) => t.id === state.dialogs.editDialog.taskId)
             ?.attachments ?? [],
     );
-    // 同一リスト内で既に使われているタグ候補（名前ユニーク、同名は最初の色を採用）
     const listTagCandidates = $derived.by(() => {
         if (state.showType === "archived") {
             return [...(archiveTagCandidatesQuery.data ?? [])].sort(
@@ -176,7 +168,6 @@
     const searchResults = $derived(
         waitingForSearch ? [] : (searchResultsQuery.data?.tasks ?? []),
     );
-    // 検索結果をリスト名でグループ化
     const searchResultsByList = $derived.by(() => {
         return groupSearchResultsByList(searchResults, state.selectedListId);
     });
@@ -194,9 +185,7 @@
         try {
             const result = await createListMutation.mutateAsync(title);
             selectList(result.listId);
-        } catch {
-            // グローバルエラーハンドラがトースト表示を担当
-        }
+        } catch {}
     }
 
     async function addTask(data: TaskAddSubmission): Promise<boolean> {
@@ -220,12 +209,10 @@
             }
             return true;
         } catch {
-            // グローバルエラーハンドラがトースト表示を担当
             return false;
         }
     }
 
-    /** タスク作成成功後、選択済み添付ファイルを順次送信する。個別失敗はタスク自体を残したまま通知する */
     async function uploadTaskAttachments(taskId: number, files: File[]) {
         for (const file of files) {
             try {
@@ -249,13 +236,9 @@
                 taskId,
                 ...taskData,
             });
-        } catch {
-            // グローバルエラーハンドラがトースト表示を担当
-        }
+        } catch {}
     }
 
-    // 添付ファイル追加・削除完了後の呼び出し。SSE経由の反映を待たず同一タブへ即時反映する。
-    // タスク更新の通知と同じ処理を通し、実行中の初回取得が返す更新前の応答を採用しない。
     function handleAttachmentChange() {
         void invalidateEventQueries(queryClient, SSE_EVENTS.tasksUpdated);
     }
@@ -283,7 +266,6 @@
         const session = state.dialogs.editDialog;
         const { listId, taskId, savedCompleted: wasCompleted } = session;
 
-        // 完了状態の変更（toggleTask と同じロジック）
         const statusChange =
             data.completed !== wasCompleted
                 ? data.completed
@@ -297,10 +279,6 @@
                 taskId,
                 text: data.text,
                 moveTo: Number(data.moveTo),
-                // 「保存」（closeAfter=false）は編集続行のため並び順を維持し、
-                // 「保存して閉じる」（closeAfter=true）は並び順を更新して閉じる。
-                // 移動先リストが現在のリストと異なる場合は、サーバー側仕様で
-                // keepOrder に関わらず移動先リストの先頭へ配置される
                 keepOrder: !data.closeAfter,
                 tags: data.tags,
                 kind: data.kind,
@@ -308,7 +286,6 @@
             });
 
             if (state.dialogs.editDialog === session && session.open) {
-                // 次の更新は直前の保存先と完了状態へ送る。入力のbaselineとは寿命が異なる。
                 session.listId = Number(data.moveTo);
                 session.savedCompleted = data.completed;
             }
@@ -329,7 +306,6 @@
             }
             return true;
         } catch {
-            // グローバルエラーハンドラがトースト表示を担当
             return false;
         }
     }
@@ -344,9 +320,7 @@
         if (!newTitle || newTitle === currentTitle) return;
         try {
             await renameListMutation.mutateAsync({ listId, title: newTitle });
-        } catch {
-            // グローバルエラーハンドラがトースト表示を担当
-        }
+        } catch {}
     }
 
     function deleteList(listId: number) {
@@ -363,9 +337,7 @@
                 if (first) selectList(first.id);
                 else state.selectedListId = null;
             }
-        } catch {
-            // グローバルエラーハンドラがトースト表示を担当
-        }
+        } catch {}
     }
 
     function archiveList(listId: number) {
@@ -382,20 +354,15 @@
                 if (first) selectList(first.id);
                 else state.selectedListId = null;
             }
-        } catch {
-            // グローバルエラーハンドラがトースト表示を担当
-        }
+        } catch {}
     }
 
     async function unarchiveList(listId: number) {
         try {
             await unarchiveListMutation.mutateAsync(listId);
-        } catch {
-            // グローバルエラーハンドラがトースト表示を担当
-        }
+        } catch {}
     }
 
-    /** 統合ダイアログを開く。activeTasks キャッシュからタスク数をカウントする。 */
     function openMergeDialog(listId: number) {
         const list = lists.find((l) => l.id === listId);
         if (!list) return;
@@ -422,7 +389,6 @@
             });
             succeeded = isCurrent();
         } catch {
-            // グローバルエラーハンドラがトースト表示を担当
         } finally {
             if (state.dialogs.finishMerge(submission, succeeded)) {
                 selectList(targetListId);
@@ -433,15 +399,11 @@
     async function clearList(listId: number) {
         try {
             await clearListMutation.mutateAsync(listId);
-        } catch {
-            // グローバルエラーハンドラがトースト表示を担当
-        }
+        } catch {}
     }
 
-    /** タスクの並び替え（楽観的更新 + API呼出） */
     function handleReorderTasks(taskIds: number[]) {
         if (!state.selectedListId) return;
-        // 仮IDはサーバー入力の正整数制約に反するため、送信配列と楽観更新の双方から除く
         const persistedTaskIds = taskIds.filter(
             (taskId) => !isTempTaskId(taskId),
         );
@@ -464,27 +426,22 @@
         });
     }
 
-    /** サイドバーのリストへのタスクD&D移動（楽観的更新 + 失敗時ロールバック） */
     async function handleTaskDropToList(taskId: number, targetListId: number) {
         if (!state.selectedListId || targetListId === state.selectedListId)
             return;
         state.dragOverListId = null;
 
         try {
-            // updateTaskMutation の onMutate で楽観的更新を実施する
             await updateTaskMutation.mutateAsync({
                 listId: state.selectedListId,
                 taskId,
                 moveTo: targetListId,
                 keepOrder: false,
             });
-        } catch {
-            // onError でロールバック済みのため追加処理不要
-        }
+        } catch {}
     }
 
     let searchResultNavigation = 0;
-    /** 検索結果からリストへ遷移する。アーカイブのタスクを選んだ時は、そのタスクを含むページを開く。 */
     async function goToSearchResult(listId: number, taskId?: number) {
         const navigation = ++searchResultNavigation;
         let page = 0;
@@ -498,7 +455,6 @@
             } catch (error) {
                 showErrorToast(extractErrorMessage(error));
             }
-            // 応答を待つ間に別の結果の選択、検索や表示種別の変更があった場合は、利用者の新しい操作を優先する。
             if (
                 navigation !== searchResultNavigation ||
                 state.searchQuery !== searchQuery ||
@@ -512,11 +468,8 @@
         if (state.selectedListId === listId) state.archivePage = page;
     }
 
-    /** モバイルでリスト一覧に戻る（pushState でハッシュを除去） */
     function backToLists() {
-        // history.back() だと直接 /#ID にアクセスした場合にサイト外へ遷移するため pushState を使う
         history.pushState(null, "", window.location.pathname);
-        // pushState は hashchange を発火しないため手動で同期
         state.hasHash = false;
     }
 </script>
@@ -550,11 +503,6 @@
     </div>
 {/if}
 
-<!-- ボディ: サイドバー + メインコンテンツ -->
-<!--
-    レスポンシブ幅はbootstrapのcontainer風に各ブレークポイントで細かく刻む方法もあるが、
-    本画面では細かく刻まず、xl ブレークポイント以上での最大幅制限のみ行う。
--->
 <div class="mx-auto flex min-h-0 w-full flex-1 xl:max-w-285">
     <ListSidebar
         {lists}
@@ -578,7 +526,6 @@
         onAddList={addList}
     />
 
-    <!-- メインコンテンツ: 選択リストのタスク or 検索結果 -->
     <main
         class="flex-1 flex-col bg-white sm:flex dark:bg-gray-800"
         class:flex={mobileView === "tasks"}

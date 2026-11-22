@@ -9,7 +9,6 @@ vi.mock("#lib/server/session.ts", async (importOriginal) => {
     await importOriginal<typeof import("#lib/server/session.ts")>();
   return {
     ...actual,
-    // 試験ではトークン値"valid"だけをログイン済みとみなす
     verifySessionToken: vi.fn(async (token: string) =>
       token === "valid" ? 1 : null,
     ),
@@ -21,7 +20,6 @@ const { COOKIELESS_MUTATION_PATHS, EXTENSION_EMBEDDABLE_PATHS, safeReturnTo } =
 
 type HandleEvent = Parameters<Handle>[0]["event"];
 
-/** `handle`へ渡す要求を作る。`cookieName`のCookieへ有効なセッションを持つ利用者として送る。 */
 function makeEvent(
   pathname: string,
   {
@@ -65,7 +63,6 @@ describe("セッション認証の入口", () => {
   });
 
   it("未ログインのポップアップからの共有POSTは、元の画面をreturnToに付けてログインへ転送する", async () => {
-    // ログイン後にトップ画面へ移ると拡張からの埋め込みが拒否されるため、タスク追加画面へ戻す
     const event = makeEvent("/share/ingest?in_popup=1", {
       cookieName: "other",
     });
@@ -78,7 +75,6 @@ describe("セッション認証の入口", () => {
   });
 
   it.each([
-    // Chrome拡張のポップアップはタスク追加画面を埋め込み、ログイン後にこの画面へ戻る必要がある
     [
       "/share/ingest?title=t&in_popup=1",
       "/auth/login?returnTo=%2Fshare%2Fingest%3Ftitle%3Dt%26in_popup%3D1",
@@ -158,14 +154,12 @@ describe("他オリジンからの更新要求", () => {
 
   it("全ルートのうちCookieを読まない入口以外は、他オリジンからの更新要求を拒否する", async () => {
     const routes = listRoutePaths();
-    // 除外集合はルートとして実在する入口だけで構成する
     for (const pathname of COOKIELESS_MUTATION_PATHS) {
       expect(routes).toContain(pathname);
     }
     const protectedRoutes = routes.filter(
       (pathname) => !COOKIELESS_MUTATION_PATHS.has(pathname),
     );
-    // 起草時の全16ルート（`/api/`外14件と`/api/events`・`/api/trpc`）を下回る列挙は走査の誤りとみなす
     expect(routes.length).toBeGreaterThanOrEqual(16);
     for (const pathname of protectedRoutes) {
       const { response, resolved } = await run(

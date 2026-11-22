@@ -1,10 +1,3 @@
-/**
- * @fileoverview OAuth 2.1 認可エンドポイント（GET=同意画面、POST=コード発行）
- *
- * MCP クライアントが /oauth/authorize?response_type=code&... をブラウザで開く。
- * 未ログイン時は /auth/login へ returnTo 付きで誘導し、ログイン後に本ページへ戻る。
- */
-
 import { fail, redirect } from "@sveltejs/kit";
 import { z } from "zod";
 import { getClient, issueAuthorizationCode } from "#lib/server/mcp/store.ts";
@@ -34,7 +27,6 @@ const QuerySchema = z.object({
 
 type AuthorizeParams = z.infer<typeof QuerySchema>;
 
-/** 戻り先を検証できない失敗。画面に表示し、クライアントへは返さない */
 type UnverifiedTargetError =
   "unknown_client" | "invalid_redirect_uri" | "invalid_request";
 
@@ -56,7 +48,6 @@ function ensureRegisteredClient(url: URL) {
 
 type ValidatedTarget = ReturnType<typeof ensureRegisteredClient>;
 
-/** 戻り先を検証できない失敗の分類を、画面に表示する値へそろえる。 */
 function unverifiedTargetError(error: unknown): UnverifiedTargetError {
   return error instanceof Error &&
     (error.message === "unknown_client" ||
@@ -65,10 +56,6 @@ function unverifiedTargetError(error: unknown): UnverifiedTargetError {
     : "invalid_request";
 }
 
-/**
- * 登録済みの戻り先だけへ認可結果を返し、未検証URIへの転送を防ぐ。
- * 失敗は`error`と、理由と次の操作をつないだ`error_description`を返す。
- */
 function respond(
   target: ValidatedTarget,
   result:

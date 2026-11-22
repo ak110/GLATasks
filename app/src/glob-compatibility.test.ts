@@ -8,7 +8,6 @@ import { ESLint } from "eslint";
 import { createLinter, loadTextlintrc } from "textlint";
 import { afterEach, beforeEach, expect, it } from "vitest";
 
-// 依存元が実際に解決する版を検査し、overrideの適用漏れも検出する。
 const rootRequire = createRequire(
   new URL("../../package.json", import.meta.url),
 );
@@ -56,7 +55,6 @@ it("ESLint selects nested and dot files while preserving global ignores", async 
   expect(results.every((result) => result.errorCount === 0)).toBe(true);
 });
 
-// 実際の.textlintrc.yamlから全ルールを読み込むため、並行実行の負荷下では既定の5秒の上限を超える。
 it("textlint finds Markdown files and respects explicit and default ignores", async () => {
   for (const path of [
     "docs/main.md",
@@ -87,8 +85,6 @@ it("textlint finds Markdown files and respects explicit and default ignores", as
 }, 60_000);
 
 it("bounds globstar-parent pattern expansion at optimization level two", () => {
-  // GHSA-g3hv-75wg-m249: 小さな入力で上限を確かめ、時間閾値には依存しない。
-  // minimatch 11.0.5以降は上限を超える展開を切り詰めずにRangeErrorで拒否する。どちらも展開量の上限を守る。
   const pattern = Array(8).fill("**/../a/b").join("/");
   let size: number;
   try {
@@ -122,6 +118,5 @@ it("stops directory traversal when the signal aborts during a read", async () =>
       },
     }),
   ).toThrow(reason);
-  // GHSA-3g3m-2fjr-6pw4: abort後に子ディレクトリへ読み進まない。
   expect(reads).toBe(1);
 });

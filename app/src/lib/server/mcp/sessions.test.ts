@@ -3,7 +3,6 @@ import { _resetProcessStateForTest } from "../process-state";
 
 type SessionsModule = typeof import("./sessions");
 
-/** 開発サーバーのモジュール再評価と同じく、新しい世代として読み込み直す。 */
 async function loadSessions(): Promise<SessionsModule> {
   vi.resetModules();
   return import("./sessions");

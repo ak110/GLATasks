@@ -131,7 +131,6 @@ test.describe("非同期の画面状態", () => {
       const listError = page
         .getByRole("alert")
         .filter({ hasText: "リストを取得できませんでした" });
-      // 初回のHTTPバッチ全体が失敗した場合、リストだけ先に再取得して選択を復元する。
       if (await listError.isVisible())
         await listError.getByRole("button", { name: "再試行" }).click();
       const alert = page

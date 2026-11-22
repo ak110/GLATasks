@@ -1,8 +1,4 @@
 <script lang="ts">
-    /**
-     * @fileoverview リストサイドバー（リスト一覧表示 + リスト追加フォーム）
-     */
-
     import type { ListInfo } from "#lib/types.ts";
     import ListItem from "./ListItem.svelte";
 
@@ -80,7 +76,6 @@
             <p class="p-4 text-gray-400 dark:text-gray-500">リストなし</p>
         {/if}
     </div>
-    <!-- リスト追加フォーム -->
     <div class="border-t border-gray-200 p-3 dark:border-gray-700">
         <form onsubmit={handleAddList} class="flex gap-2">
             <input

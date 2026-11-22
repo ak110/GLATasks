@@ -6,31 +6,15 @@ import {
   type Page,
   type Response,
 } from "@playwright/test";
-/**
- * @fileoverview e2eテスト共通ヘルパー
- *
- * BASE_URL・storageStateパス・リスト準備/後片付け処理を一元管理する。
- * 各テストファイルで重複していた定義をここに集約し、
- * 不統一なパス形式（絶対パスと相対パスの混在）を解消する。
- */
 
 import * as path from "node:path";
 
-/** テスト対象のベースURL */
 export const BASE_URL = process.env.BASE_URL ?? "https://localhost:38180";
 
-/**
- * 認証状態ファイルのパス
- *
- * `import.meta.dirname` 基準の絶対パスで統一し、実行ディレクトリに依存しない形にする。
- * playwright.config.ts の storageState 設定はリポジトリルート基準の相対パスを使うが、
- * テストコード内では絶対パスを使うことで一貫性を保つ。
- */
 export const STORAGE_STATE_PATH = process.env.E2E_STORAGE_STATE
   ? path.resolve(import.meta.dirname, "../../..", process.env.E2E_STORAGE_STATE)
   : path.join(import.meta.dirname, "..", ".auth", "user.json");
 
-/** 指定したprocedureを含むtRPC応答かどうかを判定する */
 export function isMutationResponse(
   response: Response,
   procedure: string,
@@ -45,7 +29,6 @@ export function isTrpcUrl(url: string, procedure: string): boolean {
   return pathname.slice(prefix.length).split(",").includes(procedure);
 }
 
-/** 操作前に登録した指定procedureのmutation応答を待つ */
 export function waitForMutationResponse(
   page: Page,
   procedure: string,
@@ -55,7 +38,6 @@ export function waitForMutationResponse(
   );
 }
 
-/** 指定procedureのmutationがHTTP成功で完了するまで待つ */
 export async function waitForSuccessfulMutationResponse(
   page: Page,
   procedure: string,
@@ -67,19 +49,16 @@ export async function waitForSuccessfulMutationResponse(
   return response;
 }
 
-/** タスク更新mutationの応答を待つ */
 export function waitForTaskUpdateResponse(page: Page): Promise<Response> {
   return waitForMutationResponse(page, "tasks.update");
 }
 
-/** 楽観追加されたタスクが実IDへ置き換わるまで待つ */
 export async function waitForPersistedTask(taskRow: Locator): Promise<void> {
   await expect
     .poll(async () => Number(await taskRow.getAttribute("data-reorder-id")))
     .toBeGreaterThan(0);
 }
 
-/** タスク状態を1段階進め、成功応答と画面状態の反映後に返る */
 export async function toggleTaskAndWaitForUpdate(
   page: Page,
   checkbox: Locator,
@@ -116,7 +95,6 @@ export async function toggleTaskAndWaitForUpdate(
   }
 }
 
-/** テスト用リストを作成するための共通コンテキストオプション */
 export function makeContextOptions(
   overrides: BrowserContextOptions = {},
 ): BrowserContextOptions {
@@ -129,7 +107,6 @@ export function makeContextOptions(
   };
 }
 
-/** 並行するテストと衝突しない名前を生成する */
 export function uniqueTestName(prefix: string): string {
   return `${prefix}_${Date.now()}_${crypto.randomUUID().slice(0, 8)}`;
 }
@@ -140,7 +117,6 @@ export async function requireBoundingBox(locator: Locator) {
   return box;
 }
 
-/** 公開UIでリストを追加し、必要に応じて選択する */
 export async function createListFromPage(
   page: Page,
   listName: string,
@@ -163,7 +139,6 @@ export async function createListFromPage(
   }
 }
 
-/** 入力内容を追加し、実IDと追加欄の復元を待つ */
 export async function addTask(
   page: Page,
   text: string,
@@ -202,8 +177,6 @@ async function deleteTestListFromPage(
   listName: string,
 ): Promise<void> {
   const listRow = page.getByTestId("list-item").filter({ hasText: listName });
-  // 一覧の取得応答の後も行の描画は遅れて届く。描画前に数えると対象が無いと判定して削除を省くため、
-  // 一覧行の表示を待ってから対象の有無を判定する
   await expect(page.getByTestId("list-item").first()).toBeVisible();
   if ((await listRow.count()) === 0) return;
   await listRow.getByTestId("list-menu-btn").click();
@@ -221,12 +194,6 @@ async function deleteTestListFromPage(
   await expect(listRow).toHaveCount(0);
 }
 
-/**
- * 公開UIを操作してテスト用リストを作成・削除する
- *
- * 開発サーバーとビルド済み環境の双方で成立する経路へ統一するため、
- * Viteのソースモジュール（`/src/lib/trpc.ts`）へは依存しない。
- */
 async function mutateTestListFixtures(
   page: Page,
   operation: FixtureOperation,
@@ -257,11 +224,6 @@ async function mutateTestListFixtures(
   await page.goto("about:blank");
 }
 
-/**
- * テスト用リストを作成する
- *
- * `beforeAll` から呼び出す。作成後にコンテキストをクローズする。
- */
 export async function setupTestList(
   browser: Browser,
   listName: string,
@@ -269,7 +231,6 @@ export async function setupTestList(
   await setupTestLists(browser, [listName]);
 }
 
-/** 1つのコンテキストで複数のテスト用リストを作成する */
 export async function setupTestLists(
   browser: Browser,
   listNames: readonly string[],
@@ -303,11 +264,6 @@ export async function setupTestLists(
   }
 }
 
-/**
- * テスト用リストを削除する
- *
- * `afterAll` から呼び出す。削除後にコンテキストをクローズする。
- */
 export async function cleanupTestList(
   browser: Browser,
   listName: string,
@@ -315,7 +271,6 @@ export async function cleanupTestList(
   await cleanupTestLists(browser, [listName]);
 }
 
-/** 1つのコンテキストで複数のテスト用リストを削除する */
 export async function cleanupTestLists(
   browser: Browser,
   listNames: readonly string[],

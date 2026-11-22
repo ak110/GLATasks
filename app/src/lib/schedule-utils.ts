@@ -9,27 +9,15 @@
 import { RRule, rrulestr } from "rrule";
 import { SCHEDULE_TIMEZONE } from "#lib/date-time.ts";
 
-/** rrule の byweekday 数値表現（0=月曜〜6=日曜）に対応する日本語曜日名 */
 const WEEKDAY_JA = ["月", "火", "水", "木", "金", "土", "日"] as const;
 
-/** 数値配列を「・」区切りの文字列に変換する */
 function joinNumbers(values: number[]): string {
   return values.join("・");
 }
 
-/**
- * RRULE文字列から日本語の繰り返し要約文を生成する。
- *
- * `rrule` はBYDAY・BYMONTHDAY・BYMONTHを明示指定しない場合でも、`options`（解決後の値）
- * へDTSTART由来の値を自動補完する。この自動補完値と利用者の明示指定を区別するため、
- * 利用者が実際に入力した値の有無は `origOptions` で判定し、表示する数値自体は
- * 解決後の `options` から取り出す。
- */
 export function describeSchedule(rrule: string): string {
   const rule = rrulestr(rrule, { tzid: SCHEDULE_TIMEZONE });
   if (!(rule instanceof RRule)) {
-    // RDATE/EXDATE等を含む RRuleSet は本アプリのスケジュールでは生成しないため、
-    // 想定外の入力に対するフォールバック表示とする
     return "不明な繰り返し";
   }
   const { freq, interval } = rule.options;

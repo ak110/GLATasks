@@ -1,11 +1,4 @@
 <script lang="ts">
-    /**
-     * @fileoverview 定期TODOスケジュール一覧の表示専用コンポーネント
-     *
-     * 有効/無効切替・編集・削除はいずれもコールバック経由で親（ScheduleDialog.svelte）へ
-     * 委譲する。tRPC呼び出しは持たない。
-     */
-
     import type { ScheduleInfo } from "#lib/types.ts";
     import { describeSchedule } from "#lib/schedule-utils.ts";
 

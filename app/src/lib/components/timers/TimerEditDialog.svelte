@@ -3,9 +3,6 @@
     import { grayButtonClass } from "#lib/components/ui/styles.ts";
     import { getUtcOffsetMinutes } from "#lib/date-time.ts";
     import Dialog from "#lib/components/dialogs/Dialog.svelte";
-    /**
-     * @fileoverview タイマー追加/編集ダイアログ
-     */
 
     import {
         TIMER_DEFAULT_ADJUST_MINUTES,
@@ -58,7 +55,6 @@
         onSaveAsDefault,
     }: Props = $props();
 
-    // ダイアログタイトル: 一時タイマー作成時のみ専用文言に差し替える
     const dialogTitle = $derived(
         mode === "edit"
             ? "タイマー編集"
@@ -76,7 +72,6 @@
     let nameInputEl = $state<HTMLInputElement | null>(null);
     let formEl = $state<HTMLFormElement | null>(null);
 
-    // ダイアログ開閉時にローカル状態をリセット
     $effect(() => {
         void session;
         if (open) {
@@ -127,7 +122,6 @@
         if (data) onSubmit(data);
     }
 
-    /** 現在のフォーム値を利用者既定値として保存する */
     function handleSaveAsDefault() {
         if (!onSaveAsDefault) return;
         // 送信ボタンと異なりブラウザ標準の制約検証を経由しないため明示的に呼び出す
@@ -181,7 +175,6 @@
             />
         </div>
 
-        <!-- モード切替 -->
         <div class="flex gap-0" data-testid="timer-mode-selector">
             <button
                 type="button"

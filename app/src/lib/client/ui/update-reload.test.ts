@@ -1,10 +1,3 @@
-/**
- * @fileoverview 新しい版の検知後の自動再読み込みのユニットテスト
- *
- * 作業中・保存中・通信断では再読み込みを見送って試し直し、条件が揃った時点で1回だけ再読み込みすることを、
- * 見送り要因ごとの代表値で検証する。時間経過はfake timersで制御する。
- */
-
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   startUpdateAutoReload,

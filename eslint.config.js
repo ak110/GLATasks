@@ -12,8 +12,7 @@ export default [
       globals: { ...globals.browser, ...globals.node },
     },
     rules: {
-      // `_` プレフィックス付きの引数・変数・catchハンドラは意図的な未使用としてlint対象外にする
-      // （TypeScript/typescript-eslintコミュニティの一般的慣例）
+      "no-empty": ["error", { allowEmptyCatch: true }],
       "@typescript-eslint/no-unused-vars": [
         "error",
         {
@@ -61,9 +60,6 @@ export default [
   },
 ];
 
-/**
- * `location`・`window.location`・`globalThis.location`の`reload()`・`assign()`・`replace()`呼び出しと`href`への代入を表すselector。
- */
 function fullNavigationSelectors() {
   const isLocation =
     ":matches([object.type='Identifier'][object.name='location'], [object.type='MemberExpression'][object.property.name='location'][object.object.name=/^(window|globalThis)$/])";

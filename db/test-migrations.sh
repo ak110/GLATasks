@@ -80,7 +80,6 @@ INSERT INTO `timer` (id, user_id, name, base_seconds, remaining_seconds, created
  (10, 999, 'orphan', 60, 60, UTC_TIMESTAMP(), UTC_TIMESTAMP());
 SET FOREIGN_KEY_CHECKS = 1;
 SQL
-    # 最新migration自体の再実行も確認する（履歴管理による実行済み判定と独立）。
     for ((repeat = 0; repeat < 2; repeat++)); do
         for migration in "$repo_root"/drizzle/migrations/0018_*.sql; do
             sql "$database" <"$migration"

@@ -1,13 +1,3 @@
-/**
- * @fileoverview Vitestのプロジェクト分割設定
- *
- * - node: Node環境テスト（既存の *.test.ts）
- * - dom:  DOM環境テスト（*.svelte.test.ts / *.dom.test.ts）
- *
- * DOM環境テストでのみ @sveltejs/vite-plugin-svelte と
- * @testing-library/svelte の svelteTesting プラグインを適用し、
- * 既存のNode環境テストには影響を与えない。
- */
 import * as path from "node:path";
 import { svelte, vitePreprocess } from "@sveltejs/vite-plugin-svelte";
 import { svelteTesting } from "@testing-library/svelte/vite";
@@ -21,7 +11,6 @@ export default defineConfig({
   test: {
     projects: [
       {
-        // Node環境プロジェクト（既存テスト）
         resolve: { alias: libAlias },
         test: {
           name: "node",
@@ -39,10 +28,6 @@ export default defineConfig({
         },
       },
       {
-        // DOM環境プロジェクト（Svelteコンポーネントテスト）
-        // `$app/*` を import するコンポーネントは、このprojectが sveltekit()
-        // プラグインを使わないため解決できない。該当コンポーネントの表示と
-        // 操作は app/tests 配下のPlaywrightテストで検証する。
         plugins: [
           svelte({ configFile: false, preprocess: vitePreprocess() }),
           svelteTesting(),
@@ -62,7 +47,6 @@ export default defineConfig({
             "tests/**",
             "**/.{cache,build,svelte-kit}/**",
           ],
-          // @testing-library/jest-dom のカスタムマッチャーを全テストで有効化する
           setupFiles: ["src/test-setup.ts"],
         },
       },

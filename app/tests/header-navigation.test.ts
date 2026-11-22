@@ -1,7 +1,3 @@
-/**
- * @fileoverview 共通ヘッダーのナビゲーション契約テスト
- */
-
 import { expect, test } from "@playwright/test";
 
 import { openPage, PAGE_NAMES } from "./helpers/page-scroll";

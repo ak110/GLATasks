@@ -1,16 +1,9 @@
-/**
- * @fileoverview セッショントークン（JWT/HS256）の生成・検証
- */
-
 import type { Cookies } from "@sveltejs/kit";
 import { SignJWT, jwtVerify } from "jose";
 import { getSecret } from "./jwt-key";
 
 const SESSION_AUDIENCE = "glatasks-session";
 
-/**
- * ユーザーIDを含む署名済みセッショントークンを生成する。
- */
 export async function createSessionToken(
   userId: number,
   generation = 0,
@@ -29,16 +22,10 @@ export async function createSessionToken(
  */
 export const DEFAULT_SESSION_COOKIE_NAME = "__Host-gla-session";
 
-/**
- * セッションCookie名を返す。環境変数`SESSION_COOKIE_NAME`が空でなければその値を使う。
- *
- * 既存の名前で運用する環境（本番など）は設定で旧名を使い続け、端末ごとの再ログインを避ける。
- */
 export function getSessionCookieName(): string {
   return process.env.SESSION_COOKIE_NAME?.trim() || DEFAULT_SESSION_COOKIE_NAME;
 }
 
-/** セッション Cookie 有効期限（秒） */
 const SESSION_MAX_AGE = 365 * 24 * 60 * 60;
 
 /**
@@ -54,9 +41,6 @@ const SESSION_COOKIE_ATTRIBUTES = {
   sameSite: "none",
 } as const;
 
-/**
- * セッショントークンを Cookie にセットする。
- */
 export function setSessionCookie(cookies: Cookies, token: string): void {
   cookies.set(getSessionCookieName(), token, {
     ...SESSION_COOKIE_ATTRIBUTES,
@@ -64,17 +48,10 @@ export function setSessionCookie(cookies: Cookies, token: string): void {
   });
 }
 
-/**
- * セッションCookieを削除する。
- */
 export function deleteSessionCookie(cookies: Cookies): void {
   cookies.delete(getSessionCookieName(), SESSION_COOKIE_ATTRIBUTES);
 }
 
-/**
- * セッショントークンを検証してユーザーIDを返す。
- * 無効なトークンの場合は null を返す。
- */
 export async function verifySessionToken(
   token: string,
   getGeneration: (userId: number) => Promise<number | undefined> = async () =>
@@ -84,7 +61,6 @@ export async function verifySessionToken(
     const { payload } = await jwtVerify(token, getSecret(), {
       algorithms: ["HS256"],
     });
-    // 既存のaud無しCookieは維持し、同じ鍵で署名したMCP用JWTの転用を拒否する。
     if (payload.aud !== undefined && payload.aud !== SESSION_AUDIENCE) {
       return null;
     }
@@ -99,7 +75,6 @@ export async function verifySessionToken(
   }
 }
 
-/** 旧セッションのログインは維持し、本人確認の省略は用途・世代・発行時刻が揃った署名済みセッションに限る。 */
 export async function getRecentAuthenticationUntil(
   cookies: Cookies,
   userId: number,

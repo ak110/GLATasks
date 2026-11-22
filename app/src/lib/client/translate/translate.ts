@@ -1,8 +1,3 @@
-/**
- * @fileoverview 翻訳ページの言語設定、方向判定、Prompt API用設定
- */
-
-/** ChromeのTranslator APIが対応すると案内している言語タグ */
 export const LANGUAGE_TAGS = [
   "ar",
   "bg",
@@ -45,7 +40,6 @@ export const LANGUAGE_TAGS = [
   "zh-Hant",
 ] as const;
 
-/** Prompt APIが受理する言語タグ */
 export const PROMPT_LANGUAGE_TAGS = ["en", "ja", "es", "de", "fr"] as const;
 
 export type TranslateEngine = "translator" | "prompt";
@@ -80,7 +74,6 @@ const STORAGE_KEYS = {
 
 const promptLanguageTagSet = new Set<string>(PROMPT_LANGUAGE_TAGS);
 
-/** 言語タグ比較用に地域・スクリプト部分を取り除く */
 function getBaseLanguageTag(languageTag: string): string {
   return languageTag.split("-", 1)[0]?.toLowerCase() ?? "";
 }
@@ -91,10 +84,6 @@ function isPromptLanguageTag(
   return languageTag !== null && promptLanguageTagSet.has(languageTag);
 }
 
-/**
- * 言語名または言語タグを、Translator APIで使う言語タグへ解決する。
- * タグの大小文字と前後の空白を正規化し、日本語・英語の表示名も受理する。
- */
 export function resolveLanguageTag(input: string): string | null {
   const normalizedInput = input.trim().toLowerCase();
   if (!normalizedInput) return null;
@@ -121,7 +110,6 @@ export function resolveLanguageTag(input: string): string | null {
   return null;
 }
 
-/** 検出結果と言語設定から翻訳元と言語先を決める */
 export function decideDirection(
   detectedLanguage: string | null,
   nativeLanguage: string,
@@ -152,7 +140,6 @@ export function decideDirection(
   };
 }
 
-/** Prompt APIへ翻訳方向と出力形式を指定するシステム指示を生成する */
 export function buildTranslationPrompt(
   nativeLanguage: string,
   foreignLanguage: string,
@@ -160,12 +147,6 @@ export function buildTranslationPrompt(
   return `あなたは翻訳エンジンとして動作する。入力テキストが「${nativeLanguage}」で書かれていれば「${foreignLanguage}」へ、それ以外の言語で書かれていれば「${nativeLanguage}」へ翻訳する。訳文だけを出力し、説明、注釈、引用符を付けない。`;
 }
 
-/**
- * Prompt APIの言語宣言を生成する。
- * `expectedInputs`はシステム指示と設定外の対応言語による原文を含む集合を宣言し、
- * `expectedOutputs`は設定された母語・相手言語だけを宣言する。
- * https://developer.chrome.com/docs/ai/prompt-api
- */
 export function buildPromptLanguageOptions(
   nativeLanguage: string,
   foreignLanguage: string,
@@ -195,7 +176,6 @@ export function buildPromptLanguageOptions(
   };
 }
 
-/** localStorageから翻訳設定を取得する */
 export function getStoredTranslateSettings(): TranslateSettings {
   if (typeof localStorage === "undefined") {
     return { ...TRANSLATE_DEFAULTS };
@@ -225,7 +205,6 @@ export function getStoredTranslateSettings(): TranslateSettings {
   };
 }
 
-/** 翻訳設定をlocalStorageへ保存する */
 export function setStoredTranslateSettings(settings: TranslateSettings): void {
   if (typeof localStorage === "undefined") return;
 
@@ -234,7 +213,6 @@ export function setStoredTranslateSettings(settings: TranslateSettings): void {
   localStorage.setItem(STORAGE_KEYS.engine, settings.engine);
 }
 
-/** 空行で区切った段落を、改行を保持した翻訳単位へ分ける */
 export function splitTranslationUnits(text: string): string[] {
   return text
     .replace(/\r\n?/g, "\n")

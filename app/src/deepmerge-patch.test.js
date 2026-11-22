@@ -1,7 +1,6 @@
 import { createRequire } from "node:module";
 import { describe, expect, it } from "vitest";
 
-// Viteプラグインが実際に解決する依存を検査し、パッチの適用漏れも検出する。
 const pluginRequire = createRequire(
   import.meta.resolve("@sveltejs/vite-plugin-svelte"),
 );
@@ -9,7 +8,6 @@ const pluginRequire = createRequire(
 describe.each(["deepmerge", "deepmerge/dist/umd.js"])("%s", (entry) => {
   const merge = pluginRequire(entry);
 
-  // GHSA-gcqx-w48m-w2h4: sourceだけでなくtargetのコピーでも汚染が起きる。
   it.each([
     [
       "null prototype",

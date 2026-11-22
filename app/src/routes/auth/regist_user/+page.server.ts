@@ -1,7 +1,3 @@
-/**
- * @fileoverview ユーザー登録ページのサーバーサイド処理
- */
-
 import { fail, redirect } from "@sveltejs/kit";
 import * as api from "#lib/server/api.ts";
 import { createSessionToken, setSessionCookie } from "#lib/server/session.ts";
@@ -48,7 +44,6 @@ export const actions: Actions = {
       return fail(getErrorStatus(e), { error: getPublicError(e).message });
     }
 
-    // ログイン画面と同じく元の画面へ戻す（Chrome拡張のポップアップ内で登録した場合など）
     redirect(302, safeReturnTo(url.searchParams.get("returnTo")));
   },
 };

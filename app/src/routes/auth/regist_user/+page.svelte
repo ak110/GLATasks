@@ -1,8 +1,4 @@
 <script lang="ts">
-    /**
-     * @fileoverview ユーザー登録ページ
-     */
-
     import type { ActionData } from "./$types";
     import AuthCard from "#lib/components/layout/AuthCard.svelte";
     import PasskeyAuth from "#lib/components/layout/PasskeyAuth.svelte";
@@ -15,7 +11,6 @@
 
     let { form }: Props = $props();
 
-    // ログイン画面との往復でも転送元の画面へ戻れるよう、戻り先をログイン画面へ引き継ぐ
     let loginQuery = $derived.by(() => {
         const returnTo = page.url.searchParams.get("returnTo");
         return returnTo ? `?${new URLSearchParams({ returnTo })}` : "";

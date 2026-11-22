@@ -22,8 +22,6 @@
     let error = $state("");
     let busy = $state(false);
     let recovering = $state(false);
-    // この画面で復旧コードによる本人確認が成功したか。再開ボタンはサーバーへ照会しないため、
-    // 復旧状態の有効期限を過ぎていても recovering だけが真になる。
     let verified = $state(false);
     let embedded = $state(false);
     let ready = $state(false);

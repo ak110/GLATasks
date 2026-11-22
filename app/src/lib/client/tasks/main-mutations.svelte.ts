@@ -26,7 +26,6 @@ export function createMainMutations(
     onSettled: refreshTasks,
   }));
 
-  // リスト作成
   const createListMutation = createMutation(() => ({
     mutationFn: (title: RouterInputs["lists"]["create"]["title"]) =>
       trpc.lists.create.mutate({ title }),
@@ -36,7 +35,6 @@ export function createMainMutations(
     },
   }));
 
-  // タスク作成
   const createTaskMutation = createMutation(() => ({
     mutationFn: ({
       listId,
@@ -56,8 +54,6 @@ export function createMainMutations(
       queryClient.setQueryData<ActiveTasksCache>(
         queryKeys.activeTasks,
         (old) => {
-          // キャッシュ未初期化の場合は楽観タスクを追加せず、
-          // サーバー応答後の差分 sync に委ねる
           if (!old) return undefined;
           const optimisticTask: TaskListItem = {
             _key: tempId,
@@ -84,7 +80,6 @@ export function createMainMutations(
     onError: (_err, _vars, context) => {
       const tempId = context?.tempId;
       if (tempId === undefined) return;
-      // 失敗時は作成操作が追加した仮IDのタスクだけを取り消し、並行操作の結果を保持する。
       queryClient.setQueryData<ActiveTasksCache>(
         queryKeys.activeTasks,
         (old) =>
@@ -97,7 +92,6 @@ export function createMainMutations(
       );
     },
     onSuccess: (data, _vars, context) => {
-      // 仮IDタスクを実IDで置き換える。DOMの連続性を保ちつつ正しいIDになる。
       const tempId = context?.tempId;
       if (tempId !== undefined) {
         queryClient.setQueryData<ActiveTasksCache>(
@@ -118,7 +112,6 @@ export function createMainMutations(
     },
   }));
 
-  // タスク更新
   const updateTaskMutation = createMutation(() => ({
     mutationFn: (input: RouterInputs["tasks"]["update"]) =>
       trpc.tasks.update.mutate(input),
@@ -127,7 +120,6 @@ export function createMainMutations(
       const previousUpdated = queryClient
         .getQueryData<ActiveTasksCache>(queryKeys.activeTasks)
         ?.tasks.find((t) => t.id === variables.taskId)?.updated;
-      // text変更かつkeepOrder=falseなら先頭移動（サーバーロジック踏襲）
       let optimisticSortOrder: number | undefined;
       if (variables.text !== undefined && variables.keepOrder !== true) {
         const prev2 = queryClient.getQueryData<ActiveTasksCache>(
@@ -141,7 +133,6 @@ export function createMainMutations(
           sameListTasks.map((task) => task.sortOrder),
         );
       } else if (variables.moveTo !== undefined) {
-        // moveTo のみの場合も移動先リストの先頭に楽観配置
         const prev2 = queryClient.getQueryData<ActiveTasksCache>(
           queryKeys.activeTasks,
         );
@@ -192,8 +183,6 @@ export function createMainMutations(
       return { previousUpdated };
     },
     onError: (_error, _variables, context) => {
-      // 差分取得はサーバー側で updated が変わっていないタスクを応答へ含めない。
-      // 変更前の updated を起点に取り直し、失敗した楽観値を確定値で上書きする。
       const previousUpdated = context?.previousUpdated;
       if (previousUpdated !== undefined) {
         queryClient.setQueryData<ActiveTasksCache>(
@@ -206,35 +195,30 @@ export function createMainMutations(
     onSuccess: refreshTasks,
   }));
 
-  // リスト削除
   const deleteListMutation = createMutation(() => ({
     mutationFn: (listId: RouterInputs["lists"]["delete"]["listId"]) =>
       trpc.lists.delete.mutate({ listId }),
     onSuccess: refreshTasks,
   }));
 
-  // リスト名変更
   const renameListMutation = createMutation(() => ({
     mutationFn: ({ listId, title }: RouterInputs["lists"]["rename"]) =>
       trpc.lists.rename.mutate({ listId, title }),
     onSuccess: refreshTasks,
   }));
 
-  // リストをアーカイブ
   const archiveListMutation = createMutation(() => ({
     mutationFn: (listId: RouterInputs["lists"]["archive"]["listId"]) =>
       trpc.lists.archive.mutate({ listId }),
     onSuccess: refreshTasks,
   }));
 
-  // リストをアーカイブ解除
   const unarchiveListMutation = createMutation(() => ({
     mutationFn: (listId: RouterInputs["lists"]["unarchive"]["listId"]) =>
       trpc.lists.unarchive.mutate({ listId }),
     onSuccess: refreshTasks,
   }));
 
-  // 完了済みタスククリア
   const clearListMutation = createMutation(() => ({
     mutationFn: (listId: RouterInputs["lists"]["clear"]["listId"]) =>
       trpc.lists.clear.mutate({ listId }),
@@ -243,7 +227,6 @@ export function createMainMutations(
     },
   }));
 
-  // リスト統合
   const mergeListMutation = createMutation(() => ({
     mutationFn: (input: RouterInputs["lists"]["merge"]) =>
       trpc.lists.merge.mutate(input),
@@ -255,7 +238,6 @@ export function createMainMutations(
     },
   }));
 
-  // タスク並び替え
   const reorderTasksMutation = createMutation(() => ({
     mutationFn: (input: RouterInputs["tasks"]["reorder"]) =>
       trpc.tasks.reorder.mutate(input),

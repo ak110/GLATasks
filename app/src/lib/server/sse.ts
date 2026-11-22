@@ -1,72 +1,32 @@
-/**
- * @fileoverview SSE (Server-Sent Events) 接続管理と差分catchup機構
- *
- * ユーザーごとに SSE 接続を管理し、mutation 完了後に通知を配信する。
- * データは含めず、イベント種別のみを送信する（暗号化不要）。
- *
- * ## Last-Event-IDによる差分catchup方式
- *
- * SSEイベントには `id:` フィールドでプロセス内グローバルの単調増加整数を付与する。
- * クライアントが再接続時に `Last-Event-ID` ヘッダーまたは URL クエリーパラメータで
- * 直前に受信したIDを通知してきた場合、`replayEvents()` でバッファ内の該当ID以降を
- * リプレイする。バッファ外れ（バッファ縮退・TTL失効・プロセス再起動など）では
- * `reset` イベントを送信し、クライアント側で全クエリーを invalidate させる。
- *
- * ## メモリ内バッファのGC条件
- *
- * ユーザー単位のリングバッファとして直近イベントを保持する。
- * 件数が `BUFFER_MAX_EVENTS` を超えた場合は古いイベントから逐次破棄し、
- * 最終発行から `BUFFER_TTL_MS` を超えたユーザーバッファは全削除する。
- * GCはイベント発行時に他ユーザーバッファのTTLもまとめて点検する方式で、
- * 独立タイマーは持たない。
- */
-
 import type { SseEventName } from "#lib/sse-events.ts";
 import { SSE_EVENTS } from "#lib/sse-events.ts";
 import { processState } from "./process-state";
 
 export type { SseEventName };
 
-/** モジュールスコープで再利用し、呼び出しごとの生成コストを排除する */
 const encoder = new TextEncoder();
 
-/** リングバッファのユーザー単位の上限件数 */
 const BUFFER_MAX_EVENTS = 1000;
 
-/** 最終イベント発行からの経過時間がこの値を超えたユーザーバッファを破棄する（ms） */
 const BUFFER_TTL_MS = 30 * 60 * 1000;
 
-/** バッファに保持する1イベントのスナップショット */
 interface BufferedEvent {
   id: number;
   type: SseEventName;
   sourceTabId: string;
 }
 
-/** ユーザー単位のバッファ状態 */
 interface UserBuffer {
   events: BufferedEvent[];
   lastTouchAt: number;
 }
 
-/** 接続・再送バッファ・採番の状態 */
 interface SseState {
-  /** ユーザーID → 接続中の ReadableStreamController の Set */
   connections: Map<number, Set<ReadableStreamDefaultController>>;
-  /** ユーザーID → 直近イベントのリングバッファ */
   buffers: Map<number, UserBuffer>;
-  /**
-   * SSEイベント採番用のプロセス内グローバルカウンター。
-   * プロセス再起動でリセットされるが、再起動時はバッファ外れとして
-   * `reset` イベントで整合性を回復するため問題ない。
-   */
   nextEventId: number;
 }
 
-/**
- * モジュールの再評価をまたいで保持する状態。
- * 再評価前に開始した接続へ、再評価後のoperationsの通知と再送が届くようにする（`process-state.ts`を参照）。
- */
 const state = processState<SseState>("sse", () => ({
   connections: new Map(),
   buffers: new Map(),
@@ -74,7 +34,6 @@ const state = processState<SseState>("sse", () => ({
 }));
 const { connections, buffers } = state;
 
-/** SSE 接続を登録する */
 export function addConnection(
   userId: number,
   controller: ReadableStreamDefaultController,
@@ -87,7 +46,6 @@ export function addConnection(
   userConnections.add(controller);
 }
 
-/** SSE 接続を解除する */
 export function removeConnection(
   userId: number,
   controller: ReadableStreamDefaultController,
@@ -100,7 +58,6 @@ export function removeConnection(
   }
 }
 
-/** 指定ユーザーの全接続にイベントを送信する */
 export function sendEvent(
   userId: number,
   eventType: SseEventName,
@@ -120,18 +77,10 @@ export function sendEvent(
   for (const controller of userConnections) {
     try {
       controller.enqueue(encoded);
-    } catch {
-      // 接続が閉じられている場合は無視（removeConnection で後片付けされる）
-    }
+    } catch {}
   }
 }
 
-/**
- * Last-Event-ID をもとに、バッファ内の該当ID以降のイベントを順次送信する。
- *
- * バッファに該当ID（厳密にはそのIDより新しいイベント）が見つからない場合は
- * `reset` イベントを送信し、クライアントへ全リフレッシュを促す。
- */
 export function replayEvents(
   userId: number,
   lastEventId: number,
@@ -140,7 +89,6 @@ export function replayEvents(
   const buffer = buffers.get(userId);
   const oldest = buffer?.events[0];
   const newest = buffer?.events[buffer.events.length - 1];
-  // バッファ空・最古より前で欠落・最新より未来（再起動シナリオ）はいずれもbufferを信用できない
   if (
     !buffer ||
     !oldest ||
@@ -158,13 +106,11 @@ export function replayEvents(
         encoder.encode(formatEvent(event.id, event.type, event.sourceTabId)),
       );
     } catch {
-      // 接続が閉じられている場合は中断（removeConnection で後片付けされる）
       return;
     }
   }
 }
 
-/** SSEプロトコル形式の文字列を生成する */
 export function formatEvent(
   id: number | undefined,
   eventType: SseEventName,
@@ -173,18 +119,14 @@ export function formatEvent(
   return `${id === undefined ? "" : `id: ${id}\n`}event: ${eventType}\ndata: ${sourceTabId}\n\n`;
 }
 
-/** `reset` イベントをコントローラーへ送出する */
 function enqueueReset(controller: ReadableStreamDefaultController): void {
   try {
     controller.enqueue(
       encoder.encode(formatEvent(undefined, SSE_EVENTS.reset, "")),
     );
-  } catch {
-    // 接続が閉じられている場合は無視
-  }
+  } catch {}
 }
 
-/** ユーザーのバッファへイベントを追記し、上限件数を超えた古いものを破棄する */
 function appendToBuffer(userId: number, event: BufferedEvent): void {
   let buffer = buffers.get(userId);
   if (!buffer) {
@@ -198,7 +140,6 @@ function appendToBuffer(userId: number, event: BufferedEvent): void {
   buffer.lastTouchAt = Date.now();
 }
 
-/** TTL経過済みのユーザーバッファを破棄する */
 function gcExpiredBuffers(): void {
   const now = Date.now();
   for (const [userId, buffer] of buffers) {
@@ -208,7 +149,6 @@ function gcExpiredBuffers(): void {
   }
 }
 
-/** テスト用: 内部状態をリセットする */
 export function _resetForTest(): void {
   connections.clear();
   buffers.clear();

@@ -1,5 +1,3 @@
-/** @fileoverview OAuth登録からMCP認証付き要求までをHTTPと画面入口で確認する。 */
-
 import { createHash, randomBytes } from "node:crypto";
 import { expect, test, type APIRequestContext } from "@playwright/test";
 import { BASE_URL } from "./helpers/common";
@@ -133,7 +131,6 @@ async function authorizationRequest(
 test("OAuth認可の拒否は登録した戻り先へstateとaccess_deniedを返す", async ({
   page,
 }) => {
-  // HTTPリダイレクトの後続要求はrouteで捕捉されないため、実在する戻り先を登録する。
   const redirectUri = new URL("/?oauth-callback=e2e", BASE_URL);
   const query = await authorizationRequest(page.request, redirectUri.href);
   await page.goto(`/oauth/authorize?${query}`);

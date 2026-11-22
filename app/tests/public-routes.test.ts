@@ -1,5 +1,3 @@
-/** @fileoverview 公開HTTP経路と未認証の登録ページを確認する。 */
-
 import { expect, test } from "@playwright/test";
 
 test("公開経路がヘルス情報とService Workerを返す", async ({ request }) => {

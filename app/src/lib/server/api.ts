@@ -1,10 +1,3 @@
-/**
- * @fileoverview サーバーAPI再エクスポートバレル
- *
- * 呼び出し側（trpc.ts 等）の import パスを維持するための再エクスポートのみを含む。
- * 実装は api/ 配下の各ドメインファイルに分割されている。
- */
-
 export type { UserInfo } from "./api/auth";
 export { validateCredentials, registerUser } from "./api/auth";
 

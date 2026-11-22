@@ -1,0 +1,213 @@
+{
+  ".claude/skills/verify/inspect.sh": {
+    "コマンド置換の中の fail はサブシェルを終えるだけだが、set -e により代入の失敗で本体も止まる。": 1
+  },
+  ".claude/skills/verify/run.sh": {
+    ".cache直下には test-e2e が毎回削除する e2e-data などがあるため、verify- 接頭辞でそれらと名前を分ける。": 1,
+    "証拠はPlaywrightのコンテナーとホストの双方が読めるbind mount内（gitignore済みの.cache直下）に置く。": 1
+  },
+  "app/playwright.config.ts": {
+    "mouse 入力で setPointerCapture を伴う Pointer Events の自動駆動が": 1,
+    "モバイルブレークポイントの回帰検知用に viewport だけを Pixel 5 サイズへ": 1,
+    "安定しないため、入力経路は Desktop と同じものにそろえる。": 1,
+    "完全な mobile emulation（`devices[\"Pixel 5\"]`）下では Playwright の": 1,
+    "実タッチ入力での動作確認は Chrome DevTools のデバイスエミュレーション": 1,
+    "等で手動検証する想定。": 1,
+    "縮小した Desktop Chrome を使う。": 1
+  },
+  "app/src/deepmerge-patch.test.js": {
+    "* @param {unknown[]} _target @param {unknown[]} source": 1
+  },
+  "app/src/hooks.server.ts": {
+    "* * セッションCookieは`SameSite=None`（Chrome拡張のポップアップ内iframeでログイン状態を使うため）なので、 * 他サイトからの要求にも付く。その補償として、次の不変条件をこの関数で全経路へ既定で適用する。 * * - Cookie認証の更新要求は同一オリジンからだけ受け付ける（`Sec-Fetch-Site`で判定し、Cookieを読まない入口だけを除く） * - 画面は許可した埋め込み元（GLATasks自身と、拡張が開く画面に限りChrome拡張）以外から埋め込めない * * SvelteKit組み込みのOrigin検査はリバースプロキシ経由の利用でOriginが一致しないため無効のまま保つ。 * `Sec-Fetch-Site`はブラウザーが自分の見ているオリジン同士で判定するため、プロキシ経由でも同じ画面からの送信はsame-originになる。": 1,
+    "* 埋め込み元を制限する応答ヘッダーを付ける。旧ブラウザー向けの`X-Frame-Options`は拡張を表せないため拡張用の画面には付けない。": 1,
+    "例外としてChrome拡張のポップアップからの送信は元の画面へ戻す。ログイン後にトップ画面へ移ると、": 1,
+    "拡張からの埋め込みを許可しない画面になりブラウザーが表示を拒否するためである（元の画面はGETで入力欄を開き直すだけ）": 1,
+    "更新要求の転送先へ元のURLを付けると、ログイン後にその入口をGETで開き直すことになるため画面のGETに限る。": 1
+  },
+  "app/src/lib/actions/dnd-reorder.svelte.ts": {
+    "* * 座標から外部ドロップ先・並び替え対象・before/after を判定して候補を更新する。 * pointermove と自動スクロールの各フレームで共有する（指を止めたまま一覧だけが * 動く間は pointermove が届かないため）。": 1
+  },
+  "app/src/lib/client/query-client.ts": {
+    "Node.jsプロセスが例外終了するため、取得はブラウザでだけ行う。": 1,
+    "svelte-query 6.2.3以降はSSR中もqueryを購読して取得を始める。": 1,
+    "サーバー上で取得が失敗すると、エラー処理の接続チェックがブラウザ専用API（document）へ触れて": 1,
+    "個別にenabledを指定するqueryは、SSR時の初期状態で条件が偽になることを前提とする": 1
+  },
+  "app/src/lib/client/query-sync.ts": {
+    "TanStack Query はデータのない初回取得を invalidate 時に再利用する。": 1,
+    "更新前のスナップショットが返るのを防ぐため、その取得だけを先に取り消す。": 1
+  },
+  "app/src/lib/client/sse/connectivity-check.js": {
+    "* * `/healthcheck` の応答を3区分に判定する。条件は上から順に評価し、1つの応答を1区分だけへ入れる。 * * - `\"healthy\"`: HTTP 200・`application/json`・本文の`status`が`\"ok\"` * - `\"unreachable\"`: 通信エラー・タイムアウト（`fetch`の例外）、511を除く5xx。 * 再読み込みしても画面を取得できず、Service Workerのオフライン画面かエラー画面へ移るため、再読み込みの理由にしない * - `\"intercepted\"`: 上記以外。リダイレクト、511（キャプティブポータル用）、5xx・1xx以外の非200、200の非JSONや`status`不一致、本文の解析失敗。 * キャプティブポータルなどが応答を横取りした状態で、再読み込みすると認証画面へ届く * * @param {typeof fetch} fetchFn 判定に使うfetch関数 * @returns {Promise<\"healthy\" | \"unreachable\" | \"intercepted\">} 判定結果": 1,
+    "* * 接続判定を起動する契機を登録する（多重起動はno-op）。 * 非表示中はポーリングを停止し、可視復帰時は即時にコールバックを呼ぶ。 * * @param {() => void | Promise<void>} onTrigger 接続判定を起動するコールバック * @param {{ intervalMs?: number, immediate?: boolean }} [options] * `intervalMs`はポーリング間隔（既定はアプリ本体の30秒）、`immediate`は登録直後（可視の場合）に1回呼ぶか * @returns {() => void} 全契機を解除する停止関数": 1,
+    "* @type {(() => void) | null}": 1,
+    "* @type {Response}": 1,
+    "* @type {ReturnType<typeof setInterval> | null}": 1,
+    "* @type {string}": 1,
+    "* @type {unknown}": 1,
+    "判定基盤は軽量な /healthcheck のため、サーバー側 SSE heartbeat と同じ30秒間隔とする。": 1
+  },
+  "app/src/lib/client/sse/sse-client.ts": {
+    "(EventSource は自動再接続するため、再接続時もこのハンドラが再発火する)": 1,
+    "1. サーバー時刻から暫定オフセットを設定 (tRPC レスポンスの RTT/2 補正値で上書きされる)": 1,
+    "2. 全クエリーをリセットし、差分カーソルを破棄して切断中の変更を全件取り直す": 1,
+    "EventSource の error イベント発火時、接続状態が CLOSED なら自動再接続が": 1,
+    "MessageEvent.lastEventId は仕様上 string で、SSEに `id:` が無いと空文字": 1,
+    "接続確立時の処理:": 1,
+    "機能しない状態のため即時に再接続する。CONNECTING 中はブラウザの自動再接続に委ねる": 1
+  },
+  "app/src/lib/client/translate/translate-api.d.ts": {
+    "* * @fileoverview ブラウザ内蔵AI APIの型宣言 * * TypeScript 6.0.3の`lib.dom.d.ts`に型がないため宣言する。 * TypeScriptが標準で型を同梱した場合は、このファイルを撤去する。": 1
+  },
+  "app/src/lib/client/translate/translate-client.ts": {
+    "* * 準備対象の内蔵AIインスタンスを作成する。 * `available`と`downloading`は自動経路で作成し、`downloadable`だけを * 利用者操作へ分岐する。LanguageDetectorが`downloadable`のときは、 * 検出器を作成せずに方向別のTranslatorを利用者へ選択させる。 * 作成は共通の「create an AI model object」アルゴリズムに従い、 * 利用者操作起点の`create()`をPromiseキューで遅延させない。 * 仕様: https://webmachinelearning.github.io/writing-assistance-apis/#create-an-ai-model-object * https://webmachinelearning.github.io/translation-api/#dom-translator-create * https://developer.mozilla.org/en-US/docs/Web/API/Prompt_API/Using * https://learn.microsoft.com/en-us/microsoft-edge/web-platform/prompt-api * 進捗は0〜1の割合で通知する。仕様上、割合が1に達した後もモデルの初期化工程が続き、 * その間は進捗を通知しない。": 1
+  },
+  "app/src/lib/client/trpc.test.ts": {
+    "10MiBの添付の暗号化とbase64変換は既定の5秒を超えうるため、時間上限を延ばす。": 1,
+    "10MiBの添付上限が32MiBの本文上限に収まることを、実際の送信本文のUTF-8バイト数で裏付ける。": 1,
+    "docs/guide/getting-started.mdの「外部nginxの既定値（1MiB）では元のファイルで約575KiBを超える添付が413で失敗する」と、": 1
+  },
+  "app/src/lib/components/calories/CalorieItemTable.svelte": {
+    "横スクロールの要素で囲むと、最後の行の「⋯」メニューが表の下端で切り取られるため囲まない": 1
+  },
+  "app/src/lib/components/dialogs/Dialog.svelte": {
+    "attachmentの後始末では既にDOMが外れているため、更新後に起点へ戻す。": 1
+  },
+  "app/src/lib/components/layout/PageScrollArea.svelte": {
+    "relativeは絶対配置の子孫の含有ブロックをこの領域へ固定する。 位置指定の祖先が無い絶対配置の要素は初期包含ブロックを基準に配置される。 この場合はsr-onlyのような要素がスクロール領域の外側へ出て、文書ルートの高さを増やす。": 1
+  },
+  "app/src/lib/components/schedules/RecurrenceEditor.svelte": {
+    "* * ブラウザのタイムゾーンに依存せず、Asia/Tokyoの暦日（年・月・日）を取得する。 * `new Date().getFullYear()`等はブラウザTZ依存でAsia/Tokyoとずれ得るため使用しない。": 1
+  },
+  "app/src/lib/components/timers/TimerEditDialog.svelte": {
+    "送信ボタンと異なりブラウザ標準の制約検証を経由しないため明示的に呼び出す": 1
+  },
+  "app/src/lib/schedule-utils.ts": {
+    "* * @fileoverview 定期TODOの繰り返しルール（RRULE文字列）から日本語の要約文を生成する * * `rrule@2.8.1` の `toText()` は英語専用のため使用しない。 * `ScheduleList.svelte` から呼び出す共有ロジックとして `#lib` 直下に配置し、 * サーバー・クライアント双方から参照できるようにする。": 1
+  },
+  "app/src/lib/schemas.ts": {
+    "* * @fileoverview Zod バリデーションスキーマ定義と型エクスポート * * `TagInfo`・`TAG_COLOR_KEYS`・`TagColorKey` はここを正とし、`types.ts` はre-exportのみ行う。": 1
+  },
+  "app/src/lib/server/api/calories-crud.ts": {
+    "* * MariaDBのエラーコードが一致するかを返す * * drizzle-ormはドライバーのエラーをDrizzleQueryErrorで包み、元のエラーを`cause`へ置くため、 * 包まれたエラーと元のエラーの両方を調べる。": 1
+  },
+  "app/src/lib/server/api/common.ts": {
+    "SSOTは #lib/text-split.ts。サーバー・クライアント両方から参照されるため": 1,
+    "このファイルでは re-export のみとし、片側で再実装しない。": 1
+  },
+  "app/src/lib/server/api/lists.ts": {
+    "* * ユーザーの全リストについて、未完了（status=\"active\"または\"running\"）かつ kind=\"todo\" の * タスク件数を list_id ごとに集計する。 * * `listLists` のクエリ（lists 単独取得 + JS側フィルタ）とは別クエリとして扱う。 * 1クエリのJOIN + GROUP BYへ統合せず2クエリ構成とすることで、 * MySQLのGROUP BY厳格モードの影響を避ける。": 1,
+    "task行を FOR UPDATE でロックし、createAttachment 側の同一行ロックと": 1,
+    "削除の冪等性は .claude/skills/add-trpc-procedure/SKILL.md「DB層の実装」に従う。": 1,
+    "外部キーの RESTRICT に合わせ、子テーブルを先に削除する。": 1,
+    "順序を揃えて競合を防ぐ。": 1
+  },
+  "app/src/lib/server/api/passkey-webauthn.ts": {
+    "ログインも利用者→資格情報の順にロックする。削除・復旧と同時でも消えた資格情報を受理しない。": 1
+  },
+  "app/src/lib/server/api/tasks.ts": {
+    "1秒overlap: DB の TIMESTAMP 秒精度に合わせ、現在時刻のミリ秒を除去した上で": 1,
+    "gte(updated, since) は包含比較なので同秒内の更新を取り逃さない。": 1,
+    "さらに1秒以上前の値を返す。リクエスト間隔に応じて最大で約2秒前にずれるが、": 1,
+    "所有権確認の読み取りビューを次のロック取得へ持ち越さない。": 1
+  },
+  "app/src/lib/server/api/timers.ts": {
+    "削除の規約は .claude/skills/add-trpc-procedure/SKILL.md「DB層の実装」を参照。": 1
+  },
+  "app/src/lib/server/auth-routes.ts": {
+    "* * Chrome拡張のポップアップ内iframeが開く画面。拡張ページからの埋め込みだけを追加で許可する。 * 拡張は`/share/ingest`を開き、未ログイン時はログイン・利用者登録の画面へ遷移する。 * これらの画面からの転送先（追加後の表示、ログイン後の戻り先など）もこの集合の画面に限る。 * 集合外の画面へ移るとブラウザーが埋め込みを拒否し、ポップアップに「接続が拒否されました」と表示される。": 1,
+    "* * セッションCookieを読まない更新の入口。送信元判定（同一オリジンだけを受け付ける）の対象から外す。 * * MCPクライアントはブラウザー外や別オリジンから呼び、Cookieではなく登録情報・認可コード・Bearerトークンで認証する。 * Cookieを読む入口をここへ加えると、他サイトからログイン状態を使った更新を受け付けてしまう。": 1,
+    "* * 未ログインで画面を開いた要求の転送先。ログイン・利用者登録の後に元の画面へ戻れるよう`returnTo`を付ける。 * * Chrome拡張のポップアップは`/share/ingest`を埋め込む。ログイン後にトップ画面へ移ると、 * 拡張からの埋め込みを許可しない画面になりブラウザーが表示を拒否するため、元の画面へ戻す。": 1
+  },
+  "app/src/lib/server/db-test-helpers.ts": {
+    "* * 所有する利用者と、その子のfixtureを回収する。 * * 回収transactionはREAD COMMITTEDで実行する。 * MariaDBの`innodb_snapshot_isolation=ON`とREPEATABLE READでは、最初の読み取りで作った読み取りビューの後に * 別の接続が削除対象の行を更新すると、その行の削除が`ER_CHECKREAD`（1020）で失敗する。 * 定期処理（`processSchedules`）は全リストの有効な予定を走査して更新するため、別の試験の実行がfixtureの予定を更新しうる。 * 回収は固定のuserIdの行を消すだけで読み取りビューの一貫性を必要としないため、文ごとに最新の行を読む分離レベルを使う。": 1
+  },
+  "app/src/lib/server/db.ts": {
+    "* * 開発サーバーでプールを保持する`globalThis`上のキー。 * * 開発サーバーはコード更新のたびに同じNode.jsプロセスでこのモジュールを再評価し、`_db`を初期化する。 * プールをモジュールに保持すると再評価ごとに新しいプールが作成され、閉じられない旧プールの接続が * MariaDBの接続上限まで蓄積する。プールだけをモジュールの外へ保持して再評価後も再利用する。": 1
+  },
+  "app/src/lib/server/mcp/oauth-response.ts": {
+    "* * OAuthの失敗応答の`error_description`。理由と次の操作を別々の必須の値として受け取る。 * * RFC 6749 5.2は`error_description`の文字を%x20-21・%x23-5B・%x5D-7EのASCIIに限るため、 * 英語で書き、`\"`と`\\`を含めない。受け取るのはMCPクライアントとその開発者である。": 1
+  },
+  "app/src/lib/server/mcp/server.ts": {
+    "* * @fileoverview MCP サーバー定義 * * 操作層の関数を MCP ツールとして公開する。 * リスト・タスク・タイマー・利用者設定はtRPCルーター（`trpc.ts`）と同じ操作を網羅し、 * カロリーは参照だけを公開する。 * * ツールの説明と引数の説明（`schemas.ts`の`.describe()`）は、エージェントが似たツールを * 選び分けられるよう、返す内容と使い分ける相手のツール名を書く。 * Claude Codeは初期送信で説明とinstructionsを4,096文字に切り詰めるため、各説明をその範囲に収める。": 1,
+    "* * ツール注釈の3区分。MCP仕様では読み取り専用でないツールの`destructiveHint`の既定値が真であり、 * 追加だけを行う更新に限って偽にする。アーカイブや並べ替えのような可逆な更新も既存の状態を * 上書きするため破壊的として扱う。": 1
+  },
+  "app/src/lib/server/passkey-providers.ts": {
+    "* * パスキーの提供元を示す識別子（AAGUID）から、登録時に付ける名前を決める。 * * 対応表はコミュニティが管理する一覧 * （https://github.com/passkeydeveloper/passkey-authenticator-aaguids の aaguid.json）を * 2026年11月16日に写したもので、主要な4件だけを日本語表記にしている。 * 同一覧は2027年1月6日に中身を空にすると告知しているため、登録のたびに取得せず同梱する。 * 写しに無い新しい提供元はブラウザー名になる。更新する場合は後継のFIDOの配布データなどから同じ形で書き換える。": 1
+  },
+  "app/src/lib/server/process-state.ts": {
+    "* * @fileoverview モジュールの再評価をまたいでサーバー状態と周期処理を保持する共通の所有機構 * * 開発サーバーはコード更新のたびに同じNode.jsプロセスでサーバーモジュールを再評価する。 * MCPセッション・SSE接続・OAuth認可コード・schedulerの状態をモジュール変数に置くと、 * 再評価前に開始した要求・接続が旧世代の表に残り、新世代の処理から到達できなくなる。 * * 本モジュールは、世代を越えて保持する状態（表・カウンター・フラグ）と周期タイマーだけを * `globalThis`上へ置き、業務処理は各モジュールの最新の評価に置く。 * 周期処理は名前ごとに1本のタイマーを保持し、モジュールが評価されるたびに呼び出す処理を * 最新の関数へ差し替えるため、再評価でタイマーが増えず、次の周期は更新後の処理を呼ぶ。 * 本番では各モジュールが1回だけ評価されるため、保持の有無で挙動は変わらない。 * DB接続プールは`db.ts`が同じ方針で保持する。": 1
+  },
+  "app/src/lib/server/schedule-schemas.ts": {
+    "* * @fileoverview 定期TODOスケジュール操作のZodスキーマ定義 * * `rrule`（RFC5545パーサー）はCJSモジュールでありnamed exportの解決がNode実行系 * （Vite変換を経ないPlaywright e2eテスト実行系など）に依存する。`#lib/schemas.ts` * は `attachment.test.ts` から直接importされVite変換を経ずにNodeへ読み込まれるため、 * `#lib/schemas.ts`へ `rrule` への依存を持ち込むと読み込みに失敗する。 * 本ファイルはサーバー側実装（`trpc.ts`・`api/schedules.ts`）専用とし、 * Vite SSR経由でのみ読み込まれる前提を維持することでこの制約を切り分ける。": 1
+  },
+  "app/src/lib/server/scheduler.ts": {
+    "* * 真の時刻を、rruleへ渡す境界の表現へ変換する。 * * rruleは`tzid`を指定すると、プロセスの時刻帯の壁時計の時刻をUTCの成分に持つ日時で * 境界を受け取り、結果も同じ表現で返す（rruleのREADME「Important: Use UTC dates」）。 * 本番イメージは`TZ=Asia/Tokyo`で動くため、変換しないと発火予定が時差の分だけずれる。 * プロセスの時刻帯がUTCなら値は変わらない。": 1
+  },
+  "app/src/lib/server/schema.ts": {
+    "* * カロリー計算の摂取記録テーブル * * 品目を参照する記録と、品目表へ登録せず名前を記録自身が持つ一時項目の記録がある。 * 一時項目は`quantity`をkcalとして扱い、品目のkcalと掛け算しない。 * `item_id`と`temporary_name`はどちらか一方だけを持つ。MariaDBはON UPDATE CASCADEの * 外部キー列をCHECK制約に使えない（ERROR 1901）ため、この不変条件は書き込み側で守る。": 1
+  },
+  "app/src/lib/server/session.ts": {
+    "* * セッションCookieの属性。発行と削除で同じ値を使う。 * * アプリはリバースプロキシの内側でhttpとして要求を受けるため、`secure`を省くとSvelteKitは非Secureで書き出す。 * `__Host-`接頭辞のCookieは非Secureの書き込みをブラウザーが無視するため、削除でも`secure`を明示する。": 1,
+    "* * セッションCookie名の既定値。`__Host-`接頭辞は、Secure・Path=/・Domain指定なしを満たすCookieだけに使え、 * 同じ親ドメインの別サブドメインから上書きされない。": 1
+  },
+  "app/src/lib/server/share-ingest.ts": {
+    "* AndroidのXアプリは`url`を空にしてURLを`text`側へ入れて渡す場合があるため、`text`・`title`からも探す。": 1,
+    "* X投稿を取得できた場合は、本文の途中までしか含まず`&amp;`が残るChrome拡張のタブのタイトルと`text`を使わない。": 1
+  },
+  "app/src/routes/+layout.server.ts": {
+    "データ応答の`x-sveltekit-version`で、`version.json`の定期確認を待たず遷移時にも新版を検知できる。": 1,
+    "パスを参照すると、SvelteKitは画面遷移のたびにこのloadを再実行してデータ応答を返す。": 1,
+    "開発サーバーは定期確認を行わないため、更新案内を表示させる経路はこの応答だけである。": 1
+  },
+  "app/src/routes/oauth/register/+server.ts": {
+    "Zodの文面は引用符と改行を含みerror_descriptionの文字種に収まらないため、項目名だけを返す": 1
+  },
+  "app/src/routes/offline.html/+server.ts": {
+    "* * @fileoverview オフライン画面の配信エンドポイント * * 接続判定と検出契機の正本は connectivity-check.js に置き、?raw でインライン展開する。 * Service Worker がオフライン時に追加のスクリプトを取得できないため、キャッシュ対象を増やさない。": 1
+  },
+  "app/tests/csrf-framing.test.ts": {
+    "* SSEは応答の本文が終わらず、応答全体を受け取るAPIでは取得できないため、埋め込みヘッダーの確認から外す": 1
+  },
+  "app/tests/global-setup.ts": {
+    "* * @fileoverview テスト用ユーザーの作成と認証状態の保存 * * 開発用dev serverはHMRで頻繁に再読込される。ログインや登録のPOST後、 * サーバー側ではセッションCookieの設定が完了していても、HMRの再ビルド * 待ちでリダイレクト先ページへの遷移だけが10秒前後遅延し、`waitForURL` * がタイムアウトするケースがある。このため、各フェーズは「認証ページへ * 再遷移したときに非auth URLへリダイレクトされるか」を主たる成功判定と * するリトライループで堅牢化している。`waitForURL`のタイムアウトを * 単純に延ばすだけでは、Cookie設定済みにもかかわらず失敗と誤判定する * ケース（例: 登録成功後のリダイレクト待ちタイムアウト時に再度/auth/loginへ * 遷移すると認証済みとして/へリダイレクトされ、ログインフォームへのfillが失敗する） * を救済できないため、この設計を維持する必要がある。": 1
+  },
+  "app/tests/helpers/page-scroll.ts": {
+    "ブラウザ内蔵AI APIはPlaywright同梱のChromiumに存在しないため、スタブを注入して開く": 1
+  },
+  "app/tests/lists.test.ts": {
+    "SSE 接続が常時開いているため networkidle は利用できない。": 1,
+    "goto + 初回 tRPC レスポンス待ちで hydration + データ取得完了を確保する。": 1
+  },
+  "app/tests/passkey.test.ts": {
+    "Chrome拡張のポップアップ（chrome_extension/popup.html）と同じ500x500で埋め込む。": 1,
+    "既定の300x150では、リンクをスクロールで表示してもiframeの外へはみ出し、外側の文書がクリックを受ける。": 1
+  },
+  "app/tests/timers.test.ts": {
+    "SSE 接続が常時開いているため networkidle は利用できない": 1
+  },
+  "app/vite.config.ts": {
+    "Vite の既定の外部化判定では named export（rrulestr 等）を正しく解決できない": 1,
+    "Viteの変換パイプラインを通すことで interop を正しく機能させる。": 1,
+    "rrule は \"exports\" フィールドを持たない CommonJS パッケージであり、": 1,
+    "（SyntaxError: Named export 'rrulestr' not found）。noExternal で": 1
+  },
+  "chrome_extension/background.js": {
+    "global chrome": 1
+  },
+  "chrome_extension/popup.js": {
+    "global chrome": 1
+  },
+  "deploy/update-images.sh": {
+    "Composeのプロファイル指定（COMPOSE_PROFILES）をMakefileから受け取るため、`make update-images`から実行する。": 1
+  },
+  "docs/.vitepress/config.ts": {
+    "VitePress既定のslugify（@mdit-vue/shared）と同じ変換後に、仮名の濁点・半濁点を合成する。": 1,
+    "https://github.com/mdit-vue/mdit-vue/blob/main/packages/shared/src/slugify.ts": 1
+  },
+  "eslint.config.js": {
+    "再読み込みと完全な画面遷移の検出。通信断の間はService Workerのオフライン画面へ移り、表示中の画面を失う。": 1,
+    "自動処理へ書くと、AndroidのPWAで復帰直後の通信断のようにオフライン画面へ切り替わる原因になる。": 1
+  }
+}

@@ -24,7 +24,6 @@ export type MutationDiagnostic = MutationObservation & {
   classification: MutationDiagnosticClassification;
 };
 
-/** UI期限時点の応答状態から、添付操作の失敗境界を分類する純粋関数 */
 export function classifyMutationObservation(
   observation: Pick<
     MutationObservation,
@@ -43,7 +42,6 @@ export function classifyMutationObservation(
   return "response_ok_ui_missing";
 }
 
-/** 固定8項目の診断値を作成する */
 export function createMutationDiagnostic(
   observation: MutationObservation,
 ): MutationDiagnostic {
@@ -53,7 +51,6 @@ export function createMutationDiagnostic(
   };
 }
 
-/** Playwrightの失敗出力へ渡す1行JSONを作成する */
 export function serializeMutationDiagnostic(
   observation: MutationObservation,
 ): string {
@@ -70,7 +67,6 @@ export function serializeMutationDiagnostic(
   })}`;
 }
 
-/** 複数ファイル処理の失敗を最もよく表す観測を選ぶ */
 export function selectMutationDiagnosticObservation(
   observations: readonly MutationObservation[],
 ): MutationObservation | undefined {
@@ -118,7 +114,6 @@ async function getTrpcOutcome(
   }
 }
 
-/** 指定procedureの応答を操作開始前から記録する */
 export function observeMutationResponses(
   page: Page,
   procedure: string,

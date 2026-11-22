@@ -4,7 +4,6 @@ export const UI_LAYERS = {
   dialog: "z-50",
   notification: "z-[60]",
 } as const;
-// 通知はnotificationLayerでtop layerへ載せ、開いているモーダルの前へ表示する。
 
 export const menuFrameClass = `absolute top-full right-0 min-w-max rounded border border-gray-200 bg-white py-1 text-left shadow-lg dark:border-gray-600 dark:bg-gray-800 ${UI_LAYERS.menu}`;
 export const menuItemClass =
@@ -14,18 +13,13 @@ export const menuBlueItemClass =
 export const menuDangerItemClass =
   "block w-full cursor-pointer px-4 py-1.5 text-left text-red-600 hover:bg-red-50 disabled:cursor-default disabled:text-gray-400 disabled:hover:bg-transparent dark:text-red-400 dark:hover:bg-red-900/30 dark:disabled:text-gray-500";
 
-// エンドユーザーが入力した任意の名前と操作ボタンを同じ行へ並べる場合の幅配分。
-// 名前の領域は縮小でき、分割不能な長い文字列も任意の位置で折り返して全文を表示する。
-// 操作の領域は縮小しないため、名前が長くても操作は行の内側に残る。
 export const nameAreaClass = "min-w-0 flex-1 wrap-anywhere";
 export const actionAreaClass = "shrink-0";
 
 export const grayButtonClass =
   "cursor-pointer rounded bg-gray-100 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600";
-// 画面の主要な操作。他画面の青系の操作ボタンと同じ形にそろえる。
 export const primaryButtonClass =
   "cursor-pointer rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50";
-// 削除・無効化など取り消しにくい操作。普段の操作と見た目で区別する。
 export const dangerButtonClass =
   "cursor-pointer rounded bg-red-600 px-3 py-1.5 text-sm text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50";
 export const dialogInputClass =

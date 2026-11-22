@@ -1,7 +1,3 @@
-/**
- * @fileoverview 利用者設定APIの部分更新テスト
- */
-
 import { eq } from "drizzle-orm";
 import { afterAll, expect, it } from "vitest";
 

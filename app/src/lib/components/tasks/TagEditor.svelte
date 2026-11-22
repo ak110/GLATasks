@@ -1,17 +1,9 @@
 <script lang="ts">
-    /**
-     * @fileoverview タグ編集UI（現在のタグ表示＋削除、候補クリック追加、新規入力）
-     *
-     * タスク追加フォームと編集ダイアログで共通利用する。
-     */
-
     import type { TagInfo, TagColorKey } from "#lib/types.ts";
     import { getTagColorClass, resolveTagColor } from "#lib/tag-palette.ts";
 
     interface Props {
-        /** 現在設定中のタグ配列（双方向バインド） */
         tags: TagInfo[];
-        /** 同一リスト内で既に使われているタグ候補 */
         candidates: TagInfo[];
     }
 
@@ -19,7 +11,6 @@
 
     let input = $state("");
 
-    // 未設定の候補（現在のタグに含まれないもの）
     const availableCandidates = $derived(
         candidates.filter((c) => !tags.some((t) => t.name === c.name)),
     );
@@ -38,7 +29,6 @@
 
     function handleInputKeydown(e: KeyboardEvent) {
         if (e.key === "Enter") {
-            // タグ入力のEnterは親フォームの送信と分離する
             e.preventDefault();
             addTag(input);
             input = "";

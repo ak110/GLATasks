@@ -3,23 +3,14 @@ import {
   MAX_ATTACHMENTS_PER_TASK,
 } from "#lib/schemas.ts";
 
-/**
- * 公開するエラーの定義。理由（`reason`）と次の操作（`nextAction`）を別々の必須の値として持つ。
- *
- * 画面のトースト、tRPCの応答、MCPの`{error}`、フォームの`fail`は、両方をつないだ文面を返す。
- * 新しい項目で次の操作を欠くと型検査で失敗する。
- */
 interface ApiErrorDefinition {
   code: "NOT_FOUND" | "BAD_REQUEST" | "INTERNAL_SERVER_ERROR";
-  /** 起きた事実。句点で終える */
   reason: string;
-  /** 受け取った利用者やMCPクライアントが次に行う操作。句点で終える */
   nextAction: string;
 }
 
 const MAX_ATTACHMENT_MIB = MAX_ATTACHMENT_BYTES / 1024 / 1024;
 
-/** 一覧から選び直す操作。画面とMCPクライアントの両方が実行できる形で書く */
 function reselect(target: string): string {
   return `${target}の一覧を取得し直し（画面では再読み込みし）、存在する${target}を指定してください。`;
 }
@@ -184,12 +175,10 @@ export class ApiError extends Error {
   }
 }
 
-/** 理由と次の操作をつないで、入口へ返す文面にする。 */
 export function formatApiErrorMessage(definition: ApiErrorDefinition): string {
   return `${definition.reason}${definition.nextAction}`;
 }
 
-/** 未知の例外はログへ残し、入口に内部情報を渡さない。 */
 export function getPublicError(error: unknown): {
   code: ApiErrorDefinition["code"];
   message: string;

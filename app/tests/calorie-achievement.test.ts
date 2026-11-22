@@ -14,7 +14,6 @@ test.describe("calories achievement", () => {
       await addItem(page, "目標内", "1000");
       await bulkCreate(page, "目標内", 8, 1);
 
-      // 8日前が最初の記録の日なので、昨日と一昨日の2日が判定され、いずれも平均1000kcal
       const block = page.getByTestId("calorie-achievement");
       await expect(block).toHaveAttribute("data-achieved", "true");
       await expect(page.getByTestId("calorie-achievement-streak")).toHaveText(
@@ -109,7 +108,6 @@ test.describe("calories achievement", () => {
       await bulkCreate(page, "前の週", 14, 8);
       await bulkCreate(page, "直近の週", 7, 1);
 
-      // 過去の記録は今日の残量に影響しない
       await expect(remaining).toHaveText("あと 1,615 kcal");
       await expect(page.getByText(/先週より/)).toHaveCount(0);
       await expect(
@@ -134,7 +132,6 @@ test.describe("calories achievement", () => {
       await page.reload();
       await expect(remaining).toHaveText("あと -1,000 kcal");
 
-      // 目標を2500へ上げた後、残り500を一時項目で記録するとちょうど0になる
       await page.locator("#calorie-goal").fill("2500");
       const secondGoalResponse = waitForSuccessfulMutationResponse(
         page,
@@ -164,11 +161,9 @@ test.describe("calories achievement", () => {
       await addItem(page, "多め", "1000");
       const arc = page.getByTestId("calorie-summary-ring-arc");
 
-      // 初期目標1615kcalに対し、直後の摂取800kcalはおよそ49.5%
       await addRecordNow(page, "少なめ");
       await expect(arc).toHaveAttribute("stroke-dasharray", /^49\.\d 100$/);
 
-      // 合計1800kcalで目標を超えると全周になる
       await addRecordNow(page, "多め");
       await expect(arc).toHaveAttribute("stroke-dasharray", "100 100");
       await expect(

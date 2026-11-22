@@ -7,9 +7,6 @@
         queryKeys,
     } from "#lib/client/query-options.ts";
     import { getUtcOffsetMinutes } from "#lib/date-time.ts";
-    /**
-     * @fileoverview タイマーページ
-     */
 
     import {
         createQuery,
@@ -37,7 +34,6 @@
 
     const queryClient = useQueryClient();
 
-    // ダイアログ状態
     type DialogState = {
         session: number;
         open: boolean;
@@ -68,15 +64,12 @@
     let inputSnapshot = "";
     let saving = $state.raw<{ session: number; snapshot: string }>();
 
-    // タイマー削除確認ダイアログの状態
-    // open=true の場合のみ timer が有効な値を持つ前提で管理する
     type ConfirmDeleteTimerDialog =
         { open: false; timer?: TimerInfo } | { open: true; timer: TimerInfo };
     let confirmDeleteTimerDialog = $state<ConfirmDeleteTimerDialog>({
         open: false,
     });
 
-    // 利用者既定値（新規タイマー作成時の初期値ソース）
     const preferencesQuery = createQuery(() => preferencesOptions());
 
     const updatePreferencesMutation = createMutation(() => ({
@@ -86,7 +79,6 @@
             queryClient.invalidateQueries({ queryKey: queryKeys.preferences }),
     }));
 
-    // タイマー一覧取得（SSE でリアルタイム同期）
     const timersQuery = createQuery(() => ({
         ...timersOptions(),
     }));
@@ -96,13 +88,11 @@
         SSE_EVENTS.usersPreferencesUpdated,
     ]);
 
-    /** アラームモードのタイマーかどうかで tzOffsetMinutes を付加するヘルパー */
     function getTzOffset(timerId: number): number | undefined {
         const timer = timersList.find((t) => t.id === timerId);
         return timer?.mode === "alarm" ? getUtcOffsetMinutes() : undefined;
     }
 
-    // ミューテーション群
     const createTimerMutation = createMutation(() => ({
         mutationFn: (input: RouterInputs["timers"]["create"]) =>
             trpc.timers.create.mutate(input),
@@ -129,9 +119,7 @@
             trpc.timers.start.mutate(input),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: queryKeys.timers });
-            // タブミュート対策: スタート時にビープ音で気付かせる
             playStartBeep();
-            // タイマー完了通知のためにブラウザ通知の許可をリクエスト
             if (
                 typeof Notification !== "undefined" &&
                 Notification.permission === "default"
@@ -176,13 +164,10 @@
             queryClient.invalidateQueries({ queryKey: queryKeys.timers }),
     }));
 
-    // D&D 状態管理（createDragReorder は派生状態 timersList を参照するためゲッター関数で渡す）
     const dnd = createDragReorder(() => timersList, handleReorderTimers);
     onMount(() => () => dnd.dispose());
 
-    /** タイマーの並び替え（楽観的更新 + API呼出） */
     function handleReorderTimers(timerIds: number[]) {
-        // 楽観的更新: キャッシュ内のタイマー配列を即座に並び替え
         queryClient.setQueryData(
             queryKeys.timers,
             (old: TimersResult | undefined) => {
@@ -197,11 +182,9 @@
         reorderTimersMutation.mutate({ timerIds });
     }
 
-    // 派生状態
     const timersList = $derived(timersQuery.data?.timers ?? []);
     const isLoading = $derived(timersQuery.isLoading);
 
-    // ダイアログ操作
     function openCreateDialog(ephemeral: boolean = false) {
         const prefs = preferencesQuery.data ?? {};
         dialog = {
@@ -280,7 +263,6 @@
             )
                 dialog.open = false;
         } catch {
-            // グローバルエラーハンドラがトースト表示を担当
         } finally {
             if (saving === request) saving = undefined;
         }
@@ -298,9 +280,7 @@
         confirmDeleteTimerDialog.open = false;
         try {
             await deleteTimerMutation.mutateAsync(timerId);
-        } catch {
-            // グローバルエラーハンドラがトースト表示を担当
-        }
+        } catch {}
     }
 </script>
 

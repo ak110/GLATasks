@@ -6,7 +6,6 @@ export interface OperationContext {
   tabId?: string | null;
 }
 
-/** 操作の書き込みが成功した後に、影響した資源を通知する。 */
 export function notify(
   ctx: OperationContext,
   events: readonly SseEventName[],

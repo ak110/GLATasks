@@ -1,7 +1,3 @@
-/**
- * @fileoverview 翻訳設定と方向判定のユニットテスト
- */
-
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   buildPromptLanguageOptions,

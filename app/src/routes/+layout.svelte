@@ -45,8 +45,6 @@
     let draftRestored = $state(false);
     let theme = $state<Theme>("system");
 
-    // 新バージョンを検知している状態で navigation が起きた場合、
-    // バナーを見逃したユーザーにも確実に新版 JS を読み込ませるため hard reload に切り替える。
     beforeNavigate((nav) => {
         if (updated.current && nav.to?.url && !nav.willUnload) {
             nav.cancel();
@@ -55,7 +53,6 @@
         }
     });
 
-    // 暗号化鍵が提供されている場合は設定
     $effect(() => {
         if (data.encrypt_key) {
             setEncryptKey(data.encrypt_key);
@@ -63,13 +60,7 @@
     });
 
     onMount(() => {
-        // SSE 接続・能動検出監視・可視復帰トリガ（ログイン済みの場合のみ）
-        // visibilitychange は SSE 接続の健全性を前倒し判定するためのトリガであり、
-        // 未ログイン時は購読対象が存在しないため connect と同じ条件ブロックに統合する。
-        // 能動検出監視（connection-recovery）はポーリングと可視・オンライン復帰の
-        // 検出トリガを自前で持つため、ここでは起動・停止のみを担う。
         let visibilityHandler: (() => void) | null = null;
-        // 自動の再読み込みが未保存の入力を失わせないよう、利用者が入力した欄を追跡する
         const stopEditedFieldTracking = startEditedFieldTracking();
         let draftNoticeTimer: ReturnType<typeof setTimeout> | undefined;
         const stopDraftRecovery = startDraftRecovery(
@@ -94,18 +85,15 @@
             document.addEventListener("visibilitychange", visibilityHandler);
         }
 
-        // テーマ初期化
         theme = getStoredTheme();
         applyTheme(theme);
 
-        // OS テーマ変更リスナー
         const mq = matchMedia("(prefers-color-scheme:dark)");
         const handler = () => {
             if (theme === "system") applyTheme("system");
         };
         mq.addEventListener("change", handler);
 
-        // サービスワーカー登録
         if ("serviceWorker" in navigator) {
             navigator.serviceWorker
                 .register("/sw.js")
@@ -144,7 +132,6 @@
         setTheme(theme);
     }
 
-    // テーマを子コンポーネントに提供
     setContext("themeContext", {
         get theme() {
             return theme;

@@ -1,18 +1,8 @@
-/**
- * @fileoverview 接続判定と能動検出トリガーの共有モジュール
- *
- * アプリ本体とオフライン画面の判定条件・検出契機を一元化する。
- * オフライン画面へはこのファイルが ?raw でインライン展開されるため、外部依存を持たない。
- */
-
 // 判定基盤は軽量な /healthcheck のため、サーバー側 SSE heartbeat と同じ30秒間隔とする。
 export const POLL_INTERVAL_MS = 30_000;
 
-// オフライン画面は表示中の画面を持たないため、回復後すぐ戻れるよう短い間隔で判定する。
-// 間隔は通信断の長さによらず伸ばさない（長い通信断の後の回復も5秒程度で検出するため）。
 export const OFFLINE_POLL_INTERVAL_MS = 5_000;
 
-// キャプティブポータル等の応答遅延で検出が停止しないよう5秒で打ち切る。
 export const HEALTHCHECK_TIMEOUT_MS = 5_000;
 
 /**
@@ -31,8 +21,6 @@ export async function classifyHealth(fetchFn = fetch) {
   /** @type {Response} */
   let response;
   try {
-    // リダイレクトには従わない。認証画面は別オリジンやhttpへリダイレクトすることが多く、従うとCORSや混在コンテンツの拒否で
-    // 例外になり、通信断と区別できなくなるためである。/healthcheck は正常時にリダイレクトしない
     response = await fetchFn("/healthcheck", {
       cache: "no-store",
       redirect: "manual",
@@ -51,7 +39,6 @@ export async function classifyHealth(fetchFn = fetch) {
   try {
     text = await response.text();
   } catch {
-    // ヘッダー受信後に本文の読み取りが途切れた場合は通信断として扱う
     return "unreachable";
   }
   try {

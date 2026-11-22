@@ -1,7 +1,3 @@
-/**
- * @fileoverview タイマー残り時間計算のテスト
- */
-
 import { describe, it, expect, vi, afterEach } from "vitest";
 import {
   calcTimerRemainingMs,
@@ -13,7 +9,6 @@ import {
 } from "./timer-utils";
 import type { TimerInfo } from "#lib/types.ts";
 
-/** テスト用のタイマー情報を生成する */
 function makeTimer(overrides: Partial<TimerInfo> = {}): TimerInfo {
   return {
     id: 1,
@@ -51,7 +46,7 @@ describe("calcTimerRemainingMs", () => {
     const timer = makeTimer({
       running: true,
       remainingSeconds: 60,
-      startedAt: new Date(7_000).toISOString(), // 3秒前に開始
+      startedAt: new Date(7_000).toISOString(),
     });
     expect(calcTimerRemainingMs(timer, 0)).toBe(57_000);
   });
@@ -63,7 +58,6 @@ describe("calcTimerRemainingMs", () => {
       remainingSeconds: 60,
       startedAt: new Date(7_000).toISOString(),
     });
-    // オフセット +2000ms → サーバー時刻は 12秒 → 経過5秒 → 残り55秒
     expect(calcTimerRemainingMs(timer, 2_000)).toBe(55_000);
   });
 
@@ -72,7 +66,7 @@ describe("calcTimerRemainingMs", () => {
     const timer = makeTimer({
       running: true,
       remainingSeconds: 10,
-      startedAt: new Date(0).toISOString(), // 100秒前
+      startedAt: new Date(0).toISOString(),
     });
     expect(calcTimerRemainingMs(timer, 0)).toBe(0);
   });
@@ -190,19 +184,16 @@ describe("calcSecondsUntilTarget", () => {
   afterEach(() => vi.useRealTimers());
 
   it("目標が今日の後の場合、今日の残り秒数を返す", () => {
-    // 14:00:00 に設定、目標は 15:30 → 残り 90分 = 5400秒
     vi.useFakeTimers({ now: new Date(2026, 2, 18, 14, 0, 0, 0).getTime() });
     expect(calcSecondsUntilTarget(15 * 60 + 30)).toBe(5400);
   });
 
   it("目標が過ぎた場合、翌日の目標までの秒数を返す", () => {
-    // 15:00:00 に設定、目標は 14:30 → 残り 23時間30分 = 84600秒
     vi.useFakeTimers({ now: new Date(2026, 2, 18, 15, 0, 0, 0).getTime() });
     expect(calcSecondsUntilTarget(14 * 60 + 30)).toBe(84600);
   });
 
   it("目標がちょうど現在時刻と同じ分だが秒が過ぎている場合、翌日になる", () => {
-    // 14:30:10 に設定、目標は 14:30 → 翌日の 14:30 まで
     vi.useFakeTimers({ now: new Date(2026, 2, 18, 14, 30, 10, 0).getTime() });
     expect(calcSecondsUntilTarget(14 * 60 + 30)).toBe(24 * 3600 - 10);
   });

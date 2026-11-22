@@ -1,7 +1,3 @@
-/**
- * @fileoverview 画面横断のスクロール境界とヘッダー位置の回帰テスト
- */
-
 import { expect, test, type Locator } from "@playwright/test";
 
 import {
@@ -47,17 +43,10 @@ test.describe("page scroll", () => {
     test(`同時バナーがヘッダーとタイマー追加を覆わない（幅${viewport.width}）`, async ({
       page,
     }) => {
-      // 4画面それぞれで到達不能の案内の猶予（6秒）を待つため、既定の30秒では収まらない。
       test.setTimeout(120_000);
       await page.setViewportSize(viewport);
-      // 翻訳画面へ画面遷移で入るため、ブラウザー内蔵AIのスタブを最初の読み込みから注入しておく。
       await installAiStubs(page);
       let unhealthy = false;
-      // 更新案内は、データ応答の`x-sveltekit-version`が読み込み時の版と異なると表示される。
-      // `version.json`の定期確認は開発サーバーで行われないため、両方の環境で働くデータ応答を使う。
-      // 新しい版を返すのは対象の画面への遷移を終えた後に限る。遷移の前に新しい版を検知すると、
-      // ルートlayoutのbeforeNavigateが遷移を再読み込みへ切り替え、再読み込み後は更新案内が出ない。
-      // クリックのmousedownやhoverによる先読みも遷移の前にデータ応答を受け取るため、遷移中は実際の版を返す。
       const newVersion = "e2e-banner-layout-new-version";
       let reportNewVersion = false;
       await page.route("**/__data.json*", async (route) => {
@@ -75,7 +64,6 @@ test.describe("page scroll", () => {
         }),
       );
 
-      // visibleだけでは、前面のバナーに覆われた操作も合格してしまう。
       async function expectUncovered(locator: Locator) {
         await expect(locator).toBeVisible();
         await expect
@@ -95,8 +83,6 @@ test.describe("page scroll", () => {
       for (const name of PAGE_NAMES) {
         unhealthy = false;
         reportNewVersion = false;
-        // 別の画面を読み込み直してから、ヘッダーの画面遷移で対象の画面へ入る。
-        // URLは遷移の確定時に変わるため、変化を待ってbeforeNavigateの通過を確かめる。
         const otherName = name === "tasks" ? "timers" : "tasks";
         await openPage(page, otherName);
         await page.getByTestId(`header-nav-${name}`).click();
@@ -108,11 +94,9 @@ test.describe("page scroll", () => {
           name: /^(?:一時)?タイマー追加$/,
         });
         if (name === "timers") {
-          // データを書かず、実ダイアログの表示中に接続不全を検知させる。
           await page.getByTestId("timer-add-btn").click();
           await expect(timerDialog).toBeVisible();
         } else {
-          // 入力要素へのフォーカスは公開UIから行い、private状態は注入しない。
           const input =
             name === "tasks"
               ? page.getByTestId("search-input")
@@ -123,9 +107,6 @@ test.describe("page scroll", () => {
           await input.focus();
           await expect(input).toBeFocused();
         }
-        // 新しい版の検知は作業中にしてから行う。作業中でなければ検知と同時に自動で再読み込みし、更新案内が残らない。
-        // 別の画面へのリンク上のマウス移動による先読みは遷移を伴わずにデータ応答を受け取るため、これで新しい版を検知させる。
-        // タイマー追加のダイアログは背景のリンクを覆いhoverできないため、先読みが購読するmouseoverをリンクへ直接送る。
         reportNewVersion = true;
         await Promise.all([
           page.waitForResponse(
@@ -149,7 +130,6 @@ test.describe("page scroll", () => {
         const update = page.getByTestId("update-banner");
         const connectivity = page.getByTestId("connectivity-recovery-banner");
         await expect(update).toBeVisible();
-        // 到達不能の案内は、到達不能が猶予（6秒）を超えて続いた時点で出る。
         await expect(connectivity).toBeVisible({ timeout: 15_000 });
         if (name === "timers") {
           await page.keyboard.press("Escape");
@@ -160,8 +140,6 @@ test.describe("page scroll", () => {
         const updateBox = await requireBoundingBox(update);
         const connectivityBox = await requireBoundingBox(connectivity);
         const headerBox = await requireBoundingBox(page.locator("header"));
-        // タスク画面は左右分割で、PageScrollAreaではなく共通の親領域を使う。
-        // 狭幅ではmain自体がhiddenになるため、DOM上のmainから親を取得する。
         const contentArea =
           name === "tasks"
             ? page.getByRole("main", { includeHidden: true }).locator("..")
@@ -177,7 +155,6 @@ test.describe("page scroll", () => {
           headerBox.y + headerBox.height,
         );
         expect(await getRootOverflow(page), name).toBeLessThanOrEqual(0);
-        // 狭幅tasksの既存横見切れとは分け、画面内のナビゲーションを観測する。
         await expectUncovered(page.getByTestId(`header-nav-${name}`));
 
         if (name === "timers") {
@@ -193,7 +170,6 @@ test.describe("page scroll", () => {
           await page.keyboard.press("Tab");
           await expect(primaryAdd).toBeFocused();
           await expectUncovered(primaryAdd);
-          // 一時追加の狭幅での横見切れは既存不足のため、この縦遮蔽の受入と分ける。
           const addIds =
             viewport.width === 320
               ? ["timer-add-btn"]
@@ -201,7 +177,6 @@ test.describe("page scroll", () => {
           for (const id of addIds) {
             const add = page.getByTestId(id);
             await expectUncovered(add);
-            // forceなしのクリックで、バナー越しではなく実操作が届くことを確認する。
             await add.click();
             await expect(timerDialog).toBeVisible();
             await page.keyboard.press("Escape");

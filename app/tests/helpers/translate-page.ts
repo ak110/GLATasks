@@ -233,8 +233,6 @@ export async function installAiStubs(
         if (translatorCreateError) throw new Error(translatorCreateError);
         notifyProgress(options.monitor as never);
         if (blockTranslatorCreate && state.translatorCreateCount === 1) {
-          // 進捗が100%に達した後もcreate()が解決しない無応答を再現する。
-          // 中断と明示解放のどちらか先に起きた方だけでPromiseが決着する。
           try {
             await new Promise<void>((resolve, reject) => {
               releaseTranslatorCreate = resolve;
@@ -410,7 +408,6 @@ export async function expectStubbedPageReady(
       "prompt",
     );
   }
-  // SSRの原文欄はhydration前から有効として描画されるため、利用可能エンジンの判定完了を待つ
   await expect(page.getByTestId("translate-source-input")).toHaveAttribute(
     "aria-busy",
     "false",
@@ -467,7 +464,6 @@ export async function releaseDetectorCreate(page: Page): Promise<void> {
   });
 }
 
-/** 保留した初回のTranslator作成を解放して正常完了させる */
 export async function releaseTranslatorCreate(page: Page): Promise<void> {
   await page.evaluate(() => {
     (

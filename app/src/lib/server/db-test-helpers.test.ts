@@ -1,11 +1,3 @@
-/**
- * @fileoverview fixture回収（`cleanupFixtures`）が回収中の同時更新で失敗しないことの試験。
- *
- * 定期処理（`processSchedules`）は全リストの有効な予定を走査して`last_fired`を更新するため、
- * 同じ試験用DBを使う別の実行が、回収中のfixtureの予定を更新しうる。
- * 回収transactionの最初の読み取りの後に別の接続から予定を更新し、分離レベルごとの結果を比べる。
- */
-
 import { eq, inArray, sql } from "drizzle-orm";
 import { afterAll, expect, it } from "vitest";
 
@@ -17,7 +9,6 @@ import {
 import { getDb } from "./db";
 import { lists, schedules, users } from "./schema";
 
-/** 有効な予定を1件持つfixtureを作り、利用者・リスト・予定のidを返す。 */
 async function createFixtureWithSchedule() {
   const { userId, listId } = await createFixtureList();
   const now = new Date();
@@ -38,7 +29,6 @@ async function createFixtureWithSchedule() {
   return { userId, listId, scheduleId };
 }
 
-/** 別の接続から、定期処理と同じ更新（`last_fired`・`updated`）を予定へ加える。 */
 async function updateScheduleConcurrently(scheduleId: number): Promise<void> {
   const fired = new Date("2026-01-05T00:00:00.000Z");
   await getDb()
@@ -69,7 +59,6 @@ describeDb("fixture回収と同時更新", () => {
       afterFirstRead: () => updateScheduleConcurrently(before.scheduleId),
     });
     if (await snapshotIsolationEnabled()) {
-      // 修正前の分離レベルでは、元の診断と同じ`ER_CHECKREAD`で回収が失敗する。
       await expect(repeatable).rejects.toMatchObject({
         cause: expect.objectContaining({ code: "ER_CHECKREAD" }),
       });

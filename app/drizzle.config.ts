@@ -1,7 +1,3 @@
-/**
- * @fileoverview Drizzle Kit 設定ファイル
- */
-
 import { defineConfig } from "drizzle-kit";
 import { getDatabaseUrl } from "./scripts/database-config.mjs";
 
