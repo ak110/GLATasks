@@ -37,10 +37,14 @@ function makeDefaultProps(overrides?: Partial<TimerInfo>) {
 }
 
 describe("TimerCard", () => {
-  it("カウントダウンの名前と操作を表示し、実行中は開始を隠す", async () => {
-    const props = makeDefaultProps({ name: "集中タイマー" });
-    const { rerender } = render(TimerCard, { props });
+  it("指定したタイマー名を表示する", () => {
+    render(TimerCard, { props: makeDefaultProps({ name: "集中タイマー" }) });
     expect(screen.getByText("集中タイマー")).toBeInTheDocument();
+  });
+
+  it("停止中は開始とリセットを表示し、実行中は開始を隠す", async () => {
+    const props = makeDefaultProps();
+    const { rerender } = render(TimerCard, { props });
     expect(screen.getByTestId("timer-reset-btn")).toBeInTheDocument();
     expect(screen.getByTestId("timer-start-btn")).toBeInTheDocument();
     expect(screen.queryByTestId("timer-pause-btn")).not.toBeInTheDocument();

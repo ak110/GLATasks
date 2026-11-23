@@ -7,38 +7,30 @@ function makeTag(name: string): TagInfo {
 }
 
 describe("compareTagName", () => {
-  it("文字コード順に並べ、接頭辞が同じ場合は短い名前を先にする", () => {
-    const tags = [
-      "い",
-      "abc",
-      "あ",
-      "_",
-      "cherry",
-      "Apple",
-      "abcd",
-      "1",
-      "A",
-      "!",
-      "banana",
-      "う",
-      "ab",
-    ];
-    const sorted = tags.map(makeTag).sort(compareTagName);
-    expect(sorted.map((tag) => tag.name)).toEqual([
-      "!",
-      "1",
-      "A",
-      "Apple",
-      "_",
-      "ab",
-      "abc",
-      "abcd",
-      "banana",
-      "cherry",
-      "あ",
-      "い",
-      "う",
-    ]);
+  it.each([
+    {
+      label: "ASCIIの大文字と小文字",
+      names: ["banana", "Apple", "cherry"],
+      expected: ["Apple", "banana", "cherry"],
+    },
+    {
+      label: "数字・記号・英字・ひらがな",
+      names: ["あ", "A", "1", "!", "_"],
+      expected: ["!", "1", "A", "_", "あ"],
+    },
+    {
+      label: "ひらがな同士",
+      names: ["い", "あ", "う"],
+      expected: ["あ", "い", "う"],
+    },
+    {
+      label: "一方が他方の接頭辞",
+      names: ["abc", "ab", "abcd"],
+      expected: ["ab", "abc", "abcd"],
+    },
+  ])("$labelを文字コード順に並べる", ({ names, expected }) => {
+    const sorted = names.map(makeTag).sort(compareTagName);
+    expect(sorted.map((tag) => tag.name)).toEqual(expected);
   });
 
   it("同名は0を返す", () => {
