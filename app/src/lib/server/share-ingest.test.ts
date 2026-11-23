@@ -289,13 +289,6 @@ describe("DeepL APIによる訳の補完", () => {
     ["日本語の原文と判定", { status: 200, body: deeplBody("訳", "JA") }],
     ["日本語を含まない訳", { status: 200, body: deeplBody("translated") }],
     ["応答の形の不一致", { status: 200, body: { translations: "x" } }],
-    [
-      "検出言語の型の不一致",
-      {
-        status: 200,
-        body: { translations: [{ detected_source_language: 1, text: "訳" }] },
-      },
-    ],
     ["通信の失敗", "network-error"],
   ] as const)("DeepLの%sでは原文を使う", async (_label, route) => {
     const logs: string[] = [];

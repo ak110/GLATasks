@@ -273,8 +273,7 @@ export function parseDeepL(body: unknown): string | undefined {
   const translations = asRecord(body)?.translations;
   if (!Array.isArray(translations)) return undefined;
   const first = asRecord(translations[0]);
-  const detected = first?.detected_source_language;
-  if (typeof detected !== "string" || detected === "JA") return undefined;
+  if (first?.detected_source_language === "JA") return undefined;
   const text = nonEmptyString(first?.text);
   return text && JAPANESE_CHAR_PATTERN.test(text) ? text : undefined;
 }
