@@ -14,18 +14,21 @@ type Route = { status: number; body: unknown } | "network-error";
 
 function fakeFetch(
   routes: Record<string, Route>,
-): FetchLike & { calls: string[] } {
+): FetchLike & { calls: string[]; inits: Parameters<FetchLike>[1][] } {
   const calls: string[] = [];
-  const fn = (async (input: string) => {
+  const inits: Parameters<FetchLike>[1][] = [];
+  const fn = (async (input: string, init?: Parameters<FetchLike>[1]) => {
     calls.push(input);
+    inits.push(init);
     const route = Object.entries(routes).find(([prefix]) =>
       input.startsWith(prefix),
     )?.[1];
     if (!route || route === "network-error")
       throw new TypeError("fetch failed");
     return new Response(JSON.stringify(route.body), { status: route.status });
-  }) as FetchLike & { calls: string[] };
+  }) as FetchLike & { calls: string[]; inits: Parameters<FetchLike>[1][] };
   fn.calls = calls;
+  fn.inits = inits;
   return fn;
 }
 
@@ -194,6 +197,178 @@ describe("buildShareInitialText", () => {
       { fetch },
     );
     expect(text).toBe("見て https://example.com/b");
+  });
+});
+
+describe("DeepL APIによる訳の補完", () => {
+  const FREE_KEY = "test-key:fx";
+  const FREE_URL = "https://api-free.deepl.com/v2/translate";
+  const deeplBody = (text: string, source = "EN") => ({
+    translations: [{ detected_source_language: source, text }],
+  });
+
+  it("FxTwitterの訳が無ければDeepL API Freeで訳し、仕様どおりに要求する", async () => {
+    const fetch = fakeFetch({
+      [FX_URL]: { status: 200, body: fxBody(null) },
+      [FREE_URL]: {
+        status: 200,
+        body: deeplBody("先週は決断疲れがひどかった"),
+      },
+    });
+    const text = await buildShareInitialText(shared({ text: SHARED_URL }), {
+      fetch,
+      deeplApiKey: FREE_KEY,
+    });
+    expect(text).toBe(
+      `Kaelig (@kaelig): 先週は決断疲れがひどかった\n\n${POST_URL}`,
+    );
+    expect(fetch.calls).toEqual([FX_URL, FREE_URL]);
+    const init = fetch.inits[1];
+    expect(init?.method).toBe("POST");
+    expect(init?.headers?.Authorization).toBe(`DeepL-Auth-Key ${FREE_KEY}`);
+    expect(init?.headers?.["Content-Type"]).toBe("application/json");
+    expect(JSON.parse(init?.body ?? "")).toEqual({
+      text: ["decision fatigue hit me hard last week"],
+      target_lang: "JA",
+    });
+  });
+
+  it("有料版のキーはapi.deepl.comへ送る", async () => {
+    const fetch = fakeFetch({
+      [FX_URL]: { status: 200, body: fxBody(null) },
+      "https://api.deepl.com/v2/translate": {
+        status: 200,
+        body: deeplBody("訳"),
+      },
+    });
+    const text = await buildShareInitialText(shared({ text: SHARED_URL }), {
+      fetch,
+      deeplApiKey: "pro-key",
+    });
+    expect(text).toBe(`Kaelig (@kaelig): 訳\n\n${POST_URL}`);
+  });
+
+  it("oEmbedの原文も訳す", async () => {
+    const fetch = fakeFetch({
+      [FX_URL]: "network-error",
+      "https://publish.twitter.com/oembed": { status: 200, body: oembedBody },
+      [FREE_URL]: { status: 200, body: deeplBody("品質と野心") },
+    });
+    const text = await buildShareInitialText(shared({ text: SHARED_URL }), {
+      fetch,
+      deeplApiKey: FREE_KEY,
+    });
+    expect(text).toBe(`Kaelig (@kaelig): 品質と野心\n\n${POST_URL}`);
+  });
+
+  it("送る本文を1行にまとめて500文字までに抑える", async () => {
+    const fetch = fakeFetch({
+      [FX_URL]: {
+        status: 200,
+        body: {
+          code: 200,
+          tweet: {
+            text: `line1\n\nline2 ${"a".repeat(600)}`,
+            author: { name: "Kaelig", screen_name: "kaelig" },
+          },
+        },
+      },
+      [FREE_URL]: { status: 200, body: deeplBody("訳") },
+    });
+    await buildShareInitialText(shared({ text: SHARED_URL }), {
+      fetch,
+      deeplApiKey: FREE_KEY,
+    });
+    const sent = JSON.parse(fetch.inits[1]?.body ?? "") as { text: string[] };
+    expect(sent.text[0].startsWith("line1 line2 a")).toBe(true);
+    expect(Array.from(sent.text[0])).toHaveLength(500);
+  });
+
+  it.each([
+    ["HTTPエラー", { status: 456, body: { message: "Quota exceeded" } }],
+    ["日本語の原文と判定", { status: 200, body: deeplBody("訳", "JA") }],
+    ["日本語を含まない訳", { status: 200, body: deeplBody("translated") }],
+    ["応答の形の不一致", { status: 200, body: { translations: "x" } }],
+    [
+      "検出言語の型の不一致",
+      {
+        status: 200,
+        body: { translations: [{ detected_source_language: 1, text: "訳" }] },
+      },
+    ],
+    ["通信の失敗", "network-error"],
+  ] as const)("DeepLの%sでは原文を使う", async (_label, route) => {
+    const logs: string[] = [];
+    const fetch = fakeFetch({
+      [FX_URL]: { status: 200, body: fxBody(null) },
+      [FREE_URL]: route,
+    });
+    const text = await buildShareInitialText(shared({ text: SHARED_URL }), {
+      fetch,
+      deeplApiKey: FREE_KEY,
+      log: (message) => logs.push(message),
+    });
+    expect(text).toBe(
+      `Kaelig (@kaelig): decision fatigue hit me hard last week\n\n${POST_URL}`,
+    );
+    expect(logs).toHaveLength(1);
+  });
+
+  it("FxTwitterの日本語訳があればDeepLを呼ばない", async () => {
+    const fetch = fakeFetch({
+      [FX_URL]: { status: 200, body: fxBody("先週は決断疲れがひどかった") },
+    });
+    await buildShareInitialText(shared({ text: SHARED_URL }), {
+      fetch,
+      deeplApiKey: FREE_KEY,
+    });
+    expect(fetch.calls).toEqual([FX_URL]);
+  });
+
+  it("FxTwitterの訳が無くても日本語の原文ならDeepLを呼ばない", async () => {
+    const fetch = fakeFetch({
+      [FX_URL]: {
+        status: 200,
+        body: {
+          code: 200,
+          tweet: {
+            text: "先週は決断疲れがひどかった",
+            author: { name: "Kaelig", screen_name: "kaelig" },
+          },
+        },
+      },
+    });
+    const text = await buildShareInitialText(shared({ text: SHARED_URL }), {
+      fetch,
+      deeplApiKey: FREE_KEY,
+    });
+    expect(text).toBe(
+      `Kaelig (@kaelig): 先週は決断疲れがひどかった\n\n${POST_URL}`,
+    );
+    expect(fetch.calls).toEqual([FX_URL]);
+  });
+
+  it("DeepLの例外のログにキーを含めない", async () => {
+    const logs: string[] = [];
+    const base = fakeFetch({ [FX_URL]: { status: 200, body: fxBody(null) } });
+    const fetch = (async (input: string, init?: Parameters<FetchLike>[1]) => {
+      if (input.startsWith(FREE_URL))
+        throw new TypeError(`invalid header: ${FREE_KEY}`);
+      return base(input, init);
+    }) as FetchLike;
+    await buildShareInitialText(shared({ text: SHARED_URL }), {
+      fetch,
+      deeplApiKey: FREE_KEY,
+      log: (message) => logs.push(message),
+    });
+    expect(logs).toHaveLength(1);
+    expect(logs[0]).not.toContain(FREE_KEY);
+  });
+
+  it("キーが無ければDeepLを呼ばない", async () => {
+    const fetch = fakeFetch({ [FX_URL]: { status: 200, body: fxBody(null) } });
+    await buildShareInitialText(shared({ text: SHARED_URL }), { fetch });
+    expect(fetch.calls).toEqual([FX_URL]);
   });
 });
 

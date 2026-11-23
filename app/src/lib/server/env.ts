@@ -11,6 +11,7 @@ const envSchema = z.object({
   PROTOCOL_HEADER: z.string().optional(),
   WEBAUTHN_RP_ID: z.string().optional(),
   WEBAUTHN_ORIGINS: z.string().optional(),
+  DEEPL_API_KEY: z.string().optional(),
 });
 
 let _env: z.infer<typeof envSchema> | null = null;

@@ -3,6 +3,7 @@ import * as operations from "#lib/server/operations/index.ts";
 import { getErrorStatus, getPublicError } from "#lib/server/api-errors.ts";
 import { CreateTaskSchema } from "#lib/schemas.ts";
 import { buildShareInitialText } from "#lib/server/share-ingest.ts";
+import { getEnv } from "#lib/server/env.ts";
 import type { Actions, PageServerLoad } from "./$types";
 
 export const load: PageServerLoad = async ({ locals, url, fetch }) => {
@@ -17,6 +18,7 @@ export const load: PageServerLoad = async ({ locals, url, fetch }) => {
       {
         fetch,
         log: (message) => console.info(`[share/ingest] ${message}`),
+        deeplApiKey: getEnv().DEEPL_API_KEY?.trim() || undefined,
       },
     ),
     operations.lists.list({ userId: locals.user_id }, "active"),

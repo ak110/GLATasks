@@ -175,6 +175,20 @@ WEBAUTHN_ORIGINS=https://tasks.example.com
 開発構成の既定値は`localhost`と`https://localhost:38180`、隔離E2EとCIは`web`と`https://web`である。
 設定変更後は`docker compose up -d --force-recreate app`で環境変数を反映する。
 
+### 共有取り込みの翻訳設定
+
+X投稿の共有取り込みで本文を日本語へ訳すには、サーバーの`.env`へDeepL APIのキーを設定してアプリを作り直す。
+キーは[DeepL API](https://www.deepl.com/pro-api)のアカウントの「APIキー」から取得する（DeepL API Freeのキーは末尾が`:fx`）。
+
+```dotenv
+DEEPL_API_KEY=<DeepL APIのキー>
+```
+
+末尾が`:fx`のキーはDeepL API Freeの、それ以外は有料版のエンドポイントへ送る。
+FxTwitter APIが日本語訳を返した場合と、本文に日本語を含む場合はDeepL APIを呼ばない。
+FxTwitter APIの訳が無い投稿は、キーが未設定の場合とDeepL APIが失敗した場合に原文のまま取り込む。
+設定変更後は`docker compose up -d --force-recreate app`で環境変数を反映する。
+
 ### 自動適用
 
 `make deploy`（`docker compose up`）の起動時にマイグレーションが自動適用される。

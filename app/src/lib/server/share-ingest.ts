@@ -1,15 +1,29 @@
 export type FetchLike = (
   input: string,
-  init?: { signal?: AbortSignal; headers?: Record<string, string> },
+  init?: {
+    method?: string;
+    body?: string;
+    signal?: AbortSignal;
+    headers?: Record<string, string>;
+  },
 ) => Promise<Response>;
 
 export type XPostRef = { screenName: string; id: string };
 
 export type XPostContent = { name: string; screenName: string; text: string };
 
+export type ShareIngestOptions = {
+  fetch: FetchLike;
+  timeoutMs?: number;
+  log?: (message: string) => void;
+  deeplApiKey?: string;
+};
+
 export const X_FETCH_TIMEOUT_MS = 3000;
 
 export const X_POST_TEXT_MAX_CHARS = 200;
+
+export const DEEPL_SOURCE_MAX_CHARS = 500;
 
 const X_HOSTS = new Set([
   "x.com",
@@ -90,10 +104,17 @@ async function fetchJson(
   fetchFn: FetchLike,
   url: string,
   timeoutMs: number,
+  request: {
+    method?: string;
+    headers?: Record<string, string>;
+    body?: string;
+  } = {},
 ): Promise<{ status: number; body: unknown }> {
   const response = await fetchFn(url, {
+    method: request.method,
+    body: request.body,
     signal: AbortSignal.timeout(timeoutMs),
-    headers: { Accept: "application/json" },
+    headers: { Accept: "application/json", ...request.headers },
   });
   const body: unknown = await response.json();
   return { status: response.status, body };
@@ -242,6 +263,63 @@ export async function fetchXPost(
   return undefined;
 }
 
+export function deeplEndpoint(apiKey: string): string {
+  return apiKey.endsWith(":fx")
+    ? "https://api-free.deepl.com/v2/translate"
+    : "https://api.deepl.com/v2/translate";
+}
+
+export function parseDeepL(body: unknown): string | undefined {
+  const translations = asRecord(body)?.translations;
+  if (!Array.isArray(translations)) return undefined;
+  const first = asRecord(translations[0]);
+  const detected = first?.detected_source_language;
+  if (typeof detected !== "string" || detected === "JA") return undefined;
+  const text = nonEmptyString(first?.text);
+  return text && JAPANESE_CHAR_PATTERN.test(text) ? text : undefined;
+}
+
+export async function translateWithDeepL(
+  text: string,
+  options: {
+    fetch: FetchLike;
+    apiKey: string;
+    timeoutMs?: number;
+    log?: (message: string) => void;
+  },
+): Promise<string | undefined> {
+  const log = options.log ?? (() => {});
+  const endpoint = deeplEndpoint(options.apiKey);
+  try {
+    const { status, body } = await fetchJson(
+      options.fetch,
+      endpoint,
+      options.timeoutMs ?? X_FETCH_TIMEOUT_MS,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `DeepL-Auth-Key ${options.apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          text: [toSingleLine(text, DEEPL_SOURCE_MAX_CHARS)],
+          target_lang: "JA",
+        }),
+      },
+    );
+    const translation = status === 200 ? parseDeepL(body) : undefined;
+    if (translation) return translation;
+    log(
+      `DeepL APIの日本語訳を使わず原文で続行する（日本語の原文か応答の不備、HTTP ${status}）: ${endpoint}`,
+    );
+  } catch (error) {
+    log(
+      `DeepL APIの翻訳に失敗し、原文で続行する（キーと利用上限を確認）: ${endpoint}: ${error instanceof Error ? error.name : typeof error}`,
+    );
+  }
+  return undefined;
+}
+
 export function toSingleLine(
   value: string,
   maxChars: number = X_POST_TEXT_MAX_CHARS,
@@ -255,19 +333,25 @@ export function toSingleLine(
 /** X投稿を取得できた場合は、本文の途中までしか含まず`&amp;`が残るChrome拡張のタブのタイトルと`text`を使わない。 */
 export async function buildShareInitialText(
   params: { title: string; text: string; url: string },
-  options: {
-    fetch: FetchLike;
-    timeoutMs?: number;
-    log?: (message: string) => void;
-  },
+  options: ShareIngestOptions,
 ): Promise<string> {
   const rawUrl = extractUrl(params);
   const url = rawUrl ? normalizeUrl(rawUrl) : "";
   const post = rawUrl ? parseXPostUrl(rawUrl) : undefined;
   if (post) {
     const content = await fetchXPost(post, options);
-    if (content)
-      return `${content.name} (@${content.screenName}): ${toSingleLine(content.text)}\n\n${url}`;
+    if (content) {
+      const translated =
+        options.deeplApiKey && !JAPANESE_CHAR_PATTERN.test(content.text)
+          ? await translateWithDeepL(content.text, {
+              fetch: options.fetch,
+              apiKey: options.deeplApiKey,
+              timeoutMs: options.timeoutMs,
+              log: options.log,
+            })
+          : undefined;
+      return `${content.name} (@${content.screenName}): ${toSingleLine(translated ?? content.text)}\n\n${url}`;
+    }
   }
   const title = normalizeUrlsInText(params.title);
   const text = normalizeUrlsInText(params.text);

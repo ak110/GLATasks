@@ -17,6 +17,8 @@ x-app-environment: &app-environment
   SESSION_COOKIE_NAME: ${SESSION_COOKIE_NAME:-}
   WEBAUTHN_RP_ID: ${WEBAUTHN_RP_ID:-}
   WEBAUTHN_ORIGINS: ${WEBAUTHN_ORIGINS:-}
+  # X投稿の共有取り込みで本文を日本語へ訳すDeepL APIのキー。未設定の場合、FxTwitterの訳が無い投稿は原文のまま取り込む
+  DEEPL_API_KEY: ${DEEPL_API_KEY:-}
 
 # extendsで参照する共通定義。サービスとしては起動しない。
 services:
