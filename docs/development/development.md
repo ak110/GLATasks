@@ -173,7 +173,7 @@ WEBAUTHN_ORIGINS=https://tasks.example.com
 未設定の場合はパスキーを開始せず、パスワード認証は使い続けられる。
 登録後にRP IDを変更すると旧パスキーで認証できなくなるため、変更前にパスワードか復旧コードを確保する。
 開発構成の既定値は`localhost`と`https://localhost:38180`、隔離E2EとCIは`web`と`https://web`である。
-設定変更後は`docker compose up -d --force-recreate app`で環境変数を反映する。
+設定変更後は`make start`で環境変数を反映する（Makeが`COMPOSE_PROFILES`を渡し、設定が変わったサービスだけを作り直す）。
 
 ### 共有取り込みの翻訳設定
 
@@ -187,7 +187,7 @@ DEEPL_API_KEY=<DeepL APIのキー>
 末尾が`:fx`のキーはDeepL API Freeの、それ以外は有料版のエンドポイントへ送る。
 FxTwitter APIが日本語訳を返した場合と、本文に日本語を含む場合はDeepL APIを呼ばない。
 FxTwitter APIの訳が無い投稿は、キーが未設定の場合とDeepL APIが失敗した場合に原文のまま取り込む。
-設定変更後は`docker compose up -d --force-recreate app`で環境変数を反映する。
+設定変更後は`make start`で環境変数を反映する（Makeが`COMPOSE_PROFILES`を渡し、設定が変わったサービスだけを作り直す）。
 
 ### 自動適用
 
