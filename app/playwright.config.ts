@@ -9,7 +9,9 @@ const storageState = path.resolve(
 
 const shard = process.env.E2E_SHARD;
 if (shard !== undefined && shard !== "" && shard !== "1/2" && shard !== "2/2") {
-  throw new Error(`不明な E2E_SHARD: ${shard}`);
+  throw new Error(
+    `不明な E2E_SHARD: ${JSON.stringify(shard)}。1/2 または 2/2 を指定してください。未指定の場合は全件を実行します。`,
+  );
 }
 
 const longFiles =
