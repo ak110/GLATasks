@@ -126,6 +126,10 @@ jobs:
         if: matrix.shard == null
         run: make test-backup
 
+      - name: Run migration test
+        if: matrix.shard == null
+        run: make test-migrations
+
       - name: Run DB integration test
         if: matrix.shard == null
         run: make test-db COMPOSE_EXTRA_PROFILES=ci CI=true

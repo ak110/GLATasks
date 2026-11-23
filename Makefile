@@ -168,6 +168,7 @@ format:  # 整形 + 軽量lint
 test:  # 全チェック実行（これを通過すればコミット可能）
 	uvx --exclude-newer-package pyfltr=false pyfltr run
 	$(MAKE) test-backup
+	$(MAKE) test-migrations
 	$(MAKE) test-db
 	$(MAKE) test-e2e
 
@@ -183,6 +184,9 @@ db-studio:  # Drizzle Studio起動
 
 test-backup:  # バックアップ機能の隔離復元テスト（Dockerが利用できること）
 	@bash db/test-backup.sh
+
+test-migrations:  # 新規DBと旧DBのマイグレーション試験（Dockerが利用できること）
+	@bash db/test-migrations.sh
 
 docs-dev:  # ドキュメントサイトをローカルで起動
 	$(call RUN_NODE, pnpm --dir docs dev --host=0.0.0.0 --port=5173, --rm --interactive --tty -p 5173:5173)
@@ -305,4 +309,4 @@ test-db-locked:
 			TZ=Asia/Tokyo pnpm run test:unit --project node\
 		'
 
-.PHONY: help setup sync backup deploy build start stop update-images install-auto-update uninstall-auto-update restart-app logs ps healthcheck shell node-shell update update-actions format test test-unit test-backup test-db test-db-locked test-e2e test-e2e-isolated healthcheck-e2e test-e2e-run start-app logs-app migrate db-studio sql docs docs-dev
+.PHONY: help setup sync backup deploy build start stop update-images install-auto-update uninstall-auto-update restart-app logs ps healthcheck shell node-shell update update-actions format test test-unit test-backup test-migrations test-db test-db-locked test-e2e test-e2e-isolated healthcheck-e2e test-e2e-run start-app logs-app migrate db-studio sql docs docs-dev

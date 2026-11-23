@@ -84,14 +84,20 @@ SQL
         for migration in "$repo_root"/drizzle/migrations/0018_*.sql; do
             sql "$database" <"$migration"
         done
+        for table in list task attachment schedule timer; do
+            [[ "$(sql "$database" -e "SELECT COUNT(*), MIN(id), MAX(id) FROM \`$table\`")" == $'1\t1\t1' ]] || {
+                printf '%s: %sの適用%d回目で孤児の除去または正常行の保持に失敗しました\n' "$database" "$table" "$((repeat + 1))" >&2
+                exit 1
+            }
+        done
+        [[ "$(sql "$database" -e "SELECT JSON_VALUE(preferences, '$.ringSeconds'), JSON_VALUE(preferences, '$.baseSeconds'), JSON_VALUE(preferences, '$.adjustMinutes'), JSON_VALUE(preferences, '$.calorieGoalKcal'), JSON_VALUE(preferences, '$.mode'), JSON_CONTAINS_PATH(preferences, 'one', '$.ring_seconds', '$.base_seconds', '$.adjust_minutes', '$.calorie_goal_kcal') FROM user WHERE id = 1")" == $'10\t300\t5\t1800\talarm\t0' ]]
+        [[ "$(sql "$database" -e 'SELECT preferences FROM user WHERE id = 2')" == '{invalid' ]]
+        sql "$database" -e 'SELECT TABLE_NAME, INDEX_NAME, COLUMN_NAME, SEQ_IN_INDEX FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() ORDER BY TABLE_NAME, INDEX_NAME, SEQ_IN_INDEX' >"$test_root/$database-$repeat-indexes.tsv"
+        sql "$database" -e 'SELECT k.TABLE_NAME, k.CONSTRAINT_NAME, k.COLUMN_NAME, k.REFERENCED_TABLE_NAME, k.REFERENCED_COLUMN_NAME, r.DELETE_RULE, r.UPDATE_RULE FROM information_schema.KEY_COLUMN_USAGE k JOIN information_schema.REFERENTIAL_CONSTRAINTS r ON r.CONSTRAINT_SCHEMA = k.CONSTRAINT_SCHEMA AND r.TABLE_NAME = k.TABLE_NAME AND r.CONSTRAINT_NAME = k.CONSTRAINT_NAME WHERE k.TABLE_SCHEMA = DATABASE() ORDER BY k.TABLE_NAME, k.CONSTRAINT_NAME, k.ORDINAL_POSITION' >"$test_root/$database-$repeat-fks.tsv"
     done
-    for table in list task attachment schedule timer; do
-        [[ "$(sql "$database" -e "SELECT COUNT(*), MIN(id), MAX(id) FROM \`$table\`")" == $'1\t1\t1' ]]
+    for definition in indexes fks; do
+        cmp -- "$test_root/$database-0-$definition.tsv" "$test_root/$database-1-$definition.tsv"
     done
-    [[ "$(sql "$database" -e "SELECT JSON_VALUE(preferences, '$.ringSeconds'), JSON_VALUE(preferences, '$.baseSeconds'), JSON_VALUE(preferences, '$.adjustMinutes'), JSON_VALUE(preferences, '$.calorieGoalKcal'), JSON_VALUE(preferences, '$.mode'), JSON_CONTAINS_PATH(preferences, 'one', '$.ring_seconds', '$.base_seconds', '$.adjust_minutes', '$.calorie_goal_kcal') FROM user WHERE id = 1")" == $'10\t300\t5\t1800\talarm\t0' ]]
-    [[ "$(sql "$database" -e 'SELECT preferences FROM user WHERE id = 2')" == '{invalid' ]]
-    sql "$database" -e 'SELECT TABLE_NAME, INDEX_NAME, COLUMN_NAME, SEQ_IN_INDEX FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() ORDER BY TABLE_NAME, INDEX_NAME, SEQ_IN_INDEX' >"$test_root/$database-indexes.tsv"
-    sql "$database" -e 'SELECT k.TABLE_NAME, k.CONSTRAINT_NAME, k.COLUMN_NAME, k.REFERENCED_TABLE_NAME, k.REFERENCED_COLUMN_NAME, r.DELETE_RULE, r.UPDATE_RULE FROM information_schema.KEY_COLUMN_USAGE k JOIN information_schema.REFERENTIAL_CONSTRAINTS r ON r.CONSTRAINT_SCHEMA = k.CONSTRAINT_SCHEMA AND r.TABLE_NAME = k.TABLE_NAME AND r.CONSTRAINT_NAME = k.CONSTRAINT_NAME WHERE k.TABLE_SCHEMA = DATABASE() ORDER BY k.TABLE_NAME, k.CONSTRAINT_NAME, k.ORDINAL_POSITION' >"$test_root/$database-fks.tsv"
     if sql "$database" -e "DELETE FROM \`list\` WHERE id = 1"; then
         echo "RESTRICTが親の削除を拒否しませんでした。外部キー定義を確認してください" >&2
         exit 1
@@ -101,7 +107,7 @@ SQL
         exit 1
     fi
 done
-cmp -- "$test_root/fresh-indexes.tsv" "$test_root/legacy-indexes.tsv"
-cmp -- "$test_root/fresh-fks.tsv" "$test_root/legacy-fks.tsv"
-cat "$test_root/fresh-indexes.tsv" "$test_root/fresh-fks.tsv"
+cmp -- "$test_root/fresh-0-indexes.tsv" "$test_root/legacy-0-indexes.tsv"
+cmp -- "$test_root/fresh-0-fks.tsv" "$test_root/legacy-0-fks.tsv"
+cat "$test_root/fresh-0-indexes.tsv" "$test_root/fresh-0-fks.tsv"
 echo "旧DB・新規DBの定義一致、孤児除去、設定移行、再適用の試験が成功しました"

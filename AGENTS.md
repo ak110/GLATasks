@@ -22,6 +22,7 @@ SvelteKit、tRPC、Drizzleで構築し、Docker Composeで運用する。
   - commit時のフック（`pyfltr fast`）は従来どおり動く。手元で全体を確かめたい場合は`make test`を使ってよい
 - 単体実行も`pyfltr run <path>`を使い、修正後は失敗したコマンドへ限定して再実行する
 - バックアップを変更した場合は`make test-backup`を実行する
+- マイグレーションを変更した場合は`make test-migrations`を実行する
 - DBアクセスを変更した場合は`make test-db`を実行する。通常のpyfltrとCIのtest jobはDBテストをスキップし、test-dbはnode project全体をDBへ接続して実行する
 - test-dbは実行のたびに作成し直す試験専用のデータベース（`glatasks_test`）へ接続するため、開発用のデータと稼働中のアプリの定期処理に影響しない。node projectはUTCと本番と同じ`TZ=Asia/Tokyo`の両方で実行する
 - 画面と個別E2Eの変更は対応するテストを`make test-e2e E2E_GREP="パターン"`で実行する。全体E2EはCIのproduction環境で実行する
