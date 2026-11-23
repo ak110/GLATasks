@@ -28,7 +28,7 @@ describe("compareTagName", () => {
       names: ["abc", "ab", "abcd"],
       expected: ["ab", "abc", "abcd"],
     },
-  ])("$labelを文字コード順に並べる", ({ names, expected }) => {
+  ])("$label の名前を文字コード順に並べる", ({ names, expected }) => {
     const sorted = names.map(makeTag).sort(compareTagName);
     expect(sorted.map((tag) => tag.name)).toEqual(expected);
   });

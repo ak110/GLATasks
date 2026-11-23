@@ -215,7 +215,7 @@ DBが半端な状態になった場合は`make sql`から`__drizzle_migrations`�
 masterへのpushおよびPR時に`ci.yaml`が自動実行される（`.github/workflows/ci.yaml`参照）。
 masterへのpushで`docs/`配下に変更があれば`docs.yaml`ワークフローが[ドキュメントサイト運用](#ドキュメントサイト運用)の確認を経てGitHub Pagesへデプロイする。
 `release.yaml`はリリースを作成し、`deploy.yaml`を起動してアプリをデプロイする。
-`integration`ジョブはproductionスタックで疎通・バックアップ復元・DBを検証する。
+`integration`ジョブはproductionスタックで疎通・バックアップ復元・DBを検証し、0018のマイグレーション回帰試験（`make test-migrations`）も実行する。
 `e2e-*`ジョブは各自のproductionスタックでPlaywrightのシャードを1つずつ実行し、全ジョブでE2E全件を網羅する。
 Playwright設定で所要の長いファイルを分け、残りのファイルはもう一方のシャードで実行する。
 依存の脆弱性監査は`audit.yaml`が毎日06:00 UTC（JST 15:00）に定期実行し、

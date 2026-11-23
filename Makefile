@@ -185,7 +185,7 @@ db-studio:  # Drizzle Studio起動
 test-backup:  # バックアップ機能の隔離復元テスト（Dockerが利用できること）
 	@bash db/test-backup.sh
 
-test-migrations:  # 新規DBと旧DBのマイグレーション試験（Dockerが利用できること）
+test-migrations:  # 0018（索引・外部キーの統一と孤児行の除去）を新規DBと旧DBへ適用・再適用する回帰試験（Dockerが利用できること）。他のマイグレーションはtest-dbが全件適用して確かめる
 	@bash db/test-migrations.sh
 
 docs-dev:  # ドキュメントサイトをローカルで起動
