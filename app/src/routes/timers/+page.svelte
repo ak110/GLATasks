@@ -323,8 +323,10 @@
                 <button
                     class="{grayButtonClass} disabled:cursor-not-allowed disabled:opacity-50"
                     onclick={() => timersQuery.refetch()}
-                    disabled={timersQuery.isFetching}>再試行</button
+                    disabled={timersQuery.isFetching}
                 >
+                    再試行
+                </button>
             </div>
         {:else if timersList.length === 0 && !isLoading}
             <div class="flex flex-col items-center justify-center py-16">

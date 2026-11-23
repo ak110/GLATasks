@@ -67,9 +67,9 @@
     {/if}
     {#if achievement.todayRemainingKcal !== null}
         <p class="text-base" data-testid="calorie-achievement-remaining">
-            あと <span class="text-xl font-bold tabular-nums"
-                >{formatKcal(achievement.todayRemainingKcal)}</span
-            > kcal
+            あと <span class="text-xl font-bold tabular-nums">
+                {formatKcal(achievement.todayRemainingKcal)}
+            </span> kcal
         </p>
     {/if}
     <div class="ml-auto max-w-full min-w-0">

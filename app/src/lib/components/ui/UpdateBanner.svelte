@@ -23,7 +23,7 @@
 </script>
 
 {#if updated.current}
-    <ReloadBanner testId="update-banner"
-        >新しいバージョンが利用可能です。入力や保存が終わると自動で再読み込みします。</ReloadBanner
-    >
+    <ReloadBanner testId="update-banner">
+        新しいバージョンが利用可能です。入力や保存が終わると自動で再読み込みします。
+    </ReloadBanner>
 {/if}

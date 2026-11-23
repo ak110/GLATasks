@@ -498,8 +498,10 @@
         <button
             type="button"
             class={grayButtonClass}
-            onclick={() => void listsQuery.refetch()}>再試行</button
+            onclick={() => void listsQuery.refetch()}
         >
+            再試行
+        </button>
     </div>
 {/if}
 

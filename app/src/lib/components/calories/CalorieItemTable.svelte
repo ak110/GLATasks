@@ -222,24 +222,27 @@
                         <label
                             for="calorie-item-name"
                             class="text-sm font-medium text-gray-700 dark:text-gray-200"
-                            >品目名</label
                         >
+                            品目名
+                        </label>
                         {@render nameInput()}
                     </div>
                     <div class="grid gap-1 @sm:contents">
                         <label
                             for="calorie-item-kcal"
                             class="text-sm font-medium text-gray-700 dark:text-gray-200"
-                            >kcal</label
                         >
+                            kcal
+                        </label>
                         {@render kcalInput()}
                     </div>
                     <div class="grid gap-1 @sm:contents">
                         <label
                             for="calorie-item-note"
                             class="text-sm font-medium text-gray-700 dark:text-gray-200"
-                            >備考</label
                         >
+                            備考
+                        </label>
                         {@render noteInput()}
                     </div>
                 </div>
@@ -248,8 +251,9 @@
                         type="submit"
                         disabled={sending !== undefined}
                         class="cursor-pointer rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-                        >{sending ? "保存待ち…" : "変更"}</button
                     >
+                        {sending ? "保存待ち…" : "変更"}
+                    </button>
                 </div>
             </form>
         </Dialog>
@@ -264,18 +268,19 @@
     <!-- 横スクロールの要素で囲むと、最後の行の「⋯」メニューが表の下端で切り取られるため囲まない -->
     <CalorieFilterStatus keywords={filterKeywords} onClear={onClearFilter} />
     <table class="w-full table-fixed text-left text-sm">
-        <colgroup
-            ><col /><col class="w-16" /><col class="w-20" /><col
-                class="w-10"
-            /></colgroup
-        >
+        <colgroup>
+            <col /><col class="w-16" /><col class="w-20" /><col class="w-10" />
+        </colgroup>
         <thead
             class="border-b border-gray-200 text-gray-600 dark:border-gray-700 dark:text-gray-300"
         >
-            <tr
-                ><th class="p-2">品目</th><th class="p-2 text-right">kcal</th
-                ><th class="p-2">備考</th><th class="p-2"></th></tr
-            >
+            <tr>
+                <th class="p-2">品目</th><th class="p-2 text-right">kcal</th><th
+                    class="p-2"
+                >
+                    備考
+                </th><th class="p-2"></th>
+            </tr>
         </thead>
         <tbody>
             {#each visibleItems as item (item.id)}
@@ -287,8 +292,10 @@
                     <td class="p-2 text-right">{item.kcal}</td>
                     <td
                         class="truncate p-2 text-gray-600 dark:text-gray-300"
-                        title={item.note}>{item.note}</td
+                        title={item.note}
                     >
+                        {item.note}
+                    </td>
                     <td class="p-2 text-right">
                         <div
                             class="relative"
@@ -308,8 +315,10 @@
                                 class="cursor-pointer rounded px-1 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
                                 data-testid="calorie-item-menu-btn"
                                 aria-label="品目の操作"
-                                title="操作">⋯</button
+                                title="操作"
                             >
+                                ⋯
+                            </button>
                             {#if openMenuId === item.id}
                                 {@const inUse = usageText(item)}
                                 <div
@@ -322,8 +331,10 @@
                                         type="button"
                                         onclick={() => edit(item)}
                                         class={menuBlueItemClass}
-                                        role="menuitem">編集</button
+                                        role="menuitem"
                                     >
+                                        編集
+                                    </button>
                                     <button
                                         type="button"
                                         disabled={inUse !== undefined}
@@ -333,26 +344,29 @@
                                         }}
                                         class={menuDangerItemClass}
                                         role="menuitem"
-                                        >削除{#if inUse}<span
-                                                class="block text-xs"
-                                                >{inUse}</span
-                                            >{/if}</button
                                     >
+                                        削除{#if inUse}<span
+                                                class="block text-xs"
+                                            >
+                                                {inUse}
+                                            </span>{/if}
+                                    </button>
                                 </div>
                             {/if}
                         </div>
                     </td>
                 </tr>
             {:else}
-                <tr
-                    ><td
+                <tr>
+                    <td
                         colspan="4"
                         class="p-4 text-center text-gray-400 dark:text-gray-500"
-                        >{items.length === 0
+                    >
+                        {items.length === 0
                             ? "品目がありません"
-                            : "該当する品目はありません"}</td
-                    ></tr
-                >
+                            : "該当する品目はありません"}
+                    </td>
+                </tr>
             {/each}
         </tbody>
     </table>

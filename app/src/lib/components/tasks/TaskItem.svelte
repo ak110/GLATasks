@@ -167,8 +167,9 @@
                                 class="text-xs text-gray-400"
                                 title={attachment.filename}
                                 aria-label={`${attachment.filename}の画像取得に失敗`}
-                                >⚠️</span
                             >
+                                ⚠️
+                            </span>
                         {/await}
                     {:else}
                         <button
@@ -178,8 +179,9 @@
                             data-testid="task-attachment-icon"
                             title={attachment.filename}
                             aria-label={`${attachment.filename}をダウンロード`}
-                            >📎</button
                         >
+                            📎
+                        </button>
                     {/if}
                 {/each}
                 {#if task.tags.length > 0}
@@ -205,8 +207,10 @@
             data-testid="task-edit-btn"
             aria-label="タスクを編集"
             disabled={isTempTask}
-            title="編集">✏️</button
+            title="編集"
         >
+            ✏️
+        </button>
         <div
             class="relative"
             use:menuBehavior={{
@@ -219,8 +223,10 @@
                 class="cursor-pointer rounded p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-600 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-300"
                 data-testid="task-copy-btn"
                 aria-label="タスクをコピー"
-                title="コピー">📋</button
+                title="コピー"
             >
+                📋
+            </button>
             {#if copyMenuOpen}
                 <div
                     class={menuFrameClass}
@@ -281,8 +287,10 @@
                     title="ドラッグして並び替え"
                     onpointerdown={isTempTask
                         ? undefined
-                        : (e) => onDragStart(task.id, e)}>⠿</span
+                        : (e) => onDragStart(task.id, e)}
                 >
+                    ⠿
+                </span>
             {/if}
             {#if isRemoteUpdated}
                 <span

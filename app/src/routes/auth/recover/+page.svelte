@@ -10,6 +10,8 @@
     <PasskeyAuth mode="recover" />
     {#snippet footer()}<a
             href="{resolve('/auth/login')}{page.url.search}"
-            class="text-blue-600 underline dark:text-blue-400">ログインへ戻る</a
-        >{/snippet}
+            class="text-blue-600 underline dark:text-blue-400"
+        >
+            ログインへ戻る
+        </a>{/snippet}
 </AuthCard>

@@ -323,15 +323,18 @@
             <button
                 type="button"
                 onclick={() => onWindowChange(windowOffset + 1)}
-                class={grayButtonClass}>前の30日</button
+                class={grayButtonClass}
             >
+                前の30日
+            </button>
             <button
                 type="button"
                 disabled={windowOffset === 0}
                 onclick={() => onWindowChange(windowOffset - 1)}
                 class="cursor-pointer rounded bg-gray-100 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-200 disabled:cursor-default disabled:opacity-40 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
-                >次の30日</button
             >
+                次の30日
+            </button>
         </div>
     </div>
 
@@ -396,22 +399,25 @@
             {@render datetimeInput()}
             <label class="sr-only" for="calorie-record-item">品目</label>
             {@render itemInput()}
-            <label class="sr-only" for="calorie-record-quantity"
-                >{quantityLabel}</label
-            >
+            <label class="sr-only" for="calorie-record-quantity">
+                {quantityLabel}
+            </label>
             {@render quantityInput()}
             <div class="flex gap-1">
                 <button
                     type="submit"
                     disabled={sending !== undefined}
                     class="cursor-pointer rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700"
-                    >追加</button
                 >
+                    追加
+                </button>
                 <button
                     type="button"
                     onclick={resetForm}
-                    class={grayButtonClass}>取消</button
+                    class={grayButtonClass}
                 >
+                    取消
+                </button>
             </div>
             {#if temporary}
                 <div class="sm:col-span-4">
@@ -435,24 +441,27 @@
                         <label
                             for="calorie-record-datetime"
                             class="text-sm font-medium text-gray-700 dark:text-gray-200"
-                            >日時</label
                         >
+                            日時
+                        </label>
                         {@render datetimeInput()}
                     </div>
                     <div class="grid gap-1 @sm:contents">
                         <label
                             for="calorie-record-item"
                             class="text-sm font-medium text-gray-700 dark:text-gray-200"
-                            >品目</label
                         >
+                            品目
+                        </label>
                         {@render itemInput()}
                     </div>
                     <div class="grid gap-1 @sm:contents">
                         <label
                             for="calorie-record-quantity"
                             class="text-sm font-medium text-gray-700 dark:text-gray-200"
-                            >{quantityLabel}</label
                         >
+                            {quantityLabel}
+                        </label>
                         {@render quantityInput()}
                     </div>
                 </div>
@@ -471,21 +480,26 @@
                         <button
                             type="button"
                             onclick={requestConversion}
-                            class={grayButtonClass}>一時項目に変換</button
+                            class={grayButtonClass}
                         >
+                            一時項目に変換
+                        </button>
                     {:else if keepTemporary && matchedItem}
                         <button
                             type="button"
                             onclick={requestRegularConversion}
-                            class={grayButtonClass}>通常項目に変換</button
+                            class={grayButtonClass}
                         >
+                            通常項目に変換
+                        </button>
                     {/if}
                     <button
                         type="submit"
                         disabled={sending !== undefined}
                         class="ml-auto cursor-pointer rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-                        >{sending ? "保存待ち…" : "変更"}</button
                     >
+                        {sending ? "保存待ち…" : "変更"}
+                    </button>
                 </div>
             </form>
             <ConfirmDialog
@@ -517,8 +531,9 @@
                         <label
                             for="calorie-conversion-quantity"
                             class="text-sm text-gray-700 dark:text-gray-200"
-                            >数量</label
                         >
+                            数量
+                        </label>
                         <input
                             id="calorie-conversion-quantity"
                             type="number"
@@ -536,14 +551,17 @@
                             <button
                                 type="button"
                                 onclick={cancelConversion}
-                                class={grayButtonClass}>キャンセル</button
+                                class={grayButtonClass}
                             >
+                                キャンセル
+                            </button>
                             <button
                                 type="submit"
                                 disabled={sending !== undefined}
                                 class="cursor-pointer rounded bg-blue-600 px-6 py-2 text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-                                >{sending ? "変換待ち…" : "変換"}</button
                             >
+                                {sending ? "変換待ち…" : "変換"}
+                            </button>
                         </div>
                     </form>
                 </Dialog>
@@ -559,21 +577,26 @@
         </p>{/if}
     <CalorieFilterStatus keywords={filterKeywords} onClear={onClearFilter} />
     <table class="w-full table-fixed text-left text-sm">
-        <colgroup
-            ><col class="w-14 sm:w-36" /><col /><col class="w-12 sm:w-16" /><col
+        <colgroup>
+            <col class="w-14 sm:w-36" /><col /><col class="w-12 sm:w-16" /><col
                 class="w-14 sm:w-16"
-            /><col class="w-10" /></colgroup
-        >
+            /><col class="w-10" />
+        </colgroup>
         <thead
             class="border-b border-gray-200 text-gray-600 dark:border-gray-700 dark:text-gray-300"
-            ><tr
-                ><th class="p-2 whitespace-nowrap">日時</th><th
-                    class="p-2 whitespace-nowrap">品目</th
-                ><th class="p-2 text-right whitespace-nowrap">数量</th><th
-                    class="p-2 text-right whitespace-nowrap">kcal</th
-                ><th class="p-2"></th></tr
-            ></thead
         >
+            <tr>
+                <th class="p-2 whitespace-nowrap">日時</th><th
+                    class="p-2 whitespace-nowrap"
+                >
+                    品目
+                </th><th class="p-2 text-right whitespace-nowrap">数量</th><th
+                    class="p-2 text-right whitespace-nowrap"
+                >
+                    kcal
+                </th><th class="p-2"></th>
+            </tr>
+        </thead>
         <tbody>
             {#each visibleRecords as record (record.id)}
                 <tr
@@ -581,22 +604,18 @@
                     data-testid="calorie-record-row"
                 >
                     <td class="p-2 whitespace-nowrap">
-                        <span class="grid sm:hidden"
-                            ><span
-                                >{formatLocalMonthDay(
+                        <span class="grid sm:hidden">
+                            <span>
+                                {formatLocalMonthDay(
                                     new Date(record.consumedAt),
-                                )}</span
-                            ><span
-                                >{formatLocalTime(
-                                    new Date(record.consumedAt),
-                                )}</span
-                            ></span
-                        >
-                        <span class="hidden sm:inline"
-                            >{formatLocalMinute(
-                                new Date(record.consumedAt),
-                            )}</span
-                        >
+                                )}
+                            </span><span>
+                                {formatLocalTime(new Date(record.consumedAt))}
+                            </span>
+                        </span>
+                        <span class="hidden sm:inline">
+                            {formatLocalMinute(new Date(record.consumedAt))}
+                        </span>
                     </td>
                     <td class="truncate p-2" title={record.itemName}>
                         {record.itemName}
@@ -606,8 +625,9 @@
                         aria-label={record.temporary
                             ? "一時項目のため数量欄は空欄"
                             : undefined}
-                        >{record.temporary ? "" : record.quantity}</td
                     >
+                        {record.temporary ? "" : record.quantity}
+                    </td>
                     <td class="p-2 text-right">{record.totalKcal}</td>
                     <td class="p-2 text-right">
                         <div
@@ -628,8 +648,10 @@
                                 class="cursor-pointer rounded px-1 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
                                 data-testid="calorie-record-menu-btn"
                                 aria-label="記録の操作"
-                                title="操作">⋯</button
+                                title="操作"
                             >
+                                ⋯
+                            </button>
                             {#if openMenuId === record.id}
                                 <div
                                     class={menuFrameClass}
@@ -642,35 +664,42 @@
                                         onclick={() => copy(record)}
                                         class={menuBlueItemClass}
                                         data-testid="calorie-record-copy"
-                                        role="menuitem">コピー</button
+                                        role="menuitem"
                                     >
+                                        コピー
+                                    </button>
                                     <button
                                         type="button"
                                         onclick={() => edit(record)}
                                         class={menuBlueItemClass}
-                                        role="menuitem">編集</button
+                                        role="menuitem"
                                     >
+                                        編集
+                                    </button>
                                     <button
                                         type="button"
                                         onclick={() => remove(record)}
                                         class={menuDangerItemClass}
-                                        role="menuitem">削除</button
+                                        role="menuitem"
                                     >
+                                        削除
+                                    </button>
                                 </div>
                             {/if}
                         </div>
                     </td>
                 </tr>
             {:else}
-                <tr
-                    ><td
+                <tr>
+                    <td
                         colspan="5"
                         class="p-4 text-center text-gray-400 dark:text-gray-500"
-                        >{records.length === 0
+                    >
+                        {records.length === 0
                             ? "この期間の記録はありません"
-                            : "該当する記録はありません"}</td
-                    ></tr
-                >
+                            : "該当する記録はありません"}
+                    </td>
+                </tr>
             {/each}
         </tbody>
     </table>

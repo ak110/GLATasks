@@ -48,8 +48,9 @@
         onclick={onClear}
         class="{grayButtonClass} {actionAreaClass}"
         title="完了済みタスクを非表示にする"
-        ><span class="sm:hidden">非表示</span><span class="hidden sm:inline"
-            >完了済みを非表示</span
-        ></button
     >
+        <span class="sm:hidden">非表示</span><span class="hidden sm:inline">
+            完了済みを非表示
+        </span>
+    </button>
 </div>

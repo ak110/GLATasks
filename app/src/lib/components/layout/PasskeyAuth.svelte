@@ -110,8 +110,10 @@
             target="_blank"
             rel="noopener"
             class="text-blue-600 underline dark:text-blue-400"
-            data-testid="passkey-open-tab">新しいタブで認証する</a
+            data-testid="passkey-open-tab"
         >
+            新しいタブで認証する
+        </a>
     {:else if codes.length}
         <RecoveryCodes {codes} onSaved={finish} />
     {:else}
@@ -152,8 +154,10 @@
                 disabled={!ready}
                 onclick={() => {
                     recovering = true;
-                }}>本人確認済みの登録を再開</button
+                }}
             >
+                本人確認済みの登録を再開
+            </button>
         {/if}
         {#if recovering && verified}<p>
                 本人確認が完了しました。15分以内に登録してください。
@@ -170,8 +174,10 @@
                     verified = false;
                     error = "";
                 }}
-                data-testid="recovery-back">復旧コードの入力に戻る</button
+                data-testid="recovery-back"
             >
+                復旧コードの入力に戻る
+            </button>
         {/if}
         <button
             type="button"
@@ -179,7 +185,8 @@
             disabled={busy || !ready}
             onclick={run}
             data-testid="passkey-submit"
-            >{busy
+        >
+            {busy
                 ? "認証中…"
                 : mode === "login"
                   ? "パスキーでログイン"
@@ -187,8 +194,8 @@
                     ? "パスキーを作成して登録"
                     : recovering
                       ? "新しいパスキーを登録"
-                      : "復旧コードで本人確認"}</button
-        >
+                      : "復旧コードで本人確認"}
+        </button>
     {/if}
     {#if error}<p role="alert" class="text-red-600 dark:text-red-400">
             {error}

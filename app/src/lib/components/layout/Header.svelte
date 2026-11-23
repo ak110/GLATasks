@@ -78,9 +78,9 @@
 >
     {#each navigationItems as item (item.key)}
         {#if item.key !== "tasks"}
-            <span class="text-gray-400" data-testid="header-nav-separator"
-                >|</span
-            >
+            <span class="text-gray-400" data-testid="header-nav-separator">
+                |
+            </span>
         {/if}
         {#if page === item.key}
             <span
@@ -89,9 +89,9 @@
                 aria-current="page"
                 aria-label={item.label}
                 title={item.label}
-                >{item.icon}<span class="hidden sm:inline">{item.label}</span
-                ></span
             >
+                {item.icon}<span class="hidden sm:inline">{item.label}</span>
+            </span>
         {:else}
             <a
                 href={resolve(item.path)}
@@ -99,9 +99,9 @@
                 data-testid={"header-nav-" + item.key}
                 aria-label={item.label}
                 title={item.label}
-                >{item.icon}<span class="hidden sm:inline">{item.label}</span
-                ></a
             >
+                {item.icon}<span class="hidden sm:inline">{item.label}</span>
+            </a>
         {/if}
     {/each}
     {#if isLoading}
@@ -158,12 +158,14 @@
                 data-testid="account-menu-toggle"
                 aria-label="アカウント"
                 title="アカウント"
-                ><span aria-hidden="true">👤</span><span
-                    class="hidden sm:inline">アカウント</span
-                >
-                <span aria-hidden="true" class="hidden sm:inline">▾</span
-                ></button
             >
+                <span aria-hidden="true">👤</span><span
+                    class="hidden sm:inline"
+                >
+                    アカウント
+                </span>
+                <span aria-hidden="true" class="hidden sm:inline">▾</span>
+            </button>
             {#if accountOpen}
                 <div
                     class="{menuFrameClass} text-sm text-gray-800"
@@ -177,15 +179,19 @@
                         role="menuitem"
                         class={menuItemClass}
                         data-testid="security-link"
-                        onclick={() => (accountOpen = false)}>アカウント設定</a
+                        onclick={() => (accountOpen = false)}
                     >
+                        アカウント設定
+                    </a>
                     <form method="post" action="/auth/logout">
                         <button
                             type="submit"
                             role="menuitem"
                             class={menuItemClass}
-                            data-testid="account-logout">ログアウト</button
+                            data-testid="account-logout"
                         >
+                            ログアウト
+                        </button>
                     </form>
                 </div>
             {/if}

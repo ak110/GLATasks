@@ -65,8 +65,10 @@
         <div class="mb-4">
             <label
                 class="mb-1 block cursor-pointer font-medium text-gray-700 dark:text-gray-200"
-                for="merge-target">統合先リスト</label
+                for="merge-target"
             >
+                統合先リスト
+            </label>
             <select
                 id="merge-target"
                 bind:value={selectedTargetId}
@@ -88,8 +90,9 @@
                 onclick={handleSubmit}
                 disabled={!selectedTargetId || submitting}
                 class="cursor-pointer rounded bg-red-600 px-6 py-2 text-white hover:bg-red-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
-                >統合</button
             >
+                統合
+            </button>
         </div>
     </div>
 </Dialog>

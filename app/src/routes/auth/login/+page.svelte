@@ -22,16 +22,19 @@
     <a
         href="{resolve('/auth/recover')}{registerQuery}"
         class="text-blue-600 underline dark:text-blue-400"
-        >パスキーを失った場合の復旧</a
     >
+        パスキーを失った場合の復旧
+    </a>
     <div class="my-5 border-t border-gray-200 dark:border-gray-700"></div>
     <h2 class="mb-3 font-semibold">パスワードでログイン</h2>
     <form method="POST">
         <div class="mb-4">
             <label
                 class="mb-1 block cursor-pointer font-medium text-gray-700 dark:text-gray-200"
-                for="user">ユーザーID</label
+                for="user"
             >
+                ユーザーID
+            </label>
             <input
                 id="user"
                 name="user"
@@ -44,8 +47,10 @@
         <div class="mb-6">
             <label
                 class="mb-1 block cursor-pointer font-medium text-gray-700 dark:text-gray-200"
-                for="password">パスワード</label
+                for="password"
             >
+                パスワード
+            </label>
             <input
                 id="password"
                 name="password"
@@ -67,8 +72,10 @@
             アカウントをお持ちでない方は
             <a
                 href="{resolve('/auth/regist_user')}{registerQuery}"
-                class="text-blue-600 hover:underline dark:text-blue-400">登録</a
+                class="text-blue-600 hover:underline dark:text-blue-400"
             >
+                登録
+            </a>
         </p>
     {/snippet}
 </AuthCard>

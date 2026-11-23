@@ -194,8 +194,10 @@
             <div class="mb-4">
                 <label
                     class="mb-1 block cursor-pointer font-medium text-gray-700 dark:text-gray-200"
-                    for="schedule-title">タイトル</label
+                    for="schedule-title"
                 >
+                    タイトル
+                </label>
                 <input
                     id="schedule-title"
                     type="text"
@@ -207,8 +209,9 @@
             <div class="mb-4">
                 <span
                     class="mb-1 block font-medium text-gray-700 dark:text-gray-200"
-                    >タグ</span
                 >
+                    タグ
+                </span>
                 <TagEditor bind:tags={formTags} candidates={[]} />
             </div>
             <RecurrenceEditor
@@ -232,8 +235,9 @@
                         type="button"
                         class={grayButtonClass}
                         onclick={() => void schedulesQuery.refetch()}
-                        >再試行</button
                     >
+                        再試行
+                    </button>
                 </div>
             {:else}
                 <ScheduleList

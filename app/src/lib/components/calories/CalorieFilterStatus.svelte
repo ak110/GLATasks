@@ -13,17 +13,17 @@
         role="status"
         data-testid="calorie-filter-status"
     >
-        <span class="min-w-0 truncate"
-            >{keywords
-                .map((keyword) => `「${keyword}」`)
-                .join("")}で検索中</span
-        >
+        <span class="min-w-0 truncate">
+            {keywords.map((keyword) => `「${keyword}」`).join("")}で検索中
+        </span>
         <button
             type="button"
             onclick={onClear}
             class="cursor-pointer rounded p-1 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
             aria-label="検索を解除"
-            title="検索を解除">×</button
+            title="検索を解除"
         >
+            ×
+        </button>
     </div>
 {/if}

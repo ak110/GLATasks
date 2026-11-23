@@ -38,8 +38,10 @@
                 <div class="mb-4">
                     <label
                         class="mb-1 block cursor-pointer font-medium text-gray-700"
-                        for="text">内容</label
+                        for="text"
                     >
+                        内容
+                    </label>
                     <textarea
                         id="text"
                         name="text"
@@ -52,8 +54,10 @@
                 <div class="mb-4">
                     <label
                         class="mb-1 block cursor-pointer font-medium text-gray-700"
-                        for="list_id">リスト</label
+                        for="list_id"
                     >
+                        リスト
+                    </label>
                     <select
                         id="list_id"
                         name="list_id"

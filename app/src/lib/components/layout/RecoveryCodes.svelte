@@ -19,8 +19,8 @@
     </p>
     <pre
         class="overflow-x-auto rounded bg-gray-100 p-3 text-sm dark:bg-gray-700">{displayedCodes}</pre>
-    <label class="flex cursor-pointer gap-2"
-        ><input
+    <label class="flex cursor-pointer gap-2">
+        <input
             type="checkbox"
             checked={savedCodes === displayedCodes}
             onchange={(event) => {
@@ -29,13 +29,15 @@
                     : undefined;
             }}
             data-testid="codes-saved"
-        />安全な場所に保存済み</label
-    >
+        />安全な場所に保存済み
+    </label>
     <button
         type="button"
         class={grayButtonClass}
         disabled={savedCodes !== displayedCodes}
         onclick={onSaved}
-        data-testid="codes-continue">続ける</button
+        data-testid="codes-continue"
     >
+        続ける
+    </button>
 </section>

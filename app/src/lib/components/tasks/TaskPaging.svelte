@@ -35,15 +35,19 @@
             type="button"
             class={grayButtonClass}
             disabled={data.page === 0}
-            onclick={() => onPage(data.page - 1)}>前のページ</button
+            onclick={() => onPage(data.page - 1)}
         >
+            前のページ
+        </button>
         <span role="status">{data.page + 1} / {pageCount}</span>
         <button
             type="button"
             class={grayButtonClass}
             disabled={data.page + 1 >= pageCount}
-            onclick={() => onPage(data.page + 1)}>次のページ</button
+            onclick={() => onPage(data.page + 1)}
         >
+            次のページ
+        </button>
         <form class="flex items-center gap-2" onsubmit={jump}>
             <input
                 type="number"

@@ -161,8 +161,9 @@
             <label
                 for="timer-name"
                 class="mb-1 block text-sm text-gray-600 dark:text-gray-300"
-                >名前</label
             >
+                名前
+            </label>
             <input
                 id="timer-name"
                 type="text"
@@ -211,8 +212,9 @@
                 <label
                     for="timer-base-time"
                     class="mb-1 block text-sm text-gray-600 dark:text-gray-300"
-                    >ベース時間</label
                 >
+                    ベース時間
+                </label>
                 <input
                     id="timer-base-time"
                     type="text"
@@ -227,8 +229,9 @@
                 <label
                     for="timer-target-time"
                     class="mb-1 block text-sm text-gray-600 dark:text-gray-300"
-                    >目標時刻</label
                 >
+                    目標時刻
+                </label>
                 <input
                     id="timer-target-time"
                     type="time"
@@ -243,8 +246,9 @@
             <label
                 for="timer-adjust"
                 class="mb-1 block text-sm text-gray-600 dark:text-gray-300"
-                >延長/削減の単位（分）</label
             >
+                延長/削減の単位（分）
+            </label>
             <input
                 id="timer-adjust"
                 type="number"
@@ -261,8 +265,9 @@
             <label
                 for="timer-ring-seconds"
                 class="mb-1 block text-sm text-gray-600 dark:text-gray-300"
-                >鳴らす時間（秒）</label
             >
+                鳴らす時間（秒）
+            </label>
             <input
                 id="timer-ring-seconds"
                 type="number"
@@ -294,12 +299,9 @@
                 disabled={submitting}
                 class="cursor-pointer rounded bg-blue-600 px-6 py-2 text-white hover:bg-blue-700"
                 data-testid="timer-submit-btn"
-                >{submitting
-                    ? "保存中…"
-                    : mode === "create"
-                      ? "追加"
-                      : "保存"}</button
             >
+                {submitting ? "保存中…" : mode === "create" ? "追加" : "保存"}
+            </button>
         </div>
     </form>
 </Dialog>

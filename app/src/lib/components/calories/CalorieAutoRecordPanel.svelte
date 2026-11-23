@@ -195,12 +195,13 @@
                 type="submit"
                 disabled={sending !== undefined}
                 class="cursor-pointer rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >{sending
+            >
+                {sending
                     ? "保存待ち…"
                     : editing === undefined
                       ? "追加"
-                      : "変更"}</button
-            >
+                      : "変更"}
+            </button>
         </form>
     {/snippet}
     {#if editing !== undefined}
@@ -228,21 +229,26 @@
             {sendingMessage}
         </p>{/if}
     <table class="w-full table-fixed text-left text-sm">
-        <colgroup
-            ><col class="w-16" /><col /><col class="w-14" /><col
+        <colgroup>
+            <col class="w-16" /><col /><col class="w-14" /><col
                 class="w-14"
-            /><col class="w-10" /></colgroup
-        >
+            /><col class="w-10" />
+        </colgroup>
         <thead
             class="border-b border-gray-200 text-gray-600 dark:border-gray-700 dark:text-gray-300"
-            ><tr
-                ><th class="p-2 whitespace-nowrap">時刻</th><th
-                    class="p-2 whitespace-nowrap">品目</th
-                ><th class="p-2 text-right whitespace-nowrap">数量</th><th
-                    class="p-2 text-center whitespace-nowrap">ON</th
-                ><th class="p-2"></th></tr
-            ></thead
         >
+            <tr>
+                <th class="p-2 whitespace-nowrap">時刻</th><th
+                    class="p-2 whitespace-nowrap"
+                >
+                    品目
+                </th><th class="p-2 text-right whitespace-nowrap">数量</th><th
+                    class="p-2 text-center whitespace-nowrap"
+                >
+                    ON
+                </th><th class="p-2"></th>
+            </tr>
+        </thead>
         <tbody>
             {#each autoRecords as autoRecord (autoRecord.id)}
                 <tr
@@ -250,20 +256,20 @@
                     data-testid="calorie-auto-record-row"
                 >
                     <td class="p-2">{autoRecord.timeOfDay}</td>
-                    <td class="truncate p-2" title={autoRecord.itemName}
-                        >{autoRecord.itemName}</td
-                    >
+                    <td class="truncate p-2" title={autoRecord.itemName}>
+                        {autoRecord.itemName}
+                    </td>
                     <td class="p-2 text-right">{autoRecord.quantity}</td>
-                    <td class="p-2 text-center"
-                        ><input
+                    <td class="p-2 text-center">
+                        <input
                             type="checkbox"
                             checked={autoRecord.enabled}
                             onchange={() => toggle(autoRecord)}
                             aria-label={`${autoRecord.timeOfDay} ${autoRecord.itemName}の自動記録`}
                             data-testid="calorie-auto-record-enabled"
                             class="cursor-pointer"
-                        /></td
-                    >
+                        />
+                    </td>
                     <td class="p-2 text-right">
                         <div
                             class="relative"
@@ -283,8 +289,10 @@
                                 class="cursor-pointer rounded px-1 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
                                 data-testid="calorie-auto-record-menu-btn"
                                 aria-label="自動記録の操作"
-                                title="操作">⋯</button
+                                title="操作"
                             >
+                                ⋯
+                            </button>
                             {#if openMenuId === autoRecord.id}
                                 <div
                                     class={menuFrameClass}
@@ -296,8 +304,10 @@
                                         type="button"
                                         onclick={() => edit(autoRecord)}
                                         class={menuBlueItemClass}
-                                        role="menuitem">編集</button
+                                        role="menuitem"
                                     >
+                                        編集
+                                    </button>
                                     <button
                                         type="button"
                                         onclick={() => {
@@ -305,21 +315,24 @@
                                             deleteTarget = { ...autoRecord };
                                         }}
                                         class={menuDangerItemClass}
-                                        role="menuitem">削除</button
+                                        role="menuitem"
                                     >
+                                        削除
+                                    </button>
                                 </div>
                             {/if}
                         </div>
                     </td>
                 </tr>
             {:else}
-                <tr
-                    ><td
+                <tr>
+                    <td
                         colspan="5"
                         class="p-4 text-center text-gray-400 dark:text-gray-500"
-                        >自動記録の設定はありません</td
-                    ></tr
-                >
+                    >
+                        自動記録の設定はありません
+                    </td>
+                </tr>
             {/each}
         </tbody>
     </table>

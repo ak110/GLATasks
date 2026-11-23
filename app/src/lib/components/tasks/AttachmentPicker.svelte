@@ -31,15 +31,19 @@
             >
                 <span
                     class="min-w-0 flex-1 truncate text-gray-700 dark:text-gray-200"
-                    title={file.name}>{file.name}</span
+                    title={file.name}
                 >
+                    {file.name}
+                </span>
                 <button
                     type="button"
                     onclick={() => onRemove?.(i)}
                     class="cursor-pointer rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-400"
                     aria-label={`${file.name}を削除`}
-                    title="削除">🗑️</button
+                    title="削除"
                 >
+                    🗑️
+                </button>
             </li>
         {/each}
     </ul>

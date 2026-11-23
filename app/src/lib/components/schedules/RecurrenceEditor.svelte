@@ -208,8 +208,10 @@
     <div class="flex items-center gap-2">
         <label
             class="font-medium text-gray-700 dark:text-gray-200"
-            for="recur-freq">頻度</label
+            for="recur-freq"
         >
+            頻度
+        </label>
         <select
             id="recur-freq"
             bind:value={freq}
@@ -221,9 +223,9 @@
             <option value="MONTHLY">毎月</option>
             <option value="YEARLY">毎年</option>
         </select>
-        <label class="text-gray-700 dark:text-gray-200" for="recur-interval"
-            >間隔</label
-        >
+        <label class="text-gray-700 dark:text-gray-200" for="recur-interval">
+            間隔
+        </label>
         <input
             id="recur-interval"
             type="number"
@@ -257,8 +259,10 @@
             {#if freq === "YEARLY"}
                 <label
                     class="text-gray-700 dark:text-gray-200"
-                    for="recur-month">月</label
+                    for="recur-month"
                 >
+                    月
+                </label>
                 <input
                     id="recur-month"
                     type="number"
@@ -268,9 +272,9 @@
                     class="w-16 rounded border border-gray-200 px-2 py-1 focus:border-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
                 />
             {/if}
-            <label class="text-gray-700 dark:text-gray-200" for="recur-day"
-                >日</label
-            >
+            <label class="text-gray-700 dark:text-gray-200" for="recur-day">
+                日
+            </label>
             <input
                 id="recur-day"
                 type="number"
@@ -283,9 +287,9 @@
     {/if}
 
     <div class="flex items-center gap-2">
-        <label class="text-gray-700 dark:text-gray-200" for="recur-time"
-            >時刻</label
-        >
+        <label class="text-gray-700 dark:text-gray-200" for="recur-time">
+            時刻
+        </label>
         <input
             id="recur-time"
             type="time"
@@ -295,9 +299,9 @@
     </div>
 
     <div class="flex flex-col gap-1.5">
-        <span class="font-medium text-gray-700 dark:text-gray-200"
-            >終了条件</span
-        >
+        <span class="font-medium text-gray-700 dark:text-gray-200">
+            終了条件
+        </span>
         <label class="flex cursor-pointer items-center gap-1.5">
             <input type="radio" bind:group={endCondition} value="never" />
             無期限

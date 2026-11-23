@@ -179,8 +179,10 @@
                     aria-label="閉じる"
                     title="閉じる"
                     data-testid={closeTestId}
-                    class={closeButtonClass}>✕</button
+                    class={closeButtonClass}
                 >
+                    ✕
+                </button>
             </div>
         {:else if lightbox}
             <button
@@ -190,8 +192,9 @@
                 title="閉じる"
                 data-testid={closeTestId}
                 class="absolute -top-3 -right-3 cursor-pointer rounded-full bg-gray-800 p-2 text-white shadow"
-                >✕</button
             >
+                ✕
+            </button>
         {/if}
         {#if contentClass}
             <div class={contentClass}>{@render children()}</div>

@@ -145,11 +145,9 @@
                             data-testid="calorie-summary-pace"
                         >
                             {dailyPeriod.dailyKcal.toLocaleString("ja-JP")}
-                            <span class="text-base font-normal"
-                                >kcal ({dailyPeriod.percentage.toFixed(
-                                    1,
-                                )}%)</span
-                            >
+                            <span class="text-base font-normal">
+                                kcal ({dailyPeriod.percentage.toFixed(1)}%)
+                            </span>
                         </p>
                     </div>
                     <p
@@ -159,8 +157,9 @@
                         {remaining.prefix}<span
                             class="text-3xl font-bold"
                             data-testid="calorie-summary-remaining-value"
-                            >{remaining.value}</span
-                        >{remaining.suffix}
+                        >
+                            {remaining.value}
+                        </span>{remaining.suffix}
                     </p>
                 </div>
             </article>
@@ -176,9 +175,9 @@
                     </h3>
                     <p class="text-xl font-bold">
                         {period.dailyKcal.toLocaleString("ja-JP")}
-                        <span class="text-base font-normal"
-                            >kcal ({period.percentage.toFixed(1)}%)</span
-                        >
+                        <span class="text-base font-normal">
+                            kcal ({period.percentage.toFixed(1)}%)
+                        </span>
                     </p>
                 </article>
             {/each}

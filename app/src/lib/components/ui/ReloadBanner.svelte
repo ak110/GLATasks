@@ -37,8 +37,10 @@
                 <button
                     type="button"
                     class={actions ? secondaryButtonClass : buttonClass}
-                    onclick={reloadPage}>再読み込み</button
+                    onclick={reloadPage}
                 >
+                    再読み込み
+                </button>
             {/if}
         </div>
     {/if}

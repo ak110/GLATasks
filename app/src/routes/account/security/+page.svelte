@@ -213,9 +213,9 @@
                                 run(() => rename(key.id));
                             }}
                         >
-                            <label class="block text-sm" for="rename-{key.id}"
-                                >パスキーの名前</label
-                            >
+                            <label class="block text-sm" for="rename-{key.id}">
+                                パスキーの名前
+                            </label>
                             <input
                                 id="rename-{key.id}"
                                 class="w-full {inputClass}"
@@ -228,16 +228,19 @@
                                     type="submit"
                                     class={primaryButtonClass}
                                     disabled={busy || !editingName.trim()}
-                                    data-testid="passkey-name-save">保存</button
+                                    data-testid="passkey-name-save"
                                 >
+                                    保存
+                                </button>
                                 <button
                                     type="button"
                                     class={grayButtonClass}
                                     disabled={busy}
                                     onclick={() => (editingId = undefined)}
                                     data-testid="passkey-name-cancel"
-                                    >キャンセル</button
                                 >
+                                    キャンセル
+                                </button>
                             </div>
                         </form>
                     {:else}
@@ -258,8 +261,9 @@
                                         editingName = key.name;
                                     }}
                                     data-testid="passkey-rename"
-                                    >名前を変更</button
                                 >
+                                    名前を変更
+                                </button>
                                 <button
                                     type="button"
                                     class={dangerButtonClass}
@@ -271,8 +275,10 @@
                                             id: key.id,
                                             name: key.name,
                                         })}
-                                    data-testid="passkey-delete">削除</button
+                                    data-testid="passkey-delete"
                                 >
+                                    削除
+                                </button>
                             </div>
                         </div>
                     {/if}
@@ -300,8 +306,10 @@
                 class={primaryButtonClass}
                 disabled={busy}
                 onclick={() => run(add)}
-                data-testid="passkey-add">パスキーを追加</button
+                data-testid="passkey-add"
             >
+                パスキーを追加
+            </button>
         </section>
         <section
             class="space-y-3 border-t border-gray-200 pt-4 dark:border-gray-700"
@@ -321,9 +329,9 @@
                 }}
             >
                 <div class="space-y-1">
-                    <label class="block text-sm" for="new-password"
-                        >新しいパスワード</label
-                    >
+                    <label class="block text-sm" for="new-password">
+                        新しいパスワード
+                    </label>
                     <input
                         bind:this={newPasswordEl}
                         id="new-password"
@@ -342,9 +350,9 @@
                     />
                 </div>
                 <div class="space-y-1">
-                    <label class="block text-sm" for="new-password-confirm"
-                        >新しいパスワード（確認用）</label
-                    >
+                    <label class="block text-sm" for="new-password-confirm">
+                        新しいパスワード（確認用）
+                    </label>
                     <input
                         bind:this={newPasswordConfirmEl}
                         id="new-password-confirm"
@@ -374,10 +382,11 @@
                     class={primaryButtonClass}
                     disabled={busy}
                     data-testid="password-set"
-                    >{data.passwordEnabled
-                        ? "パスワードを変更"
-                        : "パスワードを設定"}</button
                 >
+                    {data.passwordEnabled
+                        ? "パスワードを変更"
+                        : "パスワードを設定"}
+                </button>
             </form>
             {#if data.passwordEnabled}
                 <p>
@@ -388,8 +397,10 @@
                     class={dangerButtonClass}
                     disabled={busy || !data.passkeys.length}
                     onclick={() => run(disablePassword)}
-                    data-testid="password-disable">パスワードを無効化</button
+                    data-testid="password-disable"
                 >
+                    パスワードを無効化
+                </button>
                 {#if !data.passkeys.length}<p class="text-sm">
                         先にパスキーを追加してください。
                     </p>{/if}
@@ -406,8 +417,10 @@
                 class={grayButtonClass}
                 disabled={busy}
                 onclick={() => (confirmingReissue = true)}
-                data-testid="codes-reissue">復旧コードを再発行</button
+                data-testid="codes-reissue"
             >
+                復旧コードを再発行
+            </button>
         </section>
         {#if codes.length}<div bind:this={codesPanel} tabindex="-1">
                 <RecoveryCodes {codes} onSaved={() => run(saved)} />

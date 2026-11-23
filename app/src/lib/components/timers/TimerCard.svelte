@@ -158,8 +158,10 @@
                 aria-label="ドラッグして並び替え"
                 data-testid="timer-drag-handle"
                 title="ドラッグして並び替え"
-                onpointerdown={(e) => onDragStart(timer.id, e)}>⠿</span
+                onpointerdown={(e) => onDragStart(timer.id, e)}
             >
+                ⠿
+            </span>
         {/if}
         {#if timer.name}
             <h3
@@ -175,8 +177,10 @@
                 class="cursor-pointer rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300"
                 title="編集"
                 aria-label="タイマーを編集"
-                data-testid="timer-edit-btn">✏️</button
+                data-testid="timer-edit-btn"
             >
+                ✏️
+            </button>
             <button
                 onclick={() => onDelete(timer, showEphemeralDeleteEmphasis)}
                 class="cursor-pointer rounded p-1 hover:bg-gray-100 dark:hover:bg-gray-700"
@@ -192,8 +196,10 @@
                 class:dark:ring-red-500={showEphemeralDeleteEmphasis}
                 title={showEphemeralDeleteEmphasis ? "削除 (確認なし)" : "削除"}
                 aria-label="タイマーを削除"
-                data-testid="timer-delete-btn">🗑</button
+                data-testid="timer-delete-btn"
             >
+                🗑
+            </button>
         </div>
     </div>
 
@@ -251,8 +257,10 @@
                     class="cursor-pointer bg-transparent {isExpired
                         ? 'text-red-500'
                         : 'text-gray-800 dark:text-gray-100'}"
-                    onclick={startEditing}>{formatTime(displaySeconds)}</button
+                    onclick={startEditing}
                 >
+                    {formatTime(displaySeconds)}
+                </button>
             {/if}
         </div>
     {/if}
@@ -264,34 +272,44 @@
                     <button
                         onclick={() => onPause(timer.id)}
                         class="cursor-pointer rounded bg-yellow-100 px-3 py-1.5 text-sm text-yellow-700 hover:bg-yellow-200"
-                        data-testid="timer-pause-btn">⏸ 一時停止</button
+                        data-testid="timer-pause-btn"
                     >
+                        ⏸ 一時停止
+                    </button>
                 {/if}
             {:else}
                 <button
                     onclick={() => onStart(timer.id)}
                     disabled={displaySeconds <= 0}
                     class="cursor-pointer rounded bg-green-100 px-3 py-1.5 text-sm text-green-700 hover:bg-green-200 disabled:cursor-not-allowed disabled:opacity-50"
-                    data-testid="timer-start-btn">▶ 開始</button
+                    data-testid="timer-start-btn"
                 >
+                    ▶ 開始
+                </button>
             {/if}
             <button
                 onclick={() => onReset(timer.id)}
                 class={grayButtonClass}
-                data-testid="timer-reset-btn">🔄 リセット</button
+                data-testid="timer-reset-btn"
             >
+                🔄 リセット
+            </button>
         </div>
         <div class="flex flex-nowrap items-center gap-2">
             <button
                 onclick={() => onAdjust(timer.id, timer.adjustMinutes)}
                 class="cursor-pointer rounded bg-blue-50 px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50"
-                data-testid="timer-plus-btn">+{timer.adjustMinutes}分</button
+                data-testid="timer-plus-btn"
             >
+                +{timer.adjustMinutes}分
+            </button>
             <button
                 onclick={() => onAdjust(timer.id, -timer.adjustMinutes)}
                 class="cursor-pointer rounded bg-blue-50 px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50"
-                data-testid="timer-minus-btn">-{timer.adjustMinutes}分</button
+                data-testid="timer-minus-btn"
             >
+                -{timer.adjustMinutes}分
+            </button>
         </div>
     </div>
 </div>

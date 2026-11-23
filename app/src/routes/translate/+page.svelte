@@ -103,8 +103,9 @@
                         <span
                             class="text-xs text-gray-500 dark:text-gray-400"
                             data-testid="translate-engine-help"
-                            >{translation.engineAvailabilityMessage}</span
                         >
+                            {translation.engineAvailabilityMessage}
+                        </span>
                     {/if}
                 </label>
             {/if}
@@ -118,8 +119,9 @@
                 <label
                     for="translate-source"
                     class="flex h-8 cursor-pointer items-center text-sm font-semibold text-gray-700 dark:text-gray-200"
-                    >原文</label
                 >
+                    原文
+                </label>
                 <textarea
                     id="translate-source"
                     value={translation.sourceText}
@@ -137,15 +139,18 @@
                     <label
                         for="translate-target"
                         class="cursor-pointer text-sm font-semibold text-gray-700 dark:text-gray-200"
-                        >訳文</label
                     >
+                        訳文
+                    </label>
                     <button
                         type="button"
                         onclick={translation.copyTranslation}
                         disabled={!translation.targetText}
                         class="h-8 cursor-pointer rounded bg-gray-100 px-3 text-sm text-gray-600 hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
-                        data-testid="translate-copy-btn">コピー</button
+                        data-testid="translate-copy-btn"
                     >
+                        コピー
+                    </button>
                 </div>
                 <textarea
                     id="translate-target"
@@ -179,9 +184,9 @@
                         data-testid="translate-direction-select"
                     >
                         {#each translation.directionPreparations as target, index (target.direction)}
-                            <option value={index}
-                                >{describePreparationDirection(target)}</option
-                            >
+                            <option value={index}>
+                                {describePreparationDirection(target)}
+                            </option>
                         {/each}
                     </select>
                 </label>

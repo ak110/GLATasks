@@ -94,9 +94,9 @@
             </fieldset>
         {/if}
         {#if usePassword}
-            <label class="block text-sm" for="current-password"
-                >現在のパスワード</label
-            >
+            <label class="block text-sm" for="current-password">
+                現在のパスワード
+            </label>
             <input
                 bind:this={passwordEl}
                 id="current-password"
@@ -117,15 +117,17 @@
                 {error}
             </p>{/if}
         <div class="flex justify-end gap-2 pt-2">
-            <button type="button" class={grayButtonClass} onclick={onCancel}
-                >キャンセル</button
-            >
+            <button type="button" class={grayButtonClass} onclick={onCancel}>
+                キャンセル
+            </button>
             <button
                 type="submit"
                 class={primaryButtonClass}
                 disabled={busy || (usePassword && !password)}
-                data-testid="verification-submit">確認して続ける</button
+                data-testid="verification-submit"
             >
+                確認して続ける
+            </button>
         </div>
     </form>
 </Dialog>

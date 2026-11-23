@@ -249,10 +249,9 @@
                 type="submit"
                 class="cursor-pointer rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700"
                 disabled={createState.kind === "sending"}
-                >{createState.kind === "sending"
-                    ? "追加中…"
-                    : "一括追加"}</button
             >
+                {createState.kind === "sending" ? "追加中…" : "一括追加"}
+            </button>
         </div>
     </form>
 
@@ -299,8 +298,10 @@
             <button
                 type="submit"
                 class="cursor-pointer rounded bg-red-600 px-3 py-1.5 text-sm text-white hover:bg-red-700"
-                disabled={deleteState.kind === "sending"}>一括削除</button
+                disabled={deleteState.kind === "sending"}
             >
+                一括削除
+            </button>
         </div>
     </form>
 

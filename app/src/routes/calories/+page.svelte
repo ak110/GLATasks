@@ -217,8 +217,9 @@
                     void query.refetch();
                 }}
                 class="mt-2 {grayButtonClass} disabled:cursor-not-allowed disabled:opacity-50"
-                >再試行</button
             >
+                再試行
+            </button>
         </div>
     {:else if query.isPending}
         <p role="status">{label}を取得中…</p>

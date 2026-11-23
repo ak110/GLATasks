@@ -176,17 +176,20 @@
             type="button"
             onclick={() =>
                 download(exportCalorieItemsCsv(items), "カロリー品目.csv")}
-            class={grayButtonClass}>品目をエクスポート</button
+            class={grayButtonClass}
         >
+            品目をエクスポート
+        </button>
         <button
             type="button"
             onclick={exportRecords}
             disabled={exportState.kind === "sending"}
             class="{grayButtonClass} disabled:cursor-not-allowed disabled:opacity-50"
-            >{exportState.kind === "sending"
-                ? "記録を取得中…"
-                : "記録をエクスポート"}</button
         >
+            {exportState.kind === "sending"
+                ? "記録を取得中…"
+                : "記録をエクスポート"}
+        </button>
         <label class={grayButtonClass}>
             品目をインポート
             <input

@@ -64,9 +64,9 @@
         class="p-4 text-red-600 dark:text-red-400"
     >
         <p>{error}</p>
-        <button type="button" onclick={onRetry} class={grayButtonClass}
-            >再試行</button
-        >
+        <button type="button" onclick={onRetry} class={grayButtonClass}>
+            再試行
+        </button>
     </div>
 {:else if searchResultsByList.size === 0}
     <p class="p-4 text-gray-400 dark:text-gray-500">

@@ -377,22 +377,26 @@
                                             class="shrink-0 text-sm text-gray-400"
                                             title={attachment.filename}
                                             aria-label={`${attachment.filename}の画像取得に失敗`}
-                                            >⚠️</span
                                         >
+                                            ⚠️
+                                        </span>
                                     {/await}
                                 {/if}
                                 <span
                                     class="min-w-0 flex-1 truncate text-gray-700 dark:text-gray-200"
                                     title={attachment.filename}
-                                    >{attachment.filename}</span
                                 >
+                                    {attachment.filename}
+                                </span>
                                 <button
                                     onclick={() =>
                                         handleDeleteAttachment(attachment.id)}
                                     class="cursor-pointer rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-400"
                                     aria-label={`${attachment.filename}を削除`}
-                                    title="削除">🗑️</button
+                                    title="削除"
                                 >
+                                    🗑️
+                                </button>
                             </li>
                         {/each}
                     </ul>
@@ -420,15 +424,18 @@
                     disabled={!!saving}
                     class="cursor-pointer rounded bg-gray-100 px-6 py-2 text-gray-700 hover:bg-gray-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
                     data-testid="task-edit-save-btn"
-                    title="Ctrl+S">保存</button
+                    title="Ctrl+S"
                 >
+                    保存
+                </button>
                 <button
                     onclick={() => handleSubmit(true)}
                     disabled={!!saving}
                     class="cursor-pointer rounded bg-blue-600 px-6 py-2 text-white hover:bg-blue-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
                     data-testid="task-edit-save-close-btn"
-                    >保存して閉じる</button
                 >
+                    保存して閉じる
+                </button>
             </div>
         </div>
     </div>

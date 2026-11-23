@@ -25,8 +25,10 @@
         <div class="mb-4">
             <label
                 class="mb-1 block cursor-pointer font-medium text-gray-700 dark:text-gray-200"
-                for="user_id">ユーザーID</label
+                for="user_id"
             >
+                ユーザーID
+            </label>
             <input
                 id="user_id"
                 name="user_id"
@@ -39,8 +41,10 @@
         <div class="mb-4">
             <label
                 class="mb-1 block cursor-pointer font-medium text-gray-700 dark:text-gray-200"
-                for="password">パスワード</label
+                for="password"
             >
+                パスワード
+            </label>
             <input
                 id="password"
                 name="password"
@@ -53,8 +57,10 @@
         <div class="mb-6">
             <label
                 class="mb-1 block cursor-pointer font-medium text-gray-700 dark:text-gray-200"
-                for="password_confirm">パスワード（確認）</label
+                for="password_confirm"
             >
+                パスワード（確認）
+            </label>
             <input
                 id="password_confirm"
                 name="password_confirm"
@@ -77,8 +83,9 @@
             <a
                 href="{resolve('/auth/login')}{loginQuery}"
                 class="text-blue-600 hover:underline dark:text-blue-400"
-                >ログイン</a
             >
+                ログイン
+            </a>
         </p>
     {/snippet}
 </AuthCard>
