@@ -51,7 +51,7 @@ async function handleAuthorizationCode(
     return errorResponse("invalid_grant", {
       reason: "redirect_uri does not match the authorization request.",
       nextAction:
-        "Send the same redirect_uri that was used in the authorization request.",
+        "Start a new authorization request and use the same redirect_uri for the token exchange.",
     });
   }
   if (

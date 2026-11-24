@@ -1,7 +1,12 @@
 ---
+verified-digest: a68f792c64971f9e13f6b27dae722f1f1b7785020c910e2667949eb125191faf
 name: timer-state-check
 description: >
   タイマーの保存状態または並行操作を変更した時に、実装を使って有限個の操作順序と保存契約を検査する。
+verifies:
+  - app/src/lib/server/timer-state.ts
+  - app/src/lib/server/api/timers.ts
+  - app/src/lib/server/api/timers-concurrency.test.ts
 ---
 
 # タイマーの有界網羅検査
@@ -44,9 +49,12 @@ MariaDBの行ロックそのもの、ネットワーク分断時の無限再送�
 pnpm --dir app exec vitest run --project node src/lib/server/api/timers-concurrency.test.ts
 ```
 
-最終同期commitは `ddb2afd`（対象実装の版）。
-この版から対象関数と保存列を書き込む呼出側の差分を読み、ロック境界や入力の代表値が変われば探索の前提を更新する。
+前回検証した版から対象関数と保存列を書き込む呼出側の差分を読み、ロック境界や入力の代表値が変われば探索の前提を更新する。
 失敗したらエラーが示すモード・初期状態・時刻・操作列を再生し、DB境界の仮定で起こり得る順序か確認する。
 起こらないなら検査を直し、起こるなら不変条件を弱めず実装の不具合として扱う。
 追従時は隔離worktreeで`transitionTimer`の開始時刻比較を一時的に反転して失敗を確認し、元に戻して再実行する。
-対象実装と検査の一致を確認してから同期commitを更新する。
+対象実装と検査の一致を確認してから、リポジトリのルートで検証記録を更新する。
+
+```bash
+uvx --exclude-newer-package pyfltr=false pyfltr verification-sync --update .claude/skills/timer-state-check/SKILL.md
+```
