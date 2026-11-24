@@ -27,7 +27,8 @@ container="$(docker run --detach --rm --init --network none \
     --env "MARIADB_ROOT_PASSWORD=$DB_CREDENTIAL" mariadb:lts)"
 ready=false
 for ((attempt = 0; attempt < 60; attempt++)); do
-    if sql -e 'SELECT 1' >"$test_root/ready.stdout" 2>"$test_root/ready.stderr"; then
+    if docker exec "$container" healthcheck.sh --connect --innodb_initialized \
+        >"$test_root/ready.stdout" 2>"$test_root/ready.stderr"; then
         ready=true
         break
     fi

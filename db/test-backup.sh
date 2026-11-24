@@ -35,8 +35,7 @@ wait_for_database() {
     local container="$1"
     local attempt
     for ((attempt = 0; attempt < 60; attempt++)); do
-        if docker exec -e "MYSQL_PWD=$DB_CREDENTIAL" "$container" \
-            mariadb "-u$DB_CREDENTIAL" glatasks --batch --skip-column-names -e 'SELECT 1' \
+        if docker exec "$container" healthcheck.sh --connect --innodb_initialized \
             >"$test_root/mariadb-wait.log" 2>&1; then
             return
         fi
