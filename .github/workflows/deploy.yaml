@@ -1,11 +1,18 @@
 name: Deploy
 
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      update_release:
+        description: 配備の成功後に起動タグのReleaseへ検証手順を追記する
+        type: boolean
+        default: false
 
-permissions:
-  contents: read
-  packages: write
+permissions: {}
+
+defaults:
+  run:
+    shell: bash
 
 concurrency:
   group: deploy
@@ -14,7 +21,22 @@ concurrency:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    outputs:
+      digest: ${{ steps.push.outputs.digest }}
+      verify-command: ${{ steps.summary.outputs.command }}
     steps:
+      - name: Check release ref
+        if: inputs.update_release && github.ref_type != 'tag'
+        run: |
+          echo "Updating a release requires dispatching this workflow on the release tag." >&2
+          exit 1
+
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -29,12 +51,36 @@ jobs:
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       - name: Build and push Docker image to GHCR
+        id: push
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           file: Dockerfile
           push: true
           tags: ghcr.io/ak110/glatasks:latest
+
+      - name: Attest image provenance
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-name: ghcr.io/ak110/glatasks
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
+          # ストレージレコードは組織所有のリポジトリに限られる。
+          create-storage-record: false
+
+      - name: Record verification command
+        id: summary
+        env:
+          IMAGE_DIGEST: ${{ steps.push.outputs.digest }}
+        run: |
+          set -euo pipefail
+          command="gh attestation verify oci://ghcr.io/ak110/glatasks@${IMAGE_DIGEST} --repo ak110/GLATasks --signer-workflow ak110/GLATasks/.github/workflows/deploy.yaml --source-digest ${GITHUB_SHA}"
+          printf 'command=%s\n' "$command" >> "$GITHUB_OUTPUT"
+          {
+            printf '### GHCRへpushしたイメージの来歴\n\n'
+            printf '%s\n\n' "GitHub APIへの認証が必要（\`gh auth login\` または \`GH_TOKEN\`）。"
+            printf '%s\n' "\`\`\`bash" "$command" "\`\`\`"
+          } >> "$GITHUB_STEP_SUMMARY"
 
   deploy:
     needs: build-and-push
@@ -53,4 +99,71 @@ jobs:
       # 開始時の後片付けは、途中で失敗したDeployが残した取得途中のレイヤーや旧版のイメージを回収してから始めるため。
       # 稼働中のコンテナーが使うイメージは削除されないため、失敗時に旧版のまま稼働を続けられる。
       - name: Deploy to aws.tqzh.tk
-        run: ssh ubuntu@aws.tqzh.tk "cd glatasks && docker system prune --all --volumes --force && make sync && make backup && make deploy && docker system prune --all --volumes --force"
+        env:
+          IMAGE_DIGEST: ${{ needs.build-and-push.outputs.digest }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$IMAGE_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            printf '配備に渡されたdigestが不正: %q\nbuild-and-pushの「Build and push Docker image to GHCR」でpushの成否とdigestを確認する。\n' "$IMAGE_DIGEST" >&2
+            exit 1
+          fi
+          {
+            printf 'set -- %s\n' "$IMAGE_DIGEST"
+            cat <<'BASH'
+          set -euo pipefail
+          cd glatasks
+          docker system prune --all --volumes --force
+          make sync
+          make backup
+          export GLATASKS_IMAGE="ghcr.io/ak110/glatasks@$1"
+          # makeを経由しない呼び出しでも、migrateが有効になるプロファイルを指定する。
+          images="$(docker compose --profile production config --images app)"
+          if ! grep -Fxq -- "$GLATASKS_IMAGE" <<< "$images" || grep -Fxq 'ghcr.io/ak110/glatasks:latest' <<< "$images"; then
+            printf '配備に必要なイメージ: %s\nComposeが解決したイメージ:\n%s\n' "$GLATASKS_IMAGE" "$images" >&2
+            echo "配備先でGLATASKS_IMAGEに上記の配備イメージを指定して docker compose --profile production config --images app を実行し、appとmigrateのイメージ設定を確認する。" >&2
+            exit 1
+          fi
+          make deploy
+          make healthcheck
+          app="$(docker compose --profile production ps -q app)"
+          running_image="$(docker inspect --format '{{.Config.Image}} {{.Image}} {{.State.Running}}' "$app")"
+          expected_id="$(docker image inspect --format '{{.Id}}' "$GLATASKS_IMAGE")"
+          if [[ "$running_image" != "$GLATASKS_IMAGE $expected_id true" ]]; then
+            printf 'appの期待値（イメージ参照、ID、稼働状態）: %s %s true\n実測値: %s\n' "$GLATASKS_IMAGE" "$expected_id" "$running_image" >&2
+            printf '配備先で docker inspect %s と docker image inspect %s を実行し、appが使うイメージIDと稼働状態を照合する。\n' "$app" "$GLATASKS_IMAGE" >&2
+            exit 1
+          fi
+          echo "Deployed $GLATASKS_IMAGE"
+          docker system prune --all --volumes --force
+          BASH
+          } | ssh ubuntu@aws.tqzh.tk 'bash -s'
+
+  record-release-deployment:
+    if: inputs.update_release && github.ref_type == 'tag'
+    needs: [build-and-push, deploy]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Record verified image digest in release notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERIFY_COMMAND: ${{ needs.build-and-push.outputs.verify-command }}
+        run: |
+          set -euo pipefail
+          gh release view --json body --jq .body -- "$GITHUB_REF_NAME" > release-notes.md
+          # 目印のある1行だけを書き換え、変更履歴や手動追記は残す。
+          record="**最後に成功した配備の検証:** \`$VERIFY_COMMAND\` <!-- glatasks-deployed-image -->"
+          awk -v record="$record" '
+            /^\*\*最後に成功した配備の検証:.* <!-- glatasks-deployed-image -->$/ {
+              if (!updated) print record
+              updated = 1
+              next
+            }
+            { print }
+            END { if (!updated) printf "\n%s\n", record }
+          ' release-notes.md > updated-notes.md
+          if ! cmp -s release-notes.md updated-notes.md; then
+            gh release edit --notes-file updated-notes.md -- "$GITHUB_REF_NAME"
+          fi

@@ -228,12 +228,31 @@ DBが半端な状態になった場合は`make sql`から`__drizzle_migrations`�
 
 masterへのpushおよびPR時に`ci.yaml`が自動実行される（`.github/workflows/ci.yaml`参照）。
 masterへのpushで`docs/`配下に変更があれば`docs.yaml`ワークフローが[ドキュメントサイト運用](#ドキュメントサイト運用)の確認を経てGitHub Pagesへデプロイする。
-`release.yaml`はリリースを作成し、`deploy.yaml`を起動してアプリをデプロイする。
+`release.yaml`は起動時の`master`のコミットにリリースタグを付け、そのタグをrefに指定して`deploy.yaml`を起動する。
 `integration`ジョブはproductionスタックで疎通・バックアップ復元・DBを検証し、0018のマイグレーション回帰試験（`make test-migrations`）も実行する。
 `e2e-*`ジョブは各自のproductionスタックでPlaywrightのシャードを1つずつ実行し、全ジョブでE2E全件を網羅する。
 Playwright設定で所要の長いファイルを分け、残りのファイルはもう一方のシャードで実行する。
 依存の脆弱性監査は`audit.yaml`が毎日06:00 UTC（JST 15:00）に定期実行し、
 検出結果をGitHub Code Scanningへアップロードする（`.github/workflows/audit.yaml`参照）。
+
+### 配備イメージの来歴を検証する
+
+`deploy.yaml`はGHCRにpushしたイメージのdigestにビルド来歴の証明を付けてから、そのdigestでアプリとマイグレーションを起動する。
+配備後はアプリの疎通と実行中のイメージがそのdigestに対応することを確かめる。
+リリース経由の配備では、成功した後にだけ対応するRelease本文へdigestと検証コマンドを追記する。
+単独で起動し、`update_release`を指定しない場合は、実行のジョブ要約でpush済みdigestと検証コマンドを確認できる。
+
+GitHub CLIで`gh auth login`を実行するか`GH_TOKEN`を設定してから、`IMAGE_DIGEST`に`sha256:`で始まるdigestを指定して検証する。
+リリース経由ではタグのコミットを`SOURCE_COMMIT`に指定する。単独起動では`deploy.yaml`を起動したrefの実行時のコミットを指定する。
+
+```bash
+gh attestation verify "oci://ghcr.io/ak110/glatasks@${IMAGE_DIGEST}" \
+  --repo ak110/GLATasks \
+  --signer-workflow ak110/GLATasks/.github/workflows/deploy.yaml \
+  --source-digest "${SOURCE_COMMIT}"
+```
+
+これまでに作成された証明は[証明一覧](https://github.com/ak110/GLATasks/attestations)で確認できる。
 
 ## バックアップとリストア
 

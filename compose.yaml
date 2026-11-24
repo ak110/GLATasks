@@ -44,7 +44,7 @@ services:
     profiles:
       - production
       - staging
-    image: ghcr.io/ak110/glatasks:latest
+    image: ${GLATASKS_IMAGE:-ghcr.io/ak110/glatasks:latest}
     restart: "no"
     networks:
       - network

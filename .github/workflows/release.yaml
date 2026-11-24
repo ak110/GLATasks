@@ -25,9 +25,14 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
+      - name: Check release branch
+        if: github.ref != 'refs/heads/master'
+        run: |
+          echo "Dispatch this workflow on master to release a commit tested by CI." >&2
+          exit 1
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: master
           fetch-depth: 0
           fetch-tags: true
 
@@ -106,14 +111,20 @@ jobs:
           echo "next=v${major}.${minor}.${patch}" >> "$GITHUB_OUTPUT"
 
       - name: Create tag and push
+        env:
+          TAG: ${{ steps.next.outputs.next }}
         run: |
+          set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          if git rev-parse "${{ steps.next.outputs.next }}" >/dev/null 2>&1; then
-            echo "Tag ${{ steps.next.outputs.next }} already exists, skipping tag creation. No action is needed (the release continues)."
+          if tag_commit="$(git rev-parse --verify --quiet "refs/tags/$TAG^{commit}")"; then
+            if [[ "$tag_commit" != "$GITHUB_SHA" ]]; then
+              echo "Tag $TAG does not point to $GITHUB_SHA" >&2
+              exit 1
+            fi
           else
-            git tag "${{ steps.next.outputs.next }}"
-            git push origin "${{ steps.next.outputs.next }}"
+            git tag -- "$TAG"
+            git push origin "refs/tags/$TAG"
           fi
 
       - name: Generate release notes
@@ -132,15 +143,43 @@ jobs:
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.next.outputs.next }}
         run: |
-          if gh release view "${{ steps.next.outputs.next }}" >/dev/null 2>&1; then
-            echo "Release ${{ steps.next.outputs.next }} already exists, skipping release creation. No action is needed."
+          set -euo pipefail
+          if gh release view --json body --jq .body -- "$TAG" > release-notes.md; then
+            if grep -Fxq '### ビルド来歴の検証' release-notes.md; then
+              exit 0
+            fi
+            existing_release=true
           else
-            gh release create "${{ steps.next.outputs.next }}" \
-              --title="${{ steps.next.outputs.next }}" --notes-file=CHANGES.md
+            cp CHANGES.md release-notes.md
+            existing_release=false
+          fi
+
+          cat >> release-notes.md <<'NOTES'
+
+          ### ビルド来歴の検証
+
+          [証明一覧](https://github.com/ak110/GLATasks/attestations)。
+          証明のソースコミットはこのReleaseのタグが指すコミット。
+          GitHub CLIで `gh auth login` を実行するか、`GH_TOKEN` を設定してから検証する。
+          配備に成功すると、実際のイメージのdigestを指定したコマンドが追記される。
+
+          ```bash
+          gh attestation verify "oci://ghcr.io/ak110/glatasks@${IMAGE_DIGEST}" \
+            --repo ak110/GLATasks --signer-workflow ak110/GLATasks/.github/workflows/deploy.yaml \
+            --source-digest "${SOURCE_COMMIT}"
+          ```
+          NOTES
+
+          if "$existing_release"; then
+            gh release edit --notes-file release-notes.md -- "$TAG"
+          else
+            gh release create --verify-tag --title="$TAG" --notes-file=release-notes.md -- "$TAG"
           fi
 
       - name: Run deploy workflow
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh workflow run deploy.yaml --ref=master
+          TAG: ${{ steps.next.outputs.next }}
+        run: gh workflow run deploy.yaml --ref "$TAG" -F update_release=true

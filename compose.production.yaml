@@ -4,7 +4,7 @@ services:
     extends:
       file: compose.common.yaml
       service: app
-    image: ghcr.io/ak110/glatasks:latest
+    image: ${GLATASKS_IMAGE:-ghcr.io/ak110/glatasks:latest}
     restart: always
     healthcheck:
       test:
