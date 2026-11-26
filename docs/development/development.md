@@ -129,6 +129,9 @@ npm / PyPIレジストリへの悪意あるパッケージ公開に対し、次�
 
 依存更新は`make update`を使う。
 
+`master` 宛てのPRでは、追加・更新される依存の既知の脆弱性をGitHub ActionsのDependency Reviewで確認する。
+この検査ではマージ可否のルールを変更しない。導入後に公表される脆弱性は既存の定期監査で確認する。
+
 推移的依存（直接インストールしていない依存の依存）の脆弱性は、上記の自動更新対策だけでは解消されない場合がある。
 脆弱性はDependabotアラートと`.github/workflows/audit.yaml`の定期監査で検知し、
 `pnpm-workspace.yaml`の`overrides`で安全なバージョンへ引き上げて対処する。
