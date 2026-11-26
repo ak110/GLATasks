@@ -315,3 +315,5 @@ gh workflow run release.yaml --field="bump=MAJOR"
 ```
 
 進捗は<https://github.com/ak110/GLATasks/actions>で確認できる。
+
+この行は依存差分がない場合の検証専用であり、マージしない。
